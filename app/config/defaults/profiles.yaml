@@ -1,0 +1,45 @@
+# Built-in profiles. A user profiles.yaml in UNCLI's config folder overrides
+# these by id, or adds new ones.
+profiles:
+  - id: chat
+    label: Chat
+    icon: message-circle
+    folder: scratch          # scratch | pick | repo; scratch = a fresh folder per session
+    model: sonnet
+    system_prompt: |         # replaces the coding persona
+      You are a helpful assistant in a desktop chat app. Answer in Markdown.
+      Put any substantial output (HTML, SVG, Mermaid, long documents) in a
+      file under ./artifacts/ and say so in your answer.
+    tools: [WebSearch, WebFetch, Write]
+    allowed_tools: [WebSearch, WebFetch, "Write(./artifacts/**)"]
+    isolated: true           # no user settings, MCP servers or skills: ~2.4k tokens a turn instead of ~26k
+    permission_mode: default
+    modifiers_on: []
+  - id: cowork
+    label: Co-work
+    icon: briefcase
+    folder: pick
+    model: sonnet
+    append_prompt: |
+      You are helping with documents and knowledge work in this folder.
+      Put generated deliverables under ./artifacts/.
+    allowed_tools: [Read, Write, Edit, Glob, Grep, WebSearch, WebFetch]
+    permission_mode: default
+  - id: code
+    label: Code
+    icon: code
+    folder: repo
+    model: opus
+    tools: []                # empty = CLI defaults
+    allowed_tools:
+      - "Bash(git status:*)"
+      - "Bash(git diff:*)"
+      - "Bash(git log:*)"
+      - "Bash(git show:*)"
+      - "Bash(npm test:*)"
+      - "Bash(npm run:*)"
+      - "Bash(go test:*)"
+      - "Bash(go build:*)"
+      - "Bash(go vet:*)"
+    permission_mode: acceptEdits
+    ide_links: true
