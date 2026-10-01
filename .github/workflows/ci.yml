@@ -1,0 +1,50 @@
+# Runs the root npm scripts (check, test, build) on every push and pull
+# request to main. Scripts that don't exist yet are skipped, so this passes
+# on a fresh repo and tightens as the scripts are wired up. Go is set up
+# only when a go.mod exists.
+#
+# Wails: the Vite bundle main.go embeds (frontend/dist) and the generated
+# bindings (frontend/wailsjs) are gitignored. Keep a frontend/dist/.gitkeep
+# so go:embed compiles, and run `wails generate module` before checks that
+# import the bindings (install the CLI with
+# `go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1`).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        if: hashFiles('**/go.mod') != ''
+        with:
+          go-version: stable
+          cache-dependency-path: '**/go.sum'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: npm ci
+        if: hashFiles('package-lock.json') != ''
+        run: npm ci
+
+      - name: Check
+        run: npm run check --if-present
+
+      - name: Test
+        run: npm run test --if-present
+
+      - name: Build
+        run: npm run build --if-present

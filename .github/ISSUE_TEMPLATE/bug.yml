@@ -1,0 +1,27 @@
+name: Something went wrong
+description: The app did something unexpected, showed an error, or crashed.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can it be reproduced?
+      placeholder: "1. Open ...\n2. Click ...\n3. See ..."
+  - type: input
+    id: version
+    attributes:
+      label: App version and OS
+      placeholder: "v1.0.0, Windows 11 24H2"
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs (optional)
+      description: Drag files here. Check them for anything personal first.

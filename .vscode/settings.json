@@ -1,0 +1,23 @@
+{
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build/bin": true,
+    "**/wailsjs": true,
+    "**/package-lock.json": true
+  },
+  // plan/ is its own repo; show it in Source Control alongside this one.
+  "git.autoRepositoryDetection": "subFolders",
+  "git.repositoryScanMaxDepth": 2,
+  "[go]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": { "source.organizeImports": "explicit" }
+  },
+  "go.lintOnSave": "package",
+  "go.vetOnSave": "package",
+  "svelte.enable-ts-plugin": true,
+  "claudeCode.preferredLocation": "sidebar"
+}

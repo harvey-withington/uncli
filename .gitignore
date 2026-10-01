@@ -1,0 +1,52 @@
+# Build output
+/dist/
+/build/bin/
+**/build/bin/
+coverage/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.syso
+*.log
+# Delve's debug binary, including numbered variants *.exe misses
+__debug_bin*
+
+# Node
+node_modules/
+**/frontend/dist/*
+!**/frontend/dist/.gitkeep
+.svelte-kit/
+.vite/
+
+# Wails (generated bindings and build scratch)
+**/frontend/wailsjs/
+**/frontend/package.json.md5
+**/build/windows/installer/wails_tools.nsh
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Editors: only the shared VS Code config is versioned
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# Claude Code: personal settings and worktrees stay local
+.claude/settings.local.json
+.claude/worktrees/
+
+# OS litter
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Private planning scratchpad (a separate repo)
+/plan/

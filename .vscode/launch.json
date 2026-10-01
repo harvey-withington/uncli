@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // npm run dev in the integrated terminal (e.g. `wails dev`): hot reload,
+      // no debugger. Add a stack-specific debug config below for breakpoints.
+      "name": "App (dev)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Website (Edge)",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:5180",
+      "webRoot": "${workspaceFolder}/website",
+      "preLaunchTask": "website: serve"
+    },
+    {
+      "name": "Go: test current package",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${fileDirname}",
+      "cwd": "${workspaceFolder}",
+      // Keep Delve's debug binary out of the source tree.
+      "output": "${env:TEMP}/dlv-test-${workspaceFolderBasename}"
+    }
+  ]
+}

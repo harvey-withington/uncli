@@ -1,0 +1,55 @@
+# Pushing a v* tag builds with `npm run release` and publishes everything it
+# leaves in dist/ as a GitHub release. The tag's version, without the v, is
+# passed as RELEASE_VERSION. Add build tools the release script needs below
+# (e.g. the Wails CLI, or NSIS for a Windows installer).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        if: hashFiles('**/go.mod') != ''
+        with:
+          go-version: stable
+          cache-dependency-path: '**/go.sum'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # - name: Tools
+      #   shell: pwsh
+      #   run: |
+      #     go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
+      #     choco install nsis -y --no-progress
+      #     echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: npm ci
+        if: hashFiles('package-lock.json') != ''
+        run: npm ci
+
+      - name: Build
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          $env:RELEASE_VERSION = $env:RELEASE_VERSION.TrimStart('v')
+          npm run release
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          # v1.0.0a, v1.0.0b1, v1.0.0-rc1 ... publish as pre-releases
+          prerelease: ${{ contains(github.ref_name, 'a') || contains(github.ref_name, 'b') || contains(github.ref_name, 'rc') || contains(github.ref_name, '-') }}
