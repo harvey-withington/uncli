@@ -79,3 +79,38 @@ describe('summaries', () => {
     expect(wantsAutoSummary(toBlocks('Short.'))).toBe(false)
   })
 })
+
+describe('paragraphs acting as headings', () => {
+  // The shape of the answer in Harvey's screenshot.
+  const ANSWER = [
+    'A few things, mostly loose ends from this session:',
+    "**1. Nothing I've told you has been measured.** I haven't run the tests, the demo or a profiler.",
+    '**2. The two bugs might matter more than the speed work.**',
+    '- **Sort and filter can read the wrong field.** ClientRowModel looks values up by key.',
+    '**Bottom line:** benchmark first.',
+    'Some **bold** words in the middle are not a heading.',
+    '**This bold opener runs on** without a label, so it stays a paragraph.',
+  ].join('\n\n')
+
+  it('count numbered and labelled bold leads, and whole bold lines', () => {
+    expect(outlineOf(toBlocks(ANSWER)).map(e => [e.level, e.text])).toEqual([
+      [1, "1. Nothing I've told you has been measured"],
+      [1, '2. The two bugs might matter more than the speed work'],
+      [1, 'Bottom line'],
+    ])
+  })
+
+  it('sit one level below the real heading before them', () => {
+    const o = outlineOf(toBlocks(['## Findings', '**1. First.** Text.', '**2. Second.** Text.', '## Next', 'Prose.'].join('\n\n')))
+    expect(o.map(e => [e.level, e.text])).toEqual([
+      [1, 'Findings'],
+      [2, '1. First'],
+      [2, '2. Second'],
+      [1, 'Next'],
+    ])
+  })
+
+  it('stop the answer counting as having no headings', () => {
+    expect(wantsAutoSummary(toBlocks(ANSWER))).toBe(false)
+  })
+})
