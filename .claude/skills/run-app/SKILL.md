@@ -10,10 +10,29 @@ the PNG and actually look at it. No app window needed.
 
 ## The app
 
-<!-- Fill in once the app exists: how to serve its UI in a browser (e.g.
-`npx vite build && npx vite preview --port 4173 --strictPort` in the frontend
-folder, plus any backend it needs on a spare port) and the URL to screenshot.
-Never kill a process you did not start: the user may have the real app running. -->
+The UI runs in a plain browser on a mock backend (canned sessions, streamed
+answers), so most visual checks need no Go and no CLI:
+
+```bash
+cd app/frontend
+npx vite build && (npx vite preview --port 4317 --strictPort &)   # background; pick a spare port
+for i in $(seq 1 30); do curl -sf http://localhost:4317/ >/dev/null && break; sleep 1; done
+```
+
+Screenshot `http://localhost:4317/`. Query parameters pick a scenario:
+`?mock=setup` (first-run download), `?mock=signin`, `?mock=empty`
+(welcome screen); `?theme=light` or `?theme=dark` forces a theme. To open a
+dialog or click through, drive the page with puppeteer-core (a root dev
+dependency) pointed at Edge, as `scripts/e2e.mjs` does.
+
+To see the real app with the real CLI, `npm run test:e2e` runs `wails dev`,
+drives the UI it serves at `http://localhost:34115` (bound to the real Go
+backend) and writes screenshots to `%TEMP%\uncli-e2e\shots`. It uses the
+user's Claude sign-in and a little of their usage, so run it when a change
+touches the backend or the CLI, not for every UI tweak. The production
+WebView2 window can't be driven over CDP: Wails clears the debug arguments.
+
+Never kill a process you did not start: the user may have the real app running.
 
 ## The website
 
