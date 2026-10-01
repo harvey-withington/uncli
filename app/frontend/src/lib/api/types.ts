@@ -210,7 +210,9 @@ export interface Backend {
   bootstrap(): Promise<Bootstrap>
   cliStatus(fresh: boolean): Promise<CLIStatus>
   installCLI(): Promise<CLIStatus>
-  signIn(): Promise<void>
+  signIn(): Promise<string> // the sign-in link, already opened in the browser
+  submitLoginCode(code: string): Promise<CLIStatus>
+  cancelSignIn(): Promise<void>
   setCLIVersion(version: string): Promise<CLIStatus>
   cliChannels(): Promise<Record<string, string>>
   pickFolder(title: string): Promise<string>

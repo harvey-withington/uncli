@@ -180,8 +180,16 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean } 
       return cli
     },
     async signIn() {
-      setTimeout(() => { cli = { ...cli, loggedIn: true }; h?.cliStatus(cli) }, 1500)
+      return 'https://claude.com/cai/oauth/authorize?code=true&client_id=mock'
     },
+    async submitLoginCode(code) {
+      await new Promise(r => setTimeout(r, 300))
+      if (code.trim() !== 'good-code') throw new Error('Invalid code. Please make sure the full code was copied.')
+      cli = { ...cli, loggedIn: true }
+      h?.cliStatus(cli)
+      return cli
+    },
+    async cancelSignIn() {},
     async setCLIVersion(v) { cli = { ...cli, version: v || cli.pinned }; return cli },
     async cliChannels() { return { stable: '2.1.285', latest: '2.1.286' } },
     async pickFolder() { return 'C:\\Users\\you\\projects\\demo' },

@@ -44,6 +44,8 @@ export function wailsBackend(): Backend {
     cliStatus: fresh => call('CLIStatus', fresh),
     installCLI: () => call('InstallCLI'),
     signIn: () => call('SignIn'),
+    submitLoginCode: code => call('SubmitLoginCode', code),
+    cancelSignIn: () => call('CancelSignIn'),
     setCLIVersion: v => call('SetCLIVersion', v),
     cliChannels: () => call('CLIChannels'),
     pickFolder: title => call('PickFolder', title),

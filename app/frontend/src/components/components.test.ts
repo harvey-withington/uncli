@@ -138,3 +138,20 @@ describe('App', () => {
     expect(thorough).toHaveAttribute('aria-pressed', 'false')
   })
 })
+
+describe('Sign-in', () => {
+  it('opens the sign-in link, takes the code and reports a wrong one', async () => {
+    const backend = mockBackend({ cli: { loggedIn: false } })
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: 'Sign in' }))
+    const box = await screen.findByRole('textbox', { name: 'Code from the sign-in page' })
+    expect(screen.getByText(/Sign-in opened in your browser/)).toBeInTheDocument()
+    await fireEvent.input(box, { target: { value: 'wrong' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Finish sign-in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid code')
+    await fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await fireEvent.input(await screen.findByRole('textbox', { name: 'Code from the sign-in page' }), { target: { value: 'good-code' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Finish sign-in' }))
+    expect(await screen.findByRole('heading', { name: 'Fix the flaky parser test' })).toBeInTheDocument()
+  })
+})

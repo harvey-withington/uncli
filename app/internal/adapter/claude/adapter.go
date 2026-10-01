@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 
 	"uncli/internal/core"
@@ -108,6 +109,16 @@ func (a *Adapter) AuthStatusCommand(bin string) core.Command {
 func (a *Adapter) LoginCommand(bin string) core.Command {
 	env, drop := childEnv(nil)
 	return core.Command{Path: bin, Args: []string{"auth", "login", "--claudeai"}, Env: env, EnvDrop: drop}
+}
+
+var loginURLRe = regexp.MustCompile(`https://\S+/oauth/authorize\?\S+`)
+
+// LoginURL finds the sign-in link in what "claude auth login" printed.
+// Without a terminal the CLI can't reliably open the browser itself, so
+// UNCLI opens this link and passes back the code the page shows.
+func (a *Adapter) LoginURL(output []byte) (string, bool) {
+	u := loginURLRe.Find(output)
+	return string(u), u != nil
 }
 
 func (a *Adapter) ParseAuthStatus(out []byte) (core.AuthInfo, error) {

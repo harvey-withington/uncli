@@ -291,3 +291,29 @@ func TestPhase1EndToEnd(t *testing.T) {
 		}
 	})
 }
+
+// Sign-in against an empty config folder: the CLI prints a link and waits
+// for a code. On a machine that is already signed in elsewhere, 2.1.285
+// completes the sign-in even with a wrong code (and still says "Invalid
+// code"), so the check is that UNCLI's verdict matches "auth status".
+func TestSignInFlow(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir()) // removed with its copied credentials
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if st := svc.CLIStatus(ctx, true); st.LoggedIn || st.Error != "" {
+		t.Fatalf("empty config should read as signed out, got %+v", st)
+	}
+	url, err := svc.SignIn(ctx)
+	if err != nil || !strings.HasPrefix(url, "https://") || !strings.Contains(url, "oauth/authorize") {
+		t.Fatalf("sign-in link = %q, %v", url, err)
+	}
+	st, err := svc.SubmitLoginCode(ctx, "not-a-real-code")
+	if (err == nil) != st.LoggedIn {
+		t.Fatalf("verdict and status disagree: %+v %v", st, err)
+	}
+	t.Logf("signed in: %v (%v)", st.LoggedIn, err)
+}

@@ -1,25 +1,21 @@
 {
   "app.loading": "Loading UNCLI",
   "app.tagline": "AI CLIs, minus the CLI",
-
   "common.cancel": "Cancel",
   "common.close": "Close",
   "common.dismiss": "Dismiss",
-
   "composer.label": "Your message",
   "composer.placeholder": "Ask anything. Enter to send, Shift+Enter for a new line",
   "composer.waiting": "Answering… you can type your next message",
   "composer.send": "Send",
   "composer.sendHint": "Send (Enter)",
   "composer.stop": "Stop",
-
   "copy.copy": "Copy",
   "copy.copied": "Copied",
   "copy.code": "Copy code",
   "copy.markdown": "Copy markdown",
   "copy.question": "Copy question",
   "copy.failed": "Couldn't copy: {error}",
-
   "nav.label": "Pages",
   "nav.back": "Previous page (←)",
   "nav.forward": "Next page (→)",
@@ -30,7 +26,6 @@
   "nav.bookmark": "Bookmark",
   "nav.bookmarked": "Bookmarked",
   "nav.toggleBookmark": "Bookmark this page (B)",
-
   "newSession.title": "New session",
   "newSession.mode": "Mode",
   "newSession.folder": "Folder",
@@ -42,7 +37,6 @@
   "newSession.scratchHint": "Chat sessions get their own fresh folder; anything Claude makes lands in its artifacts folder.",
   "newSession.model": "Model",
   "newSession.create": "Start session",
-
   "page.number": "Page {n}",
   "page.details": "Page details",
   "page.model": "Model used for this page",
@@ -55,14 +49,12 @@
   "page.interrupted": "Stopped before the answer finished.",
   "page.failed": "This turn failed.",
   "page.code": "code",
-
   "profile.chat.desc": "A conversation with no project. Quick questions, drafting, research.",
   "profile.chat.empty": "Start a conversation",
   "profile.cowork.desc": "Work with the documents in a folder you choose.",
   "profile.cowork.empty": "What should we work on in this folder?",
   "profile.code.desc": "Work in a code repository with full tools.",
   "profile.code.empty": "What should we build or fix?",
-
   "session.new": "New session",
   "session.list": "Sessions",
   "session.none": "No sessions yet.",
@@ -71,7 +63,6 @@
   "session.delete": "Delete",
   "session.deleteTitle": "Delete this session?",
   "session.deleteMessage": "\"{title}\" and its pages and bookmarks will be removed from UNCLI. The CLI's own transcript is kept.",
-
   "settings.title": "Settings",
   "settings.cli": "Claude CLI {version}",
   "settings.cliTitle": "Claude CLI version",
@@ -85,7 +76,6 @@
   "settings.switched": "Now using Claude CLI {version}",
   "settings.account": "Account",
   "settings.signedIn": "Signed in as {email} ({plan})",
-
   "setup.title": "Let's get you set up",
   "setup.lead": "UNCLI runs Claude Code for you, without a terminal. It needs its own copy of the CLI and your Claude sign-in.",
   "setup.download.title": "Download Claude Code",
@@ -94,11 +84,9 @@
   "setup.download.starting": "Starting download…",
   "setup.download.progress": "{done} of {total}",
   "setup.signin.title": "Sign in to Claude",
-  "setup.signin.body": "Your browser opens to sign in with your Claude subscription. Come back here when it's done.",
+  "setup.signin.body": "Sign in with your Claude subscription in your browser. The page then shows a code: paste it here.",
   "setup.signin.button": "Sign in",
-  "setup.signin.waiting": "Waiting for the browser…",
-  "setup.signin.recheck": "I've signed in",
-
+  "setup.signin.recheck": "Check again",
   "state.idle": "Idle",
   "state.starting": "Starting",
   "state.thinking": "Thinking",
@@ -108,11 +96,9 @@
   "state.unread": "Unread",
   "state.error": "Error",
   "state.exited": "Stopped",
-
   "theme.system": "Theme: follow system",
   "theme.light": "Theme: light",
   "theme.dark": "Theme: dark",
-
   "time.now": "just now",
   "time.minutes": "{n} min ago",
   "time.hours": "{n} h ago",
@@ -120,10 +106,8 @@
   "time.inMinutes": "in {n} min",
   "time.inHours": "in {n} h",
   "time.inDays": "in {n} days",
-
   "toolbar.label": "Session tools",
   "toolbar.model": "Model",
-
   "trace.calls": "{n} tool calls",
   "trace.running": "{n} running",
   "trace.denied": "{n} denied",
@@ -132,7 +116,6 @@
   "trace.wasDenied": "denied",
   "trace.wasFailed": "failed",
   "trace.isRunning": "running",
-
   "usage.title": "Subscription usage",
   "usage.none": "No usage reported yet. It appears after the first answer.",
   "usage.used": "{pct}% used",
@@ -140,7 +123,13 @@
   "usage.window.five_hour": "Current session (5 hours)",
   "usage.window.seven_day": "This week",
   "usage.window.seven_day_opus": "This week (Opus)",
-
   "welcome.title": "Welcome to UNCLI",
-  "welcome.body": "Run several Claude sessions side by side, read answers a page at a time, and never open a terminal."
+  "welcome.body": "Run several Claude sessions side by side, read answers a page at a time, and never open a terminal.",
+  "setup.signin.starting": "Starting sign-in…",
+  "setup.signin.opened": "Sign-in opened in your browser.",
+  "setup.signin.openAgain": "Open it again",
+  "setup.signin.copyLink": "Copy the link",
+  "setup.signin.codeLabel": "Code from the sign-in page",
+  "setup.signin.codePlaceholder": "Paste the code from the browser",
+  "setup.signin.finish": "Finish sign-in"
 }

@@ -8,11 +8,16 @@
   // No terminal at any point.
   const app = useApp()
   let installing = $state(false)
-  let signingIn = $state(false)
+  // Sign-in: the CLI prints a link (opened in the browser for you) and
+  // waits for the code the page shows after signing in.
+  let signin = $state<'idle' | 'starting' | 'code' | 'verifying'>('idle')
+  let url = $state('')
+  let code = $state('')
   let error = $state('')
 
   const installed = $derived(!!app.cli?.installed)
   const pct = $derived(app.progress && app.progress.total > 0 ? Math.round((app.progress.done / app.progress.total) * 100) : 0)
+  const clean = (e: unknown) => String(e).replace(/^Error:\s*/, '')
 
   async function install() {
     installing = true
@@ -20,21 +25,42 @@
     try {
       app.cli = await app.backend.installCLI()
     } catch (e) {
-      error = String(e).replace(/^Error:\s*/, '')
+      error = clean(e)
     } finally {
       installing = false
     }
   }
 
   async function signIn() {
-    signingIn = true
+    signin = 'starting'
     error = ''
     try {
-      await app.backend.signIn()
+      url = await app.backend.signIn()
+      signin = 'code'
     } catch (e) {
-      error = String(e).replace(/^Error:\s*/, '')
-      signingIn = false
+      error = clean(e)
+      signin = 'idle'
     }
+  }
+
+  async function submit() {
+    if (!code.trim()) return
+    signin = 'verifying'
+    error = ''
+    try {
+      app.cli = await app.backend.submitLoginCode(code)
+    } catch (e) {
+      error = clean(e)
+      // The CLI ends the attempt after one code; trying again needs a new link.
+      signin = 'idle'
+      code = ''
+    }
+  }
+
+  async function cancel() {
+    await app.backend.cancelSignIn().catch(() => {})
+    signin = 'idle'
+    code = ''
   }
 
   async function recheck() {
@@ -42,9 +68,8 @@
     try {
       app.cli = await app.backend.cliStatus(true)
     } catch (e) {
-      error = String(e)
+      error = clean(e)
     }
-    if (!app.cli?.loggedIn) signingIn = false
   }
 </script>
 
@@ -80,12 +105,38 @@
           <h2>{t('setup.signin.title')}</h2>
           <p>{t('setup.signin.body')}</p>
           {#if installed}
-            <div class="row">
-              <button class="btn primary" onclick={signIn} disabled={signingIn}>
-                {#if signingIn}<Icon name="loader" spin size={14} />{t('setup.signin.waiting')}{:else}<Icon name="log-in" size={14} />{t('setup.signin.button')}{/if}
-              </button>
-              <button class="btn ghost" onclick={recheck}>{t('setup.signin.recheck')}</button>
-            </div>
+            {#if signin === 'code' || signin === 'verifying'}
+              <p class="opened">
+                {t('setup.signin.opened')}
+                <button class="link" onclick={() => app.backend.openURL(url)}>{t('setup.signin.openAgain')}</button>
+                ·
+                <button class="link" onclick={() => app.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
+              </p>
+              <form class="row" onsubmit={e => { e.preventDefault(); submit() }}>
+                <!-- svelte-ignore a11y_autofocus -->
+                <input
+                  class="input code"
+                  bind:value={code}
+                  placeholder={t('setup.signin.codePlaceholder')}
+                  aria-label={t('setup.signin.codeLabel')}
+                  autofocus
+                  disabled={signin === 'verifying'}
+                  spellcheck="false"
+                  autocomplete="off"
+                />
+                <button class="btn primary" type="submit" disabled={!code.trim() || signin === 'verifying'}>
+                  {#if signin === 'verifying'}<Icon name="loader" spin size={14} />{/if}{t('setup.signin.finish')}
+                </button>
+                <button class="btn ghost" type="button" onclick={cancel} disabled={signin === 'verifying'}>{t('common.cancel')}</button>
+              </form>
+            {:else}
+              <div class="row">
+                <button class="btn primary" onclick={signIn} disabled={signin === 'starting'}>
+                  {#if signin === 'starting'}<Icon name="loader" spin size={14} />{t('setup.signin.starting')}{:else}<Icon name="log-in" size={14} />{t('setup.signin.button')}{/if}
+                </button>
+                <button class="btn ghost" onclick={recheck}>{t('setup.signin.recheck')}</button>
+              </div>
+            {/if}
           {/if}
         </div>
       </li>
@@ -106,7 +157,7 @@
     background: var(--bg);
   }
   .card {
-    width: 520px;
+    width: 540px;
     max-width: 100%;
     padding: var(--space-6) var(--space-6) var(--space-5);
     background: var(--surface);
@@ -185,6 +236,20 @@
   .row {
     display: flex;
     gap: var(--space-2);
+  }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font-size: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .code {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--mono);
   }
   .progress {
     height: 6px;
