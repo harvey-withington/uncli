@@ -307,13 +307,35 @@ func TestSignInFlow(t *testing.T) {
 	if st := svc.CLIStatus(ctx, true); st.LoggedIn || st.Error != "" {
 		t.Fatalf("empty config should read as signed out, got %+v", st)
 	}
-	url, err := svc.SignIn(ctx)
-	if err != nil || !strings.HasPrefix(url, "https://") || !strings.Contains(url, "oauth/authorize") {
-		t.Fatalf("sign-in link = %q, %v", url, err)
+	start, err := svc.SignIn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if start.SignedIn {
+		t.Log("the CLI signed in on its own (this machine is signed in elsewhere)")
+		return
+	}
+	if !strings.HasPrefix(start.URL, "https://") || !strings.Contains(start.URL, "oauth/authorize") {
+		t.Fatalf("sign-in link = %q", start.URL)
 	}
 	st, err := svc.SubmitLoginCode(ctx, "not-a-real-code")
 	if (err == nil) != st.LoggedIn {
 		t.Fatalf("verdict and status disagree: %+v %v", st, err)
 	}
 	t.Logf("signed in: %v (%v)", st.LoggedIn, err)
+}
+
+// VS Code's debugger auto-attach puts NODE_OPTIONS into every terminal; the
+// CLI must not inherit it (with it, every CLI command exits 1 silently).
+func TestDebuggerNodeOptionsDontLeak(t *testing.T) {
+	t.Setenv("NODE_OPTIONS", `--require "C:/no/such/bootloader.js" --inspect-publish-uid=http`)
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if st := svc.CLIStatus(ctx, true); st.Error != "" || !st.LoggedIn {
+		t.Fatalf("status with a debugger NODE_OPTIONS = %+v", st)
+	}
 }

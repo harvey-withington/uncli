@@ -98,13 +98,12 @@ func (a *App) InstallCLI() (app.CLIStatus, error) { return a.svc.InstallCLI(a.ct
 // SignIn starts the CLI's sign-in and opens its link in the user's default
 // browser (the CLI can't reliably do that without a terminal). The link is
 // returned too, so the UI can offer it again.
-func (a *App) SignIn() (string, error) {
-	url, err := a.svc.SignIn(a.ctx)
-	if err != nil {
-		return "", err
+func (a *App) SignIn() (app.SignInStart, error) {
+	start, err := a.svc.SignIn(a.ctx)
+	if err == nil && start.URL != "" {
+		wruntime.BrowserOpenURL(a.ctx, start.URL)
 	}
-	wruntime.BrowserOpenURL(a.ctx, url)
-	return url, nil
+	return start, err
 }
 
 func (a *App) SubmitLoginCode(code string) (app.CLIStatus, error) {

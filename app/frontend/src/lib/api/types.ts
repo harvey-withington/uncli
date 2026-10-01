@@ -140,6 +140,14 @@ export interface CLIStatus {
   error?: string
 }
 
+// Starting sign-in gives a link (already opened in the browser), or says
+// the CLI signed in by itself.
+export interface SignInStart {
+  url?: string
+  signedIn: boolean
+  status: CLIStatus
+}
+
 export interface Progress {
   done: number
   total: number
@@ -210,7 +218,7 @@ export interface Backend {
   bootstrap(): Promise<Bootstrap>
   cliStatus(fresh: boolean): Promise<CLIStatus>
   installCLI(): Promise<CLIStatus>
-  signIn(): Promise<string> // the sign-in link, already opened in the browser
+  signIn(): Promise<SignInStart>
   submitLoginCode(code: string): Promise<CLIStatus>
   cancelSignIn(): Promise<void>
   setCLIVersion(version: string): Promise<CLIStatus>

@@ -35,7 +35,13 @@
     signin = 'starting'
     error = ''
     try {
-      url = await app.backend.signIn()
+      const start = await app.backend.signIn()
+      if (start.signedIn) {
+        app.cli = start.status
+        signin = 'idle'
+        return
+      }
+      url = start.url ?? ''
       signin = 'code'
     } catch (e) {
       error = clean(e)
