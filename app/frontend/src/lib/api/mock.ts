@@ -180,7 +180,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean } 
       return cli
     },
     async signIn() {
-      return 'https://claude.com/cai/oauth/authorize?code=true&client_id=mock'
+      return { url: 'https://claude.com/cai/oauth/authorize?code=true&client_id=mock', signedIn: false, status: cli }
     },
     async submitLoginCode(code) {
       await new Promise(r => setTimeout(r, 300))

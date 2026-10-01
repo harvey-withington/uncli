@@ -97,7 +97,7 @@ func TestBuildCommand(t *testing.T) {
 	if strings.Contains(args, "--session-id") {
 		t.Error("resume must not also pass --session-id")
 	}
-	if cmd.Env["DISABLE_AUTOUPDATER"] != "1" || !slices.Contains(cmd.EnvDrop, "CLAUDE_CODE_") {
+	if cmd.Env["DISABLE_AUTOUPDATER"] != "1" || !slices.Contains(cmd.EnvDrop, "CLAUDE_CODE_") || !slices.Contains(cmd.EnvDrop, "NODE_OPTIONS") {
 		t.Errorf("env = %v drop = %v", cmd.Env, cmd.EnvDrop)
 	}
 	if _, err := a.BuildCommand("x", core.LaunchSpec{PermissionMode: "bypassPermissions"}); err == nil {

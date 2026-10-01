@@ -229,39 +229,107 @@ func (s *Service) InstallCLI(ctx context.Context) (CLIStatus, error) {
 	return st, nil
 }
 
-// SignIn starts the CLI's sign-in and returns the link the user opens in
-// their browser. Without a terminal the CLI uses its paste-the-code flow:
-// the page shows a code, which SubmitLoginCode hands back to the CLI.
-func (s *Service) SignIn(ctx context.Context) (string, error) {
+// SignInStart is the result of starting sign-in: either a link for the
+// user to open, or the news that the CLI signed in by itself.
+type SignInStart struct {
+	URL      string    `json:"url,omitempty"`
+	SignedIn bool      `json:"signedIn"`
+	Status   CLIStatus `json:"status"`
+}
+
+// SignIn starts the CLI's sign-in. Without a terminal the CLI uses its
+// paste-the-code flow: it prints a link and waits for the code the page
+// shows, which SubmitLoginCode hands back. If the machine is already signed
+// in elsewhere the CLI may finish on its own; "auth status" decides.
+// Every attempt is logged to <config>/logs/signin.log.
+func (s *Service) SignIn(ctx context.Context) (SignInStart, error) {
 	bin, _, err := s.binary(ctx)
 	if err != nil {
-		return "", err
+		return SignInStart{}, err
 	}
 	s.CancelSignIn()
-	p, err := local.StartInteractive(s.Adapter.LoginCommand(bin))
+	cmd := s.Adapter.LoginCommand(bin)
+	p, err := local.StartInteractive(cmd)
 	if err != nil {
-		return "", err
+		s.logSignIn("start failed: %v", err)
+		return SignInStart{}, err
 	}
 	s.loginMu.Lock()
 	s.login = p
 	s.loginMu.Unlock()
+	s.logSignIn("started %s %s", bin, strings.Join(cmd.Args, " "))
+
 	deadline := time.After(60 * time.Second)
 	for {
 		if u, ok := s.Adapter.LoginURL(p.Output()); ok {
-			return u, nil
+			s.logSignIn("link shown")
+			go s.watchSignIn(p)
+			return SignInStart{URL: u}, nil
 		}
 		select {
 		case <-p.Done():
-			return "", fmt.Errorf("sign-in stopped before showing a link: %s", lastLine(string(p.Output())))
+			s.logSignIn("exited before a link: %v\noutput: %q", p.Err(), p.Output())
+			st := s.CLIStatus(ctx, true)
+			s.emit.Emit(EvtCLIStatus, st)
+			if st.LoggedIn {
+				return SignInStart{SignedIn: true, Status: st}, nil
+			}
+			return SignInStart{}, fmt.Errorf("the Claude CLI's sign-in stopped without showing a link (%s). Details are in %s",
+				describeExit(p), s.signInLogPath())
 		case <-deadline:
+			s.logSignIn("no link after 60 s; output: %q", p.Output())
 			s.CancelSignIn()
-			return "", errors.New("sign-in didn't start within a minute")
+			return SignInStart{}, fmt.Errorf("sign-in didn't start within a minute. Details are in %s", s.signInLogPath())
 		case <-ctx.Done():
 			s.CancelSignIn()
-			return "", ctx.Err()
+			return SignInStart{}, ctx.Err()
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
+}
+
+// watchSignIn notices when the CLI finishes sign-in on its own (before any
+// code is pasted) and tells the UI.
+func (s *Service) watchSignIn(p *local.Interactive) {
+	<-p.Done()
+	s.loginMu.Lock()
+	mine := s.login == p
+	s.loginMu.Unlock()
+	if !mine { // SubmitLoginCode or CancelSignIn took it over
+		return
+	}
+	s.logSignIn("exited on its own: %v\noutput: %q", p.Err(), p.Output())
+	st := s.CLIStatus(context.Background(), true)
+	s.emit.Emit(EvtCLIStatus, st)
+}
+
+func describeExit(p *local.Interactive) string {
+	out := strings.TrimSpace(string(p.Output()))
+	msg := "it exited"
+	if err := p.Err(); err != nil {
+		msg = err.Error()
+	}
+	if out == "" {
+		return msg + " and printed nothing"
+	}
+	return msg + ": " + truncate(lastLine(out), 160)
+}
+
+func (s *Service) signInLogPath() string {
+	return filepath.Join(s.Paths.Config, "logs", "signin.log")
+}
+
+func (s *Service) logSignIn(format string, args ...any) {
+	path := s.signInLogPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s %s\n", time.Now().Format(time.RFC3339), fmt.Sprintf(format, args...))
 }
 
 // SubmitLoginCode passes the code from the sign-in page to the CLI and
@@ -275,11 +343,27 @@ func (s *Service) SubmitLoginCode(ctx context.Context, code string) (CLIStatus, 
 	s.loginMu.Lock()
 	p := s.login
 	s.loginMu.Unlock()
-	if p == nil {
-		return CLIStatus{}, errors.New("start sign-in again: the earlier attempt has ended")
+	finished := p == nil
+	if p != nil {
+		select {
+		case <-p.Done():
+			finished = true
+		default:
+		}
+	}
+	if finished {
+		// The CLI already stopped (it may have signed in on its own).
+		st := s.CLIStatus(ctx, true)
+		s.emit.Emit(EvtCLIStatus, st)
+		if st.LoggedIn {
+			return st, nil
+		}
+		return st, errors.New("that sign-in attempt has ended; press Sign in to start again")
 	}
 	before := len(p.Output())
+	s.logSignIn("code submitted (%d characters)", len(code))
 	if err := p.Send(code); err != nil {
+		s.logSignIn("couldn't write the code: %v", err)
 		return CLIStatus{}, fmt.Errorf("couldn't pass the code to the CLI: %w", err)
 	}
 	select {
@@ -297,6 +381,7 @@ func (s *Service) SubmitLoginCode(ctx context.Context, code string) (CLIStatus, 
 	s.loginMu.Unlock()
 	st := s.CLIStatus(ctx, true)
 	s.emit.Emit(EvtCLIStatus, st)
+	s.logSignIn("after the code: exit %v, signed in %v; output: %q", p.Err(), st.LoggedIn, p.Output()[before:])
 	if !st.LoggedIn {
 		msg := "the code wasn't accepted"
 		if out := string(p.Output()); len(out) > before {
