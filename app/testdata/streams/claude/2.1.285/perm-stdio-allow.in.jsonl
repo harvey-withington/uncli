@@ -1,0 +1,3 @@
+{"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":null}}
+{"type":"user","message":{"role":"user","content":"Use the Write tool to create hello.txt containing the word hi. Then reply DONE or DENIED."},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_response","response":{"subtype":"success","request_id":"c20765a8-cbb9-44c7-beaf-0fd2452d4444","response":{"behavior":"allow","updatedInput":{"file_path":"C:\\uncli-spike\\w-st\\hello.txt","content":"hi"}}}}

@@ -1,0 +1,3 @@
+{"type":"user","message":{"role":"user","content":"Remember the number 42. Reply with just OK."},"parent_tool_use_id":null,"session_id":""}
+{"type":"user","message":{"role":"user","content":"Write a two-line markdown list of fruits, then a fenced js code block printing the number I gave you."},"parent_tool_use_id":null,"session_id":""}
+{"type":"user","message":{"role":"user","content":"What number did I give you? One word."},"parent_tool_use_id":null,"session_id":""}

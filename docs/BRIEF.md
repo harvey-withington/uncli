@@ -12,7 +12,7 @@ UNCLI (pronounced "un-clee") is a desktop GUI layer over AI CLIs, starting with 
 
 **Backend rule: pure CLI.** UNCLI never calls a model API directly. Every session is a long-lived CLI process driven over stdin/stdout. This keeps subscription billing, gives one code path, and makes other providers (Gemini CLI, Codex CLI) a matter of adding adapters.
 
-**Design rule: one of each, seams for all.** Phase 1 ships exactly one implementation of each core interface (one adapter, one runtime, three built-in profiles). Every later feature in this brief must land as a new implementation or a new config file, never as a rewrite of the core. If a phase needs a core change, the architecture section was wrong; fix the brief first.
+**Design rule: one of each, seams for all.** Phase 1 ships exactly one implementation of each core interface (one adapter with its installer, one runtime, three built-in profiles). Every later feature in this brief must land as a new implementation or a new config file, never as a rewrite of the core. If a phase needs a core change, the architecture section was wrong; fix the brief first.
 
 **Modes:** Chat (no project, scratch folder, artifacts), Co-work (a user folder of documents, artifacts) and Code (a repo, full tools, IDE links). Modes are profiles, not code paths.
 
@@ -31,19 +31,18 @@ Go + Wails + Svelte 5 + TypeScript, the same stack as BRUV, with SQLite for app 
 | Icons | Lucide | Matches the toolbar and modifier icon names |
 
 ```
-uncli/
+app/                      # the Go module (the repo root holds docs, website, scripts)
   main.go                 # Wails bootstrap only
   internal/
     core/                 # interfaces + normalized events (no deps on anything else)
-    adapter/claude/       # Claude Code CLI: arg builder + stream-json parser
+    adapter/claude/       # Claude Code CLI: installer, arg builder, encoders, stream-json parser
     runtime/local/        # local process runtime
     runtime/container/    # (phase 5)
     session/              # session lifecycle, turn assembly, state machine
     store/                # SQLite: sessions, pages, bookmarks, usage
     profile/              # profile + modifier loading and resolution
-    permission/           # local MCP server for --permission-prompt-tool
-    watch/                # fsnotify: artifacts dir, touched files
-    ide/                  # open-in-editor launchers
+    watch/                # fsnotify: artifacts dir, touched files (phase 2)
+    ide/                  # open-in-editor launchers (phase 2)
     bridge/               # the ONLY package that imports Wails
   config/defaults/        # built-in profiles.yaml, modifiers.yaml, toolbar.yaml
   frontend/src/
@@ -51,8 +50,10 @@ uncli/
     lib/render/           # markdown-it setup, copy-block plugin, Shiki
     components/           # Sidebar, PageView, NavBar, Toolbar, ApprovalCard, ArtifactPane
     stores/               # sessions, pages, activity
-  testdata/streams/       # recorded CLI stream fixtures (*.jsonl)
+  testdata/streams/       # recorded CLI streams: <provider>/<cli version>/*.jsonl
 ```
+
+There is no `permission/` package: the spike showed approvals can travel over the CLI's own stdio control protocol (see Spike findings), so the adapter handles them.
 
 The rule that keeps the kitchen sink possible: `core` imports nothing internal, and only `bridge` imports Wails. If UNCLI ever runs as a local server for a docked or remote UI, `bridge` is the only package replaced.
 
@@ -60,9 +61,32 @@ The rule that keeps the kitchen sink possible: `core` imports nothing internal, 
 
 A session is an adapter (which CLI) running on a runtime (where it runs), configured by a profile plus modifiers, emitting normalized events that the session assembles into pages. The UI only ever sees UNCLI's own events and pages, never a provider's raw output.
 
-&#91;embedded content: UNCLI architecture · one session's components\]
+```mermaid
+flowchart TB
+    UI["Frontend (Svelte 5)<br/>Sidebar · PageView · NavBar · Toolbar · ApprovalCard"]
+    Bridge["bridge<br/>the only Wails importer; deltas coalesced ~50 ms"]
+    Session["session<br/>lifecycle · activity state · page assembly"]
+    Profile["profile<br/>YAML → LaunchSpec + directives"]
+    Store[("store<br/>SQLite")]
+    Adapter["Adapter: claude<br/>args · turn + control encoder · parser"]
+    Installer["Installer: claude<br/>pinned version · checksum"]
+    Runtime["Runtime: local<br/>(container, phase 5)"]
+    CLI[["claude CLI<br/>-p · stream-json in and out"]]
+    Dist[("downloads.claude.ai")]
 
-Everything above the CLI process is UNCLI's; swapping the adapter or runtime box is how phases 5 and 6 land.
+    UI <-- "typed api: calls + events" --> Bridge
+    Bridge <--> Session
+    Profile --> Session
+    Session <--> Store
+    Session -- "LaunchSpec, turns, controls" --> Adapter
+    Adapter -- "normalized events" --> Session
+    Adapter -- "command" --> Runtime
+    Installer -- "binary path" --> Adapter
+    Installer -. "first run / version change" .-> Dist
+    Runtime <-- "stdin / stdout lines" --> CLI
+```
+
+Everything above the CLI process is UNCLI's; swapping the adapter, installer or runtime box is how phases 5 and 6 land. Approvals (phase 2) travel over the same stdio pipe as control requests, so there is no separate permission server.
 
 ### Core interfaces (`internal/core`)
 
@@ -71,10 +95,24 @@ Everything above the CLI process is UNCLI's; swapping the adapter or runtime box
 type Adapter interface {
     ID() string
     Capabilities() Capabilities
-    BuildCommand(spec LaunchSpec) (Command, error) // binary, args, env
-    EncodeTurn(t UserTurn) ([]byte, error)         // one stdin line
-    EncodeControl(c Control) ([]byte, bool)        // interrupt, set model; false = unsupported
-    NewParser() Parser                             // stateful, one per process
+    Installer() Installer
+    BuildCommand(bin string, spec LaunchSpec) (Command, error) // args, env
+    AuthStatusCommand(bin string) Command                      // e.g. claude auth status
+    ParseAuthStatus(out []byte) (AuthInfo, error)
+    LoginCommand(bin string) Command                           // opens the provider's browser sign-in
+    EncodeTurn(t UserTurn) ([]byte, error)                     // one stdin line
+    EncodeControl(c Control) ([]byte, bool)                    // interrupt, set model, approval answer; false = unsupported
+    NewParser() Parser                                         // stateful, one per process
+}
+
+// Installer: UNCLI downloads and pins each CLI itself, so a CLI update
+// on the user's machine never breaks UNCLI. Each UNCLI release names the
+// CLI version it was tested against; the user may advance it at their own risk.
+type Installer interface {
+    Pinned() string                                   // version this UNCLI build is tested with
+    Installed() ([]string, error)                     // versions in UNCLI's own cache
+    Ensure(ctx context.Context, version string, progress func(done, total int64)) (bin string, err error)
+    Channels(ctx context.Context) (map[string]string, error) // e.g. stable, latest -> version
 }
 
 type Parser interface {
@@ -97,15 +135,19 @@ type Proc interface {
 
 // LaunchSpec: everything resolved from profile + model + system-scope modifiers.
 type LaunchSpec struct {
-    ResumeID        string            // provider session id; empty = new
+    SessionID       string            // provider session id chosen by UNCLI for a new conversation
+    ResumeID        string            // provider session id to resume; empty = new
     Model           string
+    Effort          string            // low | medium | high | xhigh | max; empty = CLI default
     Workdir         string
     SystemPrompt    string            // replace (chat profile)
     AppendPrompt    string            // append (code, co-work)
-    AllowedTools    []string
+    Tools           []string          // tools that exist at all; nil = CLI default set
+    AllowedTools    []string          // tools pre-approved without a prompt
     DisallowedTools []string
-    PermissionMCP   *PermissionConfig // phase 2
-    Settings        map[string]any    // thinking budget etc.
+    PermissionMode  string            // default | acceptEdits | dontAsk | plan; never bypass
+    Approvals       bool              // phase 2: route prompts to UNCLI; false = deny automatically
+    Isolated        bool              // ignore user settings, MCP servers and skills (chat)
     Env             map[string]string
 }
 
@@ -120,13 +162,19 @@ type UserTurn struct {
 
 **Profile resolver** (`profile`). Merges built-in YAML with user overrides by `id`. Takes a profile, a model and the active modifiers; returns a `LaunchSpec` (from system-scope modifiers) and a directive renderer (for turn-scope modifiers). Per-model modifier text is matched by family glob (`opus*`), falling back to `default`.
 
-**Session** (`session`). Owns one process at a time. Runs a reader goroutine that feeds stdout lines to the parser, updates the activity state machine, assembles pages and writes them to the store. Model switches and system-scope modifier changes trigger a **respawn**: wait for idle (or queue the change), kill, relaunch with `ResumeID`. If the adapter reports `LiveModelSwitch`, send a control message instead.
+**Session** (`session`). Owns one process at a time. Runs a reader goroutine that feeds stdout lines to the parser, updates the activity state machine, assembles pages and writes them to the store. A new session gets its provider session id from UNCLI (`--session-id`), and the session updates it whenever the CLI reports a different one (`/clear` starts a new conversation with a new id). Model switches use a control message when the adapter reports `LiveModelSwitch` (Claude does). System-scope changes, and model switches on adapters without a live switch, trigger a **respawn**: wait for idle (or queue the change), kill, relaunch with `ResumeID`. Respawns always reuse the session's workdir, because the CLI files transcripts by working directory.
+
+**Installer** (`adapter/claude`, behind `core.Installer`). Downloads the pinned CLI version into UNCLI's cache dir (`<user cache>/uncli/cli/claude/<version>/`), never touching the user's own install. For Claude it reads `https://downloads.claude.ai/claude-code-releases/<version>/manifest.json`, downloads `<version>/<platform>/claude(.exe)` and checks its SHA-256 against the manifest before use. Each UNCLI release pins one version; a setting lets the user pick a newer one (from the `stable` or `latest` channel) at their own risk, with a one-click return to the pinned version. The download is about 240 MB, so first run shows progress. The CLI's own auto-updater is disabled in the environment UNCLI passes.
+
+**Sign-in.** Before the first session, UNCLI runs the adapter's auth status command (`claude auth status` prints JSON with `loggedIn`). If signed out, the app shows a sign-in screen whose button runs `claude auth login`, which opens the browser. A turn that fails with `authentication_failed` returns the user to that screen.
+
+**Process environment.** UNCLI builds the child's environment explicitly: it inherits the user's environment minus any `CLAUDE_CODE_*` and `CLAUDECODE` variables (UNCLI may itself be launched from inside a Claude session), plus `DISABLE_AUTOUPDATER=1`.
 
 **Store** (`store`). SQLite for sessions, pages, bookmarks, usage and the raw event log. The provider's own transcript remains the source of truth for conversation content; UNCLI's store holds structure, metadata and a replayable copy.
 
 **Bridge** (`bridge`). The only Wails importer. Exposes bound methods (create session, send turn, switch model, toggle modifier, answer approval, open in IDE) and emits per-session events to the frontend, with text deltas coalesced to about every 50 ms.
 
-**Permission bridge** (`permission`, phase 2). One local MCP server on 127.0.0.1, started with the app. Each session's generated `--mcp-config` points at it with a per-session token, and `--permission-prompt-tool` names its `approve` tool. It rejects any request carrying a browser Origin header or lacking its exact JSON content type, so a web page can never reach it. A call blocks until the UI answers or it times out, and the session shows the Needs approval state meanwhile.
+**Approvals** (adapter, phase 2). With `--permission-prompt-tool stdio`, the CLI writes a `control_request` with subtype `can_use_tool` (tool name, input, a description and permission suggestions) to stdout and waits for a `control_response` on stdin with `behavior: allow` (plus `updatedInput`) or `behavior: deny` (plus a message). The parser turns the request into `EvApprovalAsked`, and the answer goes back through `EncodeControl`. No local server, port or token is involved, so there is nothing for a web page to reach. The session shows Needs approval until the UI answers.
 
 **Watchers** (`watch`). fsnotify on each session's artifacts folder (chat and co-work) and, for code sessions, the repo (debounced, ignore-listed). Watchers feed the artifact pane and the touched-files list.
 
@@ -137,7 +185,7 @@ type UserTurn struct {
 1. UI calls `SendTurn(sessionID, text)`. The session renders the directives, creates a page row (question plus active model and modifiers) and writes `EncodeTurn` to stdin.
 2. The reader goroutine parses stdout into events. Each event goes to the raw log, updates the activity state and is appended to the open page.
 3. The bridge emits events to the UI, coalescing deltas.
-4. A `TurnResult` event closes the page, records usage and sets Unread if the session isn't focused.
+4. A `TurnResult` event closes the page, records usage and sets Unread if the session isn't focused. Token usage on the result is per turn, but the cost is cumulative for the process, so the page's cost is the difference from the previous result on the same process (and the full value after a respawn).
 
 ## Events and capabilities
 
@@ -147,16 +195,18 @@ The normalized event model is the most important contract in UNCLI: get it right
 type EventKind string
 
 const (
-    EvSessionReady  EventKind = "session_ready"   // provider session id, model, tools
+    EvSessionReady  EventKind = "session_ready"   // provider session id, model, tools (also when the id changes)
     EvTurnStarted   EventKind = "turn_started"
-    EvThinking      EventKind = "thinking"        // optional text
+    EvThinking      EventKind = "thinking"        // estimated tokens; text only if the provider exposes it
     EvTextDelta     EventKind = "text_delta"
     EvTextBlock     EventKind = "text_block"      // a completed assistant text block
     EvToolStarted   EventKind = "tool_started"    // id, name, input
-    EvToolFinished  EventKind = "tool_finished"   // id, ok, summary, output (truncated)
+    EvToolFinished  EventKind = "tool_finished"   // id, ok, denied, summary, output (truncated)
     EvFileTouched   EventKind = "file_touched"    // path, line, how (edit/write/bash-detected)
     EvApprovalAsked EventKind = "approval_asked"  // request id, tool, input (phase 2)
-    EvTurnResult    EventKind = "turn_result"     // usage, cost, duration, is_error
+    EvNotice        EventKind = "notice"          // model changed, compacted, conversation reset, command output
+    EvUsageLimit    EventKind = "usage_limit"     // subscription window utilisation and reset times
+    EvTurnResult    EventKind = "turn_result"     // usage, cost, duration, is_error, error code
     EvError         EventKind = "error"
     EvExited        EventKind = "exited"          // exit code
     EvUnknown       EventKind = "unknown"         // raw line kept, never dropped
@@ -171,7 +221,29 @@ type Event struct {
 }
 ```
 
-`EvFileTouched` is derived by the adapter from Edit, MultiEdit and Write tool inputs, and by the repo watcher for changes made through Bash. Both feed the same touched-files list.
+`EvFileTouched` is derived by the adapter from Edit, MultiEdit and Write tool inputs (the CLI's `tool_use_result` also reports `type: create` and `filePath`), and by the repo watcher for changes made through Bash. Both feed the same touched-files list.
+
+### Claude stream mapping (CLI 2.1.285)
+
+| Claude stdout line | Normalized |
+| --- | --- |
+| `system/init` (repeats at the start of every turn) | `EvSessionReady` the first time, and again only if the session id or model changed |
+| `system/status` with `status: requesting` | `EvTurnStarted` |
+| `system/status` with `status: compacting`, `system/compact_boundary` | `EvNotice` (compacted) |
+| `system/thinking_tokens`, `thinking_delta` stream events | `EvThinking` (token estimate only; thinking text arrives empty) |
+| `stream_event` `content_block_delta` with `text_delta` | `EvTextDelta` |
+| `assistant` message with a `text` block (one message per content block) | `EvTextBlock` |
+| `assistant` message with a `tool_use` block | `EvToolStarted`, plus `EvFileTouched` for Write and Edit |
+| `user` message with a `tool_result` block | `EvToolFinished` |
+| `system/permission_denied` | `EvToolFinished` with `denied` (the trace strip shows it) |
+| `control_request` `can_use_tool` | `EvApprovalAsked` (phase 2) |
+| `assistant` from model `<synthetic>` (slash command output, errors) | `EvTextBlock`; its `error` field (`authentication_failed`, `model_not_found`) feeds the result |
+| `user` with `<local-command-stdout>` (echo of `/model`, `set_model`, `/compact`) | `EvNotice` |
+| `conversation_reset` (after `/clear`) | `EvNotice`; the next `init` carries the new session id |
+| `rate_limit_event` | `EvUsageLimit` |
+| `result` | `EvTurnResult`; `is_error` can be true while `subtype` is `success`, and an interrupt gives `error_during_execution` |
+| `control_response` | consumed by the session (acknowledges interrupt, set_model, initialize) |
+| anything else | `EvUnknown` |
 
 ### Activity state machine
 
@@ -179,7 +251,7 @@ type Event struct {
 | --- | --- | --- |
 | Starting | process spawned | `session_ready` |
 | Idle | `session_ready`, or `turn_result` while focused | turn sent |
-| Thinking | turn sent, or `thinking` | first text or tool event |
+| Thinking | turn sent, `turn_started` or `thinking` | first text or tool event |
 | Writing | `text_delta` / `text_block` | tool started or result |
 | Running tools | `tool_started` with no matching finish | all tools finished |
 | Needs approval | `approval_asked` | user answers |
@@ -204,6 +276,8 @@ type Capabilities struct {
 }
 ```
 
+The Claude adapter at 2.1.285 sets all of these to true. Thinking events carry token estimates rather than text, and slash passthrough covers `/compact`, `/context`, `/cost`, `/model` and `/clear` but not `/help`.
+
 ## Data model and config
 
 App state lives in one SQLite file in the user config dir; profiles, modifiers and toolbar are YAML, with built-ins embedded in the binary and user files overriding them by `id`. Columns for later phases exist from day one so no migration is needed to add them.
@@ -219,7 +293,8 @@ CREATE TABLE sessions (
   runtime_ref   TEXT,               -- container profile id (phase 5)
   profile_id    TEXT NOT NULL,      -- 'chat' | 'cowork' | 'code' | user ids
   workdir       TEXT NOT NULL,
-  provider_sid  TEXT,               -- CLI session id, for --resume
+  provider_sid  TEXT,               -- CLI session id, for --resume; updated when the CLI reports a new one
+  cli_version   TEXT,               -- CLI version the session last ran on
   model         TEXT NOT NULL,
   modifiers     TEXT NOT NULL DEFAULT '[]',  -- active modifier ids, JSON
   sort_order    REAL,
@@ -244,7 +319,7 @@ CREATE TABLE pages (
   pinned        INTEGER DEFAULT 0,
   input_tokens  INTEGER, output_tokens INTEGER,
   cache_read    INTEGER, cache_write INTEGER,
-  cost_usd      REAL, duration_ms INTEGER,
+  cost_usd      REAL, duration_ms INTEGER,  -- cost is this turn's share, not the CLI's running total
   started_at    INTEGER, finished_at INTEGER,
   UNIQUE(session_id, seq)
 );
@@ -267,12 +342,14 @@ profiles:
   - id: chat
     label: Chat
     icon: message-circle
-    folder: scratch          # scratch | pick | repo
+    folder: scratch          # scratch | pick | repo; scratch = <user data>/uncli/scratch/<session id>
     model: sonnet
     system_prompt: |         # replaces the coding persona
       You are a helpful assistant in a desktop chat app. Put any substantial
       output (HTML, SVG, Mermaid, long documents) in a file under ./artifacts/.
+    tools: [WebSearch, WebFetch, Write]                    # --tools: nothing else exists
     allowed_tools: [WebSearch, WebFetch, "Write(./artifacts/**)"]
+    isolated: true           # --strict-mcp-config, --setting-sources "", --disable-slash-commands
     permission_mode: default
     modifiers_on: []
   - id: cowork
@@ -284,12 +361,15 @@ profiles:
       You are helping with documents and knowledge work in this folder.
       Put generated deliverables under ./artifacts/.
     allowed_tools: [Read, Write, Edit, Glob, Grep, WebSearch, WebFetch]
+    permission_mode: default
   - id: code
     label: Code
     icon: code
     folder: repo
     model: opus
-    allowed_tools: []        # empty = CLI defaults
+    tools: []                # empty = CLI defaults
+    allowed_tools: ["Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(npm test:*)", "Bash(npm run:*)", "Bash(go test:*)", "Bash(go build:*)"]
+    permission_mode: acceptEdits
     ide_links: true
 ```
 
@@ -317,10 +397,12 @@ modifiers:
     icon: microscope
     scope: turn
     group: verbosity
-    settings: { thinking: high }
+    settings: { effort: high } # launch flag: applied by respawn before the next turn
     text:
       default: "Verify, check edge cases, and explain trade-offs."
 ```
+
+The chat profile's isolation matters for cost: on the spike machine a default session sends about 26k tokens of system prompt, tools, skills and MCP instructions every turn, and the isolated chat profile about 2.4k. `settings` on a turn-scope modifier are launch flags (`effort` maps to `--effort`), so toggling such a modifier respawns the session with resume before the next turn. The text part still travels as a directive.
 
 The directive block restates the full active set every turn, wrapped in `<session_directives>`. When a modifier was switched off since the previous turn, add one line saying its earlier instruction no longer applies.
 
@@ -332,11 +414,12 @@ toolbar:
   - { kind: modifiers }                       # renders all modifiers as toggles
   - { kind: separator }
   - { kind: slash, label: Compact, icon: shrink, command: /compact }
+  - { kind: slash, label: Context, icon: gauge, command: /context }
   - { kind: native, label: Usage, icon: bar-chart, action: usage }
   - { kind: native, label: Open folder, icon: folder-open, action: open_workdir }
 ```
 
-`slash` items are sent into the session as text. `native` items are implemented by UNCLI itself, because many interactive slash commands don't work in headless mode.
+`slash` items are sent into the session as text. Their output comes back as a synthetic assistant message and closes as a page like any other turn. `native` items are implemented by UNCLI itself, because some slash commands (such as `/help`) don't work in headless mode. The Usage action reads the latest `EvUsageLimit`.
 
 ## Phase 1: weekend MVP
 
@@ -351,10 +434,11 @@ By Sunday night UNCLI runs several Claude sessions side by side in a paged, book
 - Page view: pinned question, streamed markdown answer, collapsed tool trace strip, per-page chips (model, modifiers, tokens).
 - Nav bar: previous bookmark, back, forward, next bookmark, toggle bookmark. Previous and next bookmark fall back to the first and last page when no bookmark lies in that direction. Keyboard: left/right arrows, `B` to bookmark.
 - Copy on hover for the question, every code block and every markdown block (copies source markdown).
-- Model picker that respawns with resume.
+- Model picker that switches live via the control protocol (respawn with resume as the fallback), listing the models the CLI reports in its `initialize` response.
 - Turn-scope modifiers from `modifiers.yaml`, with groups and per-model text.
 - Three built-in profiles; a toolbar rendered from `toolbar.yaml` (model picker, modifiers, two slash commands).
-- Interrupt (stop the current turn) if the CLI supports it; otherwise kill and respawn.
+- Interrupt (stop the current turn) through the control protocol; kill and respawn only if it fails.
+- UNCLI-managed Claude CLI: download the pinned version on first run with progress and checksum check; sign-in screen when signed out. A setting to run a different version at the user's own risk (no version-manager UI yet).
 
 ### Out of scope (deliberately)
 
@@ -362,7 +446,7 @@ Approval UI, artifact pane, touched files and IDE links, images, pins, search, u
 
 ### Phase 1 permissions
 
-Chat and co-work run with their tool allowlists from the profile. Code runs with `--permission-mode acceptEdits` and an allowlist of safe Bash patterns from the profile (for example `Bash(git status:*)`, `Bash(npm test:*)`). Anything else is denied by the CLI, and the denial appears in the trace strip. Never use the bypass mode as a default.
+Chat and co-work run with their tool allowlists from the profile. Code runs with `--permission-mode acceptEdits` and an allowlist of safe Bash patterns from the profile (for example `Bash(git status:*)`, `Bash(npm test:*)`). Every phase 1 session passes `--permission-prompts none`, so anything else is denied by the CLI immediately (without it a prompt would wait for an answer UNCLI can't give yet), and the denial appears in the trace strip. Never use the bypass mode as a default.
 
 ### Build order
 
@@ -379,7 +463,10 @@ Chat and co-work run with their tool allowlists from the profile. Code runs with
 | 9 | Nav bar + bookmarks + keyboard | 1.5 h |
 | 10 | Toolbar, model picker (respawn), modifier toggles | 2 h |
 | 11 | Visual polish pass: theme tokens, light and dark, motion | 2 h |
-|  | **Total** | **24 h** |
+| 12 | CLI installer (pinned download, checksum, progress) and sign-in screen | 2 h |
+|  | **Total** | **26 h** |
+
+Task 12 was added after the spike. It can land any time after task 3; until then development points UNCLI at an existing binary through the version setting.
 
 That total is tight for a weekend. If it slips, cut in this order: polish pass to an hour, keyboard shortcuts, interrupt, the modifier groups.
 
@@ -392,6 +479,7 @@ That total is tight for a weekend. If it slips, cut in this order: polish pass t
 - [ ] Every code block, markdown block and question copies correctly
 - [ ] Parser tests pass on all recorded fixtures, and an unknown event type doesn't crash anything
 - [ ] No terminal window appears at any point on Windows or macOS
+- [ ] On a machine with no Claude CLI, UNCLI downloads its pinned version, verifies it and gets the user signed in without a terminal
 
 ## Phases 2 to 6
 
@@ -401,7 +489,7 @@ Each phase is a new implementation behind an existing seam; none of them changes
 
 The goal is that UNCLI replaces the terminal for real work.
 
-- **Permission bridge:** local MCP server (per-session token, browser Origin headers rejected), generated `--mcp-config`, `--permission-prompt-tool`. Approval cards with Allow, Deny and Always for this session. Session-level allow rules stored on the session row. Code profile drops the narrow Bash allowlist.
+- **Approvals:** `--permission-prompt-tool stdio` replaces `--permission-prompts none`; `can_use_tool` control requests become approval cards with Allow, Deny and Always for this session (the request's `permission_suggestions` can seed "Always"). Session-level allow rules stored on the session row. Code profile drops the narrow Bash allowlist.
 - **Artifact pane:** watcher on `./artifacts/`, sandboxed iframe renderer with strict CSP for HTML, SVG and Mermaid, markdown viewer. The artifacts folder is a git repo, auto-committed at turn end; each page links to the artifact versions it produced, so paging back pages the artifact back too.
 - **Touched files + IDE links:** `EvFileTouched` from tool inputs plus the repo watcher; a per-page list with open-in-IDE buttons using the `ide` presets.
 - **Desktop notifications** when a background session finishes or needs approval.
@@ -417,13 +505,15 @@ The goal is that UNCLI replaces the terminal for real work.
 ### Phase 4: customisation
 
 - Editors for user profiles, modifiers (with per-model variants) and the toolbar; user files override built-ins by `id`.
-- **System-scope modifiers** (long personas or house styles), applied by respawn.
-- `LiveModelSwitch` via the control protocol if the CLI exposes it, keeping respawn as fallback.
+- **System-scope modifiers** (long personas or house styles), applied by respawn. The CLI records the system prompt on a conversation's first request and reuses it on every resume (`--system-prompt-snapshot on` is the default), so a respawn alone does not change it: these modifiers need `--system-prompt-snapshot off` (fresh prompt every request, more cache writes) or must apply only to new sessions.
+- **CLI version manager:** see installed versions, try `stable` or `latest` at your own risk, return to the pinned version.
 - Cost hint on the model picker: estimated tokens to re-read after a cache-invalidating switch.
+
+(`LiveModelSwitch` moved into phase 1: the spike found the `set_model` control request.)
 
 ### Phase 5: containers
 
-- **Container runtime:** Docker Engine API from Go; `Start` runs `docker exec -i <ctr> claude ...` so the stdio transport is unchanged.
+- **Container runtime:** Docker Engine API from Go; `Start` runs `docker exec -i <ctr> claude ...` so the stdio transport is unchanged. The installer fetches the Linux build of the same pinned version from the same manifest.
 - **Container profiles** (`containers.yaml`): base image, packages, git, toolchains, MCP servers (for example BRUV over Tailscale), network policy. UNCLI compiles them into a cached Dockerfile layer.
 - **Auth:** `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, stored in the OS keychain, passed as env. Never mount credentials.
 - **Brain modes:** Shared (skills, commands, agents and a memory directory mounted read-write; `settings.json` generated read-only), Sandboxed (a persistent volume per container profile) and Reviewed (an overlay whose changes UNCLI shows as a diff for approval before merging into `~/.claude`).
@@ -449,29 +539,46 @@ containers:
 
 ## Verify first, and risks
 
-The phase 1 spike must confirm the CLI facts this brief assumes, because they were written from memory and the CLI changes quickly. Check each against the installed CLI and current docs before writing the adapter.
+The phase 1 spike checked the CLI facts this brief assumed against Claude Code 2.1.285 on Windows, on 2026-10-01. The recorded streams are in `app/testdata/streams/claude/2.1.285/`, listed in its README.
 
-- [ ] `claude -p --input-format stream-json --output-format stream-json --verbose` stays alive for multiple turns over stdin
-- [ ] `--include-partial-messages` produces text deltas, and their exact event shape
-- [ ] `--resume <id>` works in stream-json mode, and where the session id appears in the init event
-- [ ] `--model`, `--system-prompt`, `--append-system-prompt`, `--allowedTools`, `--disallowedTools` and `--permission-mode` names and behaviour
-- [ ] How to interrupt a running turn (control message or signal) without losing the session
-- [ ] The `result` event's usage and cost fields
-- [ ] Which slash commands work when sent as text in headless mode
-- [ ] Phase 2: `--permission-prompt-tool` and `--mcp-config` request and response shapes
-- [ ] Phase 3: image content blocks on stream-json input
-- [ ] Phase 4: whether a live model switch exists in the control protocol
-- [ ] Phase 5: `claude setup-token` and `CLAUDE_CODE_OAUTH_TOKEN` behaviour inside a container
+- [x] `claude -p --input-format stream-json --output-format stream-json --verbose` stays alive for multiple turns over stdin. Each turn is one stdin line `{"type":"user","message":{"role":"user","content":...}}`; closing stdin ends the process after the current turn.
+- [x] `--include-partial-messages` produces text deltas: `{"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"..."}}}`, framed by `message_start`, `content_block_start/stop`, `message_delta` and `message_stop`. Completed blocks still arrive as `assistant` messages, one per content block.
+- [x] `--resume <id>` works in stream-json mode, keeps the same session id and remembers the conversation. The id is `session_id` on `system/init` (and on every line). `--session-id <uuid>` lets UNCLI choose the id for a new session. `/clear` switches to a new id.
+- [x] Flag names: `--model`, `--system-prompt`, `--append-system-prompt`, `--allowedTools`, `--disallowedTools` and `--permission-mode` all exist and behave as named. `--permission-mode` lists `acceptEdits`, `auto`, `bypassPermissions`, `manual`, `dontAsk` and `plan`; `default` is still accepted and reported. New and relevant: `--tools`, `--permission-prompts host|none`, `--effort`, `--session-id`, `--strict-mcp-config`, `--setting-sources`, `--disable-slash-commands`, `--system-prompt-snapshot`, `--replay-user-messages`.
+- [x] Interrupt: `{"type":"control_request","request_id":"<id>","request":{"subtype":"interrupt"}}` on stdin. The CLI acks with `control_response`, emits the partial answer, a `[Request interrupted by user]` user message and `result` with `subtype: error_during_execution`, then accepts the next turn on the same process. No signal needed.
+- [x] `result` carries `usage` (input, output, cache read and write tokens, per turn), `total_cost_usd` and `modelUsage` (both cumulative for the process), `duration_ms`, `num_turns`, `is_error`, `permission_denials` and `terminal_reason`.
+- [x] Slash commands sent as text: `/compact`, `/context`, `/cost`, `/model <name>` and `/clear` work; `/help` replies that it isn't available. Output comes back as an `assistant` message from model `<synthetic>`.
+- [x] Phase 2: approvals don't need MCP. With `--permission-prompt-tool stdio` the CLI sends `control_request` `can_use_tool` and waits for `control_response` with `behavior: allow|deny`. Without it (and with no handler) prompts are silently denied; `--permission-prompts none` denies them with a clear message.
+- [x] Phase 3: image content blocks (`{"type":"image","source":{"type":"base64",...}}`) work on stream-json input.
+- [x] Phase 4: a live model switch exists: control request `{"subtype":"set_model","model":"sonnet"}`.
+- [ ] Phase 5: `claude setup-token` and `CLAUDE_CODE_OAUTH_TOKEN` behaviour inside a container. Not tested; needs a container.
+
+### Other spike findings
+
+- **No `claude` on PATH.** The spike machine only had the copy bundled with the VS Code extension. UNCLI therefore installs and pins its own copy (see Installer). The distribution is `downloads.claude.ai/claude-code-releases/` with `stable` and `latest` channel files, a per-version `manifest.json` holding SHA-256 checksums and sizes for each platform, and a `manifest.json.sig` signature. The bundled 2.1.285 binary matched the manifest checksum.
+- **`initialize` control request** (optional) returns the slash commands, agents, output styles, the account (email, organisation, subscription type) and a `models` list with display names, descriptions and supported effort levels. The model picker reads this list.
+- **`system/init` repeats every turn** and is about 10 KB (tools, skills, MCP servers, plugins, slash commands). The parser emits `EvSessionReady` only when something changed.
+- **Inherited environment leaks in.** Run from inside a Claude Code session, the child reported `entrypoint: claude-vscode` until the `CLAUDE_CODE_*` variables were stripped.
+- **Thinking text is not exposed.** Thinking blocks arrive with empty text and a signature; `system/thinking_tokens` gives running estimates.
+- **The system prompt is frozen per conversation.** A resume with a different `--append-system-prompt` kept the original instruction.
+- **Errors still say `success`.** An unknown model or a signed-out CLI gives a `<synthetic>` assistant message with `error: model_not_found` or `authentication_failed`, then `result` with `is_error: true` and `subtype: success`.
+- **Auth** is `claude auth status` (JSON with `loggedIn`, `authMethod`, `subscriptionType`; exit 1 when signed out) and `claude auth login` (browser). Not tested end to end, because that needs a signed-out machine.
+- **Auto-memory runs in headless mode.** Asked to remember a word, the model wrote to `~/.claude/projects/<cwd>/memory/` without a prompt; that folder is outside the workdir and not covered by the tool allowlist.
+- **New event types** not in the original model: `rate_limit_event` (five-hour and seven-day utilisation), `system/status`, `system/compact_boundary`, `system/permission_denied`, `conversation_reset`, `control_request`, `control_response`.
 
 | Risk | Effect | Mitigation |
 | --- | --- | --- |
-| Stream-json format changes in a CLI update | Parser breaks, UI goes blank | Pin a known-good CLI version per profile; fixture tests; `EvUnknown` never drops a line |
+| Stream-json format changes in a CLI update | Parser breaks, UI goes blank | UNCLI installs and pins its own CLI version; fixtures recorded per version; `EvUnknown` never drops a line |
+| User advances the CLI version | Untested format reaches the parser | Explicit at-your-own-risk setting; one click back to the pinned version |
 | Headless gaps (slash commands, interrupts) | Toolbar buttons do nothing | `native` toolbar actions; capability flags hide what can't work |
-| Per-turn token overhead of the CLI's system prompt and tools | Chat burns subscription limits faster | Chat profile replaces the system prompt and restricts tools |
+| Per-turn token overhead of the CLI's system prompt and tools | Chat burns subscription limits faster | Chat profile replaces the system prompt, restricts tools and isolates from user settings (about 26k down to 2.4k tokens a turn) |
 | Cache miss on model switch | Expensive first turn after a switch | Cost hint on the picker (phase 4) |
+| System prompt snapshot | Persona or profile edits silently ignored on existing sessions | Apply to new sessions, or `--system-prompt-snapshot off` for system-scope modifiers (phase 4) |
+| UNCLI launched from a Claude session or terminal with `CLAUDE_CODE_*` set | Child CLI misidentifies itself or changes behaviour | Strip those variables when building the child environment |
+| Auto-memory writes outside the workdir | Chat sessions leave files in `~/.claude/projects` | Accepted for phase 1; revisit with a settings override if it matters |
 | Container writes to host `~/.claude` hooks | Code runs on the host | `settings.json` generated read-only; credentials never mounted |
 | Windows process quirks (console windows, child cleanup) | Flashing terminals, orphaned CLIs | `HideWindow` on Windows; job objects or process groups so children die with UNCLI |
-| Using subscription tokens outside the official CLI | Terms of service breach | UNCLI only ever drives the official binary |
+| Using subscription tokens outside the official CLI | Terms of service breach | UNCLI only ever drives the official binary, downloaded from Anthropic and checksum-verified |
 
 ## Working rules for the builder
 

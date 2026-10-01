@@ -1,0 +1,3 @@
+{"type":"user","message":{"role":"user","content":"Write a 600-word story about a lighthouse keeper."},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_request","request_id":"req_1","request":{"subtype":"interrupt"}}
+{"type":"user","message":{"role":"user","content":"In one sentence: what were you writing before I stopped you?"},"parent_tool_use_id":null,"session_id":""}

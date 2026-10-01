@@ -1,0 +1,1 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --tools Read,Write,Bash --allowedTools Bash(git status:*) --permission-mode acceptEdits --permission-prompts none --strict-mcp-config

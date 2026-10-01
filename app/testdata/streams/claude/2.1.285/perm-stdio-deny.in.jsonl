@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Use the Write tool to create hello.txt containing the word hi. Then reply DONE or DENIED."},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_response","response":{"subtype":"success","request_id":"c8de39bf-a1df-43cc-b160-3cd82f2ee934","response":{"behavior":"deny","message":"Denied by UNCLI spike"}}}

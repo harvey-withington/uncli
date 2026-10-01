@@ -1,0 +1,1 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --include-partial-messages --resume df1bfdf0-962d-4fe2-bc28-eb1f3e0b22e2

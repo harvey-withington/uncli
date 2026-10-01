@@ -1,0 +1,1 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --system-prompt You are a helpful assistant in a desktop chat app. Always start replies with AHOY. --tools WebSearch,WebFetch,Write --allowedTools WebSearch,WebFetch,Write(./artifacts/**) --strict-mcp-config --setting-sources  --disable-slash-commands --permission-prompts none
