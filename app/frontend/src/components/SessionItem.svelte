@@ -1,0 +1,179 @@
+<script lang="ts">
+  import type { SessionView } from '../lib/api'
+  import { confirm } from '../lib/confirm.svelte'
+  import { useApp } from '../lib/context'
+  import { t } from '../lib/i18n.svelte'
+  import { showToast } from '../lib/toasts.svelte'
+  import ActivityBadge from './ActivityBadge.svelte'
+  import Icon from './Icon.svelte'
+
+  interface Props {
+    session: SessionView
+    active: boolean
+  }
+
+  let { session, active }: Props = $props()
+  const app = useApp()
+  const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
+  let editing = $state(false)
+  let draft = $state('')
+
+  function startRename() {
+    draft = session.title
+    editing = true
+  }
+
+  async function commitRename() {
+    if (!editing) return
+    editing = false
+    const title = draft.trim()
+    if (title === session.title) return
+    try {
+      app.upsertSession(await app.backend.rename(session.id, title))
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
+  }
+
+  async function remove(e: MouseEvent) {
+    e.stopPropagation()
+    const ok = await confirm({
+      title: t('session.deleteTitle'),
+      message: t('session.deleteMessage', { title: session.title || t('session.untitled') }),
+      confirmLabel: t('session.delete'),
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await app.remove(session.id)
+    } catch (err) {
+      showToast(String(err), 'error')
+    }
+  }
+</script>
+
+<li class="item" class:active>
+  {#if editing}
+    <div class="row">
+      <span class="mode"><Icon name={profile?.icon ?? 'message-circle'} /></span>
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        class="input rename"
+        bind:value={draft}
+        autofocus
+        aria-label={t('session.rename')}
+        onblur={commitRename}
+        onkeydown={e => {
+          if (e.key === 'Enter') commitRename()
+          if (e.key === 'Escape') { e.stopPropagation(); editing = false }
+        }}
+      />
+    </div>
+  {:else}
+    <button class="row main" onclick={() => app.select(session.id)} ondblclick={startRename} aria-current={active ? 'true' : undefined}>
+      <span class="mode" title={profile?.label}><Icon name={profile?.icon ?? 'message-circle'} label={profile?.label} /></span>
+      <span class="text">
+        <span class="title" class:untitled={!session.title}>{session.title || t('session.untitled')}</span>
+        <span class="meta">
+          <ActivityBadge state={session.state} />
+          {#if session.state === 'idle'}<span class="model">{session.model}</span>{/if}
+        </span>
+      </span>
+    </button>
+    <span class="actions">
+      <button class="btn ghost small icon" onclick={startRename} aria-label={t('session.rename')} title={t('session.rename')}><Icon name="pencil" size={13} /></button>
+      <button class="btn ghost small icon" onclick={remove} aria-label={t('session.delete')} title={t('session.delete')}><Icon name="trash" size={13} /></button>
+    </span>
+  {/if}
+</li>
+
+<style>
+  .item {
+    position: relative;
+    list-style: none;
+    border-radius: var(--radius);
+    transition: background var(--fast) var(--ease);
+  }
+  .item:hover {
+    background: var(--surface-2);
+  }
+  .item.active {
+    background: var(--surface);
+    box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--border);
+  }
+  .row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    width: 100%;
+    padding: 9px var(--space-3);
+    border: 0;
+    background: none;
+    text-align: left;
+    border-radius: var(--radius);
+  }
+  .mode {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-top: 1px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    flex: none;
+  }
+  .active .mode {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 1px;
+  }
+  .title {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .untitled {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .meta {
+    display: flex;
+    gap: var(--space-2);
+    min-height: 18px;
+    align-items: center;
+  }
+  .model {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+  .actions {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    padding-left: var(--space-3);
+    border-radius: var(--radius-sm);
+    background: linear-gradient(to right, transparent, var(--surface-2) 12px);
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease);
+  }
+  .item.active .actions {
+    background: linear-gradient(to right, transparent, var(--surface) 12px);
+  }
+  .item:hover .actions,
+  .item:focus-within .actions {
+    opacity: 1;
+  }
+  .rename {
+    flex: 1;
+    height: 28px;
+  }
+</style>
