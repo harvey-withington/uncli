@@ -9,16 +9,15 @@
     "node": ">=24"
   },
   "//": [
-    "The root scripts are the one command surface for every stack: VS Code tasks, CI and Claude all call",
-    "npm run dev | build | check | test | release. Add each once the app exists, e.g. for Go + Wails + Svelte:",
-    "  dev:     cd app && wails dev",
-    "  build:   cd app && wails build",
-    "  check:   cd app && go vet ./... && npm --prefix frontend run check",
-    "  test:    cd app && go test ./... && npm --prefix frontend run test:run",
-    "  release: pwsh scripts/build.ps1 (writes installers and zips to dist/)",
-    "CI skips any that are missing. For several JS packages, add \"workspaces\": [\"app/frontend\", ...]."
+    "The root scripts are the one command surface for every stack: VS Code tasks, CI and Claude all call npm run dev | build | check | test.",
+    "test:integration drives the real Claude CLI (it downloads the pinned version and uses your sign-in); it is not part of npm test."
   ],
   "scripts": {
-    "website": "node scripts/serve-website.mjs"
+    "website": "node scripts/serve-website.mjs",
+    "dev": "cd app && wails dev",
+    "build": "cd app && wails build -clean",
+    "check": "cd app && go vet ./... && npm --prefix frontend run check",
+    "test": "cd app && go test ./... && npm --prefix frontend run test:run",
+    "test:integration": "cd app && go test -tags integration -count=1 -timeout 20m ./internal/integration/"
   }
 }

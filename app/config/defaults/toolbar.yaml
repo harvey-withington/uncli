@@ -1,0 +1,10 @@
+# The session toolbar. slash items are sent into the session as text;
+# native items are implemented by UNCLI.
+toolbar:
+  - { kind: model_picker }
+  - { kind: modifiers }
+  - { kind: separator }
+  - { kind: slash, label: Compact, icon: shrink, command: /compact }
+  - { kind: slash, label: Context, icon: gauge, command: /context }
+  - { kind: native, label: Usage, icon: bar-chart, action: usage }
+  - { kind: native, label: Open folder, icon: folder-open, action: open_workdir }
