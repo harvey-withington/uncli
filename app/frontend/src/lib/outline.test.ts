@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { activeEntry, clampWidth, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, wantsAutoSummary } from './outline'
+import { activeEntry, autoSummaryFor, clampWidth, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, wordCount } from './outline'
 import { toBlocks } from './render/markdown'
 
 const SRC = `Intro paragraph.
@@ -72,11 +72,15 @@ describe('summaries', () => {
     expect(summaryEntries([{ block: 1, title: 'Earlier section', kind: 'nonsense' }], blocks)[0]?.kind).toBe('commentary')
   })
 
-  it('auto-summarises only long answers without headings', () => {
-    const long = toBlocks(Array.from({ length: 12 }, (_, i) => `Paragraph ${i}.`).join('\n\n'))
-    expect(wantsAutoSummary(long)).toBe(true)
-    expect(wantsAutoSummary(toBlocks('## H\n\n' + Array.from({ length: 12 }, (_, i) => `P ${i}.`).join('\n\n')))).toBe(false)
-    expect(wantsAutoSummary(toBlocks('Short.'))).toBe(false)
+  it('auto-summarise per the preference: off, long answers (headings or not), or always', () => {
+    const words = (n: number) => Array.from({ length: n }, (_, i) => `word${i}`).join(' ')
+    expect(wordCount('**Bold** | `code` | --- ')).toBe(2)
+    expect(autoSummaryFor(words(400), 5, 'off')).toBe('off')
+    expect(autoSummaryFor(words(150), 2, 'long')).toBe('summarise')
+    expect(autoSummaryFor(`## Heading\n\n${words(149)}`, 2, 'long')).toBe('summarise')
+    expect(autoSummaryFor(words(149), 4, 'long')).toBe('short')
+    expect(autoSummaryFor(words(20), 2, 'always')).toBe('summarise')
+    expect(autoSummaryFor(words(400), 1, 'always')).toBe('short') // one block: nothing to outline
   })
 })
 
@@ -110,7 +114,4 @@ describe('paragraphs acting as headings', () => {
     ])
   })
 
-  it('stop the answer counting as having no headings', () => {
-    expect(wantsAutoSummary(toBlocks(ANSWER))).toBe(false)
-  })
 })

@@ -20,18 +20,44 @@
   const answer = $derived(displayAnswer(page, live))
   const open = $derived(page.status === 'open')
   const thinking = $derived(open && !answer)
+  const compact = $derived(app.questionCompact)
+  // The outline's entries, marked beside their blocks in the left margin.
+  const markers = $derived(new Map(app.outlineFor(page).entries.map(e => [e.block, e])))
 </script>
+
+{#snippet toggle()}
+  <button
+    class="btn ghost small icon q-toggle"
+    onclick={() => app.toggleQuestionCompact()}
+    aria-expanded={!compact}
+    aria-label={t(compact ? 'page.expandQuestion' : 'page.collapseQuestion')}
+    title={t(compact ? 'page.expandQuestion' : 'page.collapseQuestion')}
+  >
+    <Icon name={compact ? 'chevron-down' : 'chevron-up'} size={14} />
+  </button>
+{/snippet}
 
 {#key page.id}
   <article class="page" in:fade={{ duration: 140 }}>
-    <header class="question">
-      <div class="q-head">
-        <span class="seq">{t('page.number', { n: page.seq })}</span>
-        {#if page.bookmarked}<span class="marked"><Icon name="bookmark-check" size={13} />{t('nav.bookmarked')}</span>{/if}
-        <span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>
-      </div>
-      <p class="q-text">{page.question}</p>
-      <PageChips {page} />
+    <header class="question" class:compact>
+      {#if compact}
+        <!-- Compact: the question on one line, cut short before the page number. -->
+        <div class="q-head">
+          <p class="q-line" title={page.question}>{page.question}</p>
+          <span class="seq">{t('page.number', { n: page.seq })}</span>
+          <span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>
+          {@render toggle()}
+        </div>
+      {:else}
+        <div class="q-head">
+          <span class="seq">{t('page.number', { n: page.seq })}</span>
+          {#if page.bookmarked}<span class="marked"><Icon name="bookmark-check" size={13} />{t('nav.bookmarked')}</span>{/if}
+          <span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>
+          {@render toggle()}
+        </div>
+        <p class="q-text">{page.question}</p>
+        <PageChips {page} />
+      {/if}
     </header>
 
     <div class="body">
@@ -45,7 +71,7 @@
           {/if}
         </p>
       {:else if answer}
-        <AnswerBlocks markdown={answer} streaming={open} />
+        <AnswerBlocks markdown={answer} streaming={open} {markers} />
       {/if}
 
       {#if page.status === 'interrupted'}
@@ -80,6 +106,33 @@
     align-items: center;
     gap: var(--space-3);
     min-height: 26px;
+  }
+  .compact {
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
+  }
+  /* One line: the question gives way (ellipsis) so the page number stays. */
+  .q-line {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: var(--text-md);
+    font-weight: 560;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compact .seq,
+  .compact .q-copy {
+    flex: none;
+  }
+  .q-toggle {
+    flex: none;
+    color: var(--text-faint);
+  }
+  .q-copy + .q-toggle {
+    margin-left: calc(-1 * var(--space-2));
   }
   .seq {
     font-size: var(--text-xs);

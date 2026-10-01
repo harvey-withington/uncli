@@ -10,6 +10,8 @@
   import Toasts from './components/Toasts.svelte'
   import type { Backend } from './lib/api'
   import { provideApp } from './lib/context'
+  import { listenForDrops } from './lib/drops'
+  import { tintStyle } from './lib/tint'
   import { t } from './lib/i18n.svelte'
   import { back, forward, isTyping } from './lib/nav'
   import { showToast } from './lib/toasts.svelte'
@@ -29,6 +31,7 @@
 
   onMount(() => {
     app.init().catch(e => (failed = String(e)))
+    listenForDrops(app)
   })
   onDestroy(() => app.destroy())
 
@@ -83,7 +86,7 @@
         <p>{t('welcome.body')}</p>
         <div class="cards">
           {#each app.boot?.profiles ?? [] as p (p.id)}
-            <button class="card" onclick={() => app.openNewSession(p.id)}>
+            <button class="card" style={tintStyle(p.hue)} onclick={() => app.openNewSession(p.id)}>
               <span class="cicon"><Icon name={p.icon} size={18} /></span>
               <strong>{p.label}</strong>
               <span>{t(`profile.${p.id}.desc`)}</span>
@@ -155,7 +158,7 @@
     transition: transform var(--fast) var(--ease), border-color var(--fast) var(--ease);
   }
   .card:hover {
-    border-color: var(--accent);
+    border-color: var(--tint, var(--accent));
     transform: translateY(-1px);
   }
   .card span:last-child {
@@ -169,7 +172,7 @@
     height: 34px;
     margin-bottom: var(--space-2);
     border-radius: 10px;
-    background: var(--accent-soft);
-    color: var(--accent);
+    background: var(--tint-soft, var(--accent-soft));
+    color: var(--tint, var(--accent));
   }
 </style>

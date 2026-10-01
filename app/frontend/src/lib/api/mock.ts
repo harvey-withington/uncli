@@ -7,9 +7,9 @@ import type {
 import { SECTION_KINDS } from '../sections'
 
 const profiles: Bootstrap['profiles'] = [
-  { id: 'chat', label: 'Chat', icon: 'message-circle', folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false },
-  { id: 'cowork', label: 'Co-work', icon: 'briefcase', folder: 'pick', model: 'sonnet', tools: null, modifiersOn: null, ideLinks: false },
-  { id: 'code', label: 'Code', icon: 'code', folder: 'repo', model: 'opus', tools: [], modifiersOn: null, ideLinks: true },
+  { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false },
+  { id: 'cowork', label: 'Co-work', icon: 'briefcase', hue: 38, folder: 'pick', model: 'sonnet', tools: null, modifiersOn: null, ideLinks: false },
+  { id: 'code', label: 'Code', icon: 'code', hue: 280, folder: 'repo', model: 'opus', tools: [], modifiersOn: null, ideLinks: true },
 ]
 
 const modifiers: Bootstrap['modifiers'] = [
@@ -139,7 +139,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
   let cli: CLIStatus = { installed: true, version: '2.1.285', pinned: '2.1.285', custom: false, loggedIn: true, email: 'you@example.com', subscription: 'max', ...opts.cli }
   let h: Handlers | null = null
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
-  let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummarise: false, ...opts.prefs }
+  let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }
   const timers = new Map<string, number[]>()
 
   const changed = (s: SessionView) => h?.sessionChanged({ ...s })
@@ -274,6 +274,14 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
       s.modifiers = modifiers.map(x => x.id).filter(x => next.includes(x))
       changed(s)
       return { ...s }
+    },
+    async setSortOrder(id, o) { const s = find(id); s.sortOrder = o; changed(s); return { ...s } },
+    async describePaths(paths) {
+      // A path ending in a separator or without a dot reads as a folder.
+      return paths.map(p => {
+        const isDir = /[\\/]$/.test(p) || !/\.[^\\/]+$/.test(p)
+        return { path: p, isDir, dir: isDir ? p : p.replace(/[\\/][^\\/]*$/, '') }
+      })
     },
     async rename(id, t) { const s = find(id); s.title = t; changed(s); return { ...s } },
     async remove(id) {

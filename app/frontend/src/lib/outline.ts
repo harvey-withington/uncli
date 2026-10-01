@@ -1,5 +1,6 @@
 // The outline of an answer: its headings, pointing at the rendered block
 // that holds each one, so the side panel can jump to and track them.
+import type { AutoSummary } from './api'
 import type { MdBlock } from './render/markdown'
 import { classifySection, isKind, type SectionKind } from './sections'
 
@@ -106,10 +107,21 @@ export function summaryEntries(sections: readonly { block: number; title: string
   }))
 }
 
-// Long answers without headings are the ones a summary helps most; only
-// those are summarised automatically (when the user has opted in).
-export const AUTO_SUMMARY_MIN_BLOCKS = 12
+// Automatic summaries (a preference): none, long answers only, or every
+// answer. Even "always" skips a one-block answer, which has nothing to
+// outline. The summary is the same one the button makes.
+export const AUTO_SUMMARY_MIN_WORDS = 150
 
-export function wantsAutoSummary(blocks: readonly MdBlock[]): boolean {
-  return blocks.length >= AUTO_SUMMARY_MIN_BLOCKS && !blocks.some(b => b.heading)
+// autoSummaryFor says what to do with a finished answer: summarise it, or
+// leave it because it's too short (the outline says so), or nothing at all
+// when automatic summaries are off.
+export function autoSummaryFor(markdown: string, blockCount: number, mode: AutoSummary): 'summarise' | 'short' | 'off' {
+  if (mode !== 'long' && mode !== 'always') return 'off'
+  if (blockCount < 2) return 'short'
+  if (mode === 'long' && wordCount(markdown) < AUTO_SUMMARY_MIN_WORDS) return 'short'
+  return 'summarise'
+}
+
+export function wordCount(markdown: string): number {
+  return markdown.match(/[\p{L}\p{N}]+/gu)?.length ?? 0
 }

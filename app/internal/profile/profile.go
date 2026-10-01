@@ -21,6 +21,7 @@ type Profile struct {
 	ID              string   `yaml:"id" json:"id"`
 	Label           string   `yaml:"label" json:"label"`
 	Icon            string   `yaml:"icon" json:"icon"`
+	Hue             int      `yaml:"hue" json:"hue"`       // icon and accent colour: HSL hue, drawn at 100% saturation; 0 = the app accent
 	Folder          string   `yaml:"folder" json:"folder"` // scratch | pick | repo
 	Model           string   `yaml:"model" json:"model"`
 	SystemPrompt    string   `yaml:"system_prompt" json:"-"`

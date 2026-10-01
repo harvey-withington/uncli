@@ -15,3 +15,16 @@ if (typeof Element !== 'undefined' && !Element.prototype.animate) {
     } as unknown as Animation
   }
 }
+
+// jsdom has no PointerEvent; a MouseEvent carries what the app reads
+// (button, clientX/Y).
+if (typeof window !== 'undefined' && !('PointerEvent' in window)) {
+  class PointerEventPolyfill extends MouseEvent {
+    pointerId: number
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init)
+      this.pointerId = init.pointerId ?? 1
+    }
+  }
+  ;(window as unknown as { PointerEvent: typeof MouseEvent }).PointerEvent = PointerEventPolyfill
+}

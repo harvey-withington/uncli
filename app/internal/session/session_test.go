@@ -496,3 +496,22 @@ type pageSink struct {
 }
 
 func (s pageSink) PageChanged(p store.Page) { s.pages <- p }
+
+func TestSetSortOrder(t *testing.T) {
+	h := newHarness(t, "single-turn")
+	a, _ := h.m.Create("chat", "", "haiku")
+	b, _ := h.m.Create("chat", "", "haiku")
+	if l := h.m.List(); l[0].ID != b.ID {
+		t.Fatal("newest first")
+	}
+	if _, err := h.m.SetSortOrder(a.ID, b.SortOrder+1); err != nil {
+		t.Fatal(err)
+	}
+	if l := h.m.List(); l[0].ID != a.ID {
+		t.Errorf("order = %s, %s", l[0].Title, l[1].Title)
+	}
+	recs, _ := h.db.ListSessions()
+	if recs[0].ID != a.ID {
+		t.Error("order not saved")
+	}
+}

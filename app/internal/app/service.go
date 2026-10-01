@@ -511,6 +511,31 @@ func (s *Service) Bootstrap() Bootstrap {
 	}
 }
 
+// DroppedPath is a file or folder dropped onto the window.
+type DroppedPath struct {
+	Path  string `json:"path"`
+	IsDir bool   `json:"isDir"`
+	Dir   string `json:"dir"` // the folder itself, or the file's folder
+}
+
+// DescribePaths says which dropped paths are folders; paths that no longer
+// exist are left out.
+func DescribePaths(paths []string) []DroppedPath {
+	out := []DroppedPath{}
+	for _, p := range paths {
+		st, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		d := DroppedPath{Path: p, IsDir: st.IsDir(), Dir: p}
+		if !d.IsDir {
+			d.Dir = filepath.Dir(p)
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
 // OpenFolder shows a folder in the OS file manager.
 func OpenFolder(path string) error {
 	var cmd *exec.Cmd

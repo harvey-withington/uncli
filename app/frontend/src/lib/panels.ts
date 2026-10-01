@@ -23,3 +23,22 @@ export function saveSidebarWidth(width: number) {
     // not persisted; still applied for this run
   }
 }
+
+// Whether the question header is collapsed to one line (compact mode).
+const QUESTION_KEY = 'uncli-question'
+
+export function loadQuestionCompact(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(QUESTION_KEY) ?? 'null')?.compact === true
+  } catch {
+    return false
+  }
+}
+
+export function saveQuestionCompact(compact: boolean) {
+  try {
+    localStorage.setItem(QUESTION_KEY, JSON.stringify({ compact }))
+  } catch {
+    // not persisted; still applied for this run
+  }
+}

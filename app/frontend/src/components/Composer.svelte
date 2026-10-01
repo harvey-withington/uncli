@@ -3,6 +3,7 @@
   import type { SessionView } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { INSERT_EVENT } from '../lib/drops'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
 
@@ -52,6 +53,29 @@
       showToast(String(e), 'error')
     }
   }
+
+  // Paths dropped onto the composer arrive as an event (lib/drops.ts) and
+  // go in at the cursor.
+  $effect(() => {
+    const el = input
+    if (!el) return
+    const insert = (e: Event) => {
+      const add = (e as CustomEvent<string>).detail
+      const start = el.selectionStart ?? text.length
+      const end = el.selectionEnd ?? text.length
+      const before = text.slice(0, start)
+      const pad = before && !/\s$/.test(before) ? ' ' : ''
+      text = before + pad + add + text.slice(end)
+      queueMicrotask(() => {
+        el.focus()
+        const at = start + pad.length + add.length
+        el.setSelectionRange(at, at)
+        el.dispatchEvent(new Event('input')) // let autosize grow it
+      })
+    }
+    el.addEventListener(INSERT_EVENT, insert)
+    return () => el.removeEventListener(INSERT_EVENT, insert)
+  })
 
   function onkeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {

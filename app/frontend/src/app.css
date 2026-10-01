@@ -32,6 +32,9 @@
   /* Section kinds in the outline: full saturation (HSL 100%), off-primary
      hues, mid-dark lightness, nudged per hue so they read evenly bright.
      Dark themes use lighter versions of the same hues. */
+  /* Type colours (session types): a hue from the profile at 100%
+     saturation and this lightness (lib/tint.ts). */
+  --tint-l: 40%;
   --kind-overview: #008c99;
   --kind-commentary: #0047d6;
   --kind-analysis: #6000e6;
@@ -92,6 +95,8 @@
     --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.55);
     --scrim: rgba(0, 0, 0, 0.55);
 
+    --tint-l: 62%;
+
     --kind-overview: #00d2e6;
     --kind-commentary: #3d7eff;
     --kind-analysis: #9a52ff;
@@ -129,6 +134,8 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.55);
   --scrim: rgba(0, 0, 0, 0.55);
+
+  --tint-l: 62%;
 
   --kind-overview: #00d2e6;
   --kind-commentary: #3d7eff;
@@ -208,7 +215,38 @@ code, pre, kbd { font-family: var(--mono); font-size: 0.9em; font-variant-ligatu
   color: var(--text);
   font-size: var(--text-sm);
 }
+/* Dropdown lists take the theme's colours: options otherwise inherit a
+   transparent select's light text over the system's white popup. */
+option, optgroup { background-color: var(--surface); color: var(--text); }
 .input:focus, .select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* The lifted copy that follows the pointer while a list item is dragged
+   (lib/actions.ts dragSort); it settles into its slot on release.
+   !important: it must look lifted whatever state the item was in. */
+.drag-ghost {
+  list-style: none;
+  pointer-events: none;
+  background: var(--surface) !important;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border) !important;
+  scale: 1.03;
+  opacity: 0.97;
+}
+.drag-ghost.settling {
+  scale: 1;
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border) !important;
+  transition: transform 170ms var(--ease), scale 170ms var(--ease), box-shadow 170ms var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .drag-ghost.settling { transition: none; }
+}
+
+/* While a list item is being dragged (lib/actions.ts dragSort). */
+body.grabbing,
+body.grabbing * {
+  cursor: grabbing !important;
+  user-select: none;
+}
 
 .visually-hidden {
   position: absolute !important;

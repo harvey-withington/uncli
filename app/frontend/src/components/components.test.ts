@@ -6,6 +6,7 @@ import type { Page } from '../lib/api'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
 import NavBar from './NavBar.svelte'
+import OutlinePanel from './OutlinePanel.svelte'
 import PageView from './PageView.svelte'
 import Sidebar from './Sidebar.svelte'
 
@@ -32,6 +33,29 @@ describe('PageView', () => {
     expect(screen.getAllByRole('button', { name: 'Copy markdown' }).length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('4 tool calls')).toBeInTheDocument()
     expect(screen.getByText('1 denied')).toBeInTheDocument()
+  })
+
+  it('collapses the question to one line with its page number, and remembers it', async () => {
+    localStorage.clear()
+    const s = await store()
+    const page = s.currentPage as Page
+    const { unmount } = render(PageView, { props: { page }, context: ctx(s) })
+    const collapse = screen.getByRole('button', { name: 'Compact question: one line' })
+    expect(collapse).toHaveAttribute('aria-expanded', 'true')
+    await fireEvent.click(collapse)
+    const header = document.querySelector('header.question') as HTMLElement
+    expect(header).toHaveClass('compact')
+    expect(within(header).getByTitle(page.question)).toHaveTextContent(page.question)
+    expect(within(header).getByText(`Page ${page.seq}`)).toBeInTheDocument()
+    expect(within(header).getByRole('button', { name: 'Copy question' })).toBeInTheDocument()
+    expect(within(header).queryByText('Opus 5.5')).not.toBeInTheDocument() // chips hidden
+    unmount()
+    // A fresh start keeps it compact.
+    const again = await store()
+    render(PageView, { props: { page: again.currentPage as Page }, context: ctx(again) })
+    await fireEvent.click(screen.getByRole('button', { name: 'Show the whole question' }))
+    expect(screen.getByText('Opus 5.5')).toBeInTheDocument()
+    expect(again.questionCompact).toBe(false)
   })
 
   it('copies the source markdown of a block, not its rendered text', async () => {
@@ -245,6 +269,54 @@ describe('Page summaries', () => {
     expect(within(panel).getAllByRole('button').length).toBeGreaterThan(2)
   })
 
+  it('summarise a long answer as soon as it finishes, with the outline closed, when opted in', async () => {
+    localStorage.clear()
+    const s = new AppStore(mockBackend({ prefs: { autoSummary: 'long' } }))
+    await s.init()
+    s.outline.open = false
+    const answerMd = '## Heading\n\n' + Array.from({ length: 40 }, (_, i) => `Paragraph ${i} has four words.`).join('\n\n')
+    const open: Page = { ...(s.currentPage as Page), id: 'p-new', seq: 99, status: 'open', answerMd, outline: undefined }
+    const done: Page = { ...open, status: 'done' }
+    const spy = vi.spyOn(s.backend, 'summarisePage').mockResolvedValue(done)
+    s.upsertPage(open)
+    expect(spy).not.toHaveBeenCalled()
+    s.upsertPage(done)
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenCalledWith(open.sessionId, 'p-new', expect.arrayContaining(['Paragraph 0 has four words.']))
+    s.upsertPage({ ...done }) // already tried: not again
+    await waitFor(() => expect(s.summarising['p-new']).toBeUndefined())
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('say when an answer was too short to summarise automatically', async () => {
+    for (const [mode, shown] of [['long', true], ['off', false]] as const) {
+      const s = new AppStore(mockBackend({ prefs: { autoSummary: mode } }))
+      await s.init()
+      const spy = vi.spyOn(s.backend, 'summarisePage')
+      const page: Page = { ...(s.currentPage as Page), status: 'done', answerMd: '## A\n\nShort.\n\n## B\n\nAlso short.', outline: undefined }
+      const { unmount } = render(OutlinePanel, { props: { page, scroller: undefined }, context: ctx(s) })
+      if (shown) expect(screen.getByText('Short answer, not summarised.')).toBeInTheDocument()
+      else expect(screen.queryByText('Short answer, not summarised.')).not.toBeInTheDocument()
+      expect(spy).not.toHaveBeenCalled()
+      unmount()
+    }
+  })
+
+  it('mark the outline entries in the answer margin, following the Summary/Headings switch', async () => {
+    localStorage.clear()
+    render(App, { props: { backend: mockBackend() } })
+    await fireEvent.click(await screen.findByText('Plan a weekend in Lisbon'))
+    const panel = await screen.findByRole('complementary', { name: 'On this page' })
+    const markers = () => [...document.querySelectorAll('.answer .marker')].map(m => m.getAttribute('title'))
+    expect(markers()).toEqual(['Steps: Saturday', expect.stringMatching(/: Sunday$/)])
+    await fireEvent.click(within(panel).getByRole('button', { name: /Summarise this page/ }))
+    await within(panel).findByText(/Summary by/)
+    const summarised = markers()
+    expect(summarised.length).toBeGreaterThan(2)
+    await fireEvent.click(within(panel).getByRole('button', { name: 'Headings' }))
+    expect(markers()).toHaveLength(2)
+  })
+
   it('switch between summary and headings when a page has both', async () => {
     localStorage.clear()
     render(App, { props: { backend: mockBackend() } })
@@ -268,9 +340,12 @@ describe('Settings', () => {
     const model = within(dialog).getByRole('combobox', { name: 'Model' })
     expect(model).toHaveValue('haiku')
     await fireEvent.change(model, { target: { value: 'sonnet' } })
-    await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ quickTaskModel: { provider: 'claude', model: 'sonnet' }, autoSummarise: false }))
-    await fireEvent.click(within(dialog).getByRole('checkbox', { name: /Summarise long answers/ }))
-    await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ quickTaskModel: { provider: 'claude', model: 'sonnet' }, autoSummarise: true }))
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ quickTaskModel: { provider: 'claude', model: 'sonnet' }, autoSummary: 'off' }))
+    const summaries = within(dialog).getByRole('combobox', { name: 'Summaries' })
+    expect(within(summaries).getAllByRole('option').map(o => o.textContent)).toEqual(["Don't summarise", 'Summarise long answers', 'Always summarise'])
+    await fireEvent.change(summaries, { target: { value: 'always' } })
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ quickTaskModel: { provider: 'claude', model: 'sonnet' }, autoSummary: 'always' }))
+    expect(await within(dialog).findByText(/Every answer of more than one paragraph/)).toBeInTheDocument()
   })
 })
 
@@ -286,5 +361,146 @@ describe('Sidebar resizing', () => {
     expect(handle).toHaveAttribute('aria-valuenow', '240')
     expect(JSON.parse(localStorage.getItem('uncli-sidebar') ?? '{}').width).toBe(240)
     expect(document.querySelector('.sidebar')).toHaveStyle({ width: '240px' })
+  })
+})
+
+describe('New session from the keyboard', () => {
+  const lastDialog = async () => (await screen.findAllByRole('dialog', { name: 'New session' })).at(-1) as HTMLElement
+
+  it('Chat: Ctrl+N, Enter starts the session', async () => {
+    const backend = mockBackend({ empty: true })
+    const create = vi.spyOn(backend, 'createSession')
+    render(App, { props: { backend } })
+    await screen.findByRole('heading', { name: 'Welcome to UNCLI' })
+    await fireEvent.keyDown(window, { key: 'n', ctrlKey: true })
+    const dialog = await lastDialog()
+    const chat = within(dialog).getByRole('radio', { name: /Chat/ })
+    await waitFor(() => expect(chat).toBeChecked())
+    await fireEvent.keyDown(chat, { key: 'Enter' })
+    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', 'sonnet'))
+  })
+
+  it('Code without a folder: Enter picks one, the next Enter starts', async () => {
+    const backend = mockBackend({ empty: true })
+    const pick = vi.spyOn(backend, 'pickFolder')
+    const create = vi.spyOn(backend, 'createSession')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: /^Code/ }))
+    const dialog = await lastDialog()
+    const code = within(dialog).getByRole('radio', { name: /Code/ })
+    await waitFor(() => expect(code).toBeChecked())
+    await fireEvent.keyDown(code, { key: 'Enter' })
+    await waitFor(() => expect(pick).toHaveBeenCalled())
+    const start = within(dialog).getByRole('button', { name: 'Start session' })
+    await waitFor(() => expect(start).toHaveFocus())
+    expect(create).not.toHaveBeenCalled()
+    await fireEvent.keyDown(code, { key: 'Enter' }) // Enter from anywhere in the body also starts now
+    await waitFor(() => expect(create).toHaveBeenCalledWith('code', expect.stringMatching(/projects.demo$/), 'opus'))
+  })
+
+  it('a remembered folder means Ctrl+N, Enter', async () => {
+    const backend = mockBackend({ empty: true, lastNew: { profileId: 'code', folders: { code: 'D:/work/repo' }, models: { code: 'haiku' } } })
+    const pick = vi.spyOn(backend, 'pickFolder')
+    const create = vi.spyOn(backend, 'createSession')
+    render(App, { props: { backend } })
+    await screen.findByRole('heading', { name: 'Welcome to UNCLI' })
+    await fireEvent.keyDown(window, { key: 'n', ctrlKey: true })
+    const code = within(await lastDialog()).getByRole('radio', { name: /Code/ })
+    await waitFor(() => expect(code).toBeChecked())
+    await fireEvent.keyDown(code, { key: 'Enter' })
+    await waitFor(() => expect(create).toHaveBeenCalledWith('code', expect.stringMatching(/repo$/), 'haiku'))
+    expect(pick).not.toHaveBeenCalled()
+  })
+})
+
+describe('Reordering sessions', () => {
+  const titles = () => Array.from(document.querySelectorAll('.sidebar li .title')).map(el => el.textContent)
+
+  it('moves a session with Alt+Arrow', async () => {
+    const backend = mockBackend()
+    const spy = vi.spyOn(backend, 'setSortOrder')
+    render(App, { props: { backend } })
+    await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
+    expect(titles()[0]).toBe('Fix the flaky parser test')
+    const first = document.querySelector('.sidebar li .main') as HTMLElement
+    await fireEvent.keyDown(first, { key: 'ArrowDown', altKey: true })
+    await waitFor(() => expect(titles()).toEqual(['Plan a weekend in Lisbon', 'Fix the flaky parser test', 'Summarise the Q3 planning notes']))
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('moves a session by dragging it', async () => {
+    render(App, { props: { backend: mockBackend() } })
+    await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
+    // jsdom has no layout: give each item a 50px-tall box.
+    document.querySelectorAll<HTMLElement>('.sidebar li[data-id]').forEach((li, i) => {
+      li.getBoundingClientRect = () => ({ top: i * 50, height: 50, bottom: i * 50 + 50, left: 0, right: 200, width: 200, x: 0, y: i * 50, toJSON: () => ({}) })
+    })
+    const first = document.querySelector('.sidebar li .main') as HTMLElement
+    await fireEvent.pointerDown(first, { button: 0, clientY: 10 })
+    await fireEvent.pointerMove(document, { clientY: 60 })
+    await fireEvent.pointerMove(document, { clientY: 140 }) // past the middle of the last item
+    const items = [...document.querySelectorAll<HTMLElement>('.sidebar li[data-id]')]
+    expect(items[0]).toHaveClass('dragging') // its slot, moved to the end
+    expect(items[0]?.style.transform).toBe(`translateY(${(items.length - 1) * 50}px)`)
+    expect(items[1]?.style.transform).toBe('translateY(-50px)') // the others make room
+    expect(document.querySelector('body > .drag-ghost')).not.toBeNull()
+    await fireEvent.pointerUp(document)
+    await waitFor(() => expect(titles().at(-1)).toBe('Fix the flaky parser test'))
+    await waitFor(() => expect(document.querySelector('.drag-ghost')).toBeNull())
+    expect(document.querySelector('.sidebar li.dragging')).toBeNull()
+    expect([...document.querySelectorAll<HTMLElement>('.sidebar li[data-id]')].every(li => !li.style.transform)).toBe(true)
+  })
+
+  it('cancels a drag with Escape, leaving the order as it was', async () => {
+    render(App, { props: { backend: mockBackend() } })
+    await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
+    document.querySelectorAll<HTMLElement>('.sidebar li[data-id]').forEach((li, i) => {
+      li.getBoundingClientRect = () => ({ top: i * 50, height: 50, bottom: i * 50 + 50, left: 0, right: 200, width: 200, x: 0, y: i * 50, toJSON: () => ({}) })
+    })
+    const before = titles()
+    await fireEvent.pointerDown(document.querySelector('.sidebar li .main') as HTMLElement, { button: 0, clientY: 10 })
+    await fireEvent.pointerMove(document, { clientY: 140 })
+    await fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(document.querySelector('.drag-ghost')).toBeNull())
+    await fireEvent.pointerUp(document)
+    expect(titles()).toEqual(before)
+  })
+})
+
+describe('Dropping files and folders', () => {
+  it('the composer inserts dropped paths at the cursor', async () => {
+    render(App, { props: { backend: mockBackend() } })
+    const box = (await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement
+    await fireEvent.input(box, { target: { value: 'Look at' } })
+    box.setSelectionRange(7, 7)
+    box.dispatchEvent(new CustomEvent('uncli-insert', { detail: 'C:/repo/a.go "C:/My Docs/b.md"' }))
+    await waitFor(() => expect(box).toHaveValue('Look at C:/repo/a.go "C:/My Docs/b.md"'))
+  })
+
+  it('opens a new session on a dropped folder, in a folder type', async () => {
+    const { handleDrop } = await import('../lib/drops')
+    const s = new AppStore(mockBackend())
+    await s.init()
+    await handleDrop(s, document.body, ['D:/work/project'])
+    expect(s.newSessionOpen).toBe(true)
+    expect(s.newSessionProfile).toBe('code')
+    expect(s.newSessionFolder).toBe('D:/work/project')
+  })
+
+  it('routes a drop on the composer to it', async () => {
+    const { handleDrop, INSERT_EVENT } = await import('../lib/drops')
+    const s = new AppStore(mockBackend())
+    await s.init()
+    const composer = document.createElement('div')
+    composer.className = 'composer'
+    const ta = document.createElement('textarea')
+    composer.append(ta)
+    document.body.append(composer)
+    const got = vi.fn()
+    ta.addEventListener(INSERT_EVENT, e => got((e as CustomEvent).detail))
+    await handleDrop(s, ta, ['C:/My Docs/b.md'])
+    expect(got).toHaveBeenCalledWith('"C:/My Docs/b.md"')
+    expect(s.newSessionOpen).toBe(false)
+    composer.remove()
   })
 })

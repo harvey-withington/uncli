@@ -74,6 +74,10 @@ func Run(assets fs.FS) error {
 			},
 		},
 		Windows: &windows.Options{Theme: windows.SystemDefault},
+		// OS file drops give the page real paths (window.runtime.OnFileDrop);
+		// the WebView's own drop handling is off so a dropped file can't
+		// navigate the window.
+		DragAndDrop: &options.DragAndDrop{EnableFileDrop: true, DisableWebViewDrop: true},
 		OnStartup: func(ctx context.Context) {
 			a.mu.Lock()
 			a.ctx = ctx
@@ -144,6 +148,13 @@ func (a *App) SetModel(sessionID, model string) error {
 func (a *App) ToggleModifier(sessionID, modifierID string, on bool) (session.View, error) {
 	return a.svc.Sessions.ToggleModifier(sessionID, modifierID, on)
 }
+
+func (a *App) SetSortOrder(sessionID string, order float64) (session.View, error) {
+	return a.svc.Sessions.SetSortOrder(sessionID, order)
+}
+
+// DescribePaths says which paths dropped onto the window are folders.
+func (a *App) DescribePaths(paths []string) []app.DroppedPath { return app.DescribePaths(paths) }
 
 func (a *App) Rename(sessionID, title string) (session.View, error) {
 	return a.svc.Sessions.Rename(sessionID, title)

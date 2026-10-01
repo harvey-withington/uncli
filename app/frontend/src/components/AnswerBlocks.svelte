@@ -1,16 +1,20 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import type { OutlineEntry } from '../lib/outline'
   import { toBlocks } from '../lib/render/markdown'
+  import { KIND_ICONS } from '../lib/sections'
   import CodeBlock from './CodeBlock.svelte'
   import CopyButton from './CopyButton.svelte'
+  import Icon from './Icon.svelte'
 
   interface Props {
     markdown: string
     streaming?: boolean
+    markers?: Map<number, OutlineEntry> // block index → the outline entry starting there
   }
 
-  let { markdown, streaming = false }: Props = $props()
+  let { markdown, streaming = false, markers }: Props = $props()
   const app = useApp()
   const blocks = $derived(toBlocks(markdown))
 
@@ -24,13 +28,26 @@
   }
 </script>
 
+<!-- The outline's section kind, in the page's left margin beside the block
+     the section starts at. -->
+{#snippet marker(m: OutlineEntry)}
+  <span class="marker" style:color="var(--kind-{m.kind})" title={`${t(`kind.${m.kind}`)}: ${m.text}`} aria-hidden="true">
+    <Icon name={KIND_ICONS[m.kind]} size={16} />
+  </span>
+{/snippet}
+
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="answer" {onclick}>
   {#each blocks as b, i (b.key)}
+    {@const m = markers?.get(i)}
     {#if b.kind === 'code'}
-      <div data-block={i}><CodeBlock code={b.code ?? ''} lang={b.lang ?? ''} streaming={streaming && i === blocks.length - 1} /></div>
+      <div class="code" data-block={i}>
+        {#if m}{@render marker(m)}{/if}
+        <CodeBlock code={b.code ?? ''} lang={b.lang ?? ''} streaming={streaming && i === blocks.length - 1} />
+      </div>
     {:else}
       <div class="block" data-block={i}>
+        {#if m}{@render marker(m)}{/if}
         <div class="md">{@html b.html}</div>
         <span class="copy-md"><CopyButton text={b.source} label={t('copy.markdown')} /></span>
       </div>
@@ -54,6 +71,24 @@
   }
   .block:hover {
     background: var(--surface-2);
+  }
+  .code {
+    position: relative;
+  }
+  /* In the page's left padding, centred on the block's first line (text
+     blocks are widened by their hover padding, so they sit further out). */
+  .marker {
+    position: absolute;
+    top: calc((1lh - 16px) / 2);
+    right: calc(100% + 10px);
+    display: inline-flex;
+    opacity: 0.9;
+  }
+  .block > .marker {
+    right: calc(100% + 10px - var(--space-3));
+  }
+  .code > .marker {
+    top: 10px;
   }
   .copy-md {
     position: absolute;

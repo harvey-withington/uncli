@@ -79,15 +79,25 @@ func TestPreferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer svc.Close()
-	if p := svc.Preferences(); p.QuickTaskModel != (ModelRef{"claude", "haiku"}) || p.AutoSummarise {
+	if p := svc.Preferences(); p.QuickTaskModel != (ModelRef{"claude", "haiku"}) || p.AutoSummary != SummaryOff {
 		t.Errorf("defaults = %+v", p)
 	}
 	if _, err := svc.SetPreferences(Preferences{QuickTaskModel: ModelRef{"qwen-local", "qwen3"}}); err == nil {
 		t.Error("an unknown provider must be refused")
 	}
-	p, err := svc.SetPreferences(Preferences{QuickTaskModel: ModelRef{"claude", "sonnet"}, AutoSummarise: true})
-	if err != nil || p.QuickTaskModel.Model != "sonnet" || !p.AutoSummarise {
+	if _, err := svc.SetPreferences(Preferences{QuickTaskModel: ModelRef{"claude", "haiku"}, AutoSummary: "sometimes"}); err == nil {
+		t.Error("an unknown summary setting must be refused")
+	}
+	p, err := svc.SetPreferences(Preferences{QuickTaskModel: ModelRef{"claude", "sonnet"}, AutoSummary: SummaryAlways})
+	if err != nil || p.QuickTaskModel.Model != "sonnet" || p.AutoSummary != SummaryAlways {
 		t.Errorf("saved = %+v, %v", p, err)
+	}
+	// The old on/off switch carries over: on meant long answers.
+	if err := svc.Store.SetSetting(settingPrefs, `{"quickTaskModel":{"provider":"claude","model":"haiku"},"autoSummarise":true}`); err != nil {
+		t.Fatal(err)
+	}
+	if p := svc.Preferences(); p.AutoSummary != SummaryLong {
+		t.Errorf("migrated = %+v", p)
 	}
 }
 
@@ -116,5 +126,15 @@ func TestSectionKinds(t *testing.T) {
 	}
 	if !strings.Contains(string(outlineSchema), `"enum":["overview",`) {
 		t.Errorf("schema = %s", outlineSchema)
+	}
+}
+
+func TestDescribePaths(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "notes.md")
+	os.WriteFile(file, []byte("x"), 0o644)
+	got := DescribePaths([]string{dir, file, filepath.Join(dir, "gone")})
+	if len(got) != 2 || !got[0].IsDir || got[0].Dir != dir || got[1].IsDir || got[1].Dir != dir {
+		t.Errorf("paths = %+v", got)
 	}
 }

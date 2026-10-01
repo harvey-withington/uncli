@@ -181,6 +181,15 @@ func (m *Manager) ToggleModifier(id, modifierID string, on bool) (View, error) {
 	return s.ToggleModifier(modifierID, on)
 }
 
+// SetSortOrder places a session in the list (higher sorts first).
+func (m *Manager) SetSortOrder(id string, order float64) (View, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return View{}, err
+	}
+	return s.SetSortOrder(order)
+}
+
 func (m *Manager) Rename(id, title string) (View, error) {
 	s, err := m.get(id)
 	if err != nil {

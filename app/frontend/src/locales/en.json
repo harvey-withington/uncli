@@ -149,8 +149,6 @@
   "settings.quickBody": "One model for small text jobs outside your sessions, like page summaries. A light model keeps them cheap.",
   "settings.quickProvider": "Provider",
   "settings.quickModel": "Model",
-  "settings.autoSummarise": "Summarise long answers without headings automatically",
-  "settings.autoSummariseHint": "Uses the quick-task model once per page, when an answer of {n} or more blocks has no headings.",
   "settings.saved": "Saved",
   "kind.overview": "Overview",
   "kind.commentary": "Commentary",
@@ -162,5 +160,16 @@
   "kind.tip": "Tip",
   "kind.warning": "Warning",
   "kind.conclusion": "Conclusion",
-  "sidebar.resize": "Resize the session list"
+  "sidebar.resize": "Resize the session list",
+  "session.moveHint": "Drag to reorder, or Alt+↑ / Alt+↓",
+  "settings.autoSummary": "Summaries",
+  "settings.autoSummary.off": "Don't summarise",
+  "settings.autoSummary.long": "Summarise long answers",
+  "settings.autoSummary.always": "Always summarise",
+  "settings.autoSummaryHint.off": "Summarise a page yourself from its outline.",
+  "settings.autoSummaryHint.long": "Answers of {n} words or more are summarised as soon as they finish.",
+  "settings.autoSummaryHint.always": "Every answer of more than one paragraph is summarised as soon as it finishes.",
+  "outline.short": "Short answer, not summarised.",
+  "page.collapseQuestion": "Compact question: one line",
+  "page.expandQuestion": "Show the whole question"
 }

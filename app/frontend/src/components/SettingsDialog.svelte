@@ -4,9 +4,9 @@
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
-  import type { Preferences } from '../lib/api'
+  import type { AutoSummary, Preferences } from '../lib/api'
   import { modelOptions } from '../lib/models'
-  import { AUTO_SUMMARY_MIN_BLOCKS } from '../lib/outline'
+  import { AUTO_SUMMARY_MIN_WORDS } from '../lib/outline'
 
   // Settings: the quick-task model, and the CLI version (anything but the
   // pinned version is at the user's own risk).
@@ -27,7 +27,7 @@
 
   async function savePrefs(next: Preferences) {
     try {
-      const saved = await app.backend.setPreferences(next)
+      const saved = await app.backend.setPreferences($state.snapshot(next)) // plain data, not reactive proxies
       if (app.boot) app.boot.preferences = saved
     } catch (e) {
       showToast(String(e), 'error')
@@ -38,6 +38,7 @@
     if (!prefs) return
     savePrefs({ ...prefs, quickTaskModel: { ...prefs.quickTaskModel, [field]: value } })
   }
+  const summaryModes: AutoSummary[] = ['off', 'long', 'always']
   const isPinned = $derived(!version || version === pinned)
 
   async function apply(v: string) {
@@ -72,14 +73,15 @@
             <option value={m.value}>{m.label}</option>
           {/each}
         </select>
+        <label for="auto-summary">{t('settings.autoSummary')}</label>
+        <select id="auto-summary" class="select" value={prefs.autoSummary} onchange={e => savePrefs({ ...prefs, autoSummary: e.currentTarget.value as AutoSummary })}>
+          {#each summaryModes as m (m)}
+            <option value={m}>{t(`settings.autoSummary.${m}`)}</option>
+          {/each}
+        </select>
+        <span></span>
+        <span class="hint">{t(`settings.autoSummaryHint.${prefs.autoSummary}`, { n: AUTO_SUMMARY_MIN_WORDS })}</span>
       </div>
-      <label class="check">
-        <input type="checkbox" checked={prefs.autoSummarise} onchange={e => savePrefs({ ...prefs, autoSummarise: e.currentTarget.checked })} />
-        <span>
-          {t('settings.autoSummarise')}
-          <span class="hint">{t('settings.autoSummariseHint', { n: AUTO_SUMMARY_MIN_BLOCKS })}</span>
-        </span>
-      </label>
     </section>
   {/if}
   <section>
@@ -121,18 +123,8 @@
     margin-bottom: var(--space-3);
     font-size: var(--text-sm);
   }
-  .check {
-    display: flex;
-    gap: var(--space-2);
-    align-items: flex-start;
-    font-size: var(--text-sm);
-    cursor: pointer;
-  }
-  .check input {
-    margin-top: 3px;
-  }
   .hint {
-    display: block;
+    margin-top: -2px;
     color: var(--text-muted);
     font-size: var(--text-xs);
   }

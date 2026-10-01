@@ -33,7 +33,20 @@ export interface MdBlock {
   heading?: { level: number; text: string; pseudo?: boolean }
 }
 
+// The answer, its outline and the margin markers all parse the same text,
+// often on every streamed delta; the last few results are kept.
+const recent = new Map<string, MdBlock[]>()
+
 export function toBlocks(src: string): MdBlock[] {
+  const hit = recent.get(src)
+  if (hit) return hit
+  const out = parseBlocks(src)
+  recent.set(src, out)
+  if (recent.size > 8) recent.delete(recent.keys().next().value as string)
+  return out
+}
+
+function parseBlocks(src: string): MdBlock[] {
   const tokens = md.parse(src, {})
   const lines = src.split('\n')
   const out: MdBlock[] = []
