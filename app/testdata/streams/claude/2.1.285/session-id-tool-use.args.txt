@@ -1,0 +1,1 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --session-id d5dc9a92-8ffa-431b-9c43-2b030165f77f

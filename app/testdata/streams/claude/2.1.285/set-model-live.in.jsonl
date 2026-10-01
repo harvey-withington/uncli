@@ -1,0 +1,3 @@
+{"type":"user","message":{"role":"user","content":"Reply with just: one"},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_request","request_id":"req_1","request":{"subtype":"set_model","model":"sonnet"}}
+{"type":"user","message":{"role":"user","content":"Which model are you? Reply with your model id only."},"parent_tool_use_id":null,"session_id":""}

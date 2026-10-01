@@ -1,0 +1,1 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --append-system-prompt Always end your reply with the word PINEAPPLE. --disallowedTools Bash --permission-prompts none
