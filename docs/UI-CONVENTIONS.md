@@ -19,8 +19,28 @@ with the code.
   `ConfirmDialog` via `confirm()` in `lib/confirm.svelte.ts`.
 - Keyed `{#each}` blocks use stable ids, never the index (toolbar items,
   which have no ids and never reorder, are the one exception).
-- Shared DOM behaviours (click-outside, focus trap, autosize) are actions in
-  `lib/actions.ts`.
+- Shared DOM behaviours (click-outside, focus trap, autosize, drag) are
+  actions in `lib/actions.ts`.
+- **Drag and drop wherever it makes sense.** Lists the user orders are
+  reordered by dragging (`dragSort`: a few pixels of movement starts it; a
+  lifted ghost follows the pointer while the others slide aside to open the
+  slot it will land in, which is the drop indicator; on release the ghost
+  settles into the slot; Escape cancels; the scroller follows near its edges;
+  the click after a drag is swallowed; reduced motion skips the animation),
+  never by up/down buttons, and always have a keyboard twin
+  (Alt+↑ / Alt+↓ on the focused item). Panel edges resize by dragging
+  (`ResizeHandle`). Files and folders dropped from the OS do the obvious thing
+  where they land (`lib/drops.ts`): paths into the composer, a folder anywhere
+  else starts a new session there. Controls inside a draggable item carry
+  `data-no-drag`.
+- **Colour comes in splashes, fully saturated.** Icons and accents that
+  distinguish things (section kinds, session types) use HSL at 100%
+  saturation and medium-to-dark lightness (lighter in dark themes; nudge it
+  per hue so a set reads evenly), never greyed or pastel. Session types take
+  a `hue` from their profile YAML and render through `tintStyle()`
+  (`--tint`, `--tint-soft`, with the theme's `--tint-l`); anything without its
+  own colour falls back to the one app accent. Colour is still never the
+  only signal.
 - The UI never parses provider JSON. It sees only UNCLI's events and pages
   through `lib/api` (the `Backend` interface), implemented by the Wails
   bridge in the app and by a mock in a plain browser.
@@ -44,6 +64,7 @@ with the code.
 | `--success` | Copied, tool succeeded |
 | `--shadow-sm` / `--shadow-md` / `--shadow-lg` | Cards / popovers and toasts / dialogs |
 | `--scrim` | Behind dialogs |
+| `--tint-l` | Lightness for type colours (40% light, 62% dark); `tintStyle(hue)` sets `--tint` and `--tint-soft` on an element |
 | `--kind-<kind>` | Outline section-kind icons, one per kind in `lib/sections.ts`: full HSL saturation, mid-dark (lighter in dark themes) |
 | `--font` / `--mono` | Inter Variable / JetBrains Mono Variable (bundled; no ligatures in code) |
 | `--text-xs` … `--text-xl` | Type scale (11.5, 12.5, 14, 15.5, 20 px) |
@@ -65,15 +86,15 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `CopyButton` | `text`, `label?` | Copies through the backend; shows a check for 1.4 s |
 | `ActivityBadge` | `state`, `showIdle?` | Dot plus label; pulses while busy |
 | `ResizeHandle` | `edge`, `width`, `min`, `max`, `label`, `onresize`, `oncommit` | A separator on a panel edge: drag, or arrow keys when focused (Shift for bigger steps). Used by the sidebar (200–440 px) and outline (180–480 px); widths kept in localStorage |
-| `Sidebar` / `SessionItem` | — / `session`, `active` | Double-click or pencil renames; trash confirms then deletes |
+| `Sidebar` / `SessionItem` | — / `session`, `active` | Drag to reorder (or Alt+↑ / Alt+↓); type icon and active stripe in the type's colour; double-click or pencil renames; trash confirms then deletes |
 | `NewSessionDialog` | none | Profile cards, folder picker for co-work and code, model select. Opens on the welcome card clicked, else the last type used; each type starts from its last model and folder (remembered in the app database) |
 | `SessionPane` | `session` | Header, toolbar, current page, nav bar, composer |
 | `Toolbar` | `session` | Rendered from `toolbar.yaml`: model picker, modifier toggles (groups exclusive), slash and native items |
 | `UsagePopover` | `usage`, `onclose` | Subscription windows from `EvUsageLimit` |
-| `PageView` | `page` | Sticky question with copy, streamed answer, banners, trace, chips |
-| `AnswerBlocks` | `markdown`, `streaming?` | One block per top-level markdown element; each copies its source markdown |
+| `PageView` | `page` | Sticky question with copy, streamed answer, banners, trace, chips. A chevron collapses the question to compact mode: one line, the question left (ellipsis when short of room) and the page number right, never cut, then copy and the chevron; kept in localStorage |
+| `AnswerBlocks` | `markdown`, `streaming?`, `markers?` | One block per top-level markdown element; each copies its source markdown. `markers` (block index → outline entry, from `app.outlineFor(page)`) puts the entry's section-kind icon in the page's left margin beside the block, 16 px in the kind colour (a step up from the outline's 13 px), so the margin always matches what the outline shows, Summary/Headings switch included |
 | `CodeBlock` | `code`, `lang`, `streaming?` | Shiki highlighting once complete; copies code only |
-| `OutlinePanel` | `page`, `scroller` | "On this page": the answer's headings (levels normalised; paragraphs that act as headings, such as "**1. Point.** …" or a short all-bold line, count one level below the real heading before them), or a summary from the quick-task model (sparkles button; Summary/Headings switch when both exist; caption names the model and cost), each entry with a section-kind icon (`lib/sections.ts`: guessed for headings, chosen by the model in a summary; the kind is in the tooltip and read out to screen readers), the question at the top; click to jump below the sticky question, the section being read is highlighted. Resized by dragging its left edge or arrow keys on it (180–480 px); width and visibility kept in localStorage |
+| `OutlinePanel` | `page`, `scroller` | "On this page": the answer's headings (levels normalised; paragraphs that act as headings, such as "**1. Point.** …" or a short all-bold line, count one level below the real heading before them), or a summary from the quick-task model (sparkles button; Summary/Headings switch when both exist; caption names the model and cost; summaries also start on their own as answers finish, per the Summaries setting, and an answer skipped as too short says so with a link to summarise it anyway), each entry with a section-kind icon (`lib/sections.ts`: guessed for headings, chosen by the model in a summary; the kind is in the tooltip and read out to screen readers), the question at the top; click to jump below the sticky question, the section being read is highlighted. Resized by dragging its left edge or arrow keys on it (180–480 px); width and visibility kept in localStorage |
 | `TraceStrip` | `items` | Collapsed summary with running, denied and failed counts |
 | `PageChips` | `page` | Model, modifiers, tokens, cost, duration |
 | `NavBar` | none | Separate rounded buttons (gradient fill, filled icons, no text): previous bookmark ◀◀, back ◀, position capsule "3 / 7" (read as "Page 3 of 7"), forward ▶, next bookmark ▶▶, bookmark toggle (filled when set). Docked by `SessionPane` on the line between answer and composer, centred over the answer column; the answer fades out above it |
@@ -93,6 +114,9 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | O | Session (not while typing) | Show or hide the page outline |
 | ← / → | A focused resize handle (sidebar, outline) | Move the edge left / right (Shift for bigger steps) |
 | Ctrl+N (⌘N) | Anywhere once set up | New session |
+| Enter | New-session dialog body | Start the session, or first open the folder picker if Co-work/Code has no folder (focus then moves to Start session). Buttons keep their own Enter |
+| ← / → / ↑ / ↓ | New-session dialog, on the type cards | Choose the session type |
+| Alt+↑ / Alt+↓ | A focused session in the sidebar | Move it up / down the list |
 | Enter | Rename field | Save; Escape cancels |
 
 ## Running the UI without the app

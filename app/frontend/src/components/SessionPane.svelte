@@ -2,6 +2,7 @@
   import type { SessionView } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { tintStyle } from '../lib/tint'
   import ActivityBadge from './ActivityBadge.svelte'
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
@@ -29,7 +30,7 @@
 <section class="pane">
   <header class="top">
     <div class="title-row">
-      <span class="mode"><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
+      <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <h1 title={session.title}>{session.title || t('session.untitled')}</h1>
       <ActivityBadge state={session.state} />
       <button
@@ -55,15 +56,17 @@
          the composer. -->
     <div class="main">
       <div class="scroll" bind:this={scroller}>
-        {#if page}
-          <PageView {page} />
-        {:else}
-          <div class="empty">
-            <span class="eicon"><Icon name={profile?.icon ?? 'message-circle'} size={22} /></span>
-            <h2>{t(`profile.${session.profileId}.empty`)}</h2>
-            <p>{t(`profile.${session.profileId}.desc`)}</p>
-          </div>
-        {/if}
+        <div class="content">
+          {#if page}
+            <PageView {page} />
+          {:else}
+            <div class="empty">
+              <span class="eicon" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={22} /></span>
+              <h2>{t(`profile.${session.profileId}.empty`)}</h2>
+              <p>{t(`profile.${session.profileId}.desc`)}</p>
+            </div>
+          {/if}
+        </div>
       </div>
       <div class="dock"><NavBar /></div>
       <footer class="bottom">
@@ -107,8 +110,8 @@
     width: 26px;
     height: 26px;
     border-radius: 8px;
-    background: var(--accent-soft);
-    color: var(--accent);
+    background: var(--tint-soft, var(--accent-soft));
+    color: var(--tint, var(--accent));
     flex: none;
   }
   h1 {
@@ -153,6 +156,13 @@
     min-height: 0;
     overflow-y: auto;
   }
+  /* At least the scroller's height, so the fade below always sits at the
+     bottom of the panel, never over the end of short content. flow-root
+     keeps children's margins inside it so they don't add scroll height. */
+  .content {
+    display: flow-root;
+    min-height: 100%;
+  }
   /* Text fades out above the page controls instead of running into them.
      Sticky inside the scroller, so it never covers the scrollbar; the
      negative margin keeps it from adding scroll height. */
@@ -196,8 +206,8 @@
     width: 48px;
     height: 48px;
     border-radius: 14px;
-    background: var(--accent-soft);
-    color: var(--accent);
+    background: var(--tint-soft, var(--accent-soft));
+    color: var(--tint, var(--accent));
   }
   .empty h2 {
     margin: var(--space-4) 0 var(--space-2);

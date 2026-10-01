@@ -9,6 +9,7 @@ interface WailsWindow {
   go?: { bridge?: { App?: Bound } }
   runtime?: {
     EventsOn(name: string, cb: (data: unknown) => void): () => void
+    OnFileDrop?(cb: (x: number, y: number, paths: string[]) => void, useDropTarget: boolean): void
     ClipboardSetText(text: string): Promise<boolean>
   }
 }
@@ -56,6 +57,8 @@ export function wailsBackend(): Backend {
     setModel: (id, m) => call('SetModel', id, m),
     toggleModifier: (id, mod, on) => call('ToggleModifier', id, mod, on),
     rename: (id, t) => call('Rename', id, t),
+    setSortOrder: (id, o) => call('SetSortOrder', id, o),
+    describePaths: p => call('DescribePaths', p),
     remove: id => call('Delete', id),
     setBookmark: (s, p, on) => call('SetBookmark', s, p, on),
     focus: id => call('Focus', id),

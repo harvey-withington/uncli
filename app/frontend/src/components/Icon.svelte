@@ -5,8 +5,10 @@
   import BookmarkCheck from 'lucide-svelte/icons/bookmark-check'
   import Briefcase from 'lucide-svelte/icons/briefcase'
   import Check from 'lucide-svelte/icons/check'
+  import ChevronDown from 'lucide-svelte/icons/chevron-down'
   import ChevronLeft from 'lucide-svelte/icons/chevron-left'
   import ChevronRight from 'lucide-svelte/icons/chevron-right'
+  import ChevronUp from 'lucide-svelte/icons/chevron-up'
   import ChevronsLeft from 'lucide-svelte/icons/chevrons-left'
   import ChevronsRight from 'lucide-svelte/icons/chevrons-right'
   import CircleAlert from 'lucide-svelte/icons/circle-alert'
@@ -52,7 +54,7 @@
   // the app uses itself. Unknown names fall back to a neutral glyph.
   const ICONS = {
     'arrow-up': ArrowUp, 'bar-chart': BarChart, bookmark: Bookmark, 'bookmark-check': BookmarkCheck,
-    briefcase: Briefcase, check: Check, 'chevron-left': ChevronLeft, 'chevron-right': ChevronRight,
+    briefcase: Briefcase, check: Check, 'chevron-down': ChevronDown, 'chevron-up': ChevronUp, 'chevron-left': ChevronLeft, 'chevron-right': ChevronRight,
     'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code,
     copy: Copy, download: Download, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,
     'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,

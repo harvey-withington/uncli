@@ -6,6 +6,7 @@
   import ResizeHandle from './ResizeHandle.svelte'
   import SessionItem from './SessionItem.svelte'
   import { SIDEBAR_MAX, SIDEBAR_MIN } from '../lib/panels'
+  import { dragSort } from '../lib/actions'
 
   const app = useApp()
   const themeIcon = $derived(theme.value === 'light' ? 'sun' : theme.value === 'dark' ? 'moon' : 'monitor')
@@ -37,7 +38,7 @@
     {#if app.sessions.length === 0}
       <p class="empty">{t('session.none')}</p>
     {:else}
-      <ul>
+      <ul use:dragSort={{ item: 'li[data-id]', onmove: (id, to) => app.moveSession(id, to) }}>
         {#each app.sessions as session (session.id)}
           <SessionItem {session} active={session.id === app.currentId} />
         {/each}
@@ -110,6 +111,26 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+  }
+  /* Drag to reorder: the others slide out of the way, and the dragged
+     item's own place becomes an empty slot where it will land. */
+  ul:global(.sorting) :global(li) {
+    transition: transform 180ms var(--ease), background var(--fast) var(--ease);
+  }
+  ul:global(.settled) :global(li) {
+    transition: none;
+  }
+  ul :global(li.dragging) {
+    background: var(--accent-soft);
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  ul :global(li.dragging > *) {
+    visibility: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    ul:global(.sorting) :global(li) {
+      transition: none;
+    }
   }
   .empty {
     color: var(--text-faint);

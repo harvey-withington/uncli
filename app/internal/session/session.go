@@ -293,6 +293,17 @@ func (s *Session) ToggleModifier(id string, on bool) (View, error) {
 	return s.viewLocked(), nil
 }
 
+func (s *Session) SetSortOrder(order float64) (View, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rec.SortOrder = order
+	if err := s.m.d.Store.UpdateSession(&s.rec); err != nil {
+		return View{}, err
+	}
+	s.changed()
+	return s.viewLocked(), nil
+}
+
 func (s *Session) Rename(title string) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

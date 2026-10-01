@@ -25,7 +25,19 @@ type ModelRef struct {
 
 type Preferences struct {
 	QuickTaskModel ModelRef `json:"quickTaskModel"` // the model for every quick task
-	AutoSummarise  bool     `json:"autoSummarise"`  // summarise long answers without headings without asking
+	AutoSummary    string   `json:"autoSummary"`    // which answers summarise themselves as they finish: off, long or always
+}
+
+// Automatic summaries: none, answers long enough to need one (the UI
+// decides what's long), or every answer of more than one block.
+const (
+	SummaryOff    = "off"
+	SummaryLong   = "long"
+	SummaryAlways = "always"
+)
+
+func validSummary(v string) bool {
+	return v == SummaryOff || v == SummaryLong || v == SummaryAlways
 }
 
 type Provider struct {
@@ -36,16 +48,27 @@ type Provider struct {
 const settingPrefs = "prefs"
 
 func defaultPreferences() Preferences {
-	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}}
+	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}, AutoSummary: SummaryOff}
 }
 
 func (s *Service) Preferences() Preferences {
-	p := defaultPreferences()
+	saved := struct {
+		Preferences
+		AutoSummarise bool `json:"autoSummarise"` // before AutoSummary: on meant long answers
+	}{Preferences: defaultPreferences()}
+	saved.AutoSummary = "" // unset until read, so the old switch can fill it
 	if raw, _ := s.Store.Setting(settingPrefs); raw != "" {
-		_ = json.Unmarshal([]byte(raw), &p)
+		_ = json.Unmarshal([]byte(raw), &saved)
 	}
+	p := saved.Preferences
 	if p.QuickTaskModel.Provider == "" || p.QuickTaskModel.Model == "" {
 		p.QuickTaskModel = defaultPreferences().QuickTaskModel
+	}
+	if !validSummary(p.AutoSummary) {
+		p.AutoSummary = SummaryOff
+		if saved.AutoSummarise {
+			p.AutoSummary = SummaryLong
+		}
 	}
 	return p
 }
@@ -56,6 +79,9 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 	}
 	if strings.TrimSpace(p.QuickTaskModel.Model) == "" {
 		return s.Preferences(), errors.New("choose a model for quick tasks")
+	}
+	if !validSummary(p.AutoSummary) {
+		return s.Preferences(), fmt.Errorf("unknown summary setting %q", p.AutoSummary)
 	}
 	b, err := json.Marshal(p)
 	if err != nil {

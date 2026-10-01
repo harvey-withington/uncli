@@ -4,6 +4,7 @@ profiles:
   - id: chat
     label: Chat
     icon: message-circle
+    hue: 205                 # azure; type icons and accents use HSL(hue, 100%, theme lightness)
     folder: scratch          # scratch | pick | repo; scratch = a fresh folder per session
     model: sonnet
     system_prompt: |         # replaces the coding persona
@@ -18,6 +19,7 @@ profiles:
   - id: cowork
     label: Co-work
     icon: briefcase
+    hue: 38                  # amber
     folder: pick
     model: sonnet
     append_prompt: |
@@ -28,6 +30,7 @@ profiles:
   - id: code
     label: Code
     icon: code
+    hue: 280                 # violet
     folder: repo
     model: opus
     tools: []                # empty = CLI defaults

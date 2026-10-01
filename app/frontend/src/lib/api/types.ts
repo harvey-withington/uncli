@@ -85,6 +85,7 @@ export interface Profile {
   id: string
   label: string
   icon: string
+  hue: number // type colour; 0 = the app accent
   folder: 'scratch' | 'pick' | 'repo'
   model: string
   tools: string[] | null
@@ -137,9 +138,12 @@ export interface ModelRef {
   model: string
 }
 
+// Which answers summarise themselves as they finish.
+export type AutoSummary = 'off' | 'long' | 'always'
+
 export interface Preferences {
   quickTaskModel: ModelRef
-  autoSummarise: boolean
+  autoSummary: AutoSummary // which answers summarise themselves as they finish
 }
 
 export interface Provider {
@@ -190,6 +194,13 @@ export interface SignInStart {
   url?: string
   signedIn: boolean
   status: CLIStatus
+}
+
+// A file or folder dropped onto the window.
+export interface DroppedPath {
+  path: string
+  isDir: boolean
+  dir: string // the folder itself, or the file's folder
 }
 
 export interface Progress {
@@ -275,6 +286,8 @@ export interface Backend {
   setModel(sessionId: string, model: string): Promise<void>
   toggleModifier(sessionId: string, modifierId: string, on: boolean): Promise<SessionView>
   rename(sessionId: string, title: string): Promise<SessionView>
+  setSortOrder(sessionId: string, order: number): Promise<SessionView>
+  describePaths(paths: string[]): Promise<DroppedPath[]>
   remove(sessionId: string): Promise<void>
   setBookmark(sessionId: string, pageId: string, on: boolean): Promise<Page>
   focus(sessionId: string): Promise<void>

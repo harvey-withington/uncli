@@ -1,19 +1,11 @@
-<script lang="ts" module>
-  // Pages already summarised automatically this run, so a failure isn't retried in a loop.
-  const autoRequested = new Set<string>()
-</script>
-
 <script lang="ts">
   import type { Page } from '../lib/api'
   import { useApp } from '../lib/context'
   import { cost } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
   import { modelLabel } from '../lib/models'
-  import { activeEntry, OUTLINE_MAX, OUTLINE_MIN, outlineOf, summaryBlocks, summaryEntries, wantsAutoSummary } from '../lib/outline'
-  import { toBlocks } from '../lib/render/markdown'
+  import { activeEntry, autoSummaryFor, OUTLINE_MAX, OUTLINE_MIN } from '../lib/outline'
   import { KIND_ICONS } from '../lib/sections'
-  import { showToast } from '../lib/toasts.svelte'
-  import { displayAnswer } from '../stores/app.svelte'
   import Icon from './Icon.svelte'
   import ResizeHandle from './ResizeHandle.svelte'
 
@@ -27,37 +19,25 @@
 
   let { page, scroller }: Props = $props()
   const app = useApp()
-  const blocks = $derived(toBlocks(displayAnswer(page, app.live[page.sessionId])))
-  const headings = $derived(outlineOf(blocks))
-  const summary = $derived(page.outline ? summaryEntries(page.outline.sections, blocks) : [])
-  let preferHeadings = $state(false)
-  const showingSummary = $derived(summary.length > 0 && !(preferHeadings && headings.length > 0))
-  const entries = $derived(showingSummary ? summary : headings)
+  const outline = $derived(app.outlineFor(page))
+  const blocks = $derived(outline.blocks)
+  const showingSummary = $derived(outline.showingSummary)
+  const entries = $derived(outline.entries)
   const quick = $derived(app.boot?.preferences.quickTaskModel)
   const quickLabel = $derived(quick ? modelLabel(app.boot?.models ?? null, quick.model) : '')
-  let summarising = $state(false)
+  const summarising = $derived(!!app.summarising[page.id])
   let active = $state(-1)
+  // A finished answer the automatic summary passed over for being short.
+  const short = $derived(
+    page.status === 'done' && !page.outline && autoSummaryFor(page.answerMd, blocks.length, app.boot?.preferences.autoSummary ?? 'off') === 'short',
+  )
 
-  async function summarise() {
-    if (summarising || page.status === 'open') return
-    summarising = true
-    try {
-      const updated = await app.backend.summarisePage(page.sessionId, page.id, summaryBlocks(toBlocks(page.answerMd)))
-      app.upsertPage(updated)
-      preferHeadings = false
-    } catch (e) {
-      showToast(String(e), 'error')
-    } finally {
-      summarising = false
-    }
-  }
+  const summarise = () => app.summarise(page)
 
-  // Opt-in: long answers without headings get a summary once they finish.
+  // Answers summarise themselves as they finish (the store does that); an
+  // older page opened here gets the same chance.
   $effect(() => {
-    if (!app.boot?.preferences.autoSummarise || page.status !== 'done' || page.outline || autoRequested.has(page.id)) return
-    if (!wantsAutoSummary(toBlocks(page.answerMd))) return
-    autoRequested.add(page.id)
-    summarise()
+    app.autoSummarise(page)
   })
 
   // The sticky question covers the top of the scroller; content is "being
@@ -123,10 +103,10 @@
     </button>
   </div>
 
-  {#if summary.length > 0 && headings.length > 0}
+  {#if outline.summary.length > 0 && outline.headings.length > 0}
     <div class="switch" role="group" aria-label={t('outline.show')}>
-      <button class:on={showingSummary} aria-pressed={showingSummary} onclick={() => (preferHeadings = false)}>{t('outline.summary')}</button>
-      <button class:on={!showingSummary} aria-pressed={!showingSummary} onclick={() => (preferHeadings = true)}>{t('outline.headings')}</button>
+      <button class:on={showingSummary} aria-pressed={showingSummary} onclick={() => delete app.preferHeadings[page.id]}>{t('outline.summary')}</button>
+      <button class:on={!showingSummary} aria-pressed={!showingSummary} onclick={() => (app.preferHeadings[page.id] = true)}>{t('outline.headings')}</button>
     </div>
   {/if}
 
@@ -153,6 +133,11 @@
 
   {#if summarising}
     <p class="note">{t('outline.summarising', { model: quickLabel })}</p>
+  {:else if short}
+    <p class="note">
+      {t('outline.short')}
+      <button class="link" onclick={summarise}>{t('outline.summariseShort')}</button>
+    </p>
   {:else if entries.length === 0}
     <p class="note">
       {t('outline.empty')}

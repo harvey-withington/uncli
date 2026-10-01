@@ -3,6 +3,7 @@
   import { confirm } from '../lib/confirm.svelte'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { tintStyle } from '../lib/tint'
   import { showToast } from '../lib/toasts.svelte'
   import ActivityBadge from './ActivityBadge.svelte'
   import Icon from './Icon.svelte'
@@ -35,6 +36,16 @@
     }
   }
 
+  // Alt+Up / Alt+Down move the session: the keyboard twin of dragging it.
+  function moveWithKeys(e: KeyboardEvent) {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+    e.preventDefault()
+    const from = app.sessions.findIndex(s => s.id === session.id)
+    app.moveSession(session.id, e.key === 'ArrowUp' ? from - 1 : from + 2).then(() => {
+      document.querySelector<HTMLElement>(`[data-id="${session.id}"] .main`)?.focus()
+    })
+  }
+
   async function remove(e: MouseEvent) {
     e.stopPropagation()
     const ok = await confirm({
@@ -52,7 +63,7 @@
   }
 </script>
 
-<li class="item" class:active>
+<li class="item" class:active data-id={session.id} style={tintStyle(profile?.hue)}>
   {#if editing}
     <div class="row">
       <span class="mode"><Icon name={profile?.icon ?? 'message-circle'} /></span>
@@ -70,7 +81,15 @@
       />
     </div>
   {:else}
-    <button class="row main" onclick={() => app.select(session.id)} ondblclick={startRename} aria-current={active ? 'true' : undefined}>
+    <button
+      class="row main"
+      onclick={() => app.select(session.id)}
+      ondblclick={startRename}
+      onkeydown={moveWithKeys}
+      aria-current={active ? 'true' : undefined}
+      aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+      title={t('session.moveHint')}
+    >
       <span class="mode" title={profile?.label}><Icon name={profile?.icon ?? 'message-circle'} label={profile?.label} /></span>
       <span class="text">
         <span class="title" class:untitled={!session.title}>{session.title || t('session.untitled')}</span>
@@ -80,7 +99,7 @@
         </span>
       </span>
     </button>
-    <span class="actions">
+    <span class="actions" data-no-drag>
       <button class="btn ghost small icon" onclick={startRename} aria-label={t('session.rename')} title={t('session.rename')}><Icon name="pencil" size={13} /></button>
       <button class="btn ghost small icon" onclick={remove} aria-label={t('session.delete')} title={t('session.delete')}><Icon name="trash" size={13} /></button>
     </span>
@@ -99,7 +118,7 @@
   }
   .item.active {
     background: var(--surface);
-    box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--border);
+    box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--border), inset 3px 0 0 var(--tint, var(--accent));
   }
   .row {
     display: flex;
@@ -119,13 +138,9 @@
     height: 26px;
     margin-top: 1px;
     border-radius: 8px;
-    background: var(--surface-2);
-    color: var(--text-muted);
+    background: var(--tint-soft, var(--surface-2));
+    color: var(--tint, var(--text-muted));
     flex: none;
-  }
-  .active .mode {
-    background: var(--accent-soft);
-    color: var(--accent);
   }
   .text {
     display: flex;

@@ -4,8 +4,10 @@ import type {
   Backend, Bootstrap, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
   ThinkingData, UsageLimit,
 } from '../lib/api'
-import { loadLayout, saveLayout, type OutlineLayout } from '../lib/outline'
-import { loadSidebarWidth, saveSidebarWidth } from '../lib/panels'
+import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
+import { loadQuestionCompact, loadSidebarWidth, saveQuestionCompact, saveSidebarWidth } from '../lib/panels'
+import { toBlocks } from '../lib/render/markdown'
+import { orderAt } from '../lib/reorder'
 import { showToast } from '../lib/toasts.svelte'
 
 export interface Live {
@@ -28,10 +30,15 @@ export class AppStore {
   usage = $state<UsageLimit | null>(null)
   newSessionOpen = $state(false)
   newSessionProfile = $state<string | null>(null) // profile the dialog opens on
+  newSessionFolder = $state<string | null>(null) // folder it opens with (a dropped folder)
   newSessionSeq = $state(0) // each open is a fresh dialog, even mid fade-out
   settingsOpen = $state(false)
   outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
   sidebarWidth = $state(loadSidebarWidth())
+  questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
+  summarising = $state<Record<string, boolean>>({}) // page id → a summary is being made
+  preferHeadings = $state<Record<string, boolean>>({}) // page id → show its headings, not its summary
+  private autoSummarised = new Set<string>() // tried once, so a failure isn't retried in a loop
   private off: (() => void) | null = null
 
   constructor(backend: Backend) {
@@ -81,8 +88,9 @@ export class AppStore {
 
   // openNewSession opens the new-session dialog, on a given profile if one
   // was picked (the welcome cards), else on the first.
-  openNewSession(profileId: string | null = null) {
+  openNewSession(profileId: string | null = null, folder: string | null = null) {
     this.newSessionProfile = profileId
+    this.newSessionFolder = folder
     this.newSessionSeq++
     this.newSessionOpen = true
   }
@@ -97,9 +105,29 @@ export class AppStore {
     saveLayout(this.outline)
   }
 
+  toggleQuestionCompact() {
+    this.questionCompact = !this.questionCompact
+    saveQuestionCompact(this.questionCompact)
+  }
+
   setOutlineWidth(width: number) {
     this.outline.width = width
     saveLayout(this.outline)
+  }
+
+  // moveSession puts a session at a position in the list as shown (drag
+  // and drop, or Alt+arrows), saving only its new sortOrder.
+  async moveSession(id: string, to: number) {
+    const order = orderAt(this.sessions, id, to)
+    if (order === null) return
+    const before = this.sessions
+    this.sessions = sortSessions(this.sessions.map(s => (s.id === id ? { ...s, sortOrder: order } : s)))
+    try {
+      this.upsertSession(await this.backend.setSortOrder(id, order))
+    } catch (e) {
+      this.sessions = before
+      showToast(String(e), 'error')
+    }
   }
 
   goTo(i: number) {
@@ -144,8 +172,49 @@ export class AppStore {
 
   upsertSession(v: SessionView) {
     const i = this.sessions.findIndex(s => s.id === v.id)
-    if (i >= 0) this.sessions[i] = v
-    else this.sessions = sortSessions([v, ...this.sessions])
+    if (i < 0) {
+      this.sessions = sortSessions([v, ...this.sessions])
+    } else if (this.sessions[i]?.sortOrder !== v.sortOrder) {
+      this.sessions = sortSessions(this.sessions.map(s => (s.id === v.id ? v : s)))
+    } else {
+      this.sessions[i] = v
+    }
+  }
+
+  // outlineFor is what the outline shows for a page: the summary when there
+  // is one (unless the user switched to headings), else the headings. The
+  // answer's margin marks the same entries.
+  outlineFor(page: Page) {
+    const blocks = toBlocks(displayAnswer(page, this.live[page.sessionId]))
+    const headings = outlineOf(blocks)
+    const summary = page.outline ? summaryEntries(page.outline.sections, blocks) : []
+    const showingSummary = summary.length > 0 && !(this.preferHeadings[page.id] && headings.length > 0)
+    const entries: OutlineEntry[] = showingSummary ? summary : headings
+    return { blocks, headings, summary, showingSummary, entries }
+  }
+
+  // summarise asks the quick-task model for a page's table of contents.
+  async summarise(page: Page) {
+    if (this.summarising[page.id] || page.status === 'open') return
+    delete this.preferHeadings[page.id] // show the summary when it arrives
+    this.summarising[page.id] = true
+    try {
+      this.upsertPage(await this.backend.summarisePage(page.sessionId, page.id, summaryBlocks(toBlocks(page.answerMd))))
+    } catch (e) {
+      showToast(String(e), 'error')
+    } finally {
+      delete this.summarising[page.id]
+    }
+  }
+
+  // autoSummarise summarises a finished page if the user's preference says
+  // this answer should be. Once per page per run.
+  autoSummarise(page: Page) {
+    if (page.status !== 'done' || page.outline || this.autoSummarised.has(page.id)) return
+    const blocks = toBlocks(page.answerMd)
+    if (autoSummaryFor(page.answerMd, blocks.length, this.boot?.preferences.autoSummary ?? 'off') !== 'summarise') return
+    this.autoSummarised.add(page.id)
+    void this.summarise(page)
   }
 
   upsertPage(p: Page) {
@@ -156,6 +225,8 @@ export class AppStore {
       list[i] = p
       const live = this.live[p.sessionId]
       if (live && live.seq === p.seq && before && before.answerMd !== p.answerMd) live.text = ''
+      // As soon as an answer finishes, wherever the user is looking.
+      if (before?.status !== 'done' && p.status === 'done') this.autoSummarise(p)
       return
     }
     list.push(p)
