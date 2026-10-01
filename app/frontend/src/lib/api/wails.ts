@@ -60,13 +60,16 @@ export function wailsBackend(): Backend {
     usage: () => call('Usage'),
     openFolder: p => call('OpenFolder', p),
     openURL: u => call('OpenURL', u),
+    // The WebView's own clipboard first; the native one if that's refused.
     async copyText(text) {
-      const rt = w().runtime
-      if (rt) {
-        await rt.ClipboardSetText(text)
+      try {
+        await navigator.clipboard.writeText(text)
         return
+      } catch (first) {
+        const rt = w().runtime
+        if (!rt) throw first
+        await rt.ClipboardSetText(text)
       }
-      await navigator.clipboard.writeText(text)
     },
   }
 }

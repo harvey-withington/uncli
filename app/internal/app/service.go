@@ -38,6 +38,8 @@ type Paths struct {
 }
 
 // DefaultPaths uses the OS's user config and cache directories.
+// UNCLI_DATA_DIR moves the database, user YAML and scratch folders
+// elsewhere (development, tests); downloaded CLIs stay in the shared cache.
 func DefaultPaths() (Paths, error) {
 	cfg, err := os.UserConfigDir()
 	if err != nil {
@@ -48,6 +50,9 @@ func DefaultPaths() (Paths, error) {
 		return Paths{}, err
 	}
 	base := filepath.Join(cfg, "uncli")
+	if d := os.Getenv("UNCLI_DATA_DIR"); d != "" {
+		base = d
+	}
 	return Paths{Config: base, Cache: filepath.Join(cache, "uncli"), Scratch: filepath.Join(base, "scratch")}, nil
 }
 
