@@ -12,14 +12,28 @@ export interface OutlineEntry {
 
 // outlineOf lists the headings of an answer. Levels are normalised so the
 // shallowest heading used is level 1 (answers often start at ##).
+// Paragraphs acting as headings ("**1. Point.** …") sit one level below the
+// real heading before them, or at the top level when there is none.
 export function outlineOf(blocks: readonly MdBlock[]): OutlineEntry[] {
-  const raw = blocks.flatMap((b, i) => (b.heading ? [{ block: i, level: b.heading.level, text: b.heading.text }] : []))
-  const top = Math.min(...raw.map(e => e.level))
-  return raw.map((e, n) => ({
-    ...e,
-    level: Math.min(4, e.level - top + 1),
-    kind: classifySection(e.text, blocks.slice(e.block + 1, raw[n + 1]?.block ?? blocks.length)),
-  }))
+  const raw = blocks.flatMap((b, i) => (b.heading ? [{ block: i, ...b.heading }] : []))
+  const realLevels = raw.filter(e => !e.pseudo).map(e => e.level)
+  const top = Math.min(...realLevels)
+  let parent = 0 // normalised level of the last real heading
+  return raw.map((e, n) => {
+    let level: number
+    if (e.pseudo) {
+      level = parent + 1
+    } else {
+      level = e.level - top + 1
+      parent = level
+    }
+    return {
+      block: e.block,
+      text: e.text,
+      level: Math.min(4, level),
+      kind: classifySection(e.text, blocks.slice(e.block + 1, raw[n + 1]?.block ?? blocks.length)),
+    }
+  })
 }
 
 // activeEntry is the entry being read: the last heading whose top has

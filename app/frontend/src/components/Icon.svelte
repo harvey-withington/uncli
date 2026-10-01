@@ -15,6 +15,7 @@
   import Download from 'lucide-svelte/icons/download'
   import Flag from 'lucide-svelte/icons/flag'
   import FlaskConical from 'lucide-svelte/icons/flask-conical'
+  import FastForward from 'lucide-svelte/icons/fast-forward'
   import FolderOpen from 'lucide-svelte/icons/folder-open'
   import Gauge from 'lucide-svelte/icons/gauge'
   import Info from 'lucide-svelte/icons/info'
@@ -30,7 +31,9 @@
   import PanelRightClose from 'lucide-svelte/icons/panel-right-close'
   import PanelRightOpen from 'lucide-svelte/icons/panel-right-open'
   import Pencil from 'lucide-svelte/icons/pencil'
+  import Play from 'lucide-svelte/icons/play'
   import Plus from 'lucide-svelte/icons/plus'
+  import Rewind from 'lucide-svelte/icons/rewind'
   import ScanSearch from 'lucide-svelte/icons/scan-search'
   import Settings from 'lucide-svelte/icons/settings'
   import ShieldX from 'lucide-svelte/icons/shield-x'
@@ -53,7 +56,7 @@
     'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code,
     copy: Copy, download: Download, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,
     'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,
-    plus: Plus, settings: Settings, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
+    plus: Plus, play: Play, rewind: Rewind, 'fast-forward': FastForward, settings: Settings, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
     sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
   } as const
@@ -67,14 +70,16 @@
     size?: number
     label?: string
     spin?: boolean
+    fill?: boolean // solid shapes (triangles, a set bookmark) instead of outlines
+    flip?: boolean // mirrored left to right (a left-pointing play triangle)
   }
 
-  let { name, size = 16, label, spin = false }: Props = $props()
+  let { name, size = 16, label, spin = false, fill = false, flip = false }: Props = $props()
   const Cmp = $derived(ICONS[name as IconName] ?? Sparkles)
 </script>
 
-<span class="icon" class:spin role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'}>
-  <Cmp {size} strokeWidth={1.75} />
+<span class="icon" class:spin class:flip role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'}>
+  <Cmp {size} strokeWidth={fill ? 1.5 : 1.75} fill={fill ? 'currentColor' : 'none'} />
 </span>
 
 <style>
@@ -82,6 +87,9 @@
     display: inline-flex;
     flex: none;
     line-height: 0;
+  }
+  .flip {
+    transform: scaleX(-1);
   }
   .spin {
     animation: spin 0.9s linear infinite;

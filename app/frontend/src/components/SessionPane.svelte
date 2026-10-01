@@ -50,28 +50,32 @@
   </header>
 
   <div class="middle">
-    <div class="scroll" bind:this={scroller}>
-      {#if page}
-        <PageView {page} />
-      {:else}
-        <div class="empty">
-          <span class="eicon"><Icon name={profile?.icon ?? 'message-circle'} size={22} /></span>
-          <h2>{t(`profile.${session.profileId}.empty`)}</h2>
-          <p>{t(`profile.${session.profileId}.desc`)}</p>
+    <!-- The answer column: the page, the page controls floating on the line
+         above the composer (centred over the answer, not the outline), and
+         the composer. -->
+    <div class="main">
+      <div class="scroll" bind:this={scroller}>
+        {#if page}
+          <PageView {page} />
+        {:else}
+          <div class="empty">
+            <span class="eicon"><Icon name={profile?.icon ?? 'message-circle'} size={22} /></span>
+            <h2>{t(`profile.${session.profileId}.empty`)}</h2>
+            <p>{t(`profile.${session.profileId}.desc`)}</p>
+          </div>
+        {/if}
+      </div>
+      <div class="dock"><NavBar /></div>
+      <footer class="bottom">
+        <div class="inner">
+          <Composer {session} />
         </div>
-      {/if}
+      </footer>
     </div>
     {#if page && app.outline.open}
       <OutlinePanel {page} {scroller} />
     {/if}
   </div>
-
-  <footer class="bottom">
-    <div class="inner">
-      <NavBar />
-      <Composer {session} />
-    </div>
-  </footer>
 </section>
 
 <style>
@@ -138,10 +142,43 @@
     display: flex;
     min-height: 0;
   }
-  .scroll {
+  .main {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .scroll {
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
+  }
+  /* Text fades out above the page controls instead of running into them.
+     Sticky inside the scroller, so it never covers the scrollbar; the
+     negative margin keeps it from adding scroll height. */
+  .scroll::after {
+    content: "";
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: block;
+    height: 64px;
+    margin-top: -64px;
+    background: linear-gradient(to bottom, transparent, var(--bg) 85%);
+    pointer-events: none;
+  }
+  /* A zero-height row on the line between page and composer; the pill is
+     centred on it, half above and half below. */
+  .dock {
+    position: relative;
+    z-index: 4;
+    height: 0;
+    display: flex;
+    align-items: flex-start; /* don't squash the pill to the row's zero height */
+    justify-content: center;
+  }
+  .dock :global(.navbar) {
+    transform: translateY(-50%);
   }
   .outline-toggle {
     margin-left: auto;
@@ -173,15 +210,14 @@
     margin: 0;
     font-size: var(--text-md);
   }
+  /* Top padding is half the page-control buttons' height (36px) plus a
+     small gap, so the composer starts just below them. */
   .bottom {
-    padding: var(--space-3) var(--space-6) var(--space-4);
+    padding: calc(18px + var(--space-2)) var(--space-6) var(--space-4);
     border-top: 1px solid var(--border);
     background: var(--bg);
   }
   .inner {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
     max-width: calc(var(--reading-width) + 2 * var(--space-6));
     margin: 0 auto;
   }

@@ -66,7 +66,7 @@
     bind:this={input}
     bind:value={text}
     use:autosize={240}
-    rows="1"
+    rows="2"
     placeholder={session.busy ? t('composer.waiting') : t('composer.placeholder')}
     aria-label={t('composer.label')}
     {onkeydown}
@@ -100,7 +100,7 @@
   }
   textarea {
     flex: 1;
-    min-height: 34px;
+    min-height: 56px;
     padding: 7px 0;
     border: 0;
     outline: none;

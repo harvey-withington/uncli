@@ -62,7 +62,6 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `Modal` | `title`, `width?`, `onclose`, `children`, `footer?` | Focus trap; `data-autofocus` picks the first focus; Escape closes; click on the scrim closes |
 | `ConfirmDialog` | none; driven by `confirm({title, message, confirmLabel, danger?})` | Resolves `true`/`false`; Enter confirms, Escape cancels |
 | `Toasts` | none; driven by `showToast(message, kind)` | Errors stay until dismissed |
-| `Icon` | `name`, `size?`, `label?`, `spin?` | Lucide names as used in YAML; unknown names fall back to a neutral glyph |
 | `CopyButton` | `text`, `label?` | Copies through the backend; shows a check for 1.4 s |
 | `ActivityBadge` | `state`, `showIdle?` | Dot plus label; pulses while busy |
 | `ResizeHandle` | `edge`, `width`, `min`, `max`, `label`, `onresize`, `oncommit` | A separator on a panel edge: drag, or arrow keys when focused (Shift for bigger steps). Used by the sidebar (200–440 px) and outline (180–480 px); widths kept in localStorage |
@@ -74,10 +73,11 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `PageView` | `page` | Sticky question with copy, streamed answer, banners, trace, chips |
 | `AnswerBlocks` | `markdown`, `streaming?` | One block per top-level markdown element; each copies its source markdown |
 | `CodeBlock` | `code`, `lang`, `streaming?` | Shiki highlighting once complete; copies code only |
-| `OutlinePanel` | `page`, `scroller` | "On this page": the answer's headings (levels normalised), or a summary from the quick-task model (sparkles button; Summary/Headings switch when both exist; caption names the model and cost), each entry with a section-kind icon (`lib/sections.ts`: guessed for headings, chosen by the model in a summary; the kind is in the tooltip and read out to screen readers), the question at the top; click to jump below the sticky question, the section being read is highlighted. Resized by dragging its left edge or arrow keys on it (180–480 px); width and visibility kept in localStorage |
+| `OutlinePanel` | `page`, `scroller` | "On this page": the answer's headings (levels normalised; paragraphs that act as headings, such as "**1. Point.** …" or a short all-bold line, count one level below the real heading before them), or a summary from the quick-task model (sparkles button; Summary/Headings switch when both exist; caption names the model and cost), each entry with a section-kind icon (`lib/sections.ts`: guessed for headings, chosen by the model in a summary; the kind is in the tooltip and read out to screen readers), the question at the top; click to jump below the sticky question, the section being read is highlighted. Resized by dragging its left edge or arrow keys on it (180–480 px); width and visibility kept in localStorage |
 | `TraceStrip` | `items` | Collapsed summary with running, denied and failed counts |
 | `PageChips` | `page` | Model, modifiers, tokens, cost, duration |
-| `NavBar` | none | Previous bookmark, back, position, forward, next bookmark, bookmark toggle |
+| `NavBar` | none | Separate rounded buttons (gradient fill, filled icons, no text): previous bookmark ◀◀, back ◀, position capsule "3 / 7" (read as "Page 3 of 7"), forward ▶, next bookmark ▶▶, bookmark toggle (filled when set). Docked by `SessionPane` on the line between answer and composer, centred over the answer column; the answer fades out above it |
+| `Icon` | `name`, `size?`, `label?`, `spin?`, `fill?`, `flip?` | `fill` for solid shapes, `flip` to mirror (a left triangle is a flipped play) |
 | `Composer` | `session` | Per-session drafts; Stop while answering |
 | `SetupScreen` | none | Download the pinned CLI, then sign in |
 | `SettingsDialog` | none | Quick tasks (provider, model, auto-summary; saved on change), and the CLI version at the user's own risk |

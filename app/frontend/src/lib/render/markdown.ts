@@ -27,7 +27,10 @@ export interface MdBlock {
   source: string // original markdown of the block
   code?: string // for code blocks: the code only
   lang?: string
-  heading?: { level: number; text: string } // for heading blocks: plain text, for the outline
+  // For the outline: a real heading (level 1–6), or a paragraph acting as
+  // one ("**1. Point.** More text…"), marked pseudo; its level is set by
+  // the outline relative to the real headings around it.
+  heading?: { level: number; text: string; pseudo?: boolean }
 }
 
 export function toBlocks(src: string): MdBlock[] {
@@ -62,6 +65,9 @@ export function toBlocks(src: string): MdBlock[] {
       if (first.type === 'heading_open') {
         const text = plainText(group[1] as Token | undefined)
         if (text) block.heading = { level: Number(first.tag.slice(1)) || 1, text }
+      } else if (first.type === 'paragraph_open') {
+        const text = boldLead(group[1] as Token | undefined)
+        if (text) block.heading = { level: 0, text, pseudo: true }
       }
       out.push(block)
     }
@@ -74,6 +80,28 @@ function plainText(inline: Token | undefined): string {
   if (!inline) return ''
   const parts = (inline.children ?? []).filter(c => c.type === 'text' || c.type === 'code_inline').map(c => c.content)
   return (parts.length ? parts.join('') : inline.content).replace(/\s+/g, ' ').trim()
+}
+
+const MAX_LEAD = 120
+
+// boldLead returns the title of a paragraph that works as a heading: one
+// that is entirely bold and short, or that opens with a short bold lead
+// which is numbered ("1.", "2)") or ends like a label (":" or "."). Answers
+// often structure points this way instead of using # headings.
+function boldLead(inline: Token | undefined): string {
+  // markdown-it starts the children with an empty text token; skip it.
+  const all = inline?.children ?? []
+  const kids = all.slice(all.findIndex(k => !(k.type === 'text' && k.content === '')))
+  if (kids[0]?.type !== 'strong_open') return ''
+  const close = kids.findIndex(k => k.type === 'strong_close')
+  if (close < 0) return ''
+  const lead = kids.slice(1, close).filter(k => k.type === 'text' || k.type === 'code_inline').map(k => k.content).join('').replace(/\s+/g, ' ').trim()
+  if (!lead || lead.length > MAX_LEAD) return ''
+  const rest = kids.slice(close + 1).filter(k => k.type === 'text' || k.type === 'code_inline').map(k => k.content).join('').trim()
+  const wholeParagraph = rest === '' || /^[:.—-]$/.test(rest)
+  const labelled = /^\d+[.)]\s/.test(lead) || /[:.]$/.test(lead)
+  if (!wholeParagraph && !labelled) return ''
+  return lead.replace(/[\s:.]+$/, '')
 }
 
 // Escape text for HTML (plain code before the highlighter loads).
