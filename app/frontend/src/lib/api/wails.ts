@@ -59,6 +59,8 @@ export function wailsBackend(): Backend {
     remove: id => call('Delete', id),
     setBookmark: (s, p, on) => call('SetBookmark', s, p, on),
     focus: id => call('Focus', id),
+    setPreferences: p => call('SetPreferences', p),
+    summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     usage: () => call('Usage'),
     openFolder: p => call('OpenFolder', p),
     openURL: u => call('OpenURL', u),

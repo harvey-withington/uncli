@@ -69,6 +69,17 @@ feat: drag to reorder / empty state for the library
 fix: settings no longer lost on a failed save
 ```
 
+## Text meant to be copied
+
+Anything the user is meant to copy and paste (a suggested commit message, a
+command, a card comment, a snippet) goes in its own fenced code block, so
+the chat shows a copy icon on it. Write it at full line width: no hard line
+breaks inside a sentence or paragraph, only between paragraphs or list items.
+Claude doesn't commit or push in this repo; it suggests the message this way
+and the user commits. The suggestion covers everything uncommitted since the
+last commit (check `git log -1` and `git status`), not only the latest
+change: the user commits once a batch of work is done.
+
 ## Documentation
 
 - `README.md` is for people who run or contribute to the app.

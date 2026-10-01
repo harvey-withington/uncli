@@ -28,9 +28,9 @@
 <div class="answer" {onclick}>
   {#each blocks as b, i (b.key)}
     {#if b.kind === 'code'}
-      <CodeBlock code={b.code ?? ''} lang={b.lang ?? ''} streaming={streaming && i === blocks.length - 1} />
+      <div data-block={i}><CodeBlock code={b.code ?? ''} lang={b.lang ?? ''} streaming={streaming && i === blocks.length - 1} /></div>
     {:else}
-      <div class="block">
+      <div class="block" data-block={i}>
         <div class="md">{@html b.html}</div>
         <span class="copy-md"><CopyButton text={b.source} label={t('copy.markdown')} /></span>
       </div>

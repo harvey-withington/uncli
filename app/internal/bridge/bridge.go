@@ -122,8 +122,11 @@ func (a *App) PickFolder(title string) (string, error) {
 	return wruntime.OpenDirectoryDialog(a.ctx, wruntime.OpenDialogOptions{Title: title})
 }
 
-func (a *App) CreateSession(profileID, workdir, model string) (session.View, error) {
-	return a.svc.Sessions.Create(profileID, workdir, model)
+// CreateSession creates a session; the choices made are remembered for the
+// next new-session dialog and returned with it.
+func (a *App) CreateSession(profileID, workdir, model string) (app.CreatedSession, error) {
+	v, last, err := a.svc.CreateSession(profileID, workdir, model)
+	return app.CreatedSession{Session: v, LastNew: last}, err
 }
 
 func (a *App) Pages(sessionID string) ([]store.Page, error) { return a.svc.Sessions.Pages(sessionID) }
@@ -150,6 +153,16 @@ func (a *App) Delete(sessionID string) error { return a.svc.Sessions.Delete(sess
 
 func (a *App) SetBookmark(sessionID, pageID string, on bool) (store.Page, error) {
 	return a.svc.Sessions.SetBookmark(sessionID, pageID, on)
+}
+
+func (a *App) SetPreferences(p app.Preferences) (app.Preferences, error) {
+	return a.svc.SetPreferences(p)
+}
+
+// SummarisePage asks the quick-task model for a table of contents of a
+// page; blocks are the answer's blocks as the UI numbers them.
+func (a *App) SummarisePage(sessionID, pageID string, blocks []string) (store.Page, error) {
+	return a.svc.SummarisePage(a.ctx, sessionID, pageID, blocks)
 }
 
 func (a *App) Focus(sessionID string) { a.svc.Sessions.Focus(sessionID) }

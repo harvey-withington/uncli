@@ -9,18 +9,24 @@
 
   const app = useApp()
   const profiles = $derived(app.boot?.profiles ?? [])
-  let profileId = $state(app.boot?.profiles[0]?.id ?? 'chat')
+  // The welcome card clicked, else what was picked last time, else the first.
+  const last = app.boot?.lastNewSession
+  const known = (id: string | null | undefined) => (id && profiles.some(p => p.id === id) ? id : null)
+  let profileId = $state(known(app.newSessionProfile) ?? known(last?.profileId) ?? app.boot?.profiles[0]?.id ?? 'chat')
   let folder = $state('')
   let model = $state('')
   let creating = $state(false)
 
   const profile = $derived<Profile | undefined>(profiles.find(p => p.id === profileId))
   const needsFolder = $derived(profile?.folder !== 'scratch')
-  const options = $derived(modelOptions(app.boot?.models ?? null))
+  const options = $derived(modelOptions(app.boot?.models ?? null, model || undefined))
 
   $effect(() => {
-    // Each profile has a default model; reset when the profile changes.
-    model = profile?.model ?? 'sonnet'
+    // On each profile, start from the model and folder used with it last
+    // time, else the profile's default model and no folder.
+    const id = profileId
+    model = last?.models?.[id] ?? profile?.model ?? 'sonnet'
+    folder = last?.folders?.[id] ?? ''
   })
 
   async function pick() {

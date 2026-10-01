@@ -198,3 +198,37 @@ func TestLoginURL(t *testing.T) {
 		t.Error("no link yet")
 	}
 }
+
+func TestTextTask(t *testing.T) {
+	a := New(nil)
+	cmd := a.TextTaskCommand("claude", core.TextTask{Model: "haiku", System: "sys", Schema: json.RawMessage(`{"type":"object"}`)})
+	args := strings.Join(cmd.Args, "|")
+	for _, want := range []string{"-p|--output-format|json|--no-session-persistence", "--tools||", "--setting-sources||", "--model|haiku", "--system-prompt|sys", `--json-schema|{"type":"object"}`} {
+		if !strings.Contains(args, want) {
+			t.Errorf("args missing %q: %s", want, args)
+		}
+	}
+	out, err := os.ReadFile(filepath.Join(fixtures, "text-task-json-schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := a.ParseTextTask(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s struct {
+		Sections []struct {
+			Block int
+			Title string
+		}
+	}
+	if json.Unmarshal(r.Structured, &s) != nil || len(s.Sections) != 5 || s.Sections[1].Title != "Saturday in Alfama" {
+		t.Errorf("structured = %s", r.Structured)
+	}
+	if r.Usage.OutputTokens == 0 || r.CostUSD <= 0 {
+		t.Errorf("usage = %+v, cost %v", r.Usage, r.CostUSD)
+	}
+	if _, err := a.ParseTextTask([]byte(`{"is_error":true,"result":"Not logged in"}`)); err == nil || err.Error() != "Not logged in" {
+		t.Errorf("error = %v", err)
+	}
+}

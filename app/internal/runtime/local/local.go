@@ -122,6 +122,24 @@ func Run(ctx context.Context, cmd core.Command) ([]byte, error) {
 	return out, nil
 }
 
+// RunInput is Run with stdin.
+func RunInput(ctx context.Context, cmd core.Command, stdin string) ([]byte, error) {
+	c := exec.CommandContext(ctx, cmd.Path, cmd.Args...)
+	c.Env = Env(os.Environ(), cmd)
+	configure(c)
+	c.Stdin = strings.NewReader(stdin)
+	var stderr strings.Builder
+	c.Stderr = &stderr
+	out, err := c.Output()
+	if err != nil {
+		if ctx.Err() != nil {
+			err = fmt.Errorf("timed out after waiting for %s", filepath.Base(cmd.Path))
+		}
+		return out, &RunError{Err: err, Stderr: stderr.String()}
+	}
+	return out, nil
+}
+
 // RunError is a failed short command, with the stderr that explains it.
 type RunError struct {
 	Err    error

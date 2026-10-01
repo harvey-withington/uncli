@@ -6,6 +6,7 @@
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
   import NavBar from './NavBar.svelte'
+  import OutlinePanel from './OutlinePanel.svelte'
   import PageView from './PageView.svelte'
   import Toolbar from './Toolbar.svelte'
 
@@ -31,6 +32,15 @@
       <span class="mode"><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <h1 title={session.title}>{session.title || t('session.untitled')}</h1>
       <ActivityBadge state={session.state} />
+      <button
+        class="btn ghost small icon outline-toggle"
+        onclick={() => app.toggleOutline()}
+        aria-pressed={app.outline.open}
+        aria-label={t('outline.toggle')}
+        title={t('outline.toggle')}
+      >
+        <Icon name={app.outline.open ? 'panel-right-close' : 'panel-right-open'} />
+      </button>
     </div>
     <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}</span>
     <Toolbar {session} />
@@ -39,15 +49,20 @@
     {/if}
   </header>
 
-  <div class="scroll" bind:this={scroller}>
-    {#if page}
-      <PageView {page} />
-    {:else}
-      <div class="empty">
-        <span class="eicon"><Icon name={profile?.icon ?? 'message-circle'} size={22} /></span>
-        <h2>{t(`profile.${session.profileId}.empty`)}</h2>
-        <p>{t(`profile.${session.profileId}.desc`)}</p>
-      </div>
+  <div class="middle">
+    <div class="scroll" bind:this={scroller}>
+      {#if page}
+        <PageView {page} />
+      {:else}
+        <div class="empty">
+          <span class="eicon"><Icon name={profile?.icon ?? 'message-circle'} size={22} /></span>
+          <h2>{t(`profile.${session.profileId}.empty`)}</h2>
+          <p>{t(`profile.${session.profileId}.desc`)}</p>
+        </div>
+      {/if}
+    </div>
+    {#if page && app.outline.open}
+      <OutlinePanel {page} {scroller} />
     {/if}
   </div>
 
@@ -118,9 +133,18 @@
     font-size: var(--text-sm);
     color: var(--danger);
   }
+  .middle {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
   .scroll {
     flex: 1;
+    min-width: 0;
     overflow-y: auto;
+  }
+  .outline-toggle {
+    margin-left: auto;
   }
   .empty {
     max-width: 420px;

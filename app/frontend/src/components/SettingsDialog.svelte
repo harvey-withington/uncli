@@ -4,9 +4,12 @@
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
+  import type { Preferences } from '../lib/api'
+  import { modelOptions } from '../lib/models'
+  import { AUTO_SUMMARY_MIN_BLOCKS } from '../lib/outline'
 
-  // Phase 1: the CLI version setting. Running anything but the pinned
-  // version is at the user's own risk.
+  // Settings: the quick-task model, and the CLI version (anything but the
+  // pinned version is at the user's own risk).
   const app = useApp()
   let version = $state(app.cli?.version ?? '')
   let channels = $state<Record<string, string>>({})
@@ -17,6 +20,24 @@
   })
 
   const pinned = $derived(app.cli?.pinned ?? '')
+
+  // Quick tasks: one provider and model for small jobs outside sessions.
+  const prefs = $derived(app.boot?.preferences)
+  const quickModels = $derived(modelOptions(app.boot?.models ?? null, prefs?.quickTaskModel.model))
+
+  async function savePrefs(next: Preferences) {
+    try {
+      const saved = await app.backend.setPreferences(next)
+      if (app.boot) app.boot.preferences = saved
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
+  }
+
+  function setQuick(field: 'provider' | 'model', value: string) {
+    if (!prefs) return
+    savePrefs({ ...prefs, quickTaskModel: { ...prefs.quickTaskModel, [field]: value } })
+  }
   const isPinned = $derived(!version || version === pinned)
 
   async function apply(v: string) {
@@ -34,6 +55,33 @@
 </script>
 
 <Modal title={t('settings.title')} width={480} onclose={() => (app.settingsOpen = false)}>
+  {#if prefs}
+    <section>
+      <h3>{t('settings.quickTitle')}</h3>
+      <p class="muted">{t('settings.quickBody')}</p>
+      <div class="grid">
+        <label for="quick-provider">{t('settings.quickProvider')}</label>
+        <select id="quick-provider" class="select" value={prefs.quickTaskModel.provider} onchange={e => setQuick('provider', e.currentTarget.value)}>
+          {#each app.boot?.providers ?? [] as p (p.id)}
+            <option value={p.id}>{p.label}</option>
+          {/each}
+        </select>
+        <label for="quick-model">{t('settings.quickModel')}</label>
+        <select id="quick-model" class="select" value={prefs.quickTaskModel.model} onchange={e => setQuick('model', e.currentTarget.value)}>
+          {#each quickModels as m (m.value)}
+            <option value={m.value}>{m.label}</option>
+          {/each}
+        </select>
+      </div>
+      <label class="check">
+        <input type="checkbox" checked={prefs.autoSummarise} onchange={e => savePrefs({ ...prefs, autoSummarise: e.currentTarget.checked })} />
+        <span>
+          {t('settings.autoSummarise')}
+          <span class="hint">{t('settings.autoSummariseHint', { n: AUTO_SUMMARY_MIN_BLOCKS })}</span>
+        </span>
+      </label>
+    </section>
+  {/if}
   <section>
     <h3>{t('settings.cliTitle')}</h3>
     <p class="muted">{t('settings.cliBody', { pinned })}</p>
@@ -65,6 +113,29 @@
 </Modal>
 
 <style>
+  .grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-2) var(--space-3);
+    align-items: center;
+    margin-bottom: var(--space-3);
+    font-size: var(--text-sm);
+  }
+  .check {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .check input {
+    margin-top: 3px;
+  }
+  .hint {
+    display: block;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
   section + section {
     margin-top: var(--space-5);
     padding-top: var(--space-4);

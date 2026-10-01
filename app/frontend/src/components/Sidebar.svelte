@@ -3,19 +3,31 @@
   import { t } from '../lib/i18n.svelte'
   import { theme, cycleTheme } from '../lib/theme.svelte'
   import Icon from './Icon.svelte'
+  import ResizeHandle from './ResizeHandle.svelte'
   import SessionItem from './SessionItem.svelte'
+  import { SIDEBAR_MAX, SIDEBAR_MIN } from '../lib/panels'
 
   const app = useApp()
   const themeIcon = $derived(theme.value === 'light' ? 'sun' : theme.value === 'dark' ? 'moon' : 'monitor')
 </script>
 
-<aside class="sidebar">
+<aside class="sidebar" style:width="{app.sidebarWidth}px">
+  <ResizeHandle
+    edge="right"
+    width={app.sidebarWidth}
+    min={SIDEBAR_MIN}
+    max={SIDEBAR_MAX}
+    label={t('sidebar.resize')}
+    onresize={w => (app.sidebarWidth = w)}
+    oncommit={w => app.setSidebarWidth(w)}
+  />
   <div class="brand">
+    <img class="mark" src="/uncli-mark.svg" alt="" width="20" height="24" />
     <span class="wordmark">UNCLI</span>
     <span class="tag">{t('app.tagline')}</span>
   </div>
 
-  <button class="btn primary new" onclick={() => (app.newSessionOpen = true)}>
+  <button class="btn primary new" onclick={() => app.openNewSession()}>
     <Icon name="plus" />
     {t('session.new')}
     <kbd>Ctrl N</kbd>
@@ -48,7 +60,7 @@
   .sidebar {
     display: flex;
     flex-direction: column;
-    width: var(--sidebar-width);
+    position: relative;
     flex: none;
     height: 100%;
     padding: var(--space-4) var(--space-3) var(--space-3);
@@ -60,6 +72,11 @@
     align-items: baseline;
     gap: var(--space-2);
     padding: var(--space-1) var(--space-2) var(--space-4);
+  }
+  .mark {
+    align-self: center;
+    width: 20px;
+    height: 24px;
   }
   .wordmark {
     font-weight: 750;

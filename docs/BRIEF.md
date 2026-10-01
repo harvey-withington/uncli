@@ -123,6 +123,15 @@ type Parser interface {
     Feed(line []byte) ([]Event, error) // unknown event types -> EvUnknown, never an error
 }
 
+// TextTasker: an adapter that can run one-off text tasks (page summaries,
+// later things like commit messages) outside any session: no tools, no
+// history, one answer, optionally JSON matching a schema. The user picks
+// one provider and model for all of them ("quick tasks").
+type TextTasker interface {
+    TextTaskCommand(bin string, t TextTask) Command // the prompt goes on stdin
+    ParseTextTask(out []byte) (TextResult, error)
+}
+
 // Runtime: where the process lives. Phase 1: local. Phase 5: container.
 type Runtime interface {
     ID() string
@@ -171,6 +180,8 @@ type UserTurn struct {
 **Installer** (`adapter/claude`, behind `core.Installer`). Downloads the pinned CLI version into UNCLI's cache dir (`<user cache>/uncli/cli/claude/<version>/`), never touching the user's own install. For Claude it reads `https://downloads.claude.ai/claude-code-releases/<version>/manifest.json`, downloads `<version>/<platform>/claude(.exe)` and checks its SHA-256 against the manifest before use. Each UNCLI release pins one version; a setting lets the user pick a newer one (from the `stable` or `latest` channel) at their own risk, with a one-click return to the pinned version. The download is about 240 MB, so first run shows progress. The CLI's own auto-updater is disabled in the environment UNCLI passes.
 
 **Sign-in.** Before the first session, UNCLI runs the adapter's auth status command (`claude auth status` prints JSON with `loggedIn`). If signed out, the sign-in screen runs `claude auth login --claudeai` with a stdin pipe. Without a terminal the CLI uses its paste-the-code flow: it prints a link and waits for a code. Its own attempt to open the browser fails from a windowless app, so UNCLI opens the link in the default browser itself (with "open again" and "copy link" fallbacks), takes the code the page shows, writes it to the CLI's stdin, and then decides the outcome from `auth status`, because the CLI's own output can't be trusted (see Spike findings). The status check allows 60 s and one retry: the first run of a freshly downloaded binary can be slow while antivirus scans it. A turn that fails with `authentication_failed` returns the user to that screen.
+
+**Quick tasks** (`app`). Small text jobs that don't belong in a conversation run as a separate one-off CLI call through the chosen provider's `TextTasker`. For Claude that's `claude -p --output-format json --no-session-persistence --tools "" --strict-mcp-config --setting-sources "" --disable-slash-commands`, with the prompt on stdin and `--json-schema` when a structured answer is wanted (it arrives as `structured_output`). One preference, `quickTaskModel` ({provider, model}, default Claude Haiku), covers every such task, so a light or local model (a Qwen behind its own CLI adapter, say) can take them all. The first task is the page summary: the UI numbers the answer's top-level markdown blocks (code blocks described, not quoted), the model returns `{block, title, kind}` sections, UNCLI keeps the ones that point at real blocks in order and stores them on the page (`pages.outline`, added by migration), so a page is summarised once. `kind` is one of ten section kinds (overview, commentary, analysis, steps, code, data, example, tip, warning, conclusion), enforced by the schema; the outline shows an icon for each. Plain headings get a kind from a local guess (heading words, then whether code, tables or numbered lists dominate the section), which costs nothing; a summary's kinds come from the model. The Go and TypeScript lists are checked against each other by a test. Summaries run on request from the outline panel, or automatically for answers of 12+ blocks without headings when the user opts in. A short answer costs about $0.005–0.01 on Haiku.
 
 **Process environment.** UNCLI builds the child's environment explicitly: it inherits the user's environment minus `CLAUDE_CODE_*`, `CLAUDECODE`, `CLAUDE_EFFORT`, `CLAUDE_PID` and `CLAUDE_AGENT_SDK*` (UNCLI may itself be launched from inside a Claude session, whose session ids and effort setting would otherwise leak into every child), plus `DISABLE_AUTOUPDATER=1`. It also drops `NODE_OPTIONS`, `NODE_INSPECT*`, `VSCODE_INSPECTOR_OPTIONS` and `BUN_INSPECT*`: the CLI runs on a JavaScript runtime, and VS Code's debugger auto-attach puts `NODE_OPTIONS=--require …/js-debug/bootloader.js` into every terminal, with which every CLI command exits 1 and prints nothing. `CLAUDE_CONFIG_DIR` and API keys pass through: they are the user's choice.
 
@@ -323,6 +334,7 @@ CREATE TABLE pages (
   status        TEXT,               -- open | done | error | interrupted
   bookmarked    INTEGER DEFAULT 0,
   pinned        INTEGER DEFAULT 0,
+  outline       TEXT,               -- JSON: quick-task summary {provider, model, sections:[{block, title}], costUsd}
   input_tokens  INTEGER, output_tokens INTEGER,
   cache_read    INTEGER, cache_write INTEGER,
   cost_usd      REAL, duration_ms INTEGER,  -- cost is this turn's share, not the CLI's running total

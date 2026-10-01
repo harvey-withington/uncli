@@ -125,3 +125,25 @@ type Capabilities struct {
 	ThinkingEvents   bool `json:"thinkingEvents"`
 	SlashPassthrough bool `json:"slashPassthrough"`
 }
+
+// TextTasker is an adapter that can run one-off text tasks (page summaries,
+// commit messages) outside any session: no tools, no history, a single
+// answer. The user picks one provider and model for all such tasks.
+type TextTasker interface {
+	TextTaskCommand(bin string, t TextTask) Command // the prompt goes on stdin
+	ParseTextTask(out []byte) (TextResult, error)
+}
+
+type TextTask struct {
+	Model  string
+	System string
+	Prompt string
+	Schema json.RawMessage // optional JSON Schema for a structured answer
+}
+
+type TextResult struct {
+	Text       string          `json:"text"`
+	Structured json.RawMessage `json:"structured,omitempty"`
+	Usage      Usage           `json:"usage"`
+	CostUSD    float64         `json:"costUsd"`
+}

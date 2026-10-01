@@ -13,22 +13,32 @@
   import Code from 'lucide-svelte/icons/code'
   import Copy from 'lucide-svelte/icons/copy'
   import Download from 'lucide-svelte/icons/download'
+  import Flag from 'lucide-svelte/icons/flag'
+  import FlaskConical from 'lucide-svelte/icons/flask-conical'
   import FolderOpen from 'lucide-svelte/icons/folder-open'
   import Gauge from 'lucide-svelte/icons/gauge'
+  import Info from 'lucide-svelte/icons/info'
+  import Lightbulb from 'lucide-svelte/icons/lightbulb'
+  import ListOrdered from 'lucide-svelte/icons/list-ordered'
   import Loader from 'lucide-svelte/icons/loader-circle'
   import LogIn from 'lucide-svelte/icons/log-in'
   import MessageCircle from 'lucide-svelte/icons/message-circle'
+  import MessageSquareText from 'lucide-svelte/icons/message-square-text'
   import Microscope from 'lucide-svelte/icons/microscope'
   import Monitor from 'lucide-svelte/icons/monitor'
   import Moon from 'lucide-svelte/icons/moon'
+  import PanelRightClose from 'lucide-svelte/icons/panel-right-close'
+  import PanelRightOpen from 'lucide-svelte/icons/panel-right-open'
   import Pencil from 'lucide-svelte/icons/pencil'
   import Plus from 'lucide-svelte/icons/plus'
+  import ScanSearch from 'lucide-svelte/icons/scan-search'
   import Settings from 'lucide-svelte/icons/settings'
   import ShieldX from 'lucide-svelte/icons/shield-x'
   import Shrink from 'lucide-svelte/icons/shrink'
   import Sparkles from 'lucide-svelte/icons/sparkles'
   import Square from 'lucide-svelte/icons/square'
   import Sun from 'lucide-svelte/icons/sun'
+  import Table from 'lucide-svelte/icons/table'
   import Trash from 'lucide-svelte/icons/trash-2'
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert'
   import Users from 'lucide-svelte/icons/users'
@@ -42,9 +52,10 @@
     briefcase: Briefcase, check: Check, 'chevron-left': ChevronLeft, 'chevron-right': ChevronRight,
     'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code,
     copy: Copy, download: Download, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,
-    'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, moon: Moon, pencil: Pencil,
+    'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,
     plus: Plus, settings: Settings, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
-    sun: Sun, trash: Trash, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
+    sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
+    lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
   } as const
 
   export type IconName = keyof typeof ICONS

@@ -35,7 +35,7 @@
   function onkeydown(e: KeyboardEvent) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
       e.preventDefault()
-      if (app.cliReady) app.newSessionOpen = true
+      if (app.cliReady) app.openNewSession()
       return
     }
     if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || app.newSessionOpen || app.settingsOpen) return
@@ -46,6 +46,9 @@
     } else if (e.key === 'ArrowRight') {
       e.preventDefault()
       app.goTo(forward(app.currentIndex, n))
+    } else if (e.key === 'o' || e.key === 'O') {
+      e.preventDefault()
+      app.toggleOutline()
     } else if (e.key === 'b' || e.key === 'B') {
       e.preventDefault()
       app.toggleBookmark().catch(err => showToast(String(err), 'error'))
@@ -80,7 +83,7 @@
         <p>{t('welcome.body')}</p>
         <div class="cards">
           {#each app.boot?.profiles ?? [] as p (p.id)}
-            <button class="card" onclick={() => (app.newSessionOpen = true)}>
+            <button class="card" onclick={() => app.openNewSession(p.id)}>
               <span class="cicon"><Icon name={p.icon} size={18} /></span>
               <strong>{p.label}</strong>
               <span>{t(`profile.${p.id}.desc`)}</span>
@@ -92,7 +95,7 @@
   </div>
 {/if}
 
-{#if app.newSessionOpen}<NewSessionDialog />{/if}
+{#if app.newSessionOpen}{#key app.newSessionSeq}<NewSessionDialog />{/key}{/if}
 {#if app.settingsOpen}<SettingsDialog />{/if}
 <ConfirmDialog />
 <Toasts />
