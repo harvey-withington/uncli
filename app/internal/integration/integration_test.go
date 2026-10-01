@@ -1,0 +1,293 @@
+//go:build integration
+
+// Package integration drives the real Claude CLI through UNCLI's app
+// service: the pinned download, three concurrent sessions, restart and
+// resume, a live model switch, modifiers, interrupt and permissions. It
+// uses the machine's Claude sign-in and real (small, Haiku) turns, so it is
+// not part of npm test. Run with: npm run test:integration
+package integration
+
+import (
+	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"uncli/internal/app"
+	"uncli/internal/session"
+	"uncli/internal/store"
+)
+
+type recorder struct {
+	mu     sync.Mutex
+	states map[string][]session.State
+}
+
+func (r *recorder) Emit(name string, data any) {
+	if v, ok := data.(session.View); ok && name == app.EvtSessionView {
+		r.mu.Lock()
+		s := r.states[v.ID]
+		if len(s) == 0 || s[len(s)-1] != v.State {
+			r.states[v.ID] = append(s, v.State)
+		}
+		r.mu.Unlock()
+	}
+}
+
+func (r *recorder) seen(id string) []session.State {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.states[id])
+}
+
+func paths(t *testing.T, config string) app.Paths {
+	t.Helper()
+	def, err := app.DefaultPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The real cache, so the download is shared with the app; everything
+	// else is throwaway.
+	return app.Paths{Config: config, Cache: def.Cache, Scratch: filepath.Join(config, "scratch")}
+}
+
+func open(t *testing.T, config string) (*app.Service, *recorder) {
+	t.Helper()
+	rec := &recorder{states: map[string][]session.State{}}
+	svc, err := app.New(paths(t, config), rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return svc, rec
+}
+
+func waitIdle(t *testing.T, svc *app.Service, ids ...string) {
+	t.Helper()
+	deadline := time.Now().Add(4 * time.Minute)
+	for time.Now().Before(deadline) {
+		busy := false
+		for _, v := range svc.Sessions.List() {
+			if slices.Contains(ids, v.ID) && v.Busy {
+				busy = true
+			}
+		}
+		if !busy {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatalf("sessions %v never finished", ids)
+}
+
+func send(t *testing.T, svc *app.Service, id, text string) store.Page {
+	t.Helper()
+	if err := svc.Sessions.Send(context.Background(), id, text); err != nil {
+		t.Fatalf("send %q: %v", text, err)
+	}
+	waitIdle(t, svc, id)
+	return last(t, svc, id)
+}
+
+func last(t *testing.T, svc *app.Service, id string) store.Page {
+	t.Helper()
+	pages, err := svc.Sessions.Pages(id)
+	if err != nil || len(pages) == 0 {
+		t.Fatalf("pages: %v", err)
+	}
+	return pages[len(pages)-1]
+}
+
+func view(svc *app.Service, id string) session.View {
+	for _, v := range svc.Sessions.List() {
+		if v.ID == id {
+			return v
+		}
+	}
+	return session.View{}
+}
+
+func TestPhase1EndToEnd(t *testing.T) {
+	config := t.TempDir()
+	svc, rec := open(t, config)
+
+	// The pinned CLI downloads, verifies and reports a signed-in user.
+	ctx := context.Background()
+	st, err := svc.InstallCLI(ctx)
+	if err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	if !st.Installed || st.Version != svc.Installer.Pinned() {
+		t.Fatalf("status after install = %+v", st)
+	}
+	if !st.LoggedIn {
+		t.Skip("the CLI is not signed in on this machine; sign in and rerun")
+	}
+	t.Logf("CLI %s installed, signed in (%s)", st.Version, st.Subscription)
+
+	cowork := t.TempDir()
+	os.WriteFile(filepath.Join(cowork, "notes.md"), []byte("# Notes\n\nThe launch date is 14 March.\n"), 0o644)
+	repo := t.TempDir()
+	if out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
+
+	chat, err := svc.Sessions.Create("chat", "", "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	co, err := svc.Sessions.Create("cowork", cowork, "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := svc.Sessions.Create("code", repo, "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.Sessions.Focus(code.ID)
+
+	t.Run("three sessions at once", func(t *testing.T) {
+		start := time.Now()
+		for id, q := range map[string]string{
+			chat.ID: "Remember the word banjo. Reply with just OK.",
+			co.ID:   "What is the launch date in notes.md? Answer in five words or fewer.",
+			code.ID: "Run `git status` and tell me in one sentence whether the repository has any commits.",
+		} {
+			if err := svc.Sessions.Send(ctx, id, q); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// All three are busy at the same time.
+		busy := 0
+		for _, v := range svc.Sessions.List() {
+			if v.Busy {
+				busy++
+			}
+		}
+		if busy != 3 {
+			t.Errorf("busy sessions = %d, want 3", busy)
+		}
+		waitIdle(t, svc, chat.ID, co.ID, code.ID)
+		t.Logf("three turns took %s", time.Since(start).Round(time.Second))
+
+		for _, id := range []string{chat.ID, co.ID, code.ID} {
+			p := last(t, svc, id)
+			if p.Status != "done" || p.AnswerMD == "" || p.OutputTokens == 0 || p.CostUSD <= 0 {
+				t.Errorf("%s page = status %s, answer %q, error %q", id, p.Status, p.AnswerMD, p.Error)
+			}
+			states := rec.seen(id)
+			if !slices.Contains(states, session.Thinking) {
+				t.Errorf("%s never showed thinking: %v", id, states)
+			}
+		}
+		if p := last(t, svc, co.ID); !strings.Contains(p.AnswerMD, "14") {
+			t.Errorf("co-work answer should read the folder: %q", p.AnswerMD)
+		}
+		if p := last(t, svc, code.ID); len(p.Trace) == 0 || !slices.ContainsFunc(p.Trace, func(i store.TraceItem) bool { return strings.Contains(i.Summary, "git status") && i.OK }) {
+			t.Errorf("code session should have run git status: %+v", p.Trace)
+		}
+		if st := view(svc, code.ID).State; st != session.Idle {
+			t.Errorf("focused session state = %s, want idle", st)
+		}
+		if st := view(svc, chat.ID).State; st != session.Unread {
+			t.Errorf("unfocused session state = %s, want unread", st)
+		}
+	})
+
+	t.Run("denied tools show in the trace", func(t *testing.T) {
+		// The CLI auto-approves read-only commands (whoami, ls) and, under
+		// acceptEdits, file commands in the workdir (mkdir, rm, mv), so this
+		// uses one that is neither and isn't on the code allowlist.
+		p := send(t, svc, code.ID, "Use Bash to run exactly `git commit --allow-empty -m probe` and report the result, or say DENIED if you can't. Don't try any other way.")
+		if !slices.ContainsFunc(p.Trace, func(i store.TraceItem) bool { return i.Denied }) {
+			t.Errorf("git commit is not on the code allowlist and should be denied: %+v", p.Trace)
+		}
+		if out, _ := exec.Command("git", "-C", repo, "log", "--oneline").CombinedOutput(); strings.Contains(string(out), "probe") {
+			t.Error("the denied command ran anyway")
+		}
+	})
+
+	t.Run("model switch continues the conversation", func(t *testing.T) {
+		if err := svc.Sessions.SetModel(chat.ID, "sonnet"); err != nil {
+			t.Fatal(err)
+		}
+		p := send(t, svc, chat.ID, "What word did I ask you to remember? Then name the model you are, in one line.")
+		if p.Model != "sonnet" || !strings.Contains(strings.ToLower(p.AnswerMD), "banjo") || !strings.Contains(strings.ToLower(p.AnswerMD), "sonnet") {
+			t.Errorf("after switch: model %s, answer %q", p.Model, p.AnswerMD)
+		}
+		svc.Sessions.SetModel(chat.ID, "haiku")
+	})
+
+	t.Run("efficiency mode on and off", func(t *testing.T) {
+		q := "Explain what a hash map is."
+		normal := send(t, svc, co.ID, q)
+		if _, err := svc.Sessions.ToggleModifier(co.ID, "efficiency", true); err != nil {
+			t.Fatal(err)
+		}
+		lean := send(t, svc, co.ID, q)
+		if _, err := svc.Sessions.ToggleModifier(co.ID, "efficiency", false); err != nil {
+			t.Fatal(err)
+		}
+		after := send(t, svc, co.ID, q)
+		if !slices.Equal(lean.Modifiers, []string{"efficiency"}) || !strings.Contains(lean.Directives, "minimum tokens") {
+			t.Errorf("efficiency page = %+v", lean)
+		}
+		if !strings.Contains(after.Directives, "no longer applies") || len(after.Modifiers) != 0 {
+			t.Errorf("switched-off page directives = %q", after.Directives)
+		}
+		t.Logf("answer lengths: normal %d, efficiency %d, after %d chars", len(normal.AnswerMD), len(lean.AnswerMD), len(after.AnswerMD))
+		if len(lean.AnswerMD) >= len(normal.AnswerMD) {
+			t.Errorf("efficiency answer (%d) should be shorter than normal (%d)", len(lean.AnswerMD), len(normal.AnswerMD))
+		}
+	})
+
+	t.Run("interrupt keeps the session", func(t *testing.T) {
+		if err := svc.Sessions.Send(ctx, chat.ID, "Write a 500-word story about a lighthouse keeper."); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(60 * time.Second)
+		for view(svc, chat.ID).State != session.Writing && time.Now().Before(deadline) {
+			time.Sleep(50 * time.Millisecond)
+		}
+		if err := svc.Sessions.Interrupt(chat.ID); err != nil {
+			t.Fatal(err)
+		}
+		waitIdle(t, svc, chat.ID)
+		if p := last(t, svc, chat.ID); p.Status != "interrupted" {
+			t.Errorf("interrupted page status = %s", p.Status)
+		}
+		p := send(t, svc, chat.ID, "In one short sentence: what were you writing about?")
+		if p.Status != "done" || !strings.Contains(strings.ToLower(p.AnswerMD), "lighthouse") {
+			t.Errorf("after interrupt: %+v", p)
+		}
+	})
+
+	// Bookmark a page, then quit.
+	pages, _ := svc.Sessions.Pages(chat.ID)
+	if _, err := svc.Sessions.SetBookmark(chat.ID, pages[0].ID, true); err != nil {
+		t.Fatal(err)
+	}
+	before := len(pages)
+	svc.Close()
+
+	t.Run("relaunch restores and continues", func(t *testing.T) {
+		svc2, _ := open(t, config)
+		defer svc2.Close()
+		list := svc2.Sessions.List()
+		if len(list) != 3 {
+			t.Fatalf("restored %d sessions", len(list))
+		}
+		pages, _ := svc2.Sessions.Pages(chat.ID)
+		if len(pages) != before || !pages[0].Bookmarked {
+			t.Fatalf("restored pages = %d (want %d), first bookmarked %v", len(pages), before, pages[0].Bookmarked)
+		}
+		p := send(t, svc2, chat.ID, "What word did I ask you to remember at the very start? One word.")
+		if !strings.Contains(strings.ToLower(p.AnswerMD), "banjo") {
+			t.Errorf("after relaunch the conversation should continue: %q", p.AnswerMD)
+		}
+	})
+}
