@@ -5,10 +5,11 @@
   import Icon from './Icon.svelte'
 
   interface Props {
-    items: TraceItem[]
+    items: TraceItem[] | null
   }
 
-  let { items }: Props = $props()
+  let { items: raw }: Props = $props()
+  const items = $derived(raw ?? [])
   let open = $state(false)
   const denied = $derived(items.filter(i => i.denied).length)
   const failed = $derived(items.filter(i => i.done && !i.ok && !i.denied).length)

@@ -47,6 +47,14 @@ describe('PageView', () => {
     expect(copy).toHaveBeenLastCalledWith('Why does TestMultiTurnPartial fail about one run in five?')
   })
 
+  it('renders a page whose lists arrive as null', async () => {
+    const s = await store()
+    const base = s.currentPage as Page
+    const page = { ...base, status: 'open', answerMd: '', trace: null, modifiers: null } as unknown as Page
+    render(PageView, { props: { page }, context: ctx(s) })
+    expect(screen.getByRole('status')).toHaveTextContent('Thinking')
+  })
+
   it('shows interrupted and failed turns', async () => {
     const s = await store()
     const base = s.currentPage as Page

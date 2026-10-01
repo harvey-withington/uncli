@@ -12,7 +12,7 @@
 
   let { page }: Props = $props()
   const app = useApp()
-  const mods = $derived(page.modifiers.map(id => app.boot?.modifiers.find(m => m.id === id)).filter(m => !!m))
+  const mods = $derived((page.modifiers ?? []).map(id => app.boot?.modifiers.find(m => m.id === id)).filter(m => !!m))
   const done = $derived(page.status !== 'open')
 </script>
 

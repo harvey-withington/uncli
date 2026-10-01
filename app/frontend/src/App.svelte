@@ -23,6 +23,8 @@
   // The backend is fixed for the app's lifetime.
   const app = new AppStore(untrack(() => backend))
   provideApp(app)
+  // Dev builds expose the store for debugging and end-to-end checks.
+  if (import.meta.env.DEV) (window as unknown as { __uncli: AppStore }).__uncli = app
   let failed = $state('')
 
   onMount(() => {

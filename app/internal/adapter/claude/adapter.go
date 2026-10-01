@@ -35,14 +35,16 @@ func (a *Adapter) Capabilities() core.Capabilities {
 	}
 }
 
-// childEnv is applied to every CLI process: UNCLI may itself be launched
-// from a Claude session, and the pinned binary must never update itself.
+// childEnv is applied to every CLI process. UNCLI may itself be launched
+// from a Claude session, whose variables (session ids, effort, entrypoint)
+// would leak into the child, and the pinned binary must never update itself.
+// CLAUDE_CONFIG_DIR and API keys are the user's choice and pass through.
 func childEnv(extra map[string]string) (map[string]string, []string) {
 	env := map[string]string{"DISABLE_AUTOUPDATER": "1"}
 	for k, v := range extra {
 		env[k] = v
 	}
-	return env, []string{"CLAUDE_CODE_", "CLAUDECODE"}
+	return env, []string{"CLAUDE_CODE_", "CLAUDECODE", "CLAUDE_EFFORT", "CLAUDE_PID", "CLAUDE_AGENT_SDK"}
 }
 
 var permissionModes = map[string]bool{"": true, "default": true, "manual": true, "acceptEdits": true, "dontAsk": true, "plan": true}

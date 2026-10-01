@@ -469,3 +469,30 @@ func TestModelsFromHandshakeArePersisted(t *testing.T) {
 		t.Error("models should survive a restart")
 	}
 }
+
+// A page the UI receives while it is still open must carry lists, not
+// null: the frontend reads trace.length straight away.
+func TestOpenPageHasNoNullLists(t *testing.T) {
+	h := newHarness(t, "single-turn")
+	h.rt.turns = nil
+	pages := make(chan store.Page, 8)
+	h.m.d.Sink = pageSink{h.sink, pages}
+	v, _ := h.m.Create("chat", "", "haiku")
+	if err := h.m.Send(context.Background(), v.ID, "hello"); err != nil {
+		t.Fatal(err)
+	}
+	p := <-pages
+	b, _ := json.Marshal(p)
+	for _, field := range []string{`"trace":null`, `"touchedFiles":null`, `"modifiers":null`} {
+		if strings.Contains(string(b), field) {
+			t.Errorf("open page has %s: %s", field, b)
+		}
+	}
+}
+
+type pageSink struct {
+	*recSink
+	pages chan store.Page
+}
+
+func (s pageSink) PageChanged(p store.Page) { s.pages <- p }

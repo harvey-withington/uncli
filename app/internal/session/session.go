@@ -73,6 +73,16 @@ func (s *Session) savePage() {
 	if s.page == nil {
 		return
 	}
+	// The UI gets lists, never null.
+	if s.page.Trace == nil {
+		s.page.Trace = []store.TraceItem{}
+	}
+	if s.page.TouchedFiles == nil {
+		s.page.TouchedFiles = []store.TouchedFile{}
+	}
+	if s.page.Modifiers == nil {
+		s.page.Modifiers = []string{}
+	}
 	if err := s.m.d.Store.SavePage(s.page); err != nil {
 		s.err = "Could not save the page: " + err.Error()
 	}
@@ -351,6 +361,12 @@ func (s *Session) read(gen int, proc core.Proc, parser core.Parser, stderr *tail
 		for _, ev := range evs {
 			s.handle(gen, ev)
 		}
+	}
+	if err := sc.Err(); err != nil {
+		// Can't keep reading (a line over 64 MB, say): report it and stop
+		// the process so the turn closes instead of hanging.
+		s.handle(gen, core.NewEvent(core.EvError, core.ErrorInfo{Message: "Could not read the CLI's output: " + err.Error()}, nil))
+		_ = proc.Kill()
 	}
 	err := proc.Wait()
 	code := 0
