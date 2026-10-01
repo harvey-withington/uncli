@@ -39,6 +39,8 @@ app/                      # the Go module (the repo root holds docs, website, sc
     runtime/local/        # local process runtime
     runtime/container/    # (phase 5)
     session/              # session lifecycle, turn assembly, state machine
+    app/                  # wiring, CLI install and sign-in, event coalescing (no Wails)
+    integration/          # end-to-end tests against the real CLI (build tag)
     store/                # SQLite: sessions, pages, bookmarks, usage
     profile/              # profile + modifier loading and resolution
     watch/                # fsnotify: artifacts dir, touched files (phase 2)
@@ -53,7 +55,7 @@ app/                      # the Go module (the repo root holds docs, website, sc
   testdata/streams/       # recorded CLI streams: <provider>/<cli version>/*.jsonl
 ```
 
-There is no `permission/` package: the spike showed approvals can travel over the CLI's own stdio control protocol (see Spike findings), so the adapter handles them.
+`app` holds everything the bridge exposes but nothing Wails-specific, so it is unit-tested and a server-mode bridge (phase 6) can reuse it. There is no `permission/` package: the spike showed approvals can travel over the CLI's own stdio control protocol (see Spike findings), so the adapter handles them.
 
 The rule that keeps the kitchen sink possible: `core` imports nothing internal, and only `bridge` imports Wails. If UNCLI ever runs as a local server for a docked or remote UI, `bridge` is the only package replaced.
 
@@ -111,6 +113,7 @@ type Adapter interface {
 type Installer interface {
     Pinned() string                                   // version this UNCLI build is tested with
     Installed() ([]string, error)                     // versions in UNCLI's own cache
+    Path(version string) (bin string, ok bool)        // an installed binary, if present
     Ensure(ctx context.Context, version string, progress func(done, total int64)) (bin string, err error)
     Channels(ctx context.Context) (map[string]string, error) // e.g. stable, latest -> version
 }
@@ -168,7 +171,7 @@ type UserTurn struct {
 
 **Sign-in.** Before the first session, UNCLI runs the adapter's auth status command (`claude auth status` prints JSON with `loggedIn`). If signed out, the app shows a sign-in screen whose button runs `claude auth login`, which opens the browser. A turn that fails with `authentication_failed` returns the user to that screen.
 
-**Process environment.** UNCLI builds the child's environment explicitly: it inherits the user's environment minus any `CLAUDE_CODE_*` and `CLAUDECODE` variables (UNCLI may itself be launched from inside a Claude session), plus `DISABLE_AUTOUPDATER=1`.
+**Process environment.** UNCLI builds the child's environment explicitly: it inherits the user's environment minus `CLAUDE_CODE_*`, `CLAUDECODE`, `CLAUDE_EFFORT`, `CLAUDE_PID` and `CLAUDE_AGENT_SDK*` (UNCLI may itself be launched from inside a Claude session, whose session ids and effort setting would otherwise leak into every child), plus `DISABLE_AUTOUPDATER=1`. `CLAUDE_CONFIG_DIR` and API keys pass through: they are the user's choice.
 
 **Store** (`store`). SQLite for sessions, pages, bookmarks, usage and the raw event log. The provider's own transcript remains the source of truth for conversation content; UNCLI's store holds structure, metadata and a replayable copy.
 
@@ -196,6 +199,7 @@ type EventKind string
 
 const (
     EvSessionReady  EventKind = "session_ready"   // provider session id, model, tools (also when the id changes)
+    EvAccount       EventKind = "account"         // models and account from the provider's handshake
     EvTurnStarted   EventKind = "turn_started"
     EvThinking      EventKind = "thinking"        // estimated tokens; text only if the provider exposes it
     EvTextDelta     EventKind = "text_delta"
@@ -242,7 +246,8 @@ type Event struct {
 | `conversation_reset` (after `/clear`) | `EvNotice`; the next `init` carries the new session id |
 | `rate_limit_event` | `EvUsageLimit` |
 | `result` | `EvTurnResult`; `is_error` can be true while `subtype` is `success`, and an interrupt gives `error_during_execution` |
-| `control_response` | consumed by the session (acknowledges interrupt, set_model, initialize) |
+| `control_response` to `initialize` | `EvAccount` (the model list for the picker) |
+| other `control_response` | nothing (acknowledges interrupt and set_model) |
 | anything else | `EvUnknown` |
 
 ### Activity state machine
@@ -448,6 +453,8 @@ Approval UI, artifact pane, touched files and IDE links, images, pins, search, u
 
 Chat and co-work run with their tool allowlists from the profile. Code runs with `--permission-mode acceptEdits` and an allowlist of safe Bash patterns from the profile (for example `Bash(git status:*)`, `Bash(npm test:*)`). Every phase 1 session passes `--permission-prompts none`, so anything else is denied by the CLI immediately (without it a prompt would wait for an answer UNCLI can't give yet), and the denial appears in the trace strip. Never use the bypass mode as a default.
 
+What "anything else" means, measured on 2.1.285: the CLI auto-approves read-only shell commands (`whoami`, `ls`) in every mode, and under `acceptEdits` it also auto-approves file commands inside the workdir (`mkdir`, `mv`, `rm`). It denies other commands such as `git commit`, `curl` and `node -e`. So the Code profile can delete files in its repository without asking; that is the CLI's meaning of accept-edits, and the approval UI in phase 2 is the way to tighten it.
+
 ### Build order
 
 | # | Task | Est. |
@@ -472,14 +479,16 @@ That total is tight for a weekend. If it slips, cut in this order: polish pass t
 
 ### Definition of done
 
-- [ ] Three sessions (one per profile) run at once, each with a correct live activity state
-- [ ] Quitting and relaunching restores every session, its pages and bookmarks, and continues the conversation
-- [ ] Switching model mid-session continues the same conversation; the page chips show the switch
-- [ ] Toggling Efficiency Mode changes the next answer and its chips; switching it off is honoured
-- [ ] Every code block, markdown block and question copies correctly
-- [ ] Parser tests pass on all recorded fixtures, and an unknown event type doesn't crash anything
+- [x] Three sessions (one per profile) run at once, each with a correct live activity state
+- [x] Quitting and relaunching restores every session, its pages and bookmarks, and continues the conversation
+- [x] Switching model mid-session continues the same conversation; the page chips show the switch
+- [x] Toggling Efficiency Mode changes the next answer and its chips; switching it off is honoured
+- [x] Every code block, markdown block and question copies correctly
+- [x] Parser tests pass on all recorded fixtures, and an unknown event type doesn't crash anything
 - [ ] No terminal window appears at any point on Windows or macOS
 - [ ] On a machine with no Claude CLI, UNCLI downloads its pinned version, verifies it and gets the user signed in without a terminal
+
+How each was checked (Windows 11, CLI 2.1.285, 2026-10-01): `npm test` covers the parser over every fixture and unknown and garbage lines; `npm run test:integration` drives the real CLI through the app service (concurrent sessions, denial, live model switch, Efficiency Mode on and off, interrupt, relaunch with resume); `npm run test:e2e` drives the real app's UI (21 checks, including copy, keyboard, bookmarks across a relaunch, no console windows and no leftover CLI processes). Still open: the no-terminal check on macOS and in the built installer, the OS clipboard (the test machine's clipboard refused all access, so copies were checked at the API UNCLI calls), and sign-in on a signed-out machine (the download and checksum path is verified; `claude auth login` is not).
 
 ## Phases 2 to 6
 

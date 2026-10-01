@@ -8,7 +8,7 @@
 *.nsi text eol=crlf
 
 # Fixtures compared byte for byte: never convert them.
-testdata/** -text
+**/testdata/** -text
 
 *.png binary
 *.jpg binary

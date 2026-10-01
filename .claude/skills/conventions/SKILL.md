@@ -13,10 +13,26 @@ not repeated here; this file holds what is specific to UNCLI.
 
 ## Architecture
 
-<!-- The rules a change must not break. Replace these examples:
-- `core/` never imports `platform/`; a new OS is a new provider.
-- Pure logic lives in `lib/` and is unit-tested; components get plain values.
--->
+`docs/BRIEF.md` describes the design; these are the rules a change must not
+break (`internal/core/seams_test.go` enforces the first two):
+
+- `internal/core` imports nothing from UNCLI. New providers are adapters,
+  new places to run are runtimes; neither changes `core` beyond adding event
+  kinds or capability flags.
+- Only `internal/bridge` imports Wails. Everything the UI calls lives in
+  `internal/app`, which a different bridge (an HTTP server, say) can reuse.
+- The UI never parses provider JSON: it sees UNCLI's events and pages
+  through `frontend/src/lib/api`. Provider details stay in the adapter.
+- Fixtures are the contract. A new CLI behaviour gets a recorded stream in
+  `app/testdata/streams/<provider>/<version>/` and a parser test before
+  anything depends on it. Moving to a new CLI version means recording
+  fixtures, passing the tests, then bumping `PinnedVersion`.
+- UNCLI runs only its own pinned, checksum-verified CLI (or one the user
+  chose at their own risk). Never bypass permissions in a profile default.
+- Config over code: profiles, modifiers and the toolbar are YAML in
+  `app/config/defaults/`, overridable by `id` from the user's config folder.
+- Pure logic lives in Go packages and `frontend/src/lib/`, with unit tests;
+  components get plain values from the store.
 
 ## Frontend
 
@@ -35,6 +51,10 @@ npm test
 
 - A UI change is not done until it has been seen rendered: use the `run-app`
   skill and look at the screenshot.
+- A change to the adapter, session or bridge also runs
+  `npm run test:integration` (real CLI); a change that affects the
+  definition of done runs `npm run test:e2e`. Both use the user's Claude
+  usage, so say when you run them.
 - Pure logic gets a unit test. Components get a smoke test that renders real
   data and asserts the text a user relies on.
 
