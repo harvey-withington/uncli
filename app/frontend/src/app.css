@@ -29,6 +29,20 @@
   --shadow-lg: 0 18px 50px rgba(29, 27, 24, 0.18);
   --scrim: rgba(29, 27, 24, 0.32);
 
+  /* Section kinds in the outline: full saturation (HSL 100%), off-primary
+     hues, mid-dark lightness, nudged per hue so they read evenly bright.
+     Dark themes use lighter versions of the same hues. */
+  --kind-overview: #008c99;
+  --kind-commentary: #0047d6;
+  --kind-analysis: #6000e6;
+  --kind-steps: #009431;
+  --kind-code: #006eb3;
+  --kind-data: #b37100;
+  --kind-example: #c20091;
+  --kind-tip: #809400;
+  --kind-warning: #cc2200;
+  --kind-conclusion: #cc003d;
+
   --font: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Consolas, monospace;
   --text-xs: 11.5px;
@@ -46,7 +60,6 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-7: 48px;
-  --sidebar-width: 272px;
   --reading-width: 760px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --fast: 120ms;
@@ -78,6 +91,17 @@
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.55);
     --scrim: rgba(0, 0, 0, 0.55);
+
+    --kind-overview: #00d2e6;
+    --kind-commentary: #3d7eff;
+    --kind-analysis: #9a52ff;
+    --kind-steps: #00d647;
+    --kind-code: #0aa1ff;
+    --kind-data: #ffa100;
+    --kind-example: #ff3dcf;
+    --kind-tip: #bad600;
+    --kind-warning: #ff5533;
+    --kind-conclusion: #ff3d77;
   }
 }
 
@@ -105,6 +129,17 @@
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.55);
   --scrim: rgba(0, 0, 0, 0.55);
+
+  --kind-overview: #00d2e6;
+  --kind-commentary: #3d7eff;
+  --kind-analysis: #9a52ff;
+  --kind-steps: #00d647;
+  --kind-code: #0aa1ff;
+  --kind-data: #ffa100;
+  --kind-example: #ff3dcf;
+  --kind-tip: #bad600;
+  --kind-warning: #ff5533;
+  --kind-conclusion: #ff3d77;
 }
 
 *, *::before, *::after { box-sizing: border-box; }

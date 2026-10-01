@@ -339,3 +339,38 @@ func TestDebuggerNodeOptionsDontLeak(t *testing.T) {
 		t.Fatalf("status with a debugger NODE_OPTIONS = %+v", st)
 	}
 }
+
+// A page summary from the quick-task model: titles anchored to real blocks.
+func TestSummarisePage(t *testing.T) {
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	svc.Store.CreateSession(&store.Session{ID: "s", Adapter: "claude", Runtime: "local", ProfileID: "chat", Workdir: t.TempDir(), Model: "haiku"})
+	svc.Store.SavePage(&store.Page{ID: "p", SessionID: "s", Seq: 1, Question: "Plan a weekend in Lisbon", Model: "haiku", Status: "done"})
+	blocks := []string{
+		"Here's a relaxed two-day plan for Lisbon.",
+		"Saturday morning: walk Alfama before the crowds and stop at the Miradouro de Santa Luzia.",
+		"Lunch at a tasca; grilled sardines in season.",
+		"(code block: text, 3 lines)",
+		"Sunday: Belém for pastéis de nata, then the Jerónimos Monastery (book ahead).",
+		"Afternoon at LX Factory; sunset at Cais do Sodré.",
+		"Budget: about €110 per person for food, transport and entry fees.",
+	}
+	p, err := svc.SummarisePage(ctx, "s", "p", blocks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o := p.Outline
+	if o == nil || o.Provider != "claude" || o.Model != "haiku" || len(o.Sections) < 2 || o.Sections[0].Block != 0 {
+		t.Fatalf("outline = %+v", o)
+	}
+	for _, s := range o.Sections {
+		if s.Block < 0 || s.Block >= len(blocks) || s.Title == "" || s.Kind == "" {
+			t.Errorf("bad section %+v", s)
+		}
+	}
+	t.Logf("sections: %+v (cost $%.4f)", o.Sections, o.CostUSD)
+}

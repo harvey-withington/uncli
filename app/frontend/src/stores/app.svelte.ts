@@ -4,6 +4,8 @@ import type {
   Backend, Bootstrap, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
   ThinkingData, UsageLimit,
 } from '../lib/api'
+import { loadLayout, saveLayout, type OutlineLayout } from '../lib/outline'
+import { loadSidebarWidth, saveSidebarWidth } from '../lib/panels'
 import { showToast } from '../lib/toasts.svelte'
 
 export interface Live {
@@ -25,7 +27,11 @@ export class AppStore {
   live = $state<Record<string, Live>>({})
   usage = $state<UsageLimit | null>(null)
   newSessionOpen = $state(false)
+  newSessionProfile = $state<string | null>(null) // profile the dialog opens on
+  newSessionSeq = $state(0) // each open is a fresh dialog, even mid fade-out
   settingsOpen = $state(false)
+  outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
+  sidebarWidth = $state(loadSidebarWidth())
   private off: (() => void) | null = null
 
   constructor(backend: Backend) {
@@ -73,12 +79,36 @@ export class AppStore {
     await this.backend.focus(id)
   }
 
+  // openNewSession opens the new-session dialog, on a given profile if one
+  // was picked (the welcome cards), else on the first.
+  openNewSession(profileId: string | null = null) {
+    this.newSessionProfile = profileId
+    this.newSessionSeq++
+    this.newSessionOpen = true
+  }
+
+  setSidebarWidth(width: number) {
+    this.sidebarWidth = width
+    saveSidebarWidth(width)
+  }
+
+  toggleOutline() {
+    this.outline.open = !this.outline.open
+    saveLayout(this.outline)
+  }
+
+  setOutlineWidth(width: number) {
+    this.outline.width = width
+    saveLayout(this.outline)
+  }
+
   goTo(i: number) {
     if (this.currentId) this.index[this.currentId] = i
   }
 
   async createSession(profileId: string, workdir: string, model: string) {
-    const v = await this.backend.createSession(profileId, workdir, model)
+    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model)
+    if (this.boot) this.boot.lastNewSession = lastNewSession
     this.upsertSession(v)
     this.pages[v.id] = []
     this.index[v.id] = 0

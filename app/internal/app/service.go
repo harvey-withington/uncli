@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -447,13 +448,66 @@ type Bootstrap struct {
 	Models       []core.ModelInfo      `json:"models"`
 	Capabilities core.Capabilities     `json:"capabilities"`
 	Platform     string                `json:"platform"`
+	LastNew      NewSessionChoices     `json:"lastNewSession"`
+	Preferences  Preferences           `json:"preferences"`
+	Providers    []Provider            `json:"providers"`
+}
+
+// NewSessionChoices is what the user picked last time in the new-session
+// dialog, the best guess for next time: the type, and per type the model
+// and folder.
+type NewSessionChoices struct {
+	ProfileID string            `json:"profileId,omitempty"`
+	Models    map[string]string `json:"models"`
+	Folders   map[string]string `json:"folders"`
+}
+
+const settingLastNew = "ui.newSession.last"
+
+// CreatedSession is a new session plus the updated remembered choices.
+type CreatedSession struct {
+	Session session.View      `json:"session"`
+	LastNew NewSessionChoices `json:"lastNewSession"`
+}
+
+func (s *Service) lastNewSession() NewSessionChoices {
+	c := NewSessionChoices{}
+	if raw, _ := s.Store.Setting(settingLastNew); raw != "" {
+		_ = json.Unmarshal([]byte(raw), &c)
+	}
+	if c.Models == nil {
+		c.Models = map[string]string{}
+	}
+	if c.Folders == nil {
+		c.Folders = map[string]string{}
+	}
+	return c
+}
+
+// CreateSession creates a session and remembers the choices for next time.
+func (s *Service) CreateSession(profileID, workdir, model string) (session.View, NewSessionChoices, error) {
+	v, err := s.Sessions.Create(profileID, workdir, model)
+	if err != nil {
+		return v, s.lastNewSession(), err
+	}
+	c := s.lastNewSession()
+	c.ProfileID = v.ProfileID
+	c.Models[v.ProfileID] = v.Model
+	if p, ok := s.Profiles.Profile(v.ProfileID); ok && p.Folder != "scratch" {
+		c.Folders[v.ProfileID] = v.Workdir
+	}
+	if b, err := json.Marshal(c); err == nil {
+		_ = s.Store.SetSetting(settingLastNew, string(b))
+	}
+	return v, c, nil
 }
 
 func (s *Service) Bootstrap() Bootstrap {
 	return Bootstrap{
 		Profiles: s.Profiles.Profiles, Modifiers: s.Profiles.Modifiers, Toolbar: s.Profiles.Toolbar,
 		Sessions: s.Sessions.List(), Models: s.Sessions.Models(), Capabilities: s.Adapter.Capabilities(),
-		Platform: runtime.GOOS,
+		Platform: runtime.GOOS, LastNew: s.lastNewSession(),
+		Preferences: s.Preferences(), Providers: s.Providers(),
 	}
 }
 

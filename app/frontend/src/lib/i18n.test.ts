@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import en from '../locales/en.json'
 import { t } from './i18n.svelte'
+import { SECTION_KINDS } from './sections'
 
 // Every key the source uses must exist in en.json.
 const sources = import.meta.glob('../**/*.{svelte,ts}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
@@ -29,6 +30,7 @@ describe('i18n', () => {
       expect(dict).toHaveProperty(`profile.${p}.empty`)
     }
     for (const th of ['system', 'light', 'dark']) expect(dict).toHaveProperty(`theme.${th}`)
+    for (const k of SECTION_KINDS) expect(dict).toHaveProperty(`kind.${k}`)
   })
 
   it('fills parameters', () => {

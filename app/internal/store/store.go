@@ -62,6 +62,30 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 `
 
+// migrate adds columns introduced after the first schema.
+func migrate(db *sql.DB) error {
+	has := func(table, col string) bool {
+		rows, err := db.Query("SELECT name FROM pragma_table_info(?)", table)
+		if err != nil {
+			return false
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var n string
+			if rows.Scan(&n) == nil && n == col {
+				return true
+			}
+		}
+		return false
+	}
+	if !has("pages", "outline") {
+		if _, err := db.Exec("ALTER TABLE pages ADD COLUMN outline TEXT"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type Store struct {
 	db *sql.DB
 	// EventCap is the most raw events kept per session; oldest pages go first.
@@ -77,6 +101,10 @@ func Open(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("schema: %w", err)
+	}
+	if err := migrate(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	return &Store{db: db, EventCap: 20000}, nil
 }
@@ -235,6 +263,44 @@ type Page struct {
 	DurationMS   int           `json:"durationMs"`
 	StartedAt    int64         `json:"startedAt"`
 	FinishedAt   int64         `json:"finishedAt"`
+	Outline      *PageOutline  `json:"outline,omitempty"` // a summary table of contents, if one was made
+}
+
+// PageOutline is a table of contents written by the quick-task model,
+// anchored to the answer's top-level markdown blocks.
+type PageOutline struct {
+	Provider string           `json:"provider"`
+	Model    string           `json:"model"`
+	Sections []OutlineSection `json:"sections"`
+	CostUSD  float64          `json:"costUsd"`
+	At       int64            `json:"at"`
+}
+
+type OutlineSection struct {
+	Block int    `json:"block"`
+	Title string `json:"title"`
+	Kind  string `json:"kind,omitempty"` // one of the section kinds; empty = let the UI guess
+}
+
+// SetPageOutline stores (or with nil, clears) a page's summary outline.
+// SavePage never touches it, so a live page can't overwrite it.
+func (s *Store) SetPageOutline(pageID string, o *PageOutline) error {
+	var v any
+	if o != nil {
+		b, err := json.Marshal(o)
+		if err != nil {
+			return err
+		}
+		v = string(b)
+	}
+	res, err := s.db.Exec(`UPDATE pages SET outline=? WHERE id=?`, v, pageID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("page not found")
+	}
+	return nil
 }
 
 // The pages table has no error column; errors ride in the trace JSON so
@@ -277,7 +343,7 @@ func nonNil[T any](v []T) []T {
 func (s *Store) ListPages(sessionID string) ([]Page, error) {
 	rows, err := s.db.Query(`SELECT id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
 		touched_files, status, bookmarked, pinned, input_tokens, output_tokens, cache_read, cache_write, cost_usd,
-		duration_ms, started_at, finished_at FROM pages WHERE session_id=? ORDER BY seq`, sessionID)
+		duration_ms, started_at, finished_at, outline FROM pages WHERE session_id=? ORDER BY seq`, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -289,9 +355,16 @@ func (s *Store) ListPages(sessionID string) ([]Page, error) {
 		var bm, pin sql.NullBool
 		var in, outT, cr, cw, dur, st, fin sql.NullInt64
 		var cost sql.NullFloat64
+		var outline sql.NullString
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Seq, &p.Question, &directives, &p.Model, &mods, &answer, &trace,
-			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin); err != nil {
+			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline); err != nil {
 			return nil, err
+		}
+		if outline.Valid && outline.String != "" {
+			var o PageOutline
+			if json.Unmarshal([]byte(outline.String), &o) == nil {
+				p.Outline = &o
+			}
 		}
 		p.Directives, p.AnswerMD, p.Status = directives.String, answer.String, status.String
 		p.Modifiers = parseList(mods)

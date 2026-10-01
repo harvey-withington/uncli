@@ -147,8 +147,8 @@ try {
 
   // Co-work and code sessions (the folder picker is a native dialog, so
   // these go through the same bridge call the dialog makes).
-  const co = await bridge(page, 'CreateSession', 'cowork', docs, 'haiku')
-  const code = await bridge(page, 'CreateSession', 'code', repo, 'haiku')
+  await bridge(page, 'CreateSession', 'cowork', docs, 'haiku')
+  await bridge(page, 'CreateSession', 'code', repo, 'haiku')
   await sleep(300)
   const sessions = await page.$$eval('.sidebar li', ls => ls.length)
   ok('three sessions listed', sessions === 3, `${sessions} in sidebar`)

@@ -27,6 +27,7 @@ export interface MdBlock {
   source: string // original markdown of the block
   code?: string // for code blocks: the code only
   lang?: string
+  heading?: { level: number; text: string } // for heading blocks: plain text, for the outline
 }
 
 export function toBlocks(src: string): MdBlock[] {
@@ -57,10 +58,22 @@ export function toBlocks(src: string): MdBlock[] {
         lang: (first.info || '').trim().split(/\s+/)[0] || '',
       })
     } else {
-      out.push({ key, kind: 'md', html: md.renderer.render(group, md.options, {}), source })
+      const block: MdBlock = { key, kind: 'md', html: md.renderer.render(group, md.options, {}), source }
+      if (first.type === 'heading_open') {
+        const text = plainText(group[1] as Token | undefined)
+        if (text) block.heading = { level: Number(first.tag.slice(1)) || 1, text }
+      }
+      out.push(block)
     }
   }
   return out
+}
+
+// plainText is an inline token's text without its markup.
+function plainText(inline: Token | undefined): string {
+  if (!inline) return ''
+  const parts = (inline.children ?? []).filter(c => c.type === 'text' || c.type === 'code_inline').map(c => c.content)
+  return (parts.length ? parts.join('') : inline.content).replace(/\s+/g, ' ').trim()
 }
 
 // Escape text for HTML (plain code before the highlighter loads).

@@ -2,8 +2,9 @@
 // component tests). It behaves like the real one closely enough to
 // exercise streaming, states, bookmarks and errors, with canned content.
 import type {
-  ActivityState, Backend, Bootstrap, CLIStatus, Handlers, Page, SessionView, UEvent,
+  ActivityState, Backend, Bootstrap, CLIStatus, Handlers, NewSessionChoices, Page, Preferences, SessionView, UEvent,
 } from './types'
+import { SECTION_KINDS } from '../sections'
 
 const profiles: Bootstrap['profiles'] = [
   { id: 'chat', label: 'Chat', icon: 'message-circle', folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false },
@@ -108,7 +109,7 @@ function session(id: string, profileId: string, title: string, state: ActivitySt
   }
 }
 
-export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean } = {}): Backend {
+export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
     session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3 }),
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2 }),
@@ -137,6 +138,8 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean } 
   }
   let cli: CLIStatus = { installed: true, version: '2.1.285', pinned: '2.1.285', custom: false, loggedIn: true, email: 'you@example.com', subscription: 'max', ...opts.cli }
   let h: Handlers | null = null
+  const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
+  let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummarise: false, ...opts.prefs }
   const timers = new Map<string, number[]>()
 
   const changed = (s: SessionView) => h?.sessionChanged({ ...s })
@@ -160,7 +163,8 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean } 
     },
     async bootstrap() {
       return {
-        profiles, modifiers, toolbar, models, platform: 'windows',
+        profiles, modifiers, toolbar, models, platform: 'windows', lastNewSession: structuredClone(lastNew),
+        preferences: structuredClone(prefs), providers: [{ id: 'claude', label: 'Claude' }],
         sessions: sessions.map(s => ({ ...s })),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
@@ -201,7 +205,10 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean } 
       sessions.unshift(s)
       pages[s.id] = []
       changed(s)
-      return { ...s }
+      lastNew.profileId = profileId
+      lastNew.models[profileId] = s.model
+      if (p?.folder !== 'scratch') lastNew.folders[profileId] = s.workdir
+      return { session: { ...s }, lastNewSession: structuredClone(lastNew) }
     },
     async pages(id) { return (pages[id] ?? []).map(p => ({ ...p })) },
     async send(id, text) {
@@ -283,6 +290,24 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean } 
     async focus(id) {
       const s = sessions.find(x => x.id === id)
       if (s && s.state === 'unread') setState(s, 'idle')
+    },
+    async setPreferences(p) {
+      prefs = structuredClone(p)
+      return structuredClone(prefs)
+    },
+    async summarisePage(sid, pid, blocks) {
+      const p = pages[sid]?.find(x => x.id === pid)
+      if (!p) throw new Error('page not found')
+      await new Promise(r => setTimeout(r, 400))
+      // A canned summary: one section per block, with varied kinds so every colour shows.
+      const sections = blocks.map((b, i) => ({
+        block: i,
+        title: b.replace(/[#*`>|-]/g, '').trim().split(/\s+/).slice(0, 4).join(' ') || `Part ${i + 1}`,
+        kind: SECTION_KINDS[(i * 3) % SECTION_KINDS.length],
+      }))
+      p.outline = { provider: prefs.quickTaskModel.provider, model: prefs.quickTaskModel.model, sections, costUsd: 0.0042, at: Date.now() }
+      h?.pageChanged({ ...p })
+      return { ...p }
     },
     async usage() {
       const now = Math.floor(Date.now() / 1000)

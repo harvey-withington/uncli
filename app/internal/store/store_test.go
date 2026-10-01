@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -120,5 +121,46 @@ func TestSettingsAndDelete(t *testing.T) {
 	}
 	if l, _ := s.ListSessions(); len(l) != 0 {
 		t.Error("session not deleted")
+	}
+}
+
+func TestPageOutline(t *testing.T) {
+	s, path := open(t)
+	s.CreateSession(&Session{ID: "s", Adapter: "claude", Runtime: "local", ProfileID: "chat", Workdir: "/", Model: "m"})
+	s.SavePage(&Page{ID: "p", SessionID: "s", Seq: 1, Question: "q", Model: "m", Status: "done"})
+	o := &PageOutline{Provider: "claude", Model: "haiku", Sections: []OutlineSection{{Block: 0, Title: "Intro"}, {Block: 3, Title: "Details", Kind: "analysis"}}, CostUSD: 0.004}
+	if err := s.SetPageOutline("p", o); err != nil {
+		t.Fatal(err)
+	}
+	// A later save of the page (bookmark, status) must keep the outline.
+	s.SavePage(&Page{ID: "p", SessionID: "s", Seq: 1, Question: "q", Model: "m", Status: "done", AnswerMD: "x"})
+	s.Close()
+	s2, _ := Open(path)
+	defer s2.Close()
+	pages, _ := s2.ListPages("s")
+	if pages[0].Outline == nil || len(pages[0].Outline.Sections) != 2 || pages[0].Outline.Sections[1].Title != "Details" {
+		t.Fatalf("outline = %+v", pages[0].Outline)
+	}
+	s2.SetPageOutline("p", nil)
+	if pages, _ := s2.ListPages("s"); pages[0].Outline != nil {
+		t.Error("outline not cleared")
+	}
+}
+
+// A database made before the outline column existed gets it on open.
+func TestMigrationAddsOutline(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	db, _ := sql.Open("sqlite", "file:"+path)
+	db.Exec(schema) // the original schema, without the outline column
+	db.Close()
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	s.CreateSession(&Session{ID: "s", Adapter: "claude", Runtime: "local", ProfileID: "chat", Workdir: "/", Model: "m"})
+	s.SavePage(&Page{ID: "p", SessionID: "s", Seq: 1, Question: "q", Model: "m", Status: "done"})
+	if err := s.SetPageOutline("p", &PageOutline{Model: "haiku"}); err != nil {
+		t.Fatal(err)
 	}
 }

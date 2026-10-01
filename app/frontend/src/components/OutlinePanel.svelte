@@ -1,0 +1,284 @@
+<script lang="ts" module>
+  // Pages already summarised automatically this run, so a failure isn't retried in a loop.
+  const autoRequested = new Set<string>()
+</script>
+
+<script lang="ts">
+  import type { Page } from '../lib/api'
+  import { useApp } from '../lib/context'
+  import { cost } from '../lib/format'
+  import { t } from '../lib/i18n.svelte'
+  import { modelLabel } from '../lib/models'
+  import { activeEntry, OUTLINE_MAX, OUTLINE_MIN, outlineOf, summaryBlocks, summaryEntries, wantsAutoSummary } from '../lib/outline'
+  import { toBlocks } from '../lib/render/markdown'
+  import { KIND_ICONS } from '../lib/sections'
+  import { showToast } from '../lib/toasts.svelte'
+  import { displayAnswer } from '../stores/app.svelte'
+  import Icon from './Icon.svelte'
+  import ResizeHandle from './ResizeHandle.svelte'
+
+  // "On this page": the answer's headings, or a summary written by the
+  // quick-task model. Clicking an entry scrolls to it; the one being read is
+  // highlighted. The left edge resizes the panel.
+  interface Props {
+    page: Page
+    scroller: HTMLElement | undefined
+  }
+
+  let { page, scroller }: Props = $props()
+  const app = useApp()
+  const blocks = $derived(toBlocks(displayAnswer(page, app.live[page.sessionId])))
+  const headings = $derived(outlineOf(blocks))
+  const summary = $derived(page.outline ? summaryEntries(page.outline.sections, blocks) : [])
+  let preferHeadings = $state(false)
+  const showingSummary = $derived(summary.length > 0 && !(preferHeadings && headings.length > 0))
+  const entries = $derived(showingSummary ? summary : headings)
+  const quick = $derived(app.boot?.preferences.quickTaskModel)
+  const quickLabel = $derived(quick ? modelLabel(app.boot?.models ?? null, quick.model) : '')
+  let summarising = $state(false)
+  let active = $state(-1)
+
+  async function summarise() {
+    if (summarising || page.status === 'open') return
+    summarising = true
+    try {
+      const updated = await app.backend.summarisePage(page.sessionId, page.id, summaryBlocks(toBlocks(page.answerMd)))
+      app.upsertPage(updated)
+      preferHeadings = false
+    } catch (e) {
+      showToast(String(e), 'error')
+    } finally {
+      summarising = false
+    }
+  }
+
+  // Opt-in: long answers without headings get a summary once they finish.
+  $effect(() => {
+    if (!app.boot?.preferences.autoSummarise || page.status !== 'done' || page.outline || autoRequested.has(page.id)) return
+    if (!wantsAutoSummary(toBlocks(page.answerMd))) return
+    autoRequested.add(page.id)
+    summarise()
+  })
+
+  // The sticky question covers the top of the scroller; content is "being
+  // read" once it passes just below it.
+  function headerHeight(): number {
+    return (scroller?.querySelector('.question') as HTMLElement | null)?.offsetHeight ?? 0
+  }
+
+  function blockEl(i: number): HTMLElement | null {
+    return scroller?.querySelector<HTMLElement>(`[data-block="${i}"]`) ?? null
+  }
+
+  function track() {
+    if (!scroller) return
+    const top = scroller.getBoundingClientRect().top
+    const tops = entries.map(e => (blockEl(e.block)?.getBoundingClientRect().top ?? Infinity) - top)
+    active = activeEntry(tops, headerHeight() + 24)
+  }
+
+  $effect(() => {
+    const el = scroller
+    void entries // re-track when the entries change (streaming, new page, summary)
+    if (!el) return
+    queueMicrotask(track)
+    el.addEventListener('scroll', track, { passive: true })
+    return () => el.removeEventListener('scroll', track)
+  })
+
+  const smooth = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
+
+  function jump(i: number) {
+    const el = blockEl(entries[i]?.block ?? -1)
+    if (!scroller || !el) return
+    const y = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - headerHeight() - 12
+    scroller.scrollTo({ top: Math.max(0, y), behavior: smooth() })
+  }
+
+  function toTop() {
+    scroller?.scrollTo({ top: 0, behavior: smooth() })
+  }
+</script>
+
+<aside class="outline" style:width="{app.outline.width}px" aria-label={t('outline.title')}>
+  <ResizeHandle
+    edge="left"
+    width={app.outline.width}
+    min={OUTLINE_MIN}
+    max={OUTLINE_MAX}
+    label={t('outline.resize')}
+    onresize={w => (app.outline.width = w)}
+    oncommit={w => app.setOutlineWidth(w)}
+  />
+  <div class="head">
+    <h2>{t('outline.title')}</h2>
+    <button
+      class="btn ghost small icon"
+      onclick={summarise}
+      disabled={summarising || page.status === 'open'}
+      aria-label={t(page.outline ? 'outline.resummarise' : 'outline.summarise', { model: quickLabel })}
+      title={t(page.outline ? 'outline.resummarise' : 'outline.summarise', { model: quickLabel })}
+    >
+      <Icon name={summarising ? 'loader' : 'sparkles'} spin={summarising} size={14} />
+    </button>
+  </div>
+
+  {#if summary.length > 0 && headings.length > 0}
+    <div class="switch" role="group" aria-label={t('outline.show')}>
+      <button class:on={showingSummary} aria-pressed={showingSummary} onclick={() => (preferHeadings = false)}>{t('outline.summary')}</button>
+      <button class:on={!showingSummary} aria-pressed={!showingSummary} onclick={() => (preferHeadings = true)}>{t('outline.headings')}</button>
+    </div>
+  {/if}
+
+  <nav>
+    <button class="entry question" class:active={active === -1} onclick={toTop}>
+      <span class="kind"><Icon name="message-circle" size={13} /></span>
+      <span class="label">{t('outline.question')}</span>
+    </button>
+    {#each entries as e, i (e.block)}
+      <button
+        class="entry kind-{e.kind}"
+        class:active={active === i}
+        style:--indent={e.level - 1}
+        onclick={() => jump(i)}
+        aria-current={active === i ? 'location' : undefined}
+        title={`${t(`kind.${e.kind}`)}: ${e.text}`}
+      >
+        <span class="kind" style:color="var(--kind-{e.kind})"><Icon name={KIND_ICONS[e.kind]} size={13} /></span>
+        <span class="visually-hidden">{t(`kind.${e.kind}`)}: </span>
+        <span class="label">{e.text}</span>
+      </button>
+    {/each}
+  </nav>
+
+  {#if summarising}
+    <p class="note">{t('outline.summarising', { model: quickLabel })}</p>
+  {:else if entries.length === 0}
+    <p class="note">
+      {t('outline.empty')}
+      {#if page.status !== 'open'}
+        <button class="link" onclick={summarise}>{t('outline.summariseShort')}</button>
+      {/if}
+    </p>
+  {/if}
+  {#if showingSummary && page.outline}
+    <p class="note by">
+      <Icon name="sparkles" size={12} />
+      {t('outline.by', { model: modelLabel(app.boot?.models ?? null, page.outline.model), cost: cost(page.outline.costUsd) })}
+    </p>
+  {/if}
+</aside>
+
+<style>
+  .outline {
+    position: relative;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: var(--space-5) var(--space-3) var(--space-4) var(--space-4);
+    border-left: 1px solid var(--border);
+    background: var(--bg);
+    overflow-y: auto;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 var(--space-2) var(--space-2);
+  }
+  h2 {
+    margin: 0;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .switch {
+    display: flex;
+    gap: 2px;
+    margin: 0 0 var(--space-3) var(--space-2);
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    align-self: flex-start;
+  }
+  .switch button {
+    padding: 2px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
+  .switch button.on {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+  nav {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .entry {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 5px var(--space-2) 5px calc(var(--space-2) + var(--indent, 0) * 14px);
+    border: 0;
+    border-left: 2px solid transparent;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: none;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    text-align: left;
+    transition: color var(--fast) var(--ease), background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+  }
+  .label {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .kind {
+    display: inline-flex;
+    flex: none;
+    color: var(--text-faint);
+    transition: color var(--fast) var(--ease);
+  }
+  .entry:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .entry.active {
+    border-left-color: var(--accent);
+    color: var(--accent);
+    font-weight: 550;
+  }
+  .question .label {
+    font-style: italic;
+  }
+  .note {
+    margin: var(--space-3) var(--space-2) 0;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+  .by {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font-size: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+</style>

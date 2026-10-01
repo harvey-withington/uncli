@@ -81,7 +81,7 @@
 
 <main class="setup">
   <div class="card">
-    <span class="wordmark">UNCLI</span>
+    <span class="brand"><img src="/uncli-mark.svg" alt="" width="22" height="26" /><span class="wordmark">UNCLI</span></span>
     <h1>{t('setup.title')}</h1>
     <p class="lead">{t('setup.lead')}</p>
 
@@ -170,6 +170,11 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
   }
   .wordmark {
     font-weight: 750;

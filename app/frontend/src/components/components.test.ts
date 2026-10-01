@@ -155,3 +155,136 @@ describe('Sign-in', () => {
     expect(await screen.findByRole('heading', { name: 'Fix the flaky parser test' })).toBeInTheDocument()
   })
 })
+
+describe('Welcome cards', () => {
+  it('open the new-session dialog on the card that was clicked', async () => {
+    render(App, { props: { backend: mockBackend({ empty: true }) } })
+    await fireEvent.click(await screen.findByRole('button', { name: /^Code/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'New session' })
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: /Code/ })).toBeChecked())
+    expect(within(dialog).getByText('Repository')).toBeInTheDocument()
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await fireEvent.click(screen.getByRole('button', { name: /New session/ }))
+    // The closed dialog may still be fading out; the new one is last.
+    const again = (await screen.findAllByRole('dialog', { name: 'New session' })).at(-1) as HTMLElement
+    await waitFor(() => expect(within(again).getByRole('radio', { name: /Chat/ })).toBeChecked())
+  })
+})
+
+describe('New session dialog', () => {
+  const lastDialog = async () => (await screen.findAllByRole('dialog', { name: 'New session' })).at(-1) as HTMLElement
+
+  it('starts from the last choices: type, and that type’s model and folder', async () => {
+    render(App, { props: { backend: mockBackend({ empty: true }) } })
+    await fireEvent.click(await screen.findByRole('button', { name: /^Code/ }))
+    let dialog = await lastDialog()
+    await fireEvent.change(within(dialog).getByRole('combobox', { name: 'Model' }), { target: { value: 'haiku' } })
+    await fireEvent.click(within(dialog).getByRole('button', { name: /Choose/ }))
+    await within(dialog).findByText(/projects.demo$/)
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Start session' }))
+    await screen.findByRole('heading', { name: 'New session' }) // the new session's pane
+
+    await fireEvent.keyDown(window, { key: 'n', ctrlKey: true })
+    dialog = await lastDialog()
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: /Code/ })).toBeChecked())
+    expect(within(dialog).getByRole('combobox', { name: 'Model' })).toHaveValue('haiku')
+    expect(within(dialog).getByText(/projects.demo$/)).toBeInTheDocument()
+
+    // Another type starts from its own defaults.
+    await fireEvent.click(within(dialog).getByRole('radio', { name: /Chat/ }))
+    await waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Model' })).toHaveValue('sonnet'))
+  })
+
+  it('lets a clicked welcome card win over the remembered type', async () => {
+    render(App, { props: { backend: mockBackend({ empty: true, lastNew: { profileId: 'code' } }) } })
+    await fireEvent.click(await screen.findByRole('button', { name: /^Co-work/ }))
+    const dialog = await lastDialog()
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: /Co-work/ })).toBeChecked())
+  })
+})
+
+describe('Outline panel', () => {
+  it('lists the answer headings, jumps to them, and hides with O', async () => {
+    localStorage.clear()
+    render(App, { props: { backend: mockBackend() } })
+    await fireEvent.click(await screen.findByText('Plan a weekend in Lisbon'))
+    const panel = await screen.findByRole('complementary', { name: 'On this page' })
+    const saturday = within(panel).getByRole('button', { name: /Saturday$/ })
+    expect(within(panel).getByRole('button', { name: /Sunday$/ })).toBeInTheDocument()
+    const scroller = document.querySelector('.scroll') as HTMLElement
+    scroller.scrollTo = vi.fn()
+    await fireEvent.click(saturday)
+    expect(scroller.scrollTo).toHaveBeenCalled()
+    await fireEvent.keyDown(window, { key: 'o' })
+    expect(screen.queryByRole('complementary', { name: 'On this page' })).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('uncli-outline') ?? '{}').open).toBe(false)
+  })
+
+  it('resizes with the arrow keys on its edge', async () => {
+    localStorage.clear()
+    render(App, { props: { backend: mockBackend() } })
+    await fireEvent.click(await screen.findByText('Plan a weekend in Lisbon'))
+    const handle = await screen.findByRole('separator', { name: 'Resize the outline' })
+    await fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+    expect(handle).toHaveAttribute('aria-valuenow', '256')
+  })
+})
+
+describe('Page summaries', () => {
+  it('summarise a page without headings with the quick-task model', async () => {
+    localStorage.clear()
+    const backend = mockBackend()
+    const spy = vi.spyOn(backend, 'summarisePage')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByText('Summarise the Q3 planning notes'))
+    const panel = await screen.findByRole('complementary', { name: 'On this page' })
+    expect(within(panel).getByText(/This answer has no headings/)).toBeInTheDocument()
+    await fireEvent.click(within(panel).getByRole('button', { name: 'Summarise this page with Haiku 4.5' }))
+    expect(await within(panel).findByText(/Summary by Haiku 4.5/)).toBeInTheDocument()
+    expect(spy).toHaveBeenCalledWith('s-cowork', 's-cowork-p3', expect.arrayContaining([expect.stringContaining('shipping desktop first')]))
+    expect(within(panel).getAllByRole('button').length).toBeGreaterThan(2)
+  })
+
+  it('switch between summary and headings when a page has both', async () => {
+    localStorage.clear()
+    render(App, { props: { backend: mockBackend() } })
+    await fireEvent.click(await screen.findByText('Plan a weekend in Lisbon'))
+    const panel = await screen.findByRole('complementary', { name: 'On this page' })
+    await fireEvent.click(within(panel).getByRole('button', { name: /Summarise this page/ }))
+    const headings = await within(panel).findByRole('button', { name: 'Headings' })
+    await fireEvent.click(headings)
+    expect(within(panel).getByRole('button', { name: /Saturday$/ })).toBeInTheDocument()
+    expect(within(panel).queryByText(/Summary by/)).not.toBeInTheDocument()
+  })
+})
+
+describe('Settings', () => {
+  it('saves the quick-task model and the auto-summary option', async () => {
+    const backend = mockBackend()
+    const spy = vi.spyOn(backend, 'setPreferences')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: /Claude CLI/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+    const model = within(dialog).getByRole('combobox', { name: 'Model' })
+    expect(model).toHaveValue('haiku')
+    await fireEvent.change(model, { target: { value: 'sonnet' } })
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ quickTaskModel: { provider: 'claude', model: 'sonnet' }, autoSummarise: false }))
+    await fireEvent.click(within(dialog).getByRole('checkbox', { name: /Summarise long answers/ }))
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ quickTaskModel: { provider: 'claude', model: 'sonnet' }, autoSummarise: true }))
+  })
+})
+
+describe('Sidebar resizing', () => {
+  it('resizes with the arrow keys on its edge and remembers the width', async () => {
+    localStorage.clear()
+    render(App, { props: { backend: mockBackend() } })
+    const handle = await screen.findByRole('separator', { name: 'Resize the session list' })
+    expect(handle).toHaveAttribute('aria-valuenow', '272')
+    await fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    expect(handle).toHaveAttribute('aria-valuenow', '288')
+    await fireEvent.keyDown(handle, { key: 'ArrowLeft', shiftKey: true })
+    expect(handle).toHaveAttribute('aria-valuenow', '240')
+    expect(JSON.parse(localStorage.getItem('uncli-sidebar') ?? '{}').width).toBe(240)
+    expect(document.querySelector('.sidebar')).toHaveStyle({ width: '240px' })
+  })
+})

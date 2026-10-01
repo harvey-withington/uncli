@@ -43,6 +43,16 @@ export interface TraceItem {
   output?: string
 }
 
+// A table of contents written by the quick-task model, anchored to the
+// answer's top-level markdown blocks.
+export interface PageOutline {
+  provider: string
+  model: string
+  sections: { block: number; title: string; kind?: string }[]
+  costUsd: number
+  at: number
+}
+
 export type PageStatus = 'open' | 'done' | 'error' | 'interrupted'
 
 export interface Page {
@@ -68,6 +78,7 @@ export interface Page {
   durationMs: number
   startedAt: number
   finishedAt: number
+  outline?: PageOutline
 }
 
 export interface Profile {
@@ -119,6 +130,36 @@ export interface Capabilities {
   slashPassthrough: boolean
 }
 
+// One model, chosen by the user, for every quick task (summaries now,
+// things like commit messages later).
+export interface ModelRef {
+  provider: string
+  model: string
+}
+
+export interface Preferences {
+  quickTaskModel: ModelRef
+  autoSummarise: boolean
+}
+
+export interface Provider {
+  id: string
+  label: string
+}
+
+// What the user picked last time in the new-session dialog: the type, and
+// per type the model and folder.
+export interface NewSessionChoices {
+  profileId?: string
+  models: Record<string, string>
+  folders: Record<string, string>
+}
+
+export interface CreatedSession {
+  session: SessionView
+  lastNewSession: NewSessionChoices
+}
+
 export interface Bootstrap {
   profiles: Profile[]
   modifiers: Modifier[]
@@ -127,6 +168,9 @@ export interface Bootstrap {
   models: ModelInfo[] | null
   capabilities: Capabilities
   platform: string
+  lastNewSession: NewSessionChoices
+  preferences: Preferences
+  providers: Provider[]
 }
 
 export interface CLIStatus {
@@ -224,7 +268,7 @@ export interface Backend {
   setCLIVersion(version: string): Promise<CLIStatus>
   cliChannels(): Promise<Record<string, string>>
   pickFolder(title: string): Promise<string>
-  createSession(profileId: string, workdir: string, model: string): Promise<SessionView>
+  createSession(profileId: string, workdir: string, model: string): Promise<CreatedSession>
   pages(sessionId: string): Promise<Page[]>
   send(sessionId: string, text: string): Promise<void>
   interrupt(sessionId: string): Promise<void>
@@ -234,6 +278,8 @@ export interface Backend {
   remove(sessionId: string): Promise<void>
   setBookmark(sessionId: string, pageId: string, on: boolean): Promise<Page>
   focus(sessionId: string): Promise<void>
+  setPreferences(p: Preferences): Promise<Preferences>
+  summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   openFolder(path: string): Promise<void>
   openURL(url: string): Promise<void>
