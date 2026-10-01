@@ -1,0 +1,10 @@
+{
+  // Drop the ones this project's stack doesn't use.
+  "recommendations": [
+    "anthropic.claude-code",
+    "editorconfig.editorconfig",
+    "golang.go",
+    "svelte.svelte-vscode",
+    "github.vscode-github-actions"
+  ]
+}

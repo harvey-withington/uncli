@@ -1,0 +1,22 @@
+# Weekly pull requests to keep dependencies current. Uncomment the
+# ecosystems the project uses, pointing directory at the folder that
+# holds go.mod or package.json.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # - package-ecosystem: gomod
+  #   directory: /app
+  #   schedule:
+  #     interval: weekly
+
+  # - package-ecosystem: npm
+  #   directory: /app/frontend
+  #   schedule:
+  #     interval: weekly
+  #   groups:
+  #     all:
+  #       patterns: ['*']

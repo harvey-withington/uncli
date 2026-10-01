@@ -1,0 +1,57 @@
+{
+  // Every task calls a root npm script, so the tasks stay the same whatever
+  // the stack. Wire the scripts in package.json.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "app: dev",
+      "detail": "npm run dev: the app with hot reload",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "app: build",
+      "detail": "npm run build",
+      "type": "shell",
+      "command": "npm run build",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$go", "$tsc"],
+      "presentation": { "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "check",
+      "detail": "npm run check: type checks and linters",
+      "type": "shell",
+      "command": "npm run check",
+      "problemMatcher": ["$go", "$tsc"]
+    },
+    {
+      "label": "test",
+      "detail": "npm test",
+      "type": "shell",
+      "command": "npm test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": ["$go"]
+    },
+    {
+      "label": "website: serve",
+      "detail": "Landing page on http://localhost:5180 (refresh to see edits)",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/serve-website.mjs"],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "website",
+        "pattern": { "regexp": "^__never_matches__$" },
+        "background": {
+          "activeBegins": true,
+          "beginsPattern": "^Serving",
+          "endsPattern": "^Serving"
+        }
+      }
+    }
+  ]
+}
