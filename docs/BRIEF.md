@@ -101,7 +101,8 @@ type Adapter interface {
     BuildCommand(bin string, spec LaunchSpec) (Command, error) // args, env
     AuthStatusCommand(bin string) Command                      // e.g. claude auth status
     ParseAuthStatus(out []byte) (AuthInfo, error)
-    LoginCommand(bin string) Command                           // opens the provider's browser sign-in
+    LoginCommand(bin string) Command                           // the provider's sign-in; reads a pasted code on stdin
+    LoginURL(output []byte) (string, bool)                     // the sign-in link it printed, once it has
     EncodeTurn(t UserTurn) ([]byte, error)                     // one stdin line
     EncodeControl(c Control) ([]byte, bool)                    // interrupt, set model, approval answer; false = unsupported
     NewParser() Parser                                         // stateful, one per process
@@ -169,7 +170,7 @@ type UserTurn struct {
 
 **Installer** (`adapter/claude`, behind `core.Installer`). Downloads the pinned CLI version into UNCLI's cache dir (`<user cache>/uncli/cli/claude/<version>/`), never touching the user's own install. For Claude it reads `https://downloads.claude.ai/claude-code-releases/<version>/manifest.json`, downloads `<version>/<platform>/claude(.exe)` and checks its SHA-256 against the manifest before use. Each UNCLI release pins one version; a setting lets the user pick a newer one (from the `stable` or `latest` channel) at their own risk, with a one-click return to the pinned version. The download is about 240 MB, so first run shows progress. The CLI's own auto-updater is disabled in the environment UNCLI passes.
 
-**Sign-in.** Before the first session, UNCLI runs the adapter's auth status command (`claude auth status` prints JSON with `loggedIn`). If signed out, the app shows a sign-in screen whose button runs `claude auth login`, which opens the browser. A turn that fails with `authentication_failed` returns the user to that screen.
+**Sign-in.** Before the first session, UNCLI runs the adapter's auth status command (`claude auth status` prints JSON with `loggedIn`). If signed out, the sign-in screen runs `claude auth login --claudeai` with a stdin pipe. Without a terminal the CLI uses its paste-the-code flow: it prints a link and waits for a code. Its own attempt to open the browser fails from a windowless app, so UNCLI opens the link in the default browser itself (with "open again" and "copy link" fallbacks), takes the code the page shows, writes it to the CLI's stdin, and then decides the outcome from `auth status`, because the CLI's own output can't be trusted (see Spike findings). The status check allows 60 s and one retry: the first run of a freshly downloaded binary can be slow while antivirus scans it. A turn that fails with `authentication_failed` returns the user to that screen.
 
 **Process environment.** UNCLI builds the child's environment explicitly: it inherits the user's environment minus `CLAUDE_CODE_*`, `CLAUDECODE`, `CLAUDE_EFFORT`, `CLAUDE_PID` and `CLAUDE_AGENT_SDK*` (UNCLI may itself be launched from inside a Claude session, whose session ids and effort setting would otherwise leak into every child), plus `DISABLE_AUTOUPDATER=1`. `CLAUDE_CONFIG_DIR` and API keys pass through: they are the user's choice.
 
@@ -571,7 +572,7 @@ The phase 1 spike checked the CLI facts this brief assumed against Claude Code 2
 - **Thinking text is not exposed.** Thinking blocks arrive with empty text and a signature; `system/thinking_tokens` gives running estimates.
 - **The system prompt is frozen per conversation.** A resume with a different `--append-system-prompt` kept the original instruction.
 - **Errors still say `success`.** An unknown model or a signed-out CLI gives a `<synthetic>` assistant message with `error: model_not_found` or `authentication_failed`, then `result` with `is_error: true` and `subtype: success`.
-- **Auth** is `claude auth status` (JSON with `loggedIn`, `authMethod`, `subscriptionType`; exit 1 when signed out) and `claude auth login` (browser). Not tested end to end, because that needs a signed-out machine.
+- **Auth** is `claude auth status` (JSON with `loggedIn`, `authMethod`, `subscriptionType`; exit 1 when signed out, JSON still on stdout) and `claude auth login`. Run without a terminal, login prints "Opening browser to sign in…" (which silently fails from a GUI app), a link, and `Paste code here if prompted >`, then reads a code from stdin. Given a wrong code it prints "Login successful." on stdout and "Invalid code…" on stderr and exits 0, and on a machine already signed in elsewhere it really does sign in, copying that account's credentials into the config folder, whatever the code. Only `auth status` is reliable.
 - **Auto-memory runs in headless mode.** Asked to remember a word, the model wrote to `~/.claude/projects/<cwd>/memory/` without a prompt; that folder is outside the workdir and not covered by the tool allowlist.
 - **New event types** not in the original model: `rate_limit_event` (five-hour and seven-day utilisation), `system/status`, `system/compact_boundary`, `system/permission_denied`, `conversation_reset`, `control_request`, `control_response`.
 

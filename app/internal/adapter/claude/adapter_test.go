@@ -186,3 +186,15 @@ func TestDetectPlatform(t *testing.T) {
 		}
 	}
 }
+
+func TestLoginURL(t *testing.T) {
+	// What "claude auth login" printed without a terminal (2.1.285).
+	out := "Opening browser to sign in…\nIf the browser didn't open, visit: https://claude.com/cai/oauth/authorize?code=true&client_id=abc&response_type=code&state=xyz\nPaste code here if prompted > "
+	u, ok := New(nil).LoginURL([]byte(out))
+	if !ok || u != "https://claude.com/cai/oauth/authorize?code=true&client_id=abc&response_type=code&state=xyz" {
+		t.Errorf("url = %q, %v", u, ok)
+	}
+	if _, ok := New(nil).LoginURL([]byte("Opening browser to sign in…\n")); ok {
+		t.Error("no link yet")
+	}
+}

@@ -3,9 +3,11 @@ package local
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -108,18 +110,94 @@ func Run(ctx context.Context, cmd core.Command) ([]byte, error) {
 	c := exec.CommandContext(ctx, cmd.Path, cmd.Args...)
 	c.Env = Env(os.Environ(), cmd)
 	configure(c)
-	return c.Output()
+	var stderr strings.Builder
+	c.Stderr = &stderr
+	out, err := c.Output()
+	if err != nil {
+		if ctx.Err() != nil {
+			err = fmt.Errorf("timed out after waiting for %s", filepath.Base(cmd.Path))
+		}
+		return out, &RunError{Err: err, Stderr: stderr.String()}
+	}
+	return out, nil
 }
 
-// StartDetached starts a command that outlives the call (browser sign-in)
-// and returns a wait function.
-func StartDetached(cmd core.Command) (func() error, error) {
+// RunError is a failed short command, with the stderr that explains it.
+type RunError struct {
+	Err    error
+	Stderr string
+}
+
+func (e *RunError) Error() string {
+	if s := strings.TrimSpace(e.Stderr); s != "" {
+		return e.Err.Error() + ": " + lastLine(s)
+	}
+	return e.Err.Error()
+}
+
+func (e *RunError) Unwrap() error { return e.Err }
+
+func lastLine(s string) string {
+	lines := strings.Split(s, "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+// Interactive is a short-lived command UNCLI talks to over stdin (sign-in).
+type Interactive struct {
+	cmd   *exec.Cmd
+	stdin io.WriteCloser
+	mu    sync.Mutex
+	out   []byte
+	done  chan struct{}
+	err   error
+}
+
+// StartInteractive starts a command with a stdin pipe, collecting stdout
+// and stderr together.
+func StartInteractive(cmd core.Command) (*Interactive, error) {
 	c := exec.Command(cmd.Path, cmd.Args...)
 	c.Env = Env(os.Environ(), cmd)
 	configure(c)
-	c.Stdin = strings.NewReader("")
+	in, err := c.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	p := &Interactive{cmd: c, stdin: in, done: make(chan struct{})}
+	c.Stdout, c.Stderr = p, p
 	if err := c.Start(); err != nil {
 		return nil, err
 	}
-	return c.Wait, nil
+	go func() { p.err = c.Wait(); close(p.done) }()
+	return p, nil
+}
+
+func (p *Interactive) Write(b []byte) (int, error) {
+	p.mu.Lock()
+	p.out = append(p.out, b...)
+	p.mu.Unlock()
+	return len(b), nil
+}
+
+// Output is everything printed so far.
+func (p *Interactive) Output() []byte {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]byte(nil), p.out...)
+}
+
+// Send writes a line to the command's stdin.
+func (p *Interactive) Send(line string) error {
+	_, err := io.WriteString(p.stdin, line+"\n")
+	return err
+}
+
+// Done is closed when the command exits; Err is its result then.
+func (p *Interactive) Done() <-chan struct{} { return p.done }
+func (p *Interactive) Err() error            { return p.err }
+
+func (p *Interactive) Kill() {
+	_ = p.stdin.Close()
+	if p.cmd.Process != nil {
+		_ = p.cmd.Process.Kill()
+	}
 }

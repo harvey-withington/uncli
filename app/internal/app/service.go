@@ -69,6 +69,9 @@ type Service struct {
 	authMu   sync.Mutex
 	auth     *core.AuthInfo
 	authTime time.Time
+
+	loginMu sync.Mutex
+	login   *local.Interactive
 }
 
 func New(paths Paths, emit Emitter) (*Service, error) {
@@ -101,6 +104,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 }
 
 func (s *Service) Close() {
+	s.CancelSignIn()
 	s.Sessions.Close()
 	s.Store.Close()
 }
@@ -177,18 +181,39 @@ func (s *Service) CLIStatus(ctx context.Context, fresh bool) CLIStatus {
 	return st
 }
 
+// authStatus asks the CLI whether it is signed in. "auth status" exits 1
+// when signed out but still prints its JSON, so the JSON decides. The first
+// run of a freshly downloaded binary can be slow (antivirus scans), so it
+// gets a generous timeout and one retry.
 func (s *Service) authStatus(ctx context.Context, bin string) (core.AuthInfo, error) {
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	out, err := local.Run(ctx, s.Adapter.AuthStatusCommand(bin))
-	// "auth status" exits 1 when signed out but still prints its JSON.
-	if info, perr := s.Adapter.ParseAuthStatus(out); perr == nil {
-		return info, nil
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		actx, cancel := context.WithTimeout(ctx, 60*time.Second)
+		out, err := local.Run(actx, s.Adapter.AuthStatusCommand(bin))
+		cancel()
+		if info, perr := s.Adapter.ParseAuthStatus(out); perr == nil {
+			return info, nil
+		}
+		switch {
+		case err != nil:
+			lastErr = err
+		case len(strings.TrimSpace(string(out))) == 0:
+			lastErr = errors.New("it printed nothing")
+		default:
+			lastErr = fmt.Errorf("unexpected output %q", truncate(string(out), 120))
+		}
+		if ctx.Err() != nil {
+			break
+		}
 	}
-	if err != nil {
-		return core.AuthInfo{}, fmt.Errorf("could not check sign-in: %w", err)
+	return core.AuthInfo{}, fmt.Errorf("couldn't check whether Claude is signed in (%v)", lastErr)
+}
+
+func truncate(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n]) + "…"
 	}
-	return core.AuthInfo{}, errors.New("could not read the CLI's sign-in status")
+	return s
 }
 
 // InstallCLI downloads the selected CLI version, reporting progress.
@@ -204,22 +229,113 @@ func (s *Service) InstallCLI(ctx context.Context) (CLIStatus, error) {
 	return st, nil
 }
 
-// SignIn starts the CLI's browser sign-in and reports the new status
-// when it completes.
-func (s *Service) SignIn(ctx context.Context) error {
+// SignIn starts the CLI's sign-in and returns the link the user opens in
+// their browser. Without a terminal the CLI uses its paste-the-code flow:
+// the page shows a code, which SubmitLoginCode hands back to the CLI.
+func (s *Service) SignIn(ctx context.Context) (string, error) {
 	bin, _, err := s.binary(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
-	wait, err := local.StartDetached(s.Adapter.LoginCommand(bin))
+	s.CancelSignIn()
+	p, err := local.StartInteractive(s.Adapter.LoginCommand(bin))
 	if err != nil {
-		return err
+		return "", err
 	}
-	go func() {
-		_ = wait()
-		s.emit.Emit(EvtCLIStatus, s.CLIStatus(context.Background(), true))
-	}()
-	return nil
+	s.loginMu.Lock()
+	s.login = p
+	s.loginMu.Unlock()
+	deadline := time.After(60 * time.Second)
+	for {
+		if u, ok := s.Adapter.LoginURL(p.Output()); ok {
+			return u, nil
+		}
+		select {
+		case <-p.Done():
+			return "", fmt.Errorf("sign-in stopped before showing a link: %s", lastLine(string(p.Output())))
+		case <-deadline:
+			s.CancelSignIn()
+			return "", errors.New("sign-in didn't start within a minute")
+		case <-ctx.Done():
+			s.CancelSignIn()
+			return "", ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+// SubmitLoginCode passes the code from the sign-in page to the CLI and
+// confirms the result with "auth status": the CLI prints "Login
+// successful." and exits 0 even for a code it rejects.
+func (s *Service) SubmitLoginCode(ctx context.Context, code string) (CLIStatus, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return CLIStatus{}, errors.New("paste the code from the sign-in page")
+	}
+	s.loginMu.Lock()
+	p := s.login
+	s.loginMu.Unlock()
+	if p == nil {
+		return CLIStatus{}, errors.New("start sign-in again: the earlier attempt has ended")
+	}
+	before := len(p.Output())
+	if err := p.Send(code); err != nil {
+		return CLIStatus{}, fmt.Errorf("couldn't pass the code to the CLI: %w", err)
+	}
+	select {
+	case <-p.Done():
+	case <-time.After(90 * time.Second):
+		s.CancelSignIn()
+		return CLIStatus{}, errors.New("the CLI didn't finish signing in within 90 seconds")
+	case <-ctx.Done():
+		return CLIStatus{}, ctx.Err()
+	}
+	s.loginMu.Lock()
+	if s.login == p {
+		s.login = nil
+	}
+	s.loginMu.Unlock()
+	st := s.CLIStatus(ctx, true)
+	s.emit.Emit(EvtCLIStatus, st)
+	if !st.LoggedIn {
+		msg := "the code wasn't accepted"
+		if out := string(p.Output()); len(out) > before {
+			if l := loginProblem(out[before:]); l != "" {
+				msg = l
+			}
+		}
+		return st, errors.New(msg)
+	}
+	return st, nil
+}
+
+// CancelSignIn stops a sign-in in progress, if any.
+func (s *Service) CancelSignIn() {
+	s.loginMu.Lock()
+	p := s.login
+	s.login = nil
+	s.loginMu.Unlock()
+	if p != nil {
+		p.Kill()
+	}
+}
+
+// loginProblem picks the CLI's complaint out of its output, skipping the
+// "Login successful." it prints regardless.
+func loginProblem(out string) string {
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		l := strings.TrimSpace(lines[i])
+		if l != "" && !strings.Contains(l, "Login successful") && !strings.HasPrefix(l, "Paste code") {
+			return l
+		}
+	}
+	return ""
+}
+
+func lastLine(s string) string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
 }
 
 // SetCLIVersion selects a CLI version; empty returns to the pinned one.

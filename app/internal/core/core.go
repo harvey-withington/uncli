@@ -14,7 +14,8 @@ type Adapter interface {
 	BuildCommand(bin string, spec LaunchSpec) (Command, error) // args, env
 	AuthStatusCommand(bin string) Command                      // e.g. claude auth status
 	ParseAuthStatus(out []byte) (AuthInfo, error)
-	LoginCommand(bin string) Command        // opens the provider's browser sign-in
+	LoginCommand(bin string) Command        // the provider's browser sign-in; reads a pasted code on stdin
+	LoginURL(output []byte) (string, bool)  // the sign-in link the login command printed, once it has
 	EncodeTurn(t UserTurn) ([]byte, error)  // one stdin line
 	EncodeControl(c Control) ([]byte, bool) // false = unsupported
 	NewParser() Parser                      // stateful, one per process

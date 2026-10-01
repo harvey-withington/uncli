@@ -95,7 +95,23 @@ func (a *App) CLIStatus(fresh bool) app.CLIStatus { return a.svc.CLIStatus(a.ctx
 
 func (a *App) InstallCLI() (app.CLIStatus, error) { return a.svc.InstallCLI(a.ctx) }
 
-func (a *App) SignIn() error { return a.svc.SignIn(a.ctx) }
+// SignIn starts the CLI's sign-in and opens its link in the user's default
+// browser (the CLI can't reliably do that without a terminal). The link is
+// returned too, so the UI can offer it again.
+func (a *App) SignIn() (string, error) {
+	url, err := a.svc.SignIn(a.ctx)
+	if err != nil {
+		return "", err
+	}
+	wruntime.BrowserOpenURL(a.ctx, url)
+	return url, nil
+}
+
+func (a *App) SubmitLoginCode(code string) (app.CLIStatus, error) {
+	return a.svc.SubmitLoginCode(a.ctx, code)
+}
+
+func (a *App) CancelSignIn() { a.svc.CancelSignIn() }
 
 func (a *App) SetCLIVersion(version string) (app.CLIStatus, error) {
 	return a.svc.SetCLIVersion(a.ctx, version)
