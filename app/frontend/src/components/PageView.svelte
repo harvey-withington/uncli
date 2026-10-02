@@ -4,6 +4,7 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { displayAnswer } from '../stores/app.svelte'
+  import { attachmentIcon, formatSize } from '../lib/attachments'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import CopyButton from './CopyButton.svelte'
   import Icon from './Icon.svelte'
@@ -21,6 +22,8 @@
   const open = $derived(page.status === 'open')
   const thinking = $derived(open && !answer)
   const compact = $derived(app.questionCompact)
+  // A question sent with files only reads as their names.
+  const questionLine = $derived(page.question || (page.attachments ?? []).map(f => f.name).join(', '))
   // The outline's entries, marked beside their blocks in the left margin.
   const markers = $derived(new Map(app.outlineFor(page).entries.map(e => [e.block, e])))
 </script>
@@ -43,7 +46,7 @@
       {#if compact}
         <!-- Compact: the question on one line, cut short before the page number. -->
         <div class="q-head">
-          <p class="q-line" title={page.question}>{page.question}</p>
+          <p class="q-line" title={questionLine}>{questionLine}</p>
           <span class="seq">{t('page.number', { n: page.seq })}</span>
           <span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>
           {@render toggle()}
@@ -55,7 +58,18 @@
           <span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>
           {@render toggle()}
         </div>
-        <p class="q-text">{page.question}</p>
+        {#if page.question}<p class="q-text">{page.question}</p>{/if}
+        {#if page.attachments?.length}
+          <ul class="q-files" aria-label={t('page.attachments')}>
+            {#each page.attachments as f, i (i)}
+              <li title={f.path || f.name}>
+                <Icon name={attachmentIcon(f.mediaType)} size={13} />
+                <span class="fname">{f.name}</span>
+                <span class="fsize">{formatSize(f.size)}</span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
         <PageChips {page} />
       {/if}
     </header>
@@ -168,6 +182,39 @@
     overflow-wrap: anywhere;
     max-height: 30vh;
     overflow-y: auto;
+  }
+  .q-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: var(--space-1) 0 var(--space-3);
+    padding: 0;
+    list-style: none;
+  }
+  .q-files li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 280px;
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--accent);
+    font-size: var(--text-xs);
+  }
+  .fname {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-weight: 550;
+  }
+  .fsize {
+    flex: none;
+    color: var(--text-faint);
   }
   .thinking {
     display: flex;

@@ -515,3 +515,46 @@ func TestSetSortOrder(t *testing.T) {
 		t.Error("order not saved")
 	}
 }
+
+// A turn can carry files: they reach the CLI as content blocks and the page
+// keeps a record of them (not their content), across a reopen of the store.
+func TestSendWithAttachments(t *testing.T) {
+	h := newHarness(t, "document-input")
+	v, err := h.m.Create("chat", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := []core.Attachment{
+		{Name: "brief.pdf", Path: `C:\docs\brief.pdf`, MediaType: "application/pdf", Data: []byte("%PDF-1.4 tiny")},
+		{Name: "notes.txt", Path: `C:\docs\notes.txt`, MediaType: "text/plain", Data: []byte("Second code word: MARMALADE.\n")},
+	}
+	if err := h.m.Send(context.Background(), v.ID, "", files...); err != nil {
+		t.Fatal(err)
+	}
+	pages := h.waitIdle(v.ID)
+	var turn string
+	for _, l := range h.rt.lines() {
+		if strings.Contains(l, `"type":"user"`) {
+			turn = l
+		}
+	}
+	for _, want := range []string{`"type":"document"`, `"title":"brief.pdf"`, `"title":"notes.txt"`, "MARMALADE"} {
+		if !strings.Contains(turn, want) {
+			t.Errorf("turn is missing %s: %s", want, turn)
+		}
+	}
+	if len(pages) != 1 || !strings.Contains(pages[0].AnswerMD, "PELICAN") {
+		t.Fatalf("pages = %+v", pages)
+	}
+	got := pages[0].Attachments
+	if len(got) != 2 || got[0].Name != "brief.pdf" || got[0].Path != `C:\docs\brief.pdf` || got[1].MediaType != "text/plain" || got[1].Size != 29 {
+		t.Errorf("attachments = %+v", got)
+	}
+	if s, _ := h.m.get(v.ID); s.View().Title != "brief.pdf" {
+		t.Errorf("title = %q (an attachments-only turn names the session after the first file)", s.View().Title)
+	}
+	again, err := h.db.ListPages(v.ID)
+	if err != nil || len(again[0].Attachments) != 2 {
+		t.Errorf("stored attachments = %+v, %v", again, err)
+	}
+}

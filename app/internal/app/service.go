@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 
 	"uncli/config"
 	"uncli/internal/adapter/claude"
+	"uncli/internal/attach"
 	"uncli/internal/core"
 	"uncli/internal/profile"
 	"uncli/internal/runtime/local"
@@ -532,6 +534,48 @@ func DescribePaths(paths []string) []DroppedPath {
 			d.Dir = filepath.Dir(p)
 		}
 		out = append(out, d)
+	}
+	return out
+}
+
+// AttachmentRef is a file the UI wants sent with a turn: a path to read,
+// or pasted image data (base64) with no file behind it.
+type AttachmentRef struct {
+	Path      string `json:"path,omitempty"`
+	Name      string `json:"name,omitempty"`
+	MediaType string `json:"mediaType,omitempty"`
+	Data      string `json:"data,omitempty"`
+}
+
+// Send starts a turn in a session, reading its attachments first; one that
+// can't be attached stops the turn with the reason.
+func (s *Service) Send(ctx context.Context, sessionID, text string, refs []AttachmentRef) error {
+	files := make([]core.Attachment, 0, len(refs))
+	for _, r := range refs {
+		var f core.Attachment
+		var err error
+		if r.Path != "" {
+			f, err = attach.Load(r.Path)
+		} else {
+			var data []byte
+			if data, err = base64.StdEncoding.DecodeString(r.Data); err == nil {
+				f, err = attach.FromData(r.Name, r.MediaType, data)
+			}
+		}
+		if err != nil {
+			return err
+		}
+		files = append(files, f)
+	}
+	return s.Sessions.Send(ctx, sessionID, text, files...)
+}
+
+// DescribeAttachments says, for each dropped or pasted path, whether it
+// can be attached (and as what) or why not.
+func DescribeAttachments(paths []string) []attach.Info {
+	out := make([]attach.Info, 0, len(paths))
+	for _, p := range paths {
+		out = append(out, attach.Describe(p))
 	}
 	return out
 }

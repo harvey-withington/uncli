@@ -78,9 +78,11 @@ func migrate(db *sql.DB) error {
 		}
 		return false
 	}
-	if !has("pages", "outline") {
-		if _, err := db.Exec("ALTER TABLE pages ADD COLUMN outline TEXT"); err != nil {
-			return err
+	for _, col := range []string{"outline", "attachments"} {
+		if !has("pages", col) {
+			if _, err := db.Exec("ALTER TABLE pages ADD COLUMN " + col + " TEXT"); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -241,29 +243,38 @@ type TouchedFile struct {
 }
 
 type Page struct {
-	ID           string        `json:"id"`
-	SessionID    string        `json:"sessionId"`
-	Seq          int           `json:"seq"`
-	Question     string        `json:"question"`
-	Directives   string        `json:"directives,omitempty"`
-	Model        string        `json:"model"`
-	Modifiers    []string      `json:"modifiers"`
-	AnswerMD     string        `json:"answerMd"`
-	Trace        []TraceItem   `json:"trace"`
-	TouchedFiles []TouchedFile `json:"touchedFiles"`
-	Status       string        `json:"status"` // open | done | error | interrupted
-	Error        string        `json:"error,omitempty"`
-	Bookmarked   bool          `json:"bookmarked"`
-	Pinned       bool          `json:"pinned"`
-	InputTokens  int           `json:"inputTokens"`
-	OutputTokens int           `json:"outputTokens"`
-	CacheRead    int           `json:"cacheRead"`
-	CacheWrite   int           `json:"cacheWrite"`
-	CostUSD      float64       `json:"costUsd"`
-	DurationMS   int           `json:"durationMs"`
-	StartedAt    int64         `json:"startedAt"`
-	FinishedAt   int64         `json:"finishedAt"`
-	Outline      *PageOutline  `json:"outline,omitempty"` // a summary table of contents, if one was made
+	ID           string           `json:"id"`
+	SessionID    string           `json:"sessionId"`
+	Seq          int              `json:"seq"`
+	Question     string           `json:"question"`
+	Directives   string           `json:"directives,omitempty"`
+	Model        string           `json:"model"`
+	Modifiers    []string         `json:"modifiers"`
+	AnswerMD     string           `json:"answerMd"`
+	Trace        []TraceItem      `json:"trace"`
+	TouchedFiles []TouchedFile    `json:"touchedFiles"`
+	Status       string           `json:"status"` // open | done | error | interrupted
+	Error        string           `json:"error,omitempty"`
+	Bookmarked   bool             `json:"bookmarked"`
+	Pinned       bool             `json:"pinned"`
+	InputTokens  int              `json:"inputTokens"`
+	OutputTokens int              `json:"outputTokens"`
+	CacheRead    int              `json:"cacheRead"`
+	CacheWrite   int              `json:"cacheWrite"`
+	CostUSD      float64          `json:"costUsd"`
+	DurationMS   int              `json:"durationMs"`
+	StartedAt    int64            `json:"startedAt"`
+	FinishedAt   int64            `json:"finishedAt"`
+	Outline      *PageOutline     `json:"outline,omitempty"` // a summary table of contents, if one was made
+	Attachments  []PageAttachment `json:"attachments"`       // files sent with the question (their content is in the CLI's transcript)
+}
+
+// PageAttachment records a file sent with a page's question.
+type PageAttachment struct {
+	Name      string `json:"name"`
+	Path      string `json:"path,omitempty"` // empty for pasted data
+	MediaType string `json:"mediaType"`
+	Size      int64  `json:"size"`
 }
 
 // PageOutline is a table of contents written by the quick-task model,
@@ -319,9 +330,10 @@ func (s *Store) NextSeq(sessionID string) (int, error) {
 func (s *Store) SavePage(p *Page) error {
 	trace, _ := json.Marshal(traceDoc{Items: nonNil(p.Trace), Error: p.Error})
 	touched, _ := json.Marshal(nonNil(p.TouchedFiles))
+	attached, _ := json.Marshal(nonNil(p.Attachments))
 	_, err := s.db.Exec(`INSERT INTO pages (id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
 		touched_files, artifacts, status, bookmarked, pinned, input_tokens, output_tokens, cache_read, cache_write,
-		cost_usd, duration_ms, started_at, finished_at) VALUES (?,?,?,?,?,?,?,?,?,?,'[]',?,?,?,?,?,?,?,?,?,?,?)
+		cost_usd, duration_ms, started_at, finished_at, attachments) VALUES (?,?,?,?,?,?,?,?,?,?,'[]',?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET answer_md=excluded.answer_md, trace=excluded.trace, touched_files=excluded.touched_files,
 		status=excluded.status, bookmarked=excluded.bookmarked, pinned=excluded.pinned, model=excluded.model,
 		input_tokens=excluded.input_tokens, output_tokens=excluded.output_tokens, cache_read=excluded.cache_read,
@@ -329,7 +341,7 @@ func (s *Store) SavePage(p *Page) error {
 		finished_at=excluded.finished_at`,
 		p.ID, p.SessionID, p.Seq, p.Question, p.Directives, p.Model, jsonList(p.Modifiers), p.AnswerMD, string(trace),
 		string(touched), p.Status, p.Bookmarked, p.Pinned, p.InputTokens, p.OutputTokens, p.CacheRead, p.CacheWrite,
-		p.CostUSD, p.DurationMS, p.StartedAt, p.FinishedAt)
+		p.CostUSD, p.DurationMS, p.StartedAt, p.FinishedAt, string(attached))
 	return err
 }
 
@@ -343,7 +355,7 @@ func nonNil[T any](v []T) []T {
 func (s *Store) ListPages(sessionID string) ([]Page, error) {
 	rows, err := s.db.Query(`SELECT id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
 		touched_files, status, bookmarked, pinned, input_tokens, output_tokens, cache_read, cache_write, cost_usd,
-		duration_ms, started_at, finished_at, outline FROM pages WHERE session_id=? ORDER BY seq`, sessionID)
+		duration_ms, started_at, finished_at, outline, attachments FROM pages WHERE session_id=? ORDER BY seq`, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -355,11 +367,13 @@ func (s *Store) ListPages(sessionID string) ([]Page, error) {
 		var bm, pin sql.NullBool
 		var in, outT, cr, cw, dur, st, fin sql.NullInt64
 		var cost sql.NullFloat64
-		var outline sql.NullString
+		var outline, attached sql.NullString
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Seq, &p.Question, &directives, &p.Model, &mods, &answer, &trace,
-			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline); err != nil {
+			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached); err != nil {
 			return nil, err
 		}
+		_ = json.Unmarshal([]byte(attached.String), &p.Attachments)
+		p.Attachments = nonNil(p.Attachments)
 		if outline.Valid && outline.String != "" {
 			var o PageOutline
 			if json.Unmarshal([]byte(outline.String), &o) == nil {

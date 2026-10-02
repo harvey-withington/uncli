@@ -80,10 +80,15 @@ type LaunchSpec struct {
 type UserTurn struct {
 	Text        string       // as typed
 	Directives  string       // rendered turn-scope modifiers, hidden in the UI
-	Attachments []Attachment // images, phase 3
+	Attachments []Attachment // files sent with the turn (Images / Documents capabilities)
 }
 
+// Attachment is a file sent with a turn. The adapter picks the provider's
+// form from the media type: image/* (Images), application/pdf or
+// text/plain (Documents).
 type Attachment struct {
+	Name      string `json:"name"`           // shown to the model as the document title
+	Path      string `json:"path,omitempty"` // where it came from; empty for pasted data
 	MediaType string `json:"mediaType"`
 	Data      []byte `json:"data"`
 }
@@ -121,6 +126,7 @@ type Capabilities struct {
 	Interrupt        bool `json:"interrupt"`
 	Approvals        bool `json:"approvals"` // permission prompt routing
 	Images           bool `json:"images"`
+	Documents        bool `json:"documents"` // PDF and text attachments
 	UsageReporting   bool `json:"usageReporting"`
 	ThinkingEvents   bool `json:"thinkingEvents"`
 	SlashPassthrough bool `json:"slashPassthrough"`

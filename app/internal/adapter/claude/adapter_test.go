@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -36,6 +37,50 @@ func TestEncodeTurnMatchesRecordedInput(t *testing.T) {
 	}
 	if !bytes.HasSuffix(got, []byte("\n")) {
 		t.Error("turn must be one newline-terminated line")
+	}
+}
+
+// Attachments encode as recorded: documents titled with the file name,
+// before the text.
+func TestEncodeTurnMatchesRecordedDocuments(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join(fixtures, "document-input.in.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec struct {
+		Message struct {
+			Content []struct {
+				Title  string
+				Text   string
+				Source struct{ Data string }
+			}
+		}
+	}
+	if err := json.Unmarshal(want, &rec); err != nil {
+		t.Fatal(err)
+	}
+	c := rec.Message.Content
+	pdf, _ := base64.StdEncoding.DecodeString(c[0].Source.Data)
+	got, err := New(nil).EncodeTurn(core.UserTurn{Text: c[2].Text, Attachments: []core.Attachment{
+		{Name: c[0].Title, MediaType: "application/pdf", Data: pdf},
+		{Name: c[1].Title, MediaType: "text/plain", Data: []byte(c[1].Source.Data)},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var g, w map[string]any
+	_ = json.Unmarshal(got, &g)
+	_ = json.Unmarshal(want, &w)
+	if fmt.Sprint(g) != fmt.Sprint(w) {
+		t.Errorf("turn = %s\nrecorded = %s", got, want)
+	}
+	// Attachments alone: no empty text block; unknown types refused.
+	only, _ := New(nil).EncodeTurn(core.UserTurn{Attachments: []core.Attachment{{Name: "a.png", MediaType: "image/png", Data: []byte{1}}}})
+	if bytes.Contains(only, []byte(`"type":"text"`)) {
+		t.Errorf("empty text block sent: %s", only)
+	}
+	if _, err := New(nil).EncodeTurn(core.UserTurn{Text: "x", Attachments: []core.Attachment{{Name: "a.exe", MediaType: "application/octet-stream"}}}); err == nil {
+		t.Error("an unsupported attachment must be refused")
 	}
 }
 

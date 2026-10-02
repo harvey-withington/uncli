@@ -43,6 +43,8 @@ app/                      # the Go module (the repo root holds docs, website, sc
     integration/          # end-to-end tests against the real CLI (build tag)
     store/                # SQLite: sessions, pages, bookmarks, usage
     profile/              # profile + modifier loading and resolution
+    attach/               # dropped and pasted files: what can be attached, size limits, reading
+    clipfiles/            # the OS clipboard's file list (files copied in Explorer)
     watch/                # fsnotify: artifacts dir, touched files (phase 2)
     ide/                  # open-in-editor launchers (phase 2)
     bridge/               # the ONLY package that imports Wails
@@ -178,7 +180,14 @@ type LaunchSpec struct {
 type UserTurn struct {
     Text        string
     Directives  string       // rendered turn-scope modifiers, hidden in the UI
-    Attachments []Attachment // images, phase 3
+    Attachments []Attachment // files sent with the turn: images, PDFs, text (Images / Documents capabilities)
+}
+
+type Attachment struct {
+    Name      string // the document title the model sees
+    Path      string // where it came from; empty for pasted data
+    MediaType string // image/png|jpeg|gif|webp, application/pdf, text/plain
+    Data      []byte
 }
 ```
 
@@ -201,6 +210,8 @@ type UserTurn struct {
 **Bridge** (`bridge`). The only Wails importer. Exposes bound methods (create session, send turn, switch model, toggle modifier, answer approval, open in IDE) and emits per-session events to the frontend, with text deltas coalesced to about every 50 ms.
 
 **Approvals** (adapter, phase 2). With `--permission-prompt-tool stdio`, the CLI writes a `control_request` with subtype `can_use_tool` (tool name, input, a description and permission suggestions) to stdout and waits for a `control_response` on stdin with `behavior: allow` (plus `updatedInput`) or `behavior: deny` (plus a message). The parser turns the request into `EvApprovalAsked`, and the answer goes back through `EncodeControl`. No local server, port or token is involved, so there is nothing for a web page to reach. The session shows Needs approval until the UI answers.
+
+**Attachments** (`attach`, `clipfiles`). Files dropped on the message box, or pasted there after copying them in Explorer, attach to the next turn. The UI sends paths, and Go reads the files, so large files never cross the bridge. A pasted image with no file behind it (a screenshot) travels as base64 data. Images (PNG, JPEG, GIF, WebP, up to 5 MB) become `image` blocks. PDFs (up to 32 MB) and UTF-8 text files with no NUL bytes (up to 512 KB) become `document` blocks titled with the file name: base64 for PDFs, a text source for text. Folders, other binaries and oversized files can't be attached; the UI inserts their path instead and says why. A page stores what was attached (name, path, media type, size) but not the content, which lives in the CLI's transcript. Explorer copies reach the page only as file names, so the paths come from the OS clipboard's file list (`CF_HDROP` on Windows; macOS and Linux to follow). On Windows, Wails delivers dropped files through the WebView's own drop events, so `DisableWebViewDrop` must stay off; the page cancels file drags itself so a drop can't navigate the window.
 
 **Watchers** (`watch`). fsnotify on each session's artifacts folder (chat and co-work) and, for code sessions, the repo (debounced, ignore-listed). Watchers feed the artifact pane and the touched-files list.
 
@@ -298,6 +309,7 @@ type Capabilities struct {
     Interrupt        bool
     Approvals        bool // permission prompt routing
     Images           bool
+    Documents        bool // PDF and text attachments
     UsageReporting   bool
     ThinkingEvents   bool
     SlashPassthrough bool
@@ -528,12 +540,13 @@ The goal is that UNCLI replaces the terminal for real work.
 - **Artifact pane:** watcher on `./artifacts/`, sandboxed iframe renderer with strict CSP for HTML, SVG and Mermaid, markdown viewer. The artifacts folder is a git repo, auto-committed at turn end; each page links to the artifact versions it produced, so paging back pages the artifact back too.
 - **Touched files + IDE links:** `EvFileTouched` from tool inputs plus the repo watcher; a per-page list with open-in-IDE buttons using the `ide` presets.
 - **Desktop notifications** when a background session finishes or needs approval.
+- **Tool classification and session modes:** a session mode (Read-only, Ask, Full; never bypass) decides UNCLI's answer to each `can_use_tool` request, live. Read tools run in every mode; write tools are refused (Read-only), asked about (Ask) or run (Full); open-world tools have their own switch. A tool's class comes from, in order: the user's override; a built-in table for Claude's own tools (Bash by command pattern); the MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`, hints only); otherwise write. The quick-task model then suggests classes for unannotated tools, applied only when the user confirms.
 
 ### Phase 3: comfort
 
 - Pins (separate from bookmarks), page search across sessions, session archive. (Rename and drag to reorder landed early, in phase 1.)
 - **Usage dashboard** from page usage columns: per session, day, model and profile.
-- **Images:** drag and drop or paste into the composer, sent as content blocks (if `Images` capability).
+- **Images:** landed early, in phase 1, together with PDF and text attachments (see Attachments).
 - **Import:** read a CLI's saved transcripts into UNCLI sessions so terminal sessions can be continued in the GUI, and a deleted UNCLI session can be restored (the CLI's transcript outlives it). Each adapter that can do this implements the optional `TranscriptReader` and sets the `Import` capability; nothing else in core changes.
   - **Claude:** `~/.claude/projects/<encoded workdir>/<session id>.jsonl`, one JSON object per line. A user message that isn't a tool result starts a page; the assistant's text blocks make its answer, `tool_use` blocks its trace, and each assistant message's `model` and `usage` its chips. Cost isn't stored, so it is estimated from usage or left blank. Compaction summaries and sidechain (subagent) lines are skipped or folded into the trace.
   - **The new session** takes the transcript's session id as its provider id and its working directory as the workdir; the profile is guessed (a UNCLI scratch folder means Chat, else Code) and can be changed. Continuing is the ordinary resume (`--resume <id>` from that workdir).
@@ -574,6 +587,7 @@ containers:
 
 - **Adapters** for Gemini CLI and Codex CLI (headless JSON modes), each with its own fixtures and capability flags (and a `TranscriptReader` each, where the CLI saves transcripts). Modifiers gain optional per-provider text and flag mappings.
 - **Handoff between providers:** "continue this conversation in Gemini". UNCLI's pages are provider-neutral, so any session can be shown under any provider, but a CLI's resume depends on its own private state (tool-call ids, hidden reasoning, server-side caching), so a conversation can't be resumed natively by another CLI, and writing another CLI's transcript format is ruled out as fragile. Instead UNCLI starts a new session with the other provider and seeds it: a summary of the earlier turns from the quick-task model, plus the last few turns verbatim, sent as context with the first message (or appended to the system prompt). The new session links back to the one it continues. Tool results and hidden reasoning don't carry over, and the seed costs tokens once.
+- **Community knowledge base of MCP tool classifications:** confirmed classifications shared through a public repo of their own, open-licensed and usable by any MCP client. The app posts a GitHub issue with the JSON entry, an Action turns it into a PR, and a maintainer merges it manually. Clients download the latest release at startup and treat merged data as trusted. Entries use the MCP annotation names, are keyed on server identity, tool name and a hash of the tool's description and schema (a changed tool falls back to unclassified), and carry provenance. Submissions that relax a server's own destructive annotation are flagged for review, and only tools from public servers can be shared.
 - **Server mode:** replace `bridge` with an HTTP and WebSocket server so the same Svelte UI runs in a browser, a docked IDE webview or a tablet on the Tailscale network.
 - Anything else that turns up, as an adapter, runtime, profile or modifier.
 
@@ -590,6 +604,7 @@ The phase 1 spike checked the CLI facts this brief assumed against Claude Code 2
 - [x] Slash commands sent as text: `/compact`, `/context`, `/cost`, `/model <name>` and `/clear` work; `/help` replies that it isn't available. Output comes back as an `assistant` message from model `<synthetic>`.
 - [x] Phase 2: approvals don't need MCP. With `--permission-prompt-tool stdio` the CLI sends `control_request` `can_use_tool` and waits for `control_response` with `behavior: allow|deny`. Without it (and with no handler) prompts are silently denied; `--permission-prompts none` denies them with a clear message.
 - [x] Phase 3: image content blocks (`{"type":"image","source":{"type":"base64",...}}`) work on stream-json input.
+- [x] Document content blocks work on stream-json input (2026-10-03, fixture `document-input`): `{"type":"document","title":"brief.pdf","source":{"type":"base64","media_type":"application/pdf",...}}` and `{"type":"document","title":"notes.txt","source":{"type":"text","media_type":"text/plain","data":"..."}}`. Haiku read both and named each title.
 - [x] Phase 4: a live model switch exists: control request `{"subtype":"set_model","model":"sonnet"}`.
 - [ ] Phase 5: `claude setup-token` and `CLAUDE_CODE_OAUTH_TOKEN` behaviour inside a container. Not tested; needs a container.
 
