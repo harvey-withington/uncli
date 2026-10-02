@@ -235,7 +235,7 @@ func TestApprovalAndAccount(t *testing.T) {
 	if len(asks) != 1 {
 		t.Fatalf("approval_asked = %d", len(asks))
 	}
-	if a := decode[core.ApprovalAsked](t, asks[0]); a.Tool != "Write" || a.RequestID == "" {
+	if a := decode[core.ApprovalAsked](t, asks[0]); a.Tool != "Write" || a.RequestID == "" || !strings.HasPrefix(a.ToolUseID, "toolu_") {
 		t.Errorf("approval = %+v", a)
 	}
 	acc := ofKind(evs, core.EvAccount)

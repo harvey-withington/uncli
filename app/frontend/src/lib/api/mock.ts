@@ -2,7 +2,7 @@
 // component tests). It behaves like the real one closely enough to
 // exercise streaming, states, bookmarks and errors, with canned content.
 import type {
-  ActivityState, Backend, Bootstrap, CLIStatus, Handlers, NewSessionChoices, Page, Preferences, SessionView, UEvent,
+  ActivityState, Backend, Bootstrap, CLIStatus, Handlers, NewSessionChoices, Page, Preferences, SearchHit, SearchQuery, SearchResult, SessionView, ToolRule, UEvent,
 } from './types'
 import { SECTION_KINDS } from '../sections'
 
@@ -91,6 +91,59 @@ That's all the adapter needs to get started.`
 let idn = 100
 const newId = () => `mock-${++idn}`
 
+// A small stand-in for the store's full-text search: every word must
+// appear (the last one as a prefix while typing, "quoted" as a phrase),
+// ignoring case and accents; the snippet marks the first match.
+function mockSearch(q: SearchQuery, sessions: SessionView[], pages: Record<string, Page[]>): SearchResult {
+  const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  const terms: { t: string; prefix: boolean }[] = []
+  let rest = q.text.replace(/"([^"]*)"/g, (_, p: string) => {
+    if (p.trim()) terms.push({ t: fold(p.trim()), prefix: false })
+    return ' '
+  })
+  rest = rest.replace(/"/g, ' ')
+  const words = rest.split(/[^\p{L}\p{N}*]+/u).filter(Boolean)
+  words.forEach((w, i) => terms.push({ t: fold(w.replace(/\*+$/, '')), prefix: w.endsWith('*') || (i === words.length - 1 && !/\s$/.test(q.text)) }))
+  const live = terms.filter(x => x.t)
+  if (live.length === 0) return { hits: [], terms: [] }
+  const has = (text: string, x: { t: string; prefix: boolean }) => {
+    const f = fold(text)
+    if (x.t.includes(' ')) return f.includes(x.t)
+    // Terms are letters and digits only, so they need no escaping.
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${x.t}${x.prefix ? '' : '(?![\\p{L}\\p{N}])'}`, 'u')
+    return re.test(f)
+  }
+  const hits: SearchHit[] = []
+  for (const s of sessions) {
+    if (q.sessionId && s.id !== q.sessionId) continue
+    if (q.profiles?.length && !q.profiles.includes(s.profileId)) continue
+    for (const p of pages[s.id] ?? []) {
+      if (q.bookmarked && !p.bookmarked) continue
+      if (q.since && p.startedAt < q.since) continue
+      if (q.until && p.startedAt >= q.until) continue
+      const extra = (p.attachments ?? []).map(a => a.name).join(' ') + ' ' + (p.outline?.sections ?? []).map(x => x.title).join(' ')
+      const all = [s.title, p.question, p.answerMd, extra].join('\n')
+      if (!live.every(x => has(all, x))) continue
+      const fields: [SearchHit['field'], string][] = [['answer', p.answerMd], ['question', p.question], ['extra', extra], ['title', s.title]]
+      const [field, text] = fields.find(([, t]) => live.some(x => has(t, x))) ?? ['answer', p.answerMd]
+      const f = fold(text)
+      const at = Math.max(0, Math.min(...live.map(x => f.indexOf(x.t)).filter(i => i >= 0)))
+      const from = Math.max(0, at - 40)
+      let snip = text.slice(from, at + 80)
+      for (const x of live) {
+        const i = fold(snip).indexOf(x.t)
+        if (i >= 0) {
+          const end = x.prefix ? i + x.t.length + (fold(snip.slice(i + x.t.length)).match(/^[\p{L}\p{N}]*/u)?.[0].length ?? 0) : i + x.t.length
+          snip = snip.slice(0, i) + '\x01' + snip.slice(i, end) + '\x02' + snip.slice(end)
+        }
+      }
+      hits.push({ pageId: p.id, sessionId: s.id, sessionTitle: s.title, profileId: s.profileId, seq: p.seq, question: p.question, field, snippet: (from > 0 ? '…' : '') + snip + '…', bookmarked: p.bookmarked, startedAt: p.startedAt })
+    }
+  }
+  hits.sort((a, b) => b.startedAt - a.startedAt)
+  return { hits: hits.slice(0, q.limit || 60), terms: live.map(x => x.t) }
+}
+
 // The media type a file would attach as, judged by its extension (mock only).
 function mockMedia(name: string): string {
   const ext = name.toLowerCase().replace(/^.*\./, '')
@@ -133,6 +186,10 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
           { id: 't2', name: 'Bash', summary: 'Bash go test -count=5 ./internal/adapter/...', done: true, ok: true },
           { id: 't3', name: 'Edit', summary: 'Edit parser.go', done: true, ok: true },
           { id: 't4', name: 'Bash', summary: 'Bash rm -rf testdata/tmp', done: true, ok: false, denied: true, output: 'Permission for this tool use was denied.' },
+          {
+            id: 't5', name: 'PowerShell', summary: 'PowerShell npm test 2>&1 | Select-Object -Last 40', done: true, ok: false, approved: 'you',
+            output: "Exit code 1\n> grid@0.1.0 test\r\n> vitest run\r\n\r\nnode.exe : 'vitest' is not recognized as an internal or external command,\r\noperable program or batch file.",
+          },
         ],
       }),
     ],
@@ -150,6 +207,11 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
   let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }
   const timers = new Map<string, number[]>()
+  // Approvals: a question that mentions "push" asks to run git push first.
+  const rules: Record<string, ToolRule[]> = {}
+  const sessionRules: Record<string, ToolRule[]> = {} // by session id
+  const approvalWaits = new Map<string, (allowed: boolean) => void>()
+  let requestSeq = 0
 
   const changed = (s: SessionView) => h?.sessionChanged({ ...s })
   const setState = (s: SessionView, state: ActivityState) => {
@@ -237,31 +299,55 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
       s.running = true
       h?.pageChanged({ ...p })
       setState(s, 'thinking')
-      const answer = text.startsWith('/') ? `Ran \`${text}\`.` : STREAM
-      const words = answer.split(/(?<=\s)/)
-      const ts: number[] = []
-      let at = 700
-      words.forEach((wd, i) => {
+      // Like the real backend, send returns once the turn has started; the
+      // rest (an approval, then the streamed answer) runs on its own.
+      const run = async () => {
+        let answer = text.startsWith('/') ? `Ran \`${text}\`.` : STREAM
+        if (/\bpush\b/i.test(text)) {
+          const suggestions: ToolRule[] = [
+            { tool: 'Bash', prefix: 'git push', action: 'allow' },
+            { tool: 'Bash', prefix: 'git:publish', action: 'allow' },
+            { tool: 'Bash', prefix: 'git', action: 'allow' },
+          ]
+          const ruled = [...(sessionRules[s.id] ?? []), ...(rules[s.workdir] ?? [])].find(r => r.tool === 'Bash' && suggestions.some(x => x.prefix === r.prefix))
+          let allowed = ruled?.action === 'allow'
+          if (!ruled || ruled.action === 'ask') {
+            const requestId = `req_${++requestSeq}`
+            s.approvals = [...(s.approvals ?? []), {
+              requestId, tool: 'Bash', input: { command: 'git push origin main', description: 'Push the branch to origin' },
+              toolUseId: `toolu_${requestSeq}`, suggestions, askedAt: Date.now(),
+            }]
+            setState(s, 'needs_approval')
+            allowed = await new Promise<boolean>(resolve => approvalWaits.set(requestId, resolve))
+          }
+          answer = allowed ? 'Pushed **main** to origin.' : "I didn't push: the push was denied. The commit is still local."
+        }
+        const words = answer.split(/(?<=\s)/)
+        const ts: number[] = []
+        let at = 700
+        words.forEach((wd, i) => {
+          ts.push(window.setTimeout(() => {
+            if (i === 0) setState(s, 'writing')
+            emit(id, 'text_delta', p.seq, { index: 1, text: wd })
+          }, at))
+          at += 35
+        })
         ts.push(window.setTimeout(() => {
-          if (i === 0) setState(s, 'writing')
-          emit(id, 'text_delta', p.seq, { index: 1, text: wd })
-        }, at))
-        at += 35
-      })
-      ts.push(window.setTimeout(() => {
-        p.answerMd = answer
-        p.status = 'done'
-        p.outputTokens = 180
-        p.costUsd = 0.0061
-        p.durationMs = at
-        p.finishedAt = Date.now()
-        h?.pageChanged({ ...p })
-        emit(id, 'text_block', p.seq, { text: answer })
-        emit(id, 'turn_result', p.seq, {})
-        s.busy = false
-        setState(s, 'idle')
-      }, at + 50))
-      timers.set(id, ts)
+          p.answerMd = answer
+          p.status = 'done'
+          p.outputTokens = 180
+          p.costUsd = 0.0061
+          p.durationMs = at
+          p.finishedAt = Date.now()
+          h?.pageChanged({ ...p })
+          emit(id, 'text_block', p.seq, { text: answer })
+          emit(id, 'turn_result', p.seq, {})
+          s.busy = false
+          setState(s, 'idle')
+        }, at + 50))
+        timers.set(id, ts)
+      }
+      void run()
     },
     async interrupt(id) {
       const s = find(id)
@@ -289,6 +375,55 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
       return { ...s }
     },
     async setSortOrder(id, o) { const s = find(id); s.sortOrder = o; changed(s); return { ...s } },
+    async answerApproval(sid, rid, decision, rule) {
+      const s = find(sid)
+      const a = (s.approvals ?? []).find(x => x.requestId === rid)
+      if (!a) throw new Error('that request is no longer waiting for an answer')
+      if (decision === 'session' && rule) {
+        const list = (sessionRules[sid] ??= [])
+        const i = list.findIndex(r => r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? ''))
+        const r = { ...rule, action: 'allow' as const }
+        if (i >= 0) list[i] = r
+        else list.push(r)
+      }
+      if (decision === 'always' && rule) {
+        const list = (rules[s.workdir] ??= [])
+        const i = list.findIndex(r => r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? ''))
+        const r = { ...rule, action: 'allow' as const }
+        if (i >= 0) list[i] = r
+        else list.push(r)
+      }
+      s.approvals = (s.approvals ?? []).filter(x => x.requestId !== rid)
+      if (s.approvals.length === 0) setState(s, 'running_tools')
+      else changed(s)
+      approvalWaits.get(rid)?.(decision !== 'deny')
+    },
+    async toolRules(sid) { return [...(rules[find(sid).workdir] ?? [])] },
+    async sessionToolRules(sid) { return [...(sessionRules[sid] ?? [])] },
+    async deleteSessionToolRule(sid, rule) {
+      sessionRules[sid] = (sessionRules[sid] ?? []).filter(r => !(r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? '')))
+      return [...sessionRules[sid]]
+    },
+    async promoteSessionToolRule(sid, rule) {
+      const list = (rules[find(sid).workdir] ??= [])
+      list.push({ ...rule })
+      sessionRules[sid] = (sessionRules[sid] ?? []).filter(r => !(r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? '')))
+    },
+    async setToolRule(sid, rule) {
+      const list = (rules[find(sid).workdir] ??= [])
+      const i = list.findIndex(r => r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? ''))
+      if (i >= 0) list[i] = { ...rule }
+      else list.push({ ...rule })
+      return [...list]
+    },
+    async deleteToolRule(sid, rule) {
+      const w = find(sid).workdir
+      rules[w] = (rules[w] ?? []).filter(r => !(r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? '')))
+      return [...rules[w]]
+    },
+    async search(q) {
+      return mockSearch(q, sessions, pages)
+    },
     async describeAttachments(paths) {
       // By extension: images, PDFs and common text files attach; a path
       // without an extension reads as a folder; anything else can't.

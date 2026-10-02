@@ -145,6 +145,43 @@ func (a *App) Send(sessionID, text string, attachments []app.AttachmentRef) erro
 
 func (a *App) Interrupt(sessionID string) error { return a.svc.Sessions.Interrupt(sessionID) }
 
+// AnswerApproval gives the user's decision (allow, always, deny) on a tool
+// use waiting for approval.
+// For "always", rule is the rule to add.
+func (a *App) AnswerApproval(sessionID, requestID, decision string, rule *store.ToolRule) error {
+	return a.svc.Sessions.Answer(sessionID, requestID, decision, rule)
+}
+
+// SessionToolRules lists a session's own rules (until UNCLI quits).
+func (a *App) SessionToolRules(sessionID string) ([]store.ToolRule, error) {
+	return a.svc.Sessions.SessionRules(sessionID)
+}
+
+// DeleteSessionToolRule drops one of a session's own rules.
+func (a *App) DeleteSessionToolRule(sessionID string, r store.ToolRule) ([]store.ToolRule, error) {
+	return a.svc.Sessions.DeleteSessionRule(sessionID, r)
+}
+
+// PromoteSessionToolRule moves a session rule to the project.
+func (a *App) PromoteSessionToolRule(sessionID string, r store.ToolRule) error {
+	return a.svc.Sessions.PromoteSessionRule(sessionID, r)
+}
+
+// ToolRules lists the tool rules of a session's project.
+func (a *App) ToolRules(sessionID string) ([]store.ToolRule, error) {
+	return a.svc.Sessions.Rules(sessionID)
+}
+
+// SetToolRule adds or changes a tool rule for a session's project.
+func (a *App) SetToolRule(sessionID string, r store.ToolRule) ([]store.ToolRule, error) {
+	return a.svc.Sessions.SetRule(sessionID, r)
+}
+
+// DeleteToolRule removes a tool rule from a session's project.
+func (a *App) DeleteToolRule(sessionID string, r store.ToolRule) ([]store.ToolRule, error) {
+	return a.svc.Sessions.DeleteRule(sessionID, r)
+}
+
 func (a *App) SetModel(sessionID, model string) error {
 	return a.svc.Sessions.SetModel(sessionID, model)
 }
@@ -181,6 +218,9 @@ func (a *App) SetPreferences(p app.Preferences) (app.Preferences, error) {
 
 // SummarisePage asks the quick-task model for a table of contents of a
 // page; blocks are the answer's blocks as the UI numbers them.
+// Search finds pages across all sessions (full-text, with filters).
+func (a *App) Search(q store.SearchQuery) (store.SearchResult, error) { return a.svc.Store.Search(q) }
+
 func (a *App) SummarisePage(sessionID, pageID string, blocks []string) (store.Page, error) {
 	return a.svc.SummarisePage(a.ctx, sessionID, pageID, blocks)
 }

@@ -1,13 +1,14 @@
 // App state: sessions, their pages, the page each session is showing, and
 // the live text of answers still streaming. All state is keyed by id.
 import type {
-  AttachmentRef, Backend, Bootstrap, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
+  AttachmentRef, Backend, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
   ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadQuestionCompact, loadSidebarWidth, saveQuestionCompact, saveSidebarWidth } from '../lib/panels'
 import { toBlocks } from '../lib/render/markdown'
 import { orderAt } from '../lib/reorder'
+import type { SearchRange } from '../lib/search'
 import { showToast } from '../lib/toasts.svelte'
 
 export interface Live {
@@ -33,9 +34,20 @@ export class AppStore {
   newSessionFolder = $state<string | null>(null) // folder it opens with (a dropped folder)
   newSessionSeq = $state(0) // each open is a fresh dialog, even mid fade-out
   settingsOpen = $state(false)
+  permissionsOpen = $state(false) // the current project's tool rules
   outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
   sidebarWidth = $state(loadSidebarWidth())
   questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
+  // Search across sessions: the box's text and filters (the sidebar shows
+  // results instead of the session list while there is text), a counter
+  // that focuses the box (Ctrl+K), and a page to scroll to a match on.
+  searchText = $state('')
+  searchFilters = $state<{ profiles: string[]; bookmarked: boolean; thisSession: boolean; range: SearchRange }>({
+    profiles: [], bookmarked: false, thisSession: false, range: 'any',
+  })
+  searchFocus = $state(0)
+  search = $state<{ result: SearchResult | null; active: number }>({ result: null, active: 0 })
+  reveal = $state<{ pageId: string; terms: string[] } | null>(null)
   summarising = $state<Record<string, boolean>>({}) // page id → a summary is being made
   preferHeadings = $state<Record<string, boolean>>({}) // page id → show its headings, not its summary
   private autoSummarised = new Set<string>() // tried once, so a failure isn't retried in a loop
@@ -128,6 +140,19 @@ export class AppStore {
       this.sessions = before
       showToast(String(e), 'error')
     }
+  }
+
+  // openHit shows a search result: its session, its page, and (via reveal)
+  // the first block with a match, scrolled into view.
+  async openHit(hit: SearchHit, terms: string[]) {
+    if (this.currentId !== hit.sessionId || !this.pages[hit.sessionId]) await this.select(hit.sessionId)
+    let list = this.pages[hit.sessionId] ?? []
+    if (!list.some(p => p.id === hit.pageId)) {
+      list = this.pages[hit.sessionId] = await this.backend.pages(hit.sessionId)
+    }
+    const i = list.findIndex(p => p.id === hit.pageId)
+    if (i >= 0) this.index[hit.sessionId] = i
+    this.reveal = { pageId: hit.pageId, terms }
   }
 
   goTo(i: number) {

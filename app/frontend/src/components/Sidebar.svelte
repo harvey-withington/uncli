@@ -4,6 +4,7 @@
   import { theme, cycleTheme } from '../lib/theme.svelte'
   import Icon from './Icon.svelte'
   import ResizeHandle from './ResizeHandle.svelte'
+  import SearchPanel from './SearchPanel.svelte'
   import SessionItem from './SessionItem.svelte'
   import { SIDEBAR_MAX, SIDEBAR_MIN } from '../lib/panels'
   import { dragSort } from '../lib/actions'
@@ -34,8 +35,12 @@
     <kbd>Ctrl N</kbd>
   </button>
 
+  <SearchPanel />
+
   <nav aria-label={t('session.list')}>
-    {#if app.sessions.length === 0}
+    {#if app.searchText.trim()}
+      <SearchPanel results />
+    {:else if app.sessions.length === 0}
       <p class="empty">{t('session.none')}</p>
     {:else}
       <ul use:dragSort={{ item: 'li[data-id]', onmove: (id, to) => app.moveSession(id, to) }}>

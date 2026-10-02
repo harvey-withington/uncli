@@ -54,13 +54,14 @@ func isResult(l []byte) bool {
 // fakeRuntime replays recorded turns: each user line written to stdin
 // releases the next recorded turn on stdout.
 type fakeRuntime struct {
-	mu       sync.Mutex
-	turns    [][]byte
-	next     int
-	starts   []core.Command
-	stdin    []string
-	procs    []*fakeProc
-	hangLast bool // keep the process alive after the last turn without replying
+	mu        sync.Mutex
+	turns     [][]byte
+	next      int
+	starts    []core.Command
+	stdin     []string
+	procs     []*fakeProc
+	hangLast  bool // keep the process alive after the last turn without replying
+	onControl bool // an approval answer (control_response) also releases the next turn
 }
 
 func (r *fakeRuntime) ID() string { return "local" }
@@ -99,7 +100,8 @@ func (p *fakeProc) Write(b []byte) (int, error) {
 	p.r.mu.Lock()
 	p.r.stdin = append(p.r.stdin, strings.TrimSpace(string(b)))
 	var seg []byte
-	if bytes.Contains(b, []byte(`"type":"user"`)) && p.r.next < len(p.r.turns) {
+	release := bytes.Contains(b, []byte(`"type":"user"`)) || p.r.onControl && bytes.Contains(b, []byte(`"type":"control_response"`))
+	if release && p.r.next < len(p.r.turns) {
 		seg = p.r.turns[p.r.next]
 		p.r.next++
 	}
@@ -255,7 +257,7 @@ func TestMultiTurnPages(t *testing.T) {
 		t.Errorf("one process should serve all turns, started %d", len(h.rt.starts))
 	}
 	args := strings.Join(h.rt.starts[0].Args, " ")
-	if !strings.Contains(args, "--session-id "+v.ID) || !strings.Contains(args, "--permission-prompts none") {
+	if !strings.Contains(args, "--session-id "+v.ID) || !strings.Contains(args, "--permission-prompt-tool stdio") || strings.Contains(args, "--permission-prompts none") {
 		t.Errorf("first spawn args = %s", args)
 	}
 	h.sink.mu.Lock()
