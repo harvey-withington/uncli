@@ -16,6 +16,8 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"uncli/internal/app"
+	"uncli/internal/attach"
+	"uncli/internal/clipfiles"
 	"uncli/internal/core"
 	"uncli/internal/session"
 	"uncli/internal/store"
@@ -74,10 +76,11 @@ func Run(assets fs.FS) error {
 			},
 		},
 		Windows: &windows.Options{Theme: windows.SystemDefault},
-		// OS file drops give the page real paths (window.runtime.OnFileDrop);
-		// the WebView's own drop handling is off so a dropped file can't
-		// navigate the window.
-		DragAndDrop: &options.DragAndDrop{EnableFileDrop: true, DisableWebViewDrop: true},
+		// OS file drops give the page real paths (window.runtime.OnFileDrop).
+		// On Windows that works through the WebView's own drop events, so
+		// they stay on; the page cancels file drops itself (lib/drops.ts), so
+		// a dropped file can't navigate the window.
+		DragAndDrop: &options.DragAndDrop{EnableFileDrop: true},
 		OnStartup: func(ctx context.Context) {
 			a.mu.Lock()
 			a.ctx = ctx
@@ -135,8 +138,9 @@ func (a *App) CreateSession(profileID, workdir, model string) (app.CreatedSessio
 
 func (a *App) Pages(sessionID string) ([]store.Page, error) { return a.svc.Sessions.Pages(sessionID) }
 
-func (a *App) Send(sessionID, text string) error {
-	return a.svc.Sessions.Send(context.Background(), sessionID, text)
+// Send starts a turn with the text and any attached files.
+func (a *App) Send(sessionID, text string, attachments []app.AttachmentRef) error {
+	return a.svc.Send(context.Background(), sessionID, text, attachments)
 }
 
 func (a *App) Interrupt(sessionID string) error { return a.svc.Sessions.Interrupt(sessionID) }
@@ -155,6 +159,11 @@ func (a *App) SetSortOrder(sessionID string, order float64) (session.View, error
 
 // DescribePaths says which paths dropped onto the window are folders.
 func (a *App) DescribePaths(paths []string) []app.DroppedPath { return app.DescribePaths(paths) }
+
+// DescribeAttachments says which dropped or pasted files can be attached.
+func (a *App) DescribeAttachments(paths []string) []attach.Info {
+	return app.DescribeAttachments(paths)
+}
 
 func (a *App) Rename(sessionID, title string) (session.View, error) {
 	return a.svc.Sessions.Rename(sessionID, title)
@@ -183,6 +192,16 @@ func (a *App) Usage() *core.UsageLimit { return a.svc.Sessions.Usage() }
 func (a *App) OpenFolder(path string) error { return app.OpenFolder(path) }
 
 func (a *App) CopyText(text string) error { return wruntime.ClipboardSetText(a.ctx, text) }
+
+// ClipboardFiles lists the files on the OS clipboard (copied in Explorer),
+// so pasting them can insert their paths; empty when there are none.
+func (a *App) ClipboardFiles() ([]string, error) {
+	p, err := clipfiles.Paths()
+	if p == nil {
+		p = []string{}
+	}
+	return p, err
+}
 
 // OpenURL opens a link from an answer in the user's browser. Only web
 // links are allowed; anything else is ignored.

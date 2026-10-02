@@ -1,7 +1,7 @@
 // App state: sessions, their pages, the page each session is showing, and
 // the live text of answers still streaming. All state is keyed by id.
 import type {
-  Backend, Bootstrap, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
+  AttachmentRef, Backend, Bootstrap, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
   ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
@@ -144,10 +144,10 @@ export class AppStore {
     return v
   }
 
-  async send(text: string) {
+  async send(text: string, attachments: AttachmentRef[] = []) {
     const id = this.currentId
     if (!id) return
-    await this.backend.send(id, text)
+    await this.backend.send(id, text, attachments)
   }
 
   async toggleBookmark() {

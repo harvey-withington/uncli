@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -31,7 +32,7 @@ func (a *Adapter) Installer() core.Installer { return a.installer }
 func (a *Adapter) Capabilities() core.Capabilities {
 	return core.Capabilities{
 		PartialStreaming: true, Resume: true, LiveModelSwitch: true, Interrupt: true,
-		Approvals: true, Images: true, UsageReporting: true, ThinkingEvents: true,
+		Approvals: true, Images: true, Documents: true, UsageReporting: true, ThinkingEvents: true,
 		SlashPassthrough: true,
 	}
 }
@@ -143,17 +144,23 @@ func (a *Adapter) ParseAuthStatus(out []byte) (core.AuthInfo, error) {
 func (a *Adapter) EncodeTurn(t core.UserTurn) ([]byte, error) {
 	text := t.Text
 	if t.Directives != "" {
-		text = t.Directives + "\n\n" + t.Text
+		text = strings.TrimSpace(t.Directives + "\n\n" + t.Text)
 	}
 	var content any = text
 	if len(t.Attachments) > 0 {
+		// Attachments first, then the text (a text block can't be empty).
 		parts := []map[string]any{}
 		for _, at := range t.Attachments {
-			parts = append(parts, map[string]any{"type": "image", "source": map[string]any{
-				"type": "base64", "media_type": at.MediaType, "data": base64.StdEncoding.EncodeToString(at.Data),
-			}})
+			block, err := attachmentBlock(at)
+			if err != nil {
+				return nil, err
+			}
+			parts = append(parts, block)
 		}
-		content = append(parts, map[string]any{"type": "text", "text": text})
+		if text != "" {
+			parts = append(parts, map[string]any{"type": "text", "text": text})
+		}
+		content = parts
 	}
 	return marshalLine(map[string]any{
 		"type":               "user",
@@ -161,6 +168,22 @@ func (a *Adapter) EncodeTurn(t core.UserTurn) ([]byte, error) {
 		"parent_tool_use_id": nil,
 		"session_id":         "",
 	})
+}
+
+// attachmentBlock is a file as a content block: images as image blocks,
+// PDFs and text as documents titled with the file name (recorded in
+// image-input and document-input).
+func attachmentBlock(at core.Attachment) (map[string]any, error) {
+	b64 := func() string { return base64.StdEncoding.EncodeToString(at.Data) }
+	switch {
+	case strings.HasPrefix(at.MediaType, "image/"):
+		return map[string]any{"type": "image", "source": map[string]any{"type": "base64", "media_type": at.MediaType, "data": b64()}}, nil
+	case at.MediaType == "application/pdf":
+		return map[string]any{"type": "document", "title": at.Name, "source": map[string]any{"type": "base64", "media_type": at.MediaType, "data": b64()}}, nil
+	case at.MediaType == "text/plain":
+		return map[string]any{"type": "document", "title": at.Name, "source": map[string]any{"type": "text", "media_type": at.MediaType, "data": string(at.Data)}}, nil
+	}
+	return nil, fmt.Errorf("can't send %s: %s attachments aren't supported", at.Name, at.MediaType)
 }
 
 func (a *Adapter) EncodeControl(c core.Control) ([]byte, bool) {

@@ -171,5 +171,12 @@
   "settings.autoSummaryHint.always": "Every answer of more than one paragraph is summarised as soon as it finishes.",
   "outline.short": "Short answer, not summarised.",
   "page.collapseQuestion": "Compact question: one line",
-  "page.expandQuestion": "Show the whole question"
+  "page.expandQuestion": "Show the whole question",
+  "composer.attachments": "Attached files",
+  "composer.remove": "Remove {name}",
+  "composer.notAttached": "{name} wasn't attached: {reason}. Its path was added instead.",
+  "composer.notAttachedMany": "{n} items weren't attached ({name}: {reason}). Their paths were added instead.",
+  "composer.pastedImage": "Pasted image",
+  "composer.pastedImageN": "Pasted image {n}",
+  "page.attachments": "Files sent with this question"
 }

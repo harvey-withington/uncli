@@ -7,7 +7,7 @@
 
 <div class="toasts" aria-live="polite">
   {#each toasts.list as toast (toast.id)}
-    <div class="toast {toast.kind}" role={toast.kind === 'error' ? 'alert' : 'status'} transition:fly={{ y: 8, duration: 160 }}>
+    <div class="toast {toast.kind}" role={toast.kind === 'error' ? 'alert' : 'status'} transition:fly={{ y: -8, duration: 160 }}>
       {#if toast.kind === 'error'}<Icon name="circle-alert" />{/if}
       <span>{toast.message}</span>
       <button class="btn ghost small icon" onclick={() => dismissToast(toast.id)} aria-label={t('common.dismiss')}><Icon name="x" size={14} /></button>
@@ -16,10 +16,12 @@
 </div>
 
 <style>
+  /* Top right: the bottom of the window is the message box and its Send
+     button, which a note must never cover. */
   .toasts {
     position: fixed;
     right: var(--space-5);
-    bottom: var(--space-5);
+    top: var(--space-5);
     z-index: 60;
     display: flex;
     flex-direction: column;

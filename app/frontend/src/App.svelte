@@ -31,7 +31,7 @@
 
   onMount(() => {
     app.init().catch(e => (failed = String(e)))
-    listenForDrops(app)
+    return listenForDrops(app)
   })
   onDestroy(() => app.destroy())
 

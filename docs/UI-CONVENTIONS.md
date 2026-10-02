@@ -30,7 +30,10 @@ with the code.
   never by up/down buttons, and always have a keyboard twin
   (Alt+↑ / Alt+↓ on the focused item). Panel edges resize by dragging
   (`ResizeHandle`). Files and folders dropped from the OS do the obvious thing
-  where they land (`lib/drops.ts`): paths into the composer, a folder anywhere
+  where they land (`lib/drops.ts`): onto the composer they attach to the next
+  turn as chips (files copied in Explorer and pasted there too, and pasted
+  screenshots; folders and files that can't be attached go in as their path,
+  with a note saying why), a folder anywhere
   else starts a new session there. Controls inside a draggable item carry
   `data-no-drag`.
 - **Colour comes in splashes, fully saturated.** Icons and accents that
@@ -82,7 +85,7 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 |---|---|---|
 | `Modal` | `title`, `width?`, `onclose`, `children`, `footer?` | Focus trap; `data-autofocus` picks the first focus; Escape closes; click on the scrim closes |
 | `ConfirmDialog` | none; driven by `confirm({title, message, confirmLabel, danger?})` | Resolves `true`/`false`; Enter confirms, Escape cancels |
-| `Toasts` | none; driven by `showToast(message, kind)` | Errors stay until dismissed |
+| `Toasts` | none; driven by `showToast(message, kind)` | Top right, never over the message box; errors stay until dismissed |
 | `CopyButton` | `text`, `label?` | Copies through the backend; shows a check for 1.4 s |
 | `ActivityBadge` | `state`, `showIdle?` | Dot plus label; pulses while busy |
 | `ResizeHandle` | `edge`, `width`, `min`, `max`, `label`, `onresize`, `oncommit` | A separator on a panel edge: drag, or arrow keys when focused (Shift for bigger steps). Used by the sidebar (200–440 px) and outline (180–480 px); widths kept in localStorage |
@@ -91,7 +94,7 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `SessionPane` | `session` | Header, toolbar, current page, nav bar, composer |
 | `Toolbar` | `session` | Rendered from `toolbar.yaml`: model picker, modifier toggles (groups exclusive), slash and native items |
 | `UsagePopover` | `usage`, `onclose` | Subscription windows from `EvUsageLimit` |
-| `PageView` | `page` | Sticky question with copy, streamed answer, banners, trace, chips. A chevron collapses the question to compact mode: one line, the question left (ellipsis when short of room) and the page number right, never cut, then copy and the chevron; kept in localStorage |
+| `PageView` | `page` | Sticky question with copy, the files sent with it (`q-files`), streamed answer, banners, trace, chips. A chevron collapses the question to compact mode: one line, the question left (ellipsis when short of room) and the page number right, never cut, then copy and the chevron; kept in localStorage |
 | `AnswerBlocks` | `markdown`, `streaming?`, `markers?` | One block per top-level markdown element; each copies its source markdown. `markers` (block index → outline entry, from `app.outlineFor(page)`) puts the entry's section-kind icon in the page's left margin beside the block, 16 px in the kind colour (a step up from the outline's 13 px), so the margin always matches what the outline shows, Summary/Headings switch included |
 | `CodeBlock` | `code`, `lang`, `streaming?` | Shiki highlighting once complete; copies code only |
 | `OutlinePanel` | `page`, `scroller` | "On this page": the answer's headings (levels normalised; paragraphs that act as headings, such as "**1. Point.** …" or a short all-bold line, count one level below the real heading before them), or a summary from the quick-task model (sparkles button; Summary/Headings switch when both exist; caption names the model and cost; summaries also start on their own as answers finish, per the Summaries setting, and an answer skipped as too short says so with a link to summarise it anyway), each entry with a section-kind icon (`lib/sections.ts`: guessed for headings, chosen by the model in a summary; the kind is in the tooltip and read out to screen readers), the question at the top; click to jump below the sticky question, the section being read is highlighted. Resized by dragging its left edge or arrow keys on it (180–480 px); width and visibility kept in localStorage |
@@ -99,7 +102,7 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `PageChips` | `page` | Model, modifiers, tokens, cost, duration |
 | `NavBar` | none | Separate rounded buttons (gradient fill, filled icons, no text): previous bookmark ◀◀, back ◀, position capsule "3 / 7" (read as "Page 3 of 7"), forward ▶, next bookmark ▶▶, bookmark toggle (filled when set). Docked by `SessionPane` on the line between answer and composer, centred over the answer column; the answer fades out above it |
 | `Icon` | `name`, `size?`, `label?`, `spin?`, `fill?`, `flip?` | `fill` for solid shapes, `flip` to mirror (a left triangle is a flipped play) |
-| `Composer` | `session` | Per-session drafts; Stop while answering |
+| `Composer` | `session` | Per-session drafts (text and attachments); attachment chips above the text (icon or thumbnail, name, size, remove); Send with text, files or both; Stop while answering |
 | `SetupScreen` | none | Download the pinned CLI, then sign in |
 | `SettingsDialog` | none | Quick tasks (provider, model, auto-summary; saved on change), and the CLI version at the user's own risk |
 

@@ -83,6 +83,9 @@ func (s *Session) savePage() {
 	if s.page.Modifiers == nil {
 		s.page.Modifiers = []string{}
 	}
+	if s.page.Attachments == nil {
+		s.page.Attachments = []store.PageAttachment{}
+	}
 	if err := s.m.d.Store.SavePage(s.page); err != nil {
 		s.err = "Could not save the page: " + err.Error()
 	}
@@ -147,9 +150,10 @@ func (s *Session) stop() {
 	}
 }
 
-func (s *Session) Send(ctx context.Context, text string) error {
+// Send starts a turn: the text and any attached files.
+func (s *Session) Send(ctx context.Context, text string, files []core.Attachment) error {
 	text = strings.TrimSpace(text)
-	if text == "" {
+	if text == "" && len(files) == 0 {
 		return errors.New("nothing to send")
 	}
 	s.mu.Lock()
@@ -179,7 +183,13 @@ func (s *Session) Send(ctx context.Context, text string) error {
 	}
 
 	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods)
-	line, err := s.m.d.Adapter.EncodeTurn(core.UserTurn{Text: text, Directives: directives})
+	caps := s.m.d.Adapter.Capabilities()
+	for _, f := range files {
+		if strings.HasPrefix(f.MediaType, "image/") && !caps.Images || !strings.HasPrefix(f.MediaType, "image/") && !caps.Documents {
+			return fmt.Errorf("this CLI can't take %s as an attachment", f.Name)
+		}
+	}
+	line, err := s.m.d.Adapter.EncodeTurn(core.UserTurn{Text: text, Directives: directives, Attachments: files})
 	if err != nil {
 		return err
 	}
@@ -187,12 +197,20 @@ func (s *Session) Send(ctx context.Context, text string) error {
 	if err != nil {
 		return err
 	}
+	attached := make([]store.PageAttachment, 0, len(files))
+	for _, f := range files {
+		attached = append(attached, store.PageAttachment{Name: f.Name, Path: f.Path, MediaType: f.MediaType, Size: int64(len(f.Data))})
+	}
 	s.page = &store.Page{ID: NewID(), SessionID: s.rec.ID, Seq: seq, Question: text, Directives: directives,
-		Model: s.rec.Model, Modifiers: active, Status: "open", StartedAt: time.Now().UnixMilli()}
+		Model: s.rec.Model, Modifiers: active, Status: "open", StartedAt: time.Now().UnixMilli(), Attachments: attached}
 	s.evN, s.runningTools, s.notice, s.err = 0, 0, "", ""
 	s.lastMods, s.lastSeq = active, seq
 	if s.rec.Title == "" {
-		s.rec.Title = titleFrom(text)
+		if text != "" {
+			s.rec.Title = titleFrom(text)
+		} else {
+			s.rec.Title = titleFrom(files[0].Name)
+		}
 	}
 	_ = s.m.d.Store.UpdateSession(&s.rec)
 	s.savePage()

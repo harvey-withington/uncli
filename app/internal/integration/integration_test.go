@@ -8,7 +8,14 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -373,4 +380,76 @@ func TestSummarisePage(t *testing.T) {
 		}
 	}
 	t.Logf("sections: %+v (cost $%.4f)", o.Sections, o.CostUSD)
+}
+
+// Files dropped or pasted go to the real CLI as content: two images (one
+// from disk, one pasted as data), a PDF and a text file, in a chat session,
+// which has no tool to read files, so the answer can only come from the
+// attachments themselves.
+func TestAttachments(t *testing.T) {
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	write := func(name string, data []byte) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	solid := func(c color.Color) []byte {
+		img := image.NewRGBA(image.Rect(0, 0, 32, 32))
+		draw.Draw(img, img.Bounds(), &image.Uniform{c}, image.Point{}, draw.Src)
+		var b bytes.Buffer
+		_ = png.Encode(&b, img)
+		return b.Bytes()
+	}
+	rec, err := os.ReadFile(filepath.Join("..", "..", "testdata", "streams", "claude", "2.1.285", "document-input.in.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var in struct {
+		Message struct {
+			Content []struct{ Source struct{ Data string } }
+		}
+	}
+	if err := json.Unmarshal(rec, &in); err != nil {
+		t.Fatal(err)
+	}
+	pdf, _ := base64.StdEncoding.DecodeString(in.Message.Content[0].Source.Data) // says PELICAN
+
+	v, err := svc.Sessions.Create("chat", "", "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs := []app.AttachmentRef{
+		{Path: write("first.png", solid(color.RGBA{220, 0, 0, 255}))},
+		{Name: "Pasted image", MediaType: "image/png", Data: base64.StdEncoding.EncodeToString(solid(color.RGBA{0, 0, 220, 255}))},
+		{Path: write("brief.pdf", pdf)},
+		{Path: write("notes.md", []byte("# Notes\n\nSecond code word: MARMALADE.\n"))},
+	}
+	q := "Reply on one line: the colour of each of the two images in order, then the code word in brief.pdf, then the one in notes.md."
+	if err := svc.Send(ctx, v.ID, q, refs); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, svc, v.ID)
+	p := last(t, svc, v.ID)
+	ans := strings.ToLower(p.AnswerMD)
+	for _, want := range []string{"red", "blue", "pelican", "marmalade"} {
+		if !strings.Contains(ans, want) {
+			t.Errorf("answer lacks %q: %s", want, p.AnswerMD)
+		}
+	}
+	if len(p.Attachments) != 4 || p.Attachments[1].Name != "Pasted image" || p.Attachments[1].Path != "" || p.Attachments[3].MediaType != "text/plain" {
+		t.Errorf("attachments = %+v", p.Attachments)
+	}
+	// A folder can't go.
+	if err := svc.Send(ctx, v.ID, "x", []app.AttachmentRef{{Path: dir}}); err == nil || !strings.Contains(err.Error(), "folders can't be attached") {
+		t.Errorf("folder: %v", err)
+	}
+	t.Logf("answer: %s (cost $%.4f)", p.AnswerMD, p.CostUSD)
 }

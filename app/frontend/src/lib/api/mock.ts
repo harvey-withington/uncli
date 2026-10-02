@@ -91,6 +91,15 @@ That's all the adapter needs to get started.`
 let idn = 100
 const newId = () => `mock-${++idn}`
 
+// The media type a file would attach as, judged by its extension (mock only).
+function mockMedia(name: string): string {
+  const ext = name.toLowerCase().replace(/^.*\./, '')
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+  if (ext === 'pdf') return 'application/pdf'
+  if (['txt', 'md', 'go', 'ts', 'js', 'json', 'yaml', 'yml', 'csv', 'py', 'svelte', 'html', 'css'].includes(ext)) return 'text/plain'
+  return ''
+}
+
 function page(sessionId: string, seq: number, question: string, answerMd: string, extra: Partial<Page> = {}): Page {
   return {
     id: `${sessionId}-p${seq}`, sessionId, seq, question, model: 'sonnet', modifiers: [], answerMd,
@@ -211,15 +220,19 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
       return { session: { ...s }, lastNewSession: structuredClone(lastNew) }
     },
     async pages(id) { return (pages[id] ?? []).map(p => ({ ...p })) },
-    async send(id, text) {
+    async send(id, text, attachments = []) {
       const s = find(id)
       if (s.busy) throw new Error('this session is still answering; wait or stop it first')
       const list = (pages[id] ??= [])
+      const attached = attachments.map(a => {
+        const name = a.name || (a.path ?? '').replace(/^.*[\\/]/, '')
+        return { name, path: a.path, mediaType: a.mediaType || mockMedia(name), size: a.data ? Math.round((a.data.length * 3) / 4) : 2048 }
+      })
       const p = page(id, list.length + 1, text, '', {
-        model: s.model, modifiers: [...s.modifiers], status: 'open', outputTokens: 0, costUsd: 0, durationMs: 0,
+        model: s.model, modifiers: [...s.modifiers], status: 'open', outputTokens: 0, costUsd: 0, durationMs: 0, attachments: attached,
       })
       list.push(p)
-      if (!s.title) s.title = text.slice(0, 60)
+      if (!s.title) s.title = (text || attached[0]?.name || '').slice(0, 60)
       s.busy = true
       s.running = true
       h?.pageChanged({ ...p })
@@ -276,6 +289,18 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
       return { ...s }
     },
     async setSortOrder(id, o) { const s = find(id); s.sortOrder = o; changed(s); return { ...s } },
+    async describeAttachments(paths) {
+      // By extension: images, PDFs and common text files attach; a path
+      // without an extension reads as a folder; anything else can't.
+      return paths.map(p => {
+        const name = p.replace(/[\\/]+$/, '').replace(/^.*[\\/]/, '')
+        const media = mockMedia(name)
+        if (/[\\/]$/.test(p) || !/\.[^\\/]+$/.test(p)) return { path: p, name, size: 0, kind: 'folder' as const, reason: "folders can't be attached" }
+        if (!media) return { path: p, name, size: 4096, kind: 'unsupported' as const, reason: 'only images, PDFs and text files can be attached' }
+        const kind = media.startsWith('image/') ? 'image' as const : media === 'application/pdf' ? 'pdf' as const : 'text' as const
+        return { path: p, name, size: 2048, kind, mediaType: media }
+      })
+    },
     async describePaths(paths) {
       // A path ending in a separator or without a dot reads as a folder.
       return paths.map(p => {
@@ -324,5 +349,6 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
     async openFolder() {},
     async openURL(url) { window.open(url, '_blank', 'noopener') },
     async copyText(text) { await navigator.clipboard?.writeText(text) },
+    async clipboardFiles() { return [] },
   }
 }

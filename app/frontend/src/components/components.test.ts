@@ -477,6 +477,130 @@ describe('Dropping files and folders', () => {
     await waitFor(() => expect(box).toHaveValue('Look at C:/repo/a.go "C:/My Docs/b.md"'))
   })
 
+  // A drag or clipboard event carrying files, as WebView2 delivers them.
+  function withFiles<T extends Event>(ev: T, files: File[], extra: Record<string, unknown> = {}): T {
+    const data = { types: ['Files'], files, dropEffect: 'none', getData: () => '' }
+    Object.defineProperty(ev, 'dataTransfer', { value: data })
+    Object.defineProperty(ev, 'clipboardData', { value: data })
+    for (const [k, v] of Object.entries(extra)) Object.defineProperty(ev, k, { value: v })
+    return ev
+  }
+
+  it('takes dropped files itself when Wails drop handling is off, so the message box never gets their names', async () => {
+    const { listenForDrops } = await import('../lib/drops')
+    const w = window as unknown as { runtime?: unknown; wails?: unknown }
+    const resolve = vi.fn()
+    w.runtime = { OnFileDrop: vi.fn(), ResolveFilePaths: resolve }
+    const s = new AppStore(mockBackend())
+    const off = listenForDrops(s)
+    try {
+      const file = new File(['x'], 'notes.md')
+      const over = withFiles(new Event('dragover', { cancelable: true }), [file])
+      window.dispatchEvent(over)
+      expect(over.defaultPrevented).toBe(true)
+      const drop = withFiles(new Event('drop', { cancelable: true }), [file], { clientX: 40, clientY: 60 })
+      window.dispatchEvent(drop)
+      expect(drop.defaultPrevented).toBe(true)
+      expect(resolve).toHaveBeenCalledWith(40, 60, [file])
+      // With Wails handling drops, it sends them; we don't send twice.
+      w.wails = { flags: { enableWailsDragAndDrop: true } }
+      window.dispatchEvent(withFiles(new Event('drop', { cancelable: true }), [file], { clientX: 1, clientY: 1 }))
+      expect(resolve).toHaveBeenCalledTimes(1)
+      // A plain text drag is left alone.
+      const text = new Event('dragover', { cancelable: true })
+      Object.defineProperty(text, 'dataTransfer', { value: { types: ['text/plain'] } })
+      window.dispatchEvent(text)
+      expect(text.defaultPrevented).toBe(false)
+    } finally {
+      off()
+      delete w.runtime
+      delete w.wails
+    }
+  })
+
+  // Pastes as WebView2 delivers them.
+  function paste(types: string[], files: File[], text = ''): Event {
+    const e = new Event('paste', { cancelable: true, bubbles: true })
+    Object.defineProperty(e, 'clipboardData', { value: { types, files, getData: () => text } })
+    return e
+  }
+  const chips = () => [...document.querySelectorAll('.composer .chip .cname')].map(c => c.textContent)
+
+  it('attaches files copied in Explorer (paths from the OS clipboard), and leaves text pastes alone', async () => {
+    const backend = mockBackend()
+    const list = vi.spyOn(backend, 'clipboardFiles').mockResolvedValue(['C:/repo/a.go', 'C:/My Docs/b.md'])
+    render(App, { props: { backend } })
+    const box = (await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement
+    // What WebView2 hands the page: the files, and their names as text.
+    const e = paste(['text/plain', 'Files'], [new File(['x'], 'a.go')], 'a.go b.md')
+    box.dispatchEvent(e)
+    expect(e.defaultPrevented).toBe(true)
+    await waitFor(() => expect(chips()).toEqual(['a.go', 'b.md']))
+    expect(box).toHaveValue('') // no names typed in
+    const t = paste(['text/plain'], [], 'hello')
+    box.dispatchEvent(t)
+    expect(t.defaultPrevented).toBe(false)
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
+  it('attaches a pasted screenshot as an image with a thumbnail', async () => {
+    const backend = mockBackend()
+    vi.spyOn(backend, 'clipboardFiles').mockResolvedValue([])
+    const send = vi.spyOn(backend, 'send')
+    render(App, { props: { backend } })
+    const box = (await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement
+    box.dispatchEvent(paste(['Files'], [new File([new Uint8Array([137, 80, 78, 71])], 'image.png', { type: 'image/png' })]))
+    await waitFor(() => expect(chips()).toEqual(['Pasted image']))
+    expect(document.querySelector('.composer .chip img.thumb')).not.toBeNull()
+    // Files only: the turn can go without text.
+    await fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.any(String), '', [{ name: 'Pasted image', mediaType: 'image/png', data: 'iVBORw==' }]))
+    await waitFor(() => expect(chips()).toEqual([]))
+  })
+
+  it('attaches files dropped on the message box, puts folders and others in as paths, and sends the rest', async () => {
+    const backend = mockBackend()
+    const send = vi.spyOn(backend, 'send')
+    render(App, { props: { backend } })
+    const box = (await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement
+    const { ATTACH_EVENT } = await import('../lib/drops')
+    box.dispatchEvent(new CustomEvent(ATTACH_EVENT, { detail: ['C:/shots/a.png', 'C:/docs/brief.pdf', 'C:/repo/notes.md', 'C:/repo', 'C:/bin/tool.exe'] }))
+    await waitFor(() => expect(chips()).toEqual(['a.png', 'brief.pdf', 'notes.md']))
+    await waitFor(() => expect(box).toHaveValue('C:/repo C:/bin/tool.exe'))
+    expect(await screen.findByText(/2 items weren't attached/)).toBeInTheDocument()
+    // The same file twice attaches once; a chip can be removed.
+    box.dispatchEvent(new CustomEvent(ATTACH_EVENT, { detail: ['C:/shots/a.png'] }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove notes.md' }))
+    expect(chips()).toEqual(['a.png', 'brief.pdf'])
+    await fireEvent.input(box, { target: { value: 'Compare these' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.any(String), 'Compare these', [{ path: 'C:/shots/a.png' }, { path: 'C:/docs/brief.pdf' }]))
+    // The page shows what went with the question.
+    const files = await screen.findByRole('list', { name: 'Files sent with this question' })
+    expect(within(files).getByText('a.png')).toBeInTheDocument()
+    expect(within(files).getByText('brief.pdf')).toBeInTheDocument()
+  })
+
+  it('keeps attachments with the session they were added in', async () => {
+    render(App, { props: { backend: mockBackend() } })
+    const box = (await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement
+    const { ATTACH_EVENT } = await import('../lib/drops')
+    box.dispatchEvent(new CustomEvent(ATTACH_EVENT, { detail: ['C:/docs/brief.pdf'] }))
+    await waitFor(() => expect(chips()).toEqual(['brief.pdf']))
+    await fireEvent.click(screen.getByText('Plan a weekend in Lisbon'))
+    await waitFor(() => expect(chips()).toEqual([]))
+    await fireEvent.click(screen.getByText('Fix the flaky parser test'))
+    await waitFor(() => expect(chips()).toEqual(['brief.pdf']))
+  })
+
+  it('ignores files whose paths could not be resolved', async () => {
+    const { handleDrop } = await import('../lib/drops')
+    const s = new AppStore(mockBackend())
+    await s.init()
+    await handleDrop(s, document.body, ['', ''])
+    expect(s.newSessionOpen).toBe(false)
+  })
+
   it('opens a new session on a dropped folder, in a folder type', async () => {
     const { handleDrop } = await import('../lib/drops')
     const s = new AppStore(mockBackend())
@@ -488,7 +612,7 @@ describe('Dropping files and folders', () => {
   })
 
   it('routes a drop on the composer to it', async () => {
-    const { handleDrop, INSERT_EVENT } = await import('../lib/drops')
+    const { handleDrop, ATTACH_EVENT } = await import('../lib/drops')
     const s = new AppStore(mockBackend())
     await s.init()
     const composer = document.createElement('div')
@@ -497,9 +621,9 @@ describe('Dropping files and folders', () => {
     composer.append(ta)
     document.body.append(composer)
     const got = vi.fn()
-    ta.addEventListener(INSERT_EVENT, e => got((e as CustomEvent).detail))
+    ta.addEventListener(ATTACH_EVENT, e => got((e as CustomEvent).detail))
     await handleDrop(s, ta, ['C:/My Docs/b.md'])
-    expect(got).toHaveBeenCalledWith('"C:/My Docs/b.md"')
+    expect(got).toHaveBeenCalledWith(['C:/My Docs/b.md'])
     expect(s.newSessionOpen).toBe(false)
     composer.remove()
   })

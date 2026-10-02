@@ -79,6 +79,34 @@ export interface Page {
   startedAt: number
   finishedAt: number
   outline?: PageOutline
+  attachments?: PageAttachment[] // files sent with the question
+}
+
+// A file sent with a page's question (its content is in the CLI's transcript).
+export interface PageAttachment {
+  name: string
+  path?: string // empty for pasted data
+  mediaType: string
+  size: number
+}
+
+// What a dropped or pasted path would attach as, or why it can't be.
+export type AttachmentKind = 'image' | 'pdf' | 'text' | 'folder' | 'unsupported'
+export interface AttachmentInfo {
+  path: string
+  name: string
+  size: number
+  kind: AttachmentKind
+  mediaType?: string
+  reason?: string
+}
+
+// A file to send with a turn: a path the app reads, or pasted image data.
+export interface AttachmentRef {
+  path?: string
+  name?: string
+  mediaType?: string
+  data?: string // base64
 }
 
 export interface Profile {
@@ -281,13 +309,14 @@ export interface Backend {
   pickFolder(title: string): Promise<string>
   createSession(profileId: string, workdir: string, model: string): Promise<CreatedSession>
   pages(sessionId: string): Promise<Page[]>
-  send(sessionId: string, text: string): Promise<void>
+  send(sessionId: string, text: string, attachments?: AttachmentRef[]): Promise<void>
   interrupt(sessionId: string): Promise<void>
   setModel(sessionId: string, model: string): Promise<void>
   toggleModifier(sessionId: string, modifierId: string, on: boolean): Promise<SessionView>
   rename(sessionId: string, title: string): Promise<SessionView>
   setSortOrder(sessionId: string, order: number): Promise<SessionView>
   describePaths(paths: string[]): Promise<DroppedPath[]>
+  describeAttachments(paths: string[]): Promise<AttachmentInfo[]>
   remove(sessionId: string): Promise<void>
   setBookmark(sessionId: string, pageId: string, on: boolean): Promise<Page>
   focus(sessionId: string): Promise<void>
@@ -297,4 +326,5 @@ export interface Backend {
   openFolder(path: string): Promise<void>
   openURL(url: string): Promise<void>
   copyText(text: string): Promise<void>
+  clipboardFiles(): Promise<string[]> // full paths of files copied in the file manager; [] if none
 }

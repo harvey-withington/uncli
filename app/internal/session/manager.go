@@ -147,12 +147,12 @@ func (m *Manager) Create(profileID, workdir, model string) (View, error) {
 
 func (m *Manager) Pages(id string) ([]store.Page, error) { return m.d.Store.ListPages(id) }
 
-func (m *Manager) Send(ctx context.Context, id, text string) error {
+func (m *Manager) Send(ctx context.Context, id, text string, files ...core.Attachment) error {
 	s, err := m.get(id)
 	if err != nil {
 		return err
 	}
-	return s.Send(ctx, text)
+	return s.Send(ctx, text, files)
 }
 
 func (m *Manager) Interrupt(id string) error {
