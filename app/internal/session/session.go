@@ -39,6 +39,8 @@ type Session struct {
 	interrupting *time.Timer
 	lastMods     []string // modifiers sent with the previous turn
 	lastSeq      int
+	pending      []Approval       // tool uses waiting for the user's answer
+	sessionRules []store.ToolRule // "for this session" rules, in memory only
 }
 
 func newSession(m *Manager, rec store.Session) *Session {
@@ -57,7 +59,8 @@ func (s *Session) View() View {
 }
 
 func (s *Session) viewLocked() View {
-	return View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err}
+	return View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err,
+		Approvals: append([]Approval{}, s.pending...)}
 }
 
 func (s *Session) changed() { s.m.d.Sink.SessionChanged(s.viewLocked()) }
@@ -139,6 +142,7 @@ func (s *Session) stopLocked() {
 	_ = s.proc.Kill()
 	s.cancel()
 	s.proc, s.cancel = nil, nil
+	s.pending = nil
 }
 
 func (s *Session) stop() {
@@ -168,6 +172,9 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	}
 	active := append([]string{}, s.rec.Modifiers...)
 	spec := set.Resolve(prof, s.rec.Model, active, s.rec.Workdir)
+	// Tool uses outside the allowlist come to the user as approval cards
+	// when the CLI can route them; otherwise the CLI denies them.
+	spec.Approvals = s.m.d.Adapter.Capabilities().Approvals
 
 	// Effort is a launch flag, so a change respawns with resume.
 	if s.proc != nil && spec.Effort != s.procEffort {
@@ -243,6 +250,8 @@ func (s *Session) Interrupt() error {
 	if s.page == nil || s.proc == nil {
 		return nil
 	}
+	// A tool use waiting for approval holds the turn: answer it first.
+	s.denyPendingLocked("The user stopped this turn.")
 	b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlInterrupt})
 	if ok {
 		if _, err := s.proc.Stdin().Write(b); err == nil {
@@ -347,6 +356,7 @@ func (s *Session) closePage(status, errText string) {
 		s.interrupting.Stop()
 		s.interrupting = nil
 	}
+	s.pending = nil // the CLI no longer waits on them
 	if s.page == nil {
 		return
 	}
@@ -509,7 +519,8 @@ func (s *Session) handle(gen int, ev core.Event) {
 			found := false
 			for i := range s.page.Trace {
 				if it := &s.page.Trace[i]; it.ID == t.ID && !it.Done {
-					it.Done, it.OK, it.Denied, it.Output = true, t.OK, t.Denied, t.Output
+					it.Done, it.OK, it.Output = true, t.OK, t.Output
+					it.Denied = it.Denied || t.Denied // a denial on its card already marked it
 					found = true
 					s.runningTools--
 				}
@@ -525,15 +536,14 @@ func (s *Session) handle(gen int, ev core.Event) {
 			s.page.TouchedFiles = append(s.page.TouchedFiles, store.TouchedFile{Path: f.Path, Line: f.Line, How: f.How})
 		}
 	case core.EvApprovalAsked:
-		// Phase 1 runs with --permission-prompts none; if a prompt arrives
-		// anyway, deny it rather than leave the turn hanging.
+		// The user answers it on an approval card, unless a session rule
+		// already does (approvals.go).
 		a, _ := core.Decode[core.ApprovalAsked](ev)
-		if b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlApprove, RequestID: a.RequestID,
-			Message: "UNCLI can't show approvals yet, so this was denied."}); ok && s.proc != nil {
-			_, _ = s.proc.Stdin().Write(b)
+		if !s.askLocked(a) {
+			s.m.d.Sink.SessionEvent(s.rec.ID, ev)
+			return
 		}
-		s.m.d.Sink.SessionEvent(s.rec.ID, ev)
-		return
+		s.changed()
 	case core.EvTurnResult:
 		r, _ := core.Decode[core.TurnResult](ev)
 		s.finishTurn(r)
@@ -544,6 +554,9 @@ func (s *Session) handle(gen int, ev core.Event) {
 		s.err = e.Message
 	}
 	s.state = next(s.state, ev.Kind, s.runningTools, turnOpen)
+	if len(s.pending) > 0 && s.page != nil {
+		s.state = NeedsApproval // still waiting on the user, whatever else arrives
+	}
 	if s.state != prev {
 		s.changed()
 	}

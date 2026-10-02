@@ -31,6 +31,7 @@ export interface SessionView {
   running: boolean
   busy: boolean
   error?: string
+  approvals?: Approval[] // tool uses waiting for the user, oldest first
 }
 
 export interface TraceItem {
@@ -41,6 +42,7 @@ export interface TraceItem {
   ok: boolean
   denied?: boolean
   output?: string
+  approved?: 'you' | 'session' | 'rule' // who let it run, when the CLI asked first
 }
 
 // A table of contents written by the quick-task model, anchored to the
@@ -88,6 +90,61 @@ export interface PageAttachment {
   path?: string // empty for pasted data
   mediaType: string
   size: number
+}
+
+// Tool permission rules for a project (a session's folder): allow, ask or
+// deny a tool, or for Bash a command prefix ("git push") or a git class
+// ("git:local").
+export type RuleAction = 'allow' | 'ask' | 'deny'
+export interface ToolRule {
+  tool: string
+  prefix?: string
+  action: RuleAction
+}
+
+// A tool use waiting for the user's answer.
+export interface Approval {
+  requestId: string
+  tool: string
+  input?: unknown
+  description?: string
+  toolUseId?: string
+  suggestions: ToolRule[] // what "Always allow" can add, most specific first
+  askedAt: number
+}
+
+// allow: this once; session: and a rule for the rest of this session;
+// always: and a rule for the project.
+export type ApprovalDecision = 'allow' | 'session' | 'always' | 'deny'
+
+// Search across sessions (the store's full-text index).
+export interface SearchQuery {
+  text: string
+  profiles?: string[] // session types; empty = all
+  sessionId?: string // only this session
+  bookmarked?: boolean
+  since?: number // ms
+  until?: number // ms
+  limit?: number
+}
+
+// One matching page; the snippet marks matches with \x01 … \x02.
+export interface SearchHit {
+  pageId: string
+  sessionId: string
+  sessionTitle: string
+  profileId: string
+  seq: number
+  question: string
+  field: 'title' | 'question' | 'answer' | 'extra'
+  snippet: string
+  bookmarked: boolean
+  startedAt: number
+}
+
+export interface SearchResult {
+  hits: SearchHit[]
+  terms: string[] // the words searched for
 }
 
 // What a dropped or pasted path would attach as, or why it can't be.
@@ -317,6 +374,14 @@ export interface Backend {
   setSortOrder(sessionId: string, order: number): Promise<SessionView>
   describePaths(paths: string[]): Promise<DroppedPath[]>
   describeAttachments(paths: string[]): Promise<AttachmentInfo[]>
+  search(q: SearchQuery): Promise<SearchResult>
+  answerApproval(sessionId: string, requestId: string, decision: ApprovalDecision, rule?: ToolRule): Promise<void>
+  toolRules(sessionId: string): Promise<ToolRule[]>
+  sessionToolRules(sessionId: string): Promise<ToolRule[]>
+  deleteSessionToolRule(sessionId: string, rule: ToolRule): Promise<ToolRule[]>
+  promoteSessionToolRule(sessionId: string, rule: ToolRule): Promise<void>
+  setToolRule(sessionId: string, rule: ToolRule): Promise<ToolRule[]>
+  deleteToolRule(sessionId: string, rule: ToolRule): Promise<ToolRule[]>
   remove(sessionId: string): Promise<void>
   setBookmark(sessionId: string, pageId: string, on: boolean): Promise<Page>
   focus(sessionId: string): Promise<void>

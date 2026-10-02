@@ -3,6 +3,8 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
+  import { blockMatching } from '../lib/search'
+  import ApprovalCard from './ApprovalCard.svelte'
   import ActivityBadge from './ActivityBadge.svelte'
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
@@ -25,6 +27,29 @@
   $effect(() => {
     if (page?.id && scroller) scroller.scrollTop = 0
   })
+
+  // Opened from search: once the page has rendered, scroll to the first
+  // block holding a search word (below the sticky question) and flash it.
+  $effect(() => {
+    const r = app.reveal
+    const el = scroller
+    if (!r || !el || page?.id !== r.pageId) return
+    const frame = window.requestAnimationFrame ?? ((f: FrameRequestCallback) => window.setTimeout(f, 16))
+    frame(() => frame(() => {
+      if (app.reveal !== r) return
+      app.reveal = null
+      const blocks = Array.from(el.querySelectorAll<HTMLElement>('[data-block]'))
+      const i = blockMatching(blocks.map(b => b.textContent ?? ''), r.terms)
+      const target = blocks[i]
+      if (!target) return
+      const header = (el.querySelector('.question') as HTMLElement | null)?.offsetHeight ?? 0
+      const top = target.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - header - 12
+      const smooth = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      el.scrollTo?.({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' })
+      target.classList.add('search-flash')
+      window.setTimeout(() => target.classList.remove('search-flash'), 1600)
+    }))
+  })
 </script>
 
 <section class="pane">
@@ -34,7 +59,15 @@
       <h1 title={session.title}>{session.title || t('session.untitled')}</h1>
       <ActivityBadge state={session.state} />
       <button
-        class="btn ghost small icon outline-toggle"
+        class="btn ghost small icon rules-btn"
+        onclick={() => (app.permissionsOpen = true)}
+        aria-label={t('rules.open')}
+        title={t('rules.open')}
+      >
+        <Icon name="shield" />
+      </button>
+      <button
+        class="btn ghost small icon"
         onclick={() => app.toggleOutline()}
         aria-pressed={app.outline.open}
         aria-label={t('outline.toggle')}
@@ -68,6 +101,13 @@
           {/if}
         </div>
       </div>
+      {#if session.approvals?.length}
+        <div class="approvals">
+          {#each session.approvals as a (a.requestId)}
+            <ApprovalCard {session} approval={a} />
+          {/each}
+        </div>
+      {/if}
       <div class="dock"><NavBar /></div>
       <footer class="bottom">
         <div class="inner">
@@ -190,8 +230,18 @@
   .dock :global(.navbar) {
     transform: translateY(-50%);
   }
-  .outline-toggle {
+  .rules-btn {
     margin-left: auto;
+  }
+  /* Approval cards sit just above the page controls, over the end of the
+     answer, so they're in view whatever page is showing. */
+  .approvals {
+    position: relative;
+    z-index: 5;
+    max-height: 55%;
+    overflow-y: auto;
+    padding: var(--space-2) var(--space-6) var(--space-5);
+    margin-top: calc(-1 * var(--space-4));
   }
   .empty {
     max-width: 420px;

@@ -220,6 +220,18 @@ code, pre, kbd { font-family: var(--mono); font-size: 0.9em; font-variant-ligatu
 option, optgroup { background-color: var(--surface); color: var(--text); }
 .input:focus, .select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
+/* A block opened from search, highlighted for a moment. */
+.search-flash {
+  animation: search-flash 1.6s var(--ease);
+}
+@keyframes search-flash {
+  0%, 30% { background: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); }
+  100% { background: transparent; box-shadow: 0 0 0 6px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-flash { animation: none; outline: 2px solid var(--accent-soft); }
+}
+
 /* The lifted copy that follows the pointer while a list item is dragged
    (lib/actions.ts dragSort); it settles into its slot on release.
    !important: it must look lifted whatever state the item was in. */

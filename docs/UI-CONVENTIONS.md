@@ -89,6 +89,9 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `CopyButton` | `text`, `label?` | Copies through the backend; shows a check for 1.4 s |
 | `ActivityBadge` | `state`, `showIdle?` | Dot plus label; pulses while busy |
 | `ResizeHandle` | `edge`, `width`, `min`, `max`, `label`, `onresize`, `oncommit` | A separator on a panel edge: drag, or arrow keys when focused (Shift for bigger steps). Used by the sidebar (200–440 px) and outline (180–480 px); widths kept in localStorage |
+| `ApprovalCard` | `session`, `approval` | A tool use waiting for the user, above the page controls (`role=alertdialog`): what Claude wants to do in plain words (`lib/approvals.ts`: command, file and content, edit as a diff, MCP tool and server), then Allow, Always allow with a choice of rule (most specific first) and of scope (for this session, the default, or in this project), and Deny. Never takes focus: the user may be typing |
+| `PermissionsDialog` | none (current session) | This session's rules first (remove, Make permanent), then the project's tool rules (the session's folder): each with Allow / Ask / Deny and remove; add a rule for a git class, a command prefix or a tool. Opened from the shield in the session header |
+| `SearchPanel` | `results?` | The search box under New session (Ctrl+K) with filters for type, bookmarked, this session and date; while it has text, the sidebar shows grouped results (`results` mode) instead of sessions. Snippets come with \x01/\x02 markers, never HTML. Opening a result selects the page and scrolls to the first matching block, which flashes (`.search-flash`) |
 | `Sidebar` / `SessionItem` | — / `session`, `active` | Drag to reorder (or Alt+↑ / Alt+↓); type icon and active stripe in the type's colour; double-click or pencil renames; trash confirms then deletes |
 | `NewSessionDialog` | none | Profile cards, folder picker for co-work and code, model select. Opens on the welcome card clicked, else the last type used; each type starts from its last model and folder (remembered in the app database) |
 | `SessionPane` | `session` | Header, toolbar, current page, nav bar, composer |
@@ -117,6 +120,7 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | O | Session (not while typing) | Show or hide the page outline |
 | ← / → | A focused resize handle (sidebar, outline) | Move the edge left / right (Shift for bigger steps) |
 | Ctrl+N (⌘N) | Anywhere once set up | New session |
+| Ctrl+K (⌘K) | Anywhere once set up | Focus the search box; ↑ / ↓ move through results, Enter opens one, Escape clears the box (and again leaves it) |
 | Enter | New-session dialog body | Start the session, or first open the folder picker if Co-work/Code has no folder (focus then moves to Start session). Buttons keep their own Enter |
 | ← / → / ↑ / ↓ | New-session dialog, on the type cards | Choose the session type |
 | Alt+↑ / Alt+↓ | A focused session in the sidebar | Move it up / down the list |

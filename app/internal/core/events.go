@@ -117,6 +117,7 @@ type ApprovalAsked struct {
 	Tool        string          `json:"tool"`
 	Input       json.RawMessage `json:"input,omitempty"`
 	Description string          `json:"description,omitempty"`
+	ToolUseID   string          `json:"toolUseId,omitempty"` // the tool call it is for, as in EvToolStarted
 }
 
 // Notice kinds.

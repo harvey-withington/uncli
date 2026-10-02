@@ -60,6 +60,17 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
+
+-- Tool permission rules per project (a session's working folder): allow,
+-- ask or deny a tool, or for Bash a command prefix ("git", "git push").
+CREATE TABLE IF NOT EXISTS tool_rules (
+  workdir TEXT NOT NULL,
+  tool    TEXT NOT NULL,
+  prefix  TEXT NOT NULL DEFAULT '',
+  action  TEXT NOT NULL,
+  created_at INTEGER,
+  PRIMARY KEY (workdir, tool, prefix)
+);
 `
 
 // migrate adds columns introduced after the first schema.
@@ -107,6 +118,10 @@ func Open(path string) (*Store, error) {
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	if err := setupSearch(db); err != nil {
+		db.Close()
+		return nil, err
 	}
 	return &Store{db: db, EventCap: 20000}, nil
 }
@@ -165,10 +180,15 @@ func (s *Store) CreateSession(x *Session) error {
 
 func (s *Store) UpdateSession(x *Session) error {
 	x.UpdatedAt = now()
+	var old sql.NullString
+	_ = s.db.QueryRow(`SELECT title FROM sessions WHERE id=?`, x.ID).Scan(&old)
 	_, err := s.db.Exec(`UPDATE sessions SET title=?, workdir=?, provider_sid=?, cli_version=?, model=?, modifiers=?,
 		sort_order=?, archived=?, updated_at=? WHERE id=?`,
 		x.Title, x.Workdir, nullStr(x.ProviderSID), nullStr(x.CLIVersion), x.Model, jsonList(x.Modifiers),
 		x.SortOrder, x.Archived, x.UpdatedAt, x.ID)
+	if err == nil && old.String != x.Title {
+		err = retitleSession(s.db, x.ID, x.Title)
+	}
 	return err
 }
 
@@ -217,6 +237,9 @@ func (s *Store) DeleteSession(id string) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := unindexSession(tx, id); err != nil {
+		return err
+	}
 	for _, q := range []string{`DELETE FROM events WHERE session_id=?`, `DELETE FROM pages WHERE session_id=?`, `DELETE FROM sessions WHERE id=?`} {
 		if _, err := tx.Exec(q, id); err != nil {
 			return err
@@ -234,6 +257,9 @@ type TraceItem struct {
 	OK      bool   `json:"ok"`
 	Denied  bool   `json:"denied,omitempty"`
 	Output  string `json:"output,omitempty"`
+	// Approved says who let a tool use run when the CLI asked first:
+	// "you" (on its card) or "rule" (a project rule). Empty when it didn't ask.
+	Approved string `json:"approved,omitempty"`
 }
 
 type TouchedFile struct {
@@ -311,7 +337,7 @@ func (s *Store) SetPageOutline(pageID string, o *PageOutline) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return errors.New("page not found")
 	}
-	return nil
+	return indexPage(s.db, pageID) // summary titles are searchable
 }
 
 // The pages table has no error column; errors ride in the trace JSON so
@@ -342,7 +368,10 @@ func (s *Store) SavePage(p *Page) error {
 		p.ID, p.SessionID, p.Seq, p.Question, p.Directives, p.Model, jsonList(p.Modifiers), p.AnswerMD, string(trace),
 		string(touched), p.Status, p.Bookmarked, p.Pinned, p.InputTokens, p.OutputTokens, p.CacheRead, p.CacheWrite,
 		p.CostUSD, p.DurationMS, p.StartedAt, p.FinishedAt, string(attached))
-	return err
+	if err != nil {
+		return err
+	}
+	return indexPage(s.db, p.ID)
 }
 
 func nonNil[T any](v []T) []T {

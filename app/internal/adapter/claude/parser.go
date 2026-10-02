@@ -257,11 +257,12 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 			ToolName    string          `json:"tool_name"`
 			Input       json.RawMessage `json:"input"`
 			Description string          `json:"description"`
+			ToolUseID   string          `json:"tool_use_id"`
 		}
 		_ = json.Unmarshal(l.Request, &req)
 		if req.Subtype == "can_use_tool" {
 			return []core.Event{ev(core.EvApprovalAsked, core.ApprovalAsked{
-				RequestID: l.RequestID, Tool: req.ToolName, Input: req.Input, Description: req.Description,
+				RequestID: l.RequestID, Tool: req.ToolName, Input: req.Input, Description: req.Description, ToolUseID: req.ToolUseID,
 			})}, nil
 		}
 		return unknown(), nil

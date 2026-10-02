@@ -27,6 +27,8 @@ type View struct {
 	Running bool   `json:"running"` // a CLI process is alive
 	Busy    bool   `json:"busy"`    // a turn is in flight
 	Error   string `json:"error,omitempty"`
+	// Approvals are tool uses waiting for the user's answer, oldest first.
+	Approvals []Approval `json:"approvals"`
 }
 
 // Sink receives everything the UI needs. Implementations must not call

@@ -155,6 +155,82 @@ func (m *Manager) Send(ctx context.Context, id, text string, files ...core.Attac
 	return s.Send(ctx, text, files)
 }
 
+// Answer gives the user's decision (allow, always, deny) on a tool use
+// waiting for approval.
+func (m *Manager) Answer(id, requestID, decision string, rule *store.ToolRule) error {
+	s, err := m.get(id)
+	if err != nil {
+		return err
+	}
+	return s.Answer(requestID, decision, rule)
+}
+
+// SessionRules lists a session's own rules (kept until UNCLI quits).
+func (m *Manager) SessionRules(id string) ([]store.ToolRule, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return nil, err
+	}
+	return s.SessionRules(), nil
+}
+
+// DeleteSessionRule drops one of a session's own rules.
+func (m *Manager) DeleteSessionRule(id string, r store.ToolRule) ([]store.ToolRule, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return nil, err
+	}
+	return s.RemoveSessionRule(r), nil
+}
+
+// PromoteSessionRule makes a session rule permanent: it moves to the project.
+func (m *Manager) PromoteSessionRule(id string, r store.ToolRule) error {
+	s, err := m.get(id)
+	if err != nil {
+		return err
+	}
+	if err := m.d.Store.SetRule(s.View().Workdir, r); err != nil {
+		return err
+	}
+	s.RemoveSessionRule(r)
+	return nil
+}
+
+// Rules lists the tool rules of a session's project (its working folder).
+func (m *Manager) Rules(id string) ([]store.ToolRule, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return nil, err
+	}
+	return m.d.Store.Rules(s.View().Workdir)
+}
+
+// SetRule adds or changes a tool rule for a session's project.
+func (m *Manager) SetRule(id string, r store.ToolRule) ([]store.ToolRule, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return nil, err
+	}
+	w := s.View().Workdir
+	if err := m.d.Store.SetRule(w, r); err != nil {
+		return nil, err
+	}
+	return m.d.Store.Rules(w)
+}
+
+// DeleteRule removes a tool rule from a session's project.
+func (m *Manager) DeleteRule(id string, r store.ToolRule) ([]store.ToolRule, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return nil, err
+	}
+	w := s.View().Workdir
+	if err := m.d.Store.DeleteRule(w, r.Tool, r.Prefix); err != nil {
+		return nil, err
+	}
+	return m.d.Store.Rules(w)
+}
+
 func (m *Manager) Interrupt(id string) error {
 	s, err := m.get(id)
 	if err != nil {

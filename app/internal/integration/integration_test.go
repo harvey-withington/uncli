@@ -209,7 +209,21 @@ func TestPhase1EndToEnd(t *testing.T) {
 		// The CLI auto-approves read-only commands (whoami, ls) and, under
 		// acceptEdits, file commands in the workdir (mkdir, rm, mv), so this
 		// uses one that is neither and isn't on the code allowlist.
-		p := send(t, svc, code.ID, "Use Bash to run exactly `git commit --allow-empty -m probe` and report the result, or say DENIED if you can't. Don't try any other way.")
+		// With approvals it waits on a card; the user denies it there.
+		if err := svc.Sessions.Send(context.Background(), code.ID, "Use Bash to run exactly `git commit --allow-empty -m probe` and report the result, or say DENIED if you can't. Don't try any other way."); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(3 * time.Minute)
+		for len(view(svc, code.ID).Approvals) == 0 && view(svc, code.ID).Busy && time.Now().Before(deadline) {
+			time.Sleep(100 * time.Millisecond)
+		}
+		if a := view(svc, code.ID).Approvals; len(a) > 0 {
+			if err := svc.Sessions.Answer(code.ID, a[0].RequestID, session.Deny, nil); err != nil {
+				t.Fatal(err)
+			}
+		}
+		waitIdle(t, svc, code.ID)
+		p := last(t, svc, code.ID)
 		if !slices.ContainsFunc(p.Trace, func(i store.TraceItem) bool { return i.Denied }) {
 			t.Errorf("git commit is not on the code allowlist and should be denied: %+v", p.Trace)
 		}
@@ -452,4 +466,74 @@ func TestAttachments(t *testing.T) {
 		t.Errorf("folder: %v", err)
 	}
 	t.Logf("answer: %s (cost $%.4f)", p.AnswerMD, p.CostUSD)
+}
+
+// Approvals against the real CLI: a command outside the Code profile's
+// allowlist waits on a card; allowed, it runs; denied, the model is told;
+// with a project rule, it runs without asking.
+func TestApprovals(t *testing.T) {
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	v, err := svc.Sessions.Create("code", t.TempDir(), "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ask := func(expr string) {
+		q := `Use the Bash tool to run exactly: node -e "console.log(` + expr + `)" and then reply with only its output, or the word DENIED if it was refused.`
+		if err := svc.Sessions.Send(ctx, v.ID, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	waitCard := func() session.Approval {
+		deadline := time.Now().Add(3 * time.Minute)
+		for time.Now().Before(deadline) {
+			if a := view(svc, v.ID).Approvals; len(a) > 0 {
+				return a[0]
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Fatal("no approval card")
+		return session.Approval{}
+	}
+
+	ask("6*7")
+	a := waitCard()
+	if a.Tool != "Bash" || !strings.Contains(string(a.Input), "node -e") || len(a.Suggestions) == 0 || a.Suggestions[0].Prefix != "node" {
+		t.Fatalf("card = %+v", a)
+	}
+	if view(svc, v.ID).State != session.NeedsApproval {
+		t.Errorf("state = %s", view(svc, v.ID).State)
+	}
+	if err := svc.Sessions.Answer(v.ID, a.RequestID, session.Allow, nil); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, svc, v.ID)
+	if p := last(t, svc, v.ID); !strings.Contains(p.AnswerMD, "42") {
+		t.Errorf("allowed answer = %q", p.AnswerMD)
+	}
+
+	ask("5*5")
+	a = waitCard()
+	if err := svc.Sessions.Answer(v.ID, a.RequestID, session.Deny, nil); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, svc, v.ID)
+	p := last(t, svc, v.ID)
+	if strings.Contains(p.AnswerMD, "25") || !slices.ContainsFunc(p.Trace, func(i store.TraceItem) bool { return i.Denied }) {
+		t.Errorf("denied answer = %q, trace = %+v", p.AnswerMD, p.Trace)
+	}
+
+	if _, err := svc.Sessions.SetRule(v.ID, store.ToolRule{Tool: "Bash", Prefix: "node", Action: store.RuleAllow}); err != nil {
+		t.Fatal(err)
+	}
+	ask("3*3")
+	waitIdle(t, svc, v.ID)
+	if p := last(t, svc, v.ID); !strings.Contains(p.AnswerMD, "9") {
+		t.Errorf("rule-allowed answer = %q", p.AnswerMD)
+	}
+	t.Logf("cost: allowed, denied and ruled turns done")
 }
