@@ -3,6 +3,7 @@ package session
 import (
 	"encoding/json"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"uncli/internal/store"
@@ -198,19 +199,149 @@ func gitClass(args []string) string {
 	return ""
 }
 
+// Commands with several parts. A command line is split at pipes and
+// chains (|, ||, &&, ;) outside quotes, after dropping harmless redirects
+// (2>&1, 2>$null, >/dev/null…). Parts that only filter output (head,
+// Select-Object…) need no rule; every other part must be covered on its
+// own. Anything that substitutes ($( ), backticks), redirects to a file,
+// reads from one or uses braces is never covered, and always asks.
+
+// Output filters: they read what's piped in and print part of it.
+var outputFilters = map[string]bool{
+	"head": true, "tail": true, "grep": true, "egrep": true, "sort": true, "uniq": true, "wc": true, "cut": true,
+	"less": true, "more": true, "cat": true, "findstr": true, "jq": true, "column": true,
+	"select-object": true, "select-string": true, "sort-object": true, "measure-object": true, "group-object": true,
+	"out-string": true, "out-host": true, "format-table": true, "format-list": true, "format-wide": true,
+	"ft": true, "fl": true, "measure": true,
+}
+
+var harmlessRedirect = regexp.MustCompile(`(^|\s)[0-9*]?>&[12](\s|$)|(^|\s)[0-9*]?>\s*(\$null|/dev/null|NUL)(\s|$)`)
+
+// commandParts splits a command line into its parts, or false when it
+// can't be covered by rules at all.
+func commandParts(cmd string) ([]string, bool) {
+	if strings.Contains(cmd, "$(") || strings.ContainsAny(cmd, "`{}") {
+		return nil, false
+	}
+	var parts []string
+	var b strings.Builder
+	var quote rune
+	runes := []rune(cmd)
+	for i := 0; i < len(runes); i++ {
+		c := runes[i]
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+			b.WriteRune(c)
+		case c == '\'' || c == '"':
+			quote = c
+			b.WriteRune(c)
+		case c == '|' || c == ';' || c == '\n' || c == '\r':
+			parts = append(parts, b.String())
+			b.Reset()
+			if c == '|' && i+1 < len(runes) && runes[i+1] == '|' {
+				i++
+			}
+		case c == '&' && i+1 < len(runes) && runes[i+1] == '&':
+			parts = append(parts, b.String())
+			b.Reset()
+			i++
+		default:
+			b.WriteRune(c)
+		}
+	}
+	if quote != 0 {
+		return nil, false
+	}
+	parts = append(parts, b.String())
+	out := parts[:0]
+	for _, p := range parts {
+		p = strings.TrimSpace(harmlessRedirect.ReplaceAllString(p, " "))
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out, len(out) > 0
+}
+
+// mainParts are the words of each part that does real work (not an
+// output filter), or false when the command can't be covered by rules.
+func mainParts(cmd string) ([][]string, bool) {
+	parts, ok := commandParts(cmd)
+	if !ok {
+		return nil, false
+	}
+	var all, main [][]string
+	for _, p := range parts {
+		w, ok := commandWords(p)
+		if !ok {
+			return nil, false
+		}
+		all = append(all, w)
+		if !outputFilters[w[0]] {
+			main = append(main, w)
+		}
+	}
+	if len(main) == 0 {
+		main = all // a filter on its own (grep x file) still needs a rule
+	}
+	return main, true
+}
+
 // ruleMatch is the action of the most specific rule matching a request,
 // or "" when none does (ask).
 func ruleMatch(rules []store.ToolRule, tool string, input json.RawMessage) string {
-	action, _ := ruleScore(rules, tool, input)
+	action, _ := decide(nil, rules, tool, input)
 	return action
 }
 
-// decide picks between the session's rules and the project's: the more
-// specific match wins, and on a tie the session's (the more recent,
-// deliberate choice). It also says where the answer came from.
+// decide answers a request from the session's rules and the project's,
+// or "" (ask). For one thing to check (a tool, or a command with one part
+// doing real work) the more specific match wins, and on a tie the
+// session's, the more recent and deliberate choice. A command with several
+// working parts is allowed only when every part is, and denied when any
+// part is. It also says where the answer came from.
 func decide(sessionRules, projectRules []store.ToolRule, tool string, input json.RawMessage) (action, from string) {
-	sa, ss := ruleScore(sessionRules, tool, input)
-	pa, ps := ruleScore(projectRules, tool, input)
+	if !IsShell(tool) {
+		return pick(sessionRules, projectRules, tool, nil, "")
+	}
+	parts, ok := mainParts(bashCommand(input))
+	if !ok {
+		return "", ""
+	}
+	allowed, asked, by := 0, "", "session"
+	for _, w := range parts {
+		class := ""
+		if w[0] == "git" {
+			class = gitClass(w[1:])
+		}
+		a, f := pick(sessionRules, projectRules, tool, w, class)
+		switch a {
+		case store.RuleDeny:
+			return store.RuleDeny, f
+		case store.RuleAllow:
+			allowed++
+			if f == "rule" {
+				by = "rule"
+			}
+		case store.RuleAsk:
+			asked = f
+		}
+	}
+	switch {
+	case allowed == len(parts):
+		return store.RuleAllow, by
+	case asked != "":
+		return store.RuleAsk, asked
+	}
+	return "", ""
+}
+
+func pick(sessionRules, projectRules []store.ToolRule, tool string, words []string, class string) (string, string) {
+	sa, ss := score(sessionRules, tool, words, class)
+	pa, ps := score(projectRules, tool, words, class)
 	switch {
 	case ss == 0 && ps == 0:
 		return "", ""
@@ -221,46 +352,35 @@ func decide(sessionRules, projectRules []store.ToolRule, tool string, input json
 	}
 }
 
-// ruleScore is the action of the most specific matching rule and how
-// specific it was (0: none matched).
-func ruleScore(rules []store.ToolRule, tool string, input json.RawMessage) (string, int) {
-	var words []string
-	var class string
+// score is the action of the most specific rule matching one tool use (or
+// one part of a command) and how specific it was (0: none matched).
+func score(rules []store.ToolRule, tool string, words []string, class string) (string, int) {
 	shell := IsShell(tool)
-	if shell {
-		w, ok := commandWords(bashCommand(input))
-		if !ok {
-			return "", 0 // only plain commands are covered by rules
-		}
-		words = w
-		if words[0] == "git" {
-			class = gitClass(words[1:])
-		}
-	}
 	best, bestScore := "", 0
 	for _, r := range rules {
 		if r.Tool != tool && !(shell && IsShell(r.Tool)) {
 			continue
 		}
-		score := 0
+		s := 0
 		switch {
 		case r.Prefix == "":
-			score = 1
+			s = 1
+		case !shell:
 		case strings.HasPrefix(r.Prefix, "git:"):
 			if r.Prefix == class {
-				score = 15
+				s = 15
 			}
 		default:
 			p := strings.Fields(r.Prefix)
 			if len(p) <= len(words) && wordsMatch(p, words) {
-				score = 10 * len(p)
+				s = 10 * len(p)
 				if len(p) == 1 {
-					score = 5
+					s = 5
 				}
 			}
 		}
-		if score > bestScore {
-			best, bestScore = r.Action, score
+		if s > bestScore {
+			best, bestScore = r.Action, s
 		}
 	}
 	return best, bestScore
@@ -276,16 +396,19 @@ func wordsMatch(prefix, words []string) bool {
 }
 
 // suggestions are the rules an approval card offers under "Always allow":
-// for a command, the command with its subcommand, its git class and the
-// program (never every command); for other tools, the tool.
+// for a command, its working part with its subcommand, its git class and
+// the program (never every command); for other tools, the tool. A command
+// with more than one working part, or one rules can't cover, gets none:
+// it can only be allowed once.
 func suggestions(tool string, input json.RawMessage) []store.ToolRule {
 	if !IsShell(tool) {
 		return []store.ToolRule{{Tool: tool, Action: store.RuleAllow}}
 	}
-	words, ok := commandWords(bashCommand(input))
-	if !ok {
-		return nil // a compound command can only be allowed once
+	parts, ok := mainParts(bashCommand(input))
+	if !ok || len(parts) != 1 {
+		return nil
 	}
+	words := parts[0]
 	var out []store.ToolRule
 	if len(words) > 1 && subcommandStyle[words[0]] && !strings.HasPrefix(words[1], "-") {
 		out = append(out, store.ToolRule{Tool: tool, Prefix: words[0] + " " + words[1], Action: store.RuleAllow})
