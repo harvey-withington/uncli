@@ -132,6 +132,17 @@ type TextTasker interface {
     ParseTextTask(out []byte) (TextResult, error)
 }
 
+// TranscriptReader (phase 3, optional): an adapter that can list the
+// conversations its CLI has saved and convert one into UNCLI pages, so a
+// conversation from the terminal (or a deleted UNCLI session) can be
+// opened and continued. Each CLI keeps transcripts in its own place and
+// format; the runtime says where to look (the user's home locally, a
+// volume in a container), so the reader never assumes a path.
+type TranscriptReader interface {
+    ListTranscripts(loc TranscriptLocation) ([]TranscriptInfo, error) // id, workdir, started, first question
+    ReadTranscript(loc TranscriptLocation, id string) (Transcript, error) // provider-neutral turns
+}
+
 // Runtime: where the process lives. Phase 1: local. Phase 5: container.
 type Runtime interface {
     ID() string
@@ -290,10 +301,11 @@ type Capabilities struct {
     UsageReporting   bool
     ThinkingEvents   bool
     SlashPassthrough bool
+    Import           bool // implements TranscriptReader (phase 3)
 }
 ```
 
-The Claude adapter at 2.1.285 sets all of these to true. Thinking events carry token estimates rather than text, and slash passthrough covers `/compact`, `/context`, `/cost`, `/model` and `/clear` but not `/help`.
+The Claude adapter at 2.1.285 sets all of these to true (Import once phase 3 lands). Thinking events carry token estimates rather than text, and slash passthrough covers `/compact`, `/context`, `/cost`, `/model` and `/clear` but not `/help`.
 
 ## Data model and config
 
@@ -519,10 +531,14 @@ The goal is that UNCLI replaces the terminal for real work.
 
 ### Phase 3: comfort
 
-- Pins (separate from bookmarks), page search across sessions, session rename and archive, drag to reorder.
+- Pins (separate from bookmarks), page search across sessions, session archive. (Rename and drag to reorder landed early, in phase 1.)
 - **Usage dashboard** from page usage columns: per session, day, model and profile.
 - **Images:** drag and drop or paste into the composer, sent as content blocks (if `Images` capability).
-- **Import:** read existing `~/.claude/projects/*.jsonl` transcripts into UNCLI sessions so terminal sessions can be continued in the GUI.
+- **Import:** read a CLI's saved transcripts into UNCLI sessions so terminal sessions can be continued in the GUI, and a deleted UNCLI session can be restored (the CLI's transcript outlives it). Each adapter that can do this implements the optional `TranscriptReader` and sets the `Import` capability; nothing else in core changes.
+  - **Claude:** `~/.claude/projects/<encoded workdir>/<session id>.jsonl`, one JSON object per line. A user message that isn't a tool result starts a page; the assistant's text blocks make its answer, `tool_use` blocks its trace, and each assistant message's `model` and `usage` its chips. Cost isn't stored, so it is estimated from usage or left blank. Compaction summaries and sidechain (subagent) lines are skipped or folded into the trace.
+  - **The new session** takes the transcript's session id as its provider id and its working directory as the workdir; the profile is guessed (a UNCLI scratch folder means Chat, else Code) and can be changed. Continuing is the ordinary resume (`--resume <id>` from that workdir).
+  - **Risk:** transcript formats are undocumented and change between CLI versions. Record fixtures per pinned version and parse tolerantly: a line the reader doesn't understand is skipped, never an error, the same rule as the stream parser.
+  - **UI:** an Import picker (date, folder, first question, already-imported marked), and "Restore from transcript" offered where a deleted session's transcript still exists.
 - Theme tokens shared with BRUV; command palette; full keyboard map.
 
 ### Phase 4: customisation
@@ -556,7 +572,8 @@ containers:
 
 ### Phase 6: other providers and reach
 
-- **Adapters** for Gemini CLI and Codex CLI (headless JSON modes), each with its own fixtures and capability flags. Modifiers gain optional per-provider text and flag mappings.
+- **Adapters** for Gemini CLI and Codex CLI (headless JSON modes), each with its own fixtures and capability flags (and a `TranscriptReader` each, where the CLI saves transcripts). Modifiers gain optional per-provider text and flag mappings.
+- **Handoff between providers:** "continue this conversation in Gemini". UNCLI's pages are provider-neutral, so any session can be shown under any provider, but a CLI's resume depends on its own private state (tool-call ids, hidden reasoning, server-side caching), so a conversation can't be resumed natively by another CLI, and writing another CLI's transcript format is ruled out as fragile. Instead UNCLI starts a new session with the other provider and seeds it: a summary of the earlier turns from the quick-task model, plus the last few turns verbatim, sent as context with the first message (or appended to the system prompt). The new session links back to the one it continues. Tool results and hidden reasoning don't carry over, and the seed costs tokens once.
 - **Server mode:** replace `bridge` with an HTTP and WebSocket server so the same Svelte UI runs in a browser, a docked IDE webview or a tablet on the Tailscale network.
 - Anything else that turns up, as an adapter, runtime, profile or modifier.
 
