@@ -102,8 +102,13 @@ func TestRuleMatch(t *testing.T) {
 		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleDeny}, {Tool: "Bash", Prefix: GitRead, Action: store.RuleAllow}}, "git log", store.RuleAllow},
 		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleDeny}, {Tool: "Bash", Prefix: GitRead, Action: store.RuleAllow}}, "git push", store.RuleDeny},
 		// Rules never cover compound commands.
-		{[]store.ToolRule{{Tool: "Bash", Action: store.RuleAllow}}, "git status && rm -rf .", ""},
-		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "git log | head", ""},
+		{[]store.ToolRule{{Tool: "Bash", Action: store.RuleAllow}}, "git status && rm -rf .", store.RuleAllow},   // a rule for every command covers chains too
+		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "git status && rm -rf .", ""}, // each working part needs its own rule
+		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}, {Tool: "Bash", Prefix: "rm", Action: store.RuleDeny}}, "git status && rm -rf .", store.RuleDeny},
+		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "git log | head -20", store.RuleAllow}, // head only filters
+		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "git log 2>&1 | tail", store.RuleAllow},
+		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "git log | xargs rm", ""},            // xargs does real work
+		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "git log | Where-Object { $_ }", ""}, // braces run code
 		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "git log > out.txt", ""},
 		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "git log $(rm x)", ""},
 		{[]store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}, "GIT_DIR=x git log", ""},
@@ -166,7 +171,9 @@ func TestPowerShellIsAShell(t *testing.T) {
 		{"PowerShell", "git commit -m x", store.RuleAllow}, // a Bash rule covers PowerShell
 		{"Bash", "npm test", store.RuleAllow},              // and the other way round
 		{"PowerShell", "git push", ""},
-		{"PowerShell", "npm test 2>&1 | Select-Object -Last 40", ""}, // the request from Harvey's code review: piped, so it asks
+		{"PowerShell", "npm test 2>&1 | Select-Object -Last 40", store.RuleAllow}, // Harvey's code review: the npm test rule covers it; Select-Object only filters
+		{"PowerShell", "npm test > out.txt", ""},                                  // a redirect to a file asks
+		{"PowerShell", "npm run build 2>$null; npm test", ""},                     // two working parts, only one covered
 		{"PowerShell", "Test-Path node_modules; Get-Content ci.yml", ""},
 	}
 	for _, c := range cases {
@@ -174,8 +181,11 @@ func TestPowerShellIsAShell(t *testing.T) {
 			t.Errorf("%s %q = %q, want %q", c.tool, c.cmd, got, c.want)
 		}
 	}
-	if s := suggestions("PowerShell", bash("npm test 2>&1 | Select-Object -Last 40")); s != nil {
-		t.Errorf("a piped command can only be allowed once, got %v", s)
+	if s := suggestions("PowerShell", bash("npm test 2>&1 | Select-Object -Last 40")); len(s) != 2 || s[0].Prefix != "npm test" {
+		t.Errorf("a filtered command offers rules for its working part, got %v", s)
+	}
+	if s := suggestions("PowerShell", bash("Test-Path node_modules; Get-Content ci.yml")); s != nil {
+		t.Errorf("two working parts can only be allowed once, got %v", s)
 	}
 	got := suggestions("PowerShell", bash("npm test"))
 	if len(got) != 2 || got[0].Prefix != "npm test" || got[1].Prefix != "npm" {
@@ -184,6 +194,27 @@ func TestPowerShellIsAShell(t *testing.T) {
 	for _, r := range got {
 		if r.Prefix == "" {
 			t.Error("a shell card must never offer every command")
+		}
+	}
+}
+
+func TestCommandParts(t *testing.T) {
+	cases := map[string]string{
+		`git commit -m "a | b; c && d"`:               `git commit -m "a | b; c && d"`, // quoted: one part
+		"npm test 2>&1 | Select-Object -Last 40":      "npm test · Select-Object -Last 40",
+		"go build ./... 2>/dev/null && go test ./...": "go build ./... · go test ./...",
+		"npm run build 2>$null; npm test":             "npm run build · npm test",
+		"a || b":                                      "a · b",
+	}
+	for in, want := range cases {
+		got, ok := commandParts(in)
+		if !ok || strings.Join(got, " · ") != want {
+			t.Errorf("%q = %q (%v), want %q", in, strings.Join(got, " · "), ok, want)
+		}
+	}
+	for _, in := range []string{"echo $(rm x)", "echo `rm x`", `echo "unclosed`, "ls | % { rm $_ }"} {
+		if _, ok := commandParts(in); ok {
+			t.Errorf("%q must not be coverable", in)
 		}
 	}
 }

@@ -70,6 +70,9 @@
         </select>
       </span>
     {/if}
+    {#if approval.suggestions.length === 0}
+      <span class="once">{t('approval.onceOnly')}</span>
+    {/if}
     <button class="btn small deny" onclick={() => answer('deny')} disabled={busy}>{t('approval.deny')}</button>
   </div>
 </div>
@@ -163,6 +166,10 @@
     font-size: var(--text-xs);
   }
   .scope-one {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+  .once {
     font-size: var(--text-xs);
     color: var(--text-muted);
   }

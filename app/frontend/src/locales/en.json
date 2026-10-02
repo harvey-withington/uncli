@@ -241,7 +241,7 @@
   "rules.toolLabel": "Tool name",
   "rules.addAction": "What to do",
   "rules.add": "Add",
-  "rules.hint": "The most specific rule wins: a command (git push), then a kind of git command, then a program (git), then the whole tool. Commands that chain or pipe always ask.",
+  "rules.hint": "The most specific rule wins: a command (git push), then a kind of git command, then a program (git), then the whole tool. A command with several parts is allowed only when every part is; output filters like Select-Object or head need no rule, and anything with , backticks, braces or file redirects always asks.",
   "trace.allowedByYou": "allowed by you",
   "trace.allowedByRule": "allowed by a rule",
   "trace.showOutput": "output",
@@ -252,5 +252,6 @@
   "trace.allowedForSession": "allowed for this session",
   "rules.thisSession": "This session",
   "rules.thisProject": "This project",
-  "rules.makePermanent": "Make permanent"
+  "rules.makePermanent": "Make permanent",
+  "approval.onceOnly": "This does several things, so it can only be allowed once. Rules for each part still apply."
 }
