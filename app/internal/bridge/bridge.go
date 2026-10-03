@@ -152,6 +152,12 @@ func (a *App) AnswerApproval(sessionID, requestID, decision string, rule *store.
 	return a.svc.Sessions.Answer(sessionID, requestID, decision, rule)
 }
 
+// SetUnattended turns a session's unattended mode on or off: requests that
+// would wait for the user are declined with a note to the model.
+func (a *App) SetUnattended(sessionID string, on bool) (session.View, error) {
+	return a.svc.Sessions.SetUnattended(sessionID, on)
+}
+
 // SessionToolRules lists a session's own rules (until UNCLI quits).
 func (a *App) SessionToolRules(sessionID string) ([]store.ToolRule, error) {
 	return a.svc.Sessions.SessionRules(sessionID)

@@ -94,7 +94,7 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `SearchPanel` | `results?` | The search box under New session (Ctrl+K) with filters for type, bookmarked, this session and date; while it has text, the sidebar shows grouped results (`results` mode) instead of sessions. Snippets come with \x01/\x02 markers, never HTML. Opening a result selects the page and scrolls to the first matching block, which flashes (`.search-flash`) |
 | `Sidebar` / `SessionItem` | — / `session`, `active` | Drag to reorder (or Alt+↑ / Alt+↓); type icon and active stripe in the type's colour; double-click or pencil renames; trash confirms then deletes |
 | `NewSessionDialog` | none | Profile cards, folder picker for co-work and code, model select. Opens on the welcome card clicked, else the last type used; each type starts from its last model and folder (remembered in the app database) |
-| `SessionPane` | `session` | Header, toolbar, current page, nav bar, composer |
+| `SessionPane` | `session` | Header, toolbar, current page, nav bar, composer. The header's Unattended toggle (coffee icon, `aria-pressed`, warning tint when on) declines whatever would ask the user; while on, a status line under the folder says so |
 | `Toolbar` | `session` | Rendered from `toolbar.yaml`: model picker, modifier toggles (groups exclusive), slash and native items |
 | `UsagePopover` | `usage`, `onclose` | Subscription windows from `EvUsageLimit` |
 | `PageView` | `page` | Sticky question with copy, the files sent with it (`q-files`), streamed answer, banners, trace, chips. A chevron collapses the question to compact mode: one line, the question left (ellipsis when short of room) and the page number right, never cut, then copy and the chevron; kept in localStorage |

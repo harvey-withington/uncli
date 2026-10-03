@@ -62,6 +62,7 @@ export function wailsBackend(): Backend {
     describeAttachments: p => call('DescribeAttachments', p),
     search: q => call('Search', q),
     answerApproval: (s, r, d, rule) => call('AnswerApproval', s, r, d, rule ?? null),
+    setUnattended: (s, on) => call('SetUnattended', s, on),
     toolRules: s => call('ToolRules', s),
     sessionToolRules: s => call('SessionToolRules', s),
     deleteSessionToolRule: (s, r) => call('DeleteSessionToolRule', s, r),

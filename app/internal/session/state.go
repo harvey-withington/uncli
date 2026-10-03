@@ -29,6 +29,8 @@ type View struct {
 	Error   string `json:"error,omitempty"`
 	// Approvals are tool uses waiting for the user's answer, oldest first.
 	Approvals []Approval `json:"approvals"`
+	// Unattended: requests that would wait for the user are declined.
+	Unattended bool `json:"unattended"`
 }
 
 // Sink receives everything the UI needs. Implementations must not call

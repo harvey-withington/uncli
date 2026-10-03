@@ -3,6 +3,7 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
+  import { showToast } from '../lib/toasts.svelte'
   import { blockMatching } from '../lib/search'
   import ApprovalCard from './ApprovalCard.svelte'
   import ActivityBadge from './ActivityBadge.svelte'
@@ -22,6 +23,16 @@
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   const page = $derived(app.currentPage)
   let scroller: HTMLElement | undefined = $state()
+
+  // Unattended: rules still apply, but anything that would wait for the
+  // user is declined, and Claude is told the user is away.
+  async function toggleUnattended() {
+    try {
+      app.upsertSession(await app.backend.setUnattended(session.id, !session.unattended))
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
+  }
 
   // A different page starts at the top.
   $effect(() => {
@@ -59,7 +70,16 @@
       <h1 title={session.title}>{session.title || t('session.untitled')}</h1>
       <ActivityBadge state={session.state} />
       <button
-        class="btn ghost small icon rules-btn"
+        class="btn ghost small away-btn"
+        class:on={session.unattended}
+        onclick={toggleUnattended}
+        aria-pressed={!!session.unattended}
+        title={t('unattended.hint')}
+      >
+        <Icon name="coffee" size={15} />{t('unattended.label')}
+      </button>
+      <button
+        class="btn ghost small icon"
         onclick={() => (app.permissionsOpen = true)}
         aria-label={t('rules.open')}
         title={t('rules.open')}
@@ -77,6 +97,9 @@
       </button>
     </div>
     <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}</span>
+    {#if session.unattended}
+      <p class="away" role="status"><Icon name="coffee" size={14} />{t('unattended.on')}</p>
+    {/if}
     <Toolbar {session} />
     {#if session.error && session.state === 'error'}
       <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>
@@ -230,8 +253,22 @@
   .dock :global(.navbar) {
     transform: translateY(-50%);
   }
-  .rules-btn {
+  .away-btn {
     margin-left: auto;
+    gap: 6px;
+    color: var(--text-muted);
+  }
+  .away-btn.on {
+    background: var(--warning-soft);
+    color: var(--warning);
+  }
+  .away {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 0 38px;
+    font-size: var(--text-xs);
+    color: var(--warning);
   }
   /* Approval cards sit just above the page controls, over the end of the
      answer, so they're in view whatever page is showing. */

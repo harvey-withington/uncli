@@ -289,3 +289,97 @@ func TestDecidePrecedence(t *testing.T) {
 		t.Errorf("no rules = %s %s", a, from)
 	}
 }
+
+// Unattended: rules still answer, but whatever would wait for the user is
+// declined with a note to the model, and the model is told when the mode
+// changes.
+func TestUnattended(t *testing.T) {
+	h := newHarness(t, "perm-stdio-allow")
+	h.rt.onControl = true
+	write := map[string]string{"file_path": "a.txt", "content": "a"}
+	chained := map[string]string{"command": "npm test && git push"}
+	question := map[string]any{"questions": []any{map[string]any{"question": "Which one?"}}}
+	h.rt.turns = [][]byte{
+		// Turn 1: a card is waiting when the user walks away.
+		seg(toolUseLine("toolu_1", "Write", write), askLine("req_1", "toolu_1", "Write", write)),
+		seg(toolResultLine("toolu_1", unattendedDeclined, true), scriptedResult),
+		// Turn 2: a rule allows the write; the chained command and the question are declined.
+		seg(toolUseLine("toolu_2", "Write", write), askLine("req_2", "toolu_2", "Write", write)),
+		seg(toolResultLine("toolu_2", "ok", false), toolUseLine("toolu_3", "Bash", chained), askLine("req_3", "toolu_3", "Bash", chained)),
+		seg(toolResultLine("toolu_3", unattendedDeclined, true), toolUseLine("toolu_4", "AskUserQuestion", question), askLine("req_4", "toolu_4", "AskUserQuestion", question)),
+		seg(toolResultLine("toolu_4", unattendedQuestion, true), scriptedResult),
+		seg(scriptedResult), // turn 3
+		seg(scriptedResult), // turn 4
+	}
+	v, _ := h.m.Create("code", t.TempDir(), "")
+	s, _ := h.m.get(v.ID)
+	h.m.Send(context.Background(), v.ID, "write")
+	waitUntil(t, "the request", func() bool { return len(s.View().Approvals) == 1 })
+
+	// Turning it on declines the waiting card.
+	view, err := h.m.SetUnattended(v.ID, true)
+	if err != nil || !view.Unattended || len(view.Approvals) != 0 {
+		t.Fatalf("view = %+v, %v", view, err)
+	}
+	if c := lastControl(h); c["behavior"] != "deny" || c["request_id"] != "req_1" || c["message"] != unattendedDeclined {
+		t.Errorf("waiting card answer = %v", c)
+	}
+	pages := h.waitIdle(v.ID)
+	if !pages[len(pages)-1].Trace[0].Denied {
+		t.Errorf("trace = %+v", pages[len(pages)-1].Trace)
+	}
+
+	// Turn 2: told it's unattended; rules still apply; nothing waits.
+	h.m.SetRule(v.ID, store.ToolRule{Tool: "Write", Action: store.RuleAllow})
+	h.m.Send(context.Background(), v.ID, "carry on")
+	pages = h.waitIdle(v.ID)
+	answers := map[string]string{}
+	for _, l := range h.rt.lines() {
+		for _, id := range []string{"req_2", "req_3", "req_4"} {
+			if strings.Contains(l, id) {
+				answers[id] = l
+			}
+		}
+	}
+	if !strings.Contains(answers["req_2"], `"behavior":"allow"`) {
+		t.Errorf("the rule should still allow the write: %s", answers["req_2"])
+	}
+	if !strings.Contains(answers["req_3"], `"behavior":"deny"`) || !strings.Contains(answers["req_3"], "separate commands") {
+		t.Errorf("chained command answer = %s", answers["req_3"])
+	}
+	if !strings.Contains(answers["req_4"], `"behavior":"deny"`) || !strings.Contains(answers["req_4"], "can't answer questions") {
+		t.Errorf("question answer = %s", answers["req_4"])
+	}
+	if p := pages[len(pages)-1]; p.Status != "done" || p.Trace[0].Approved != "rule" || !p.Trace[1].Denied || !p.Trace[2].Denied {
+		t.Errorf("turn 2 = %s %+v", p.Status, p.Trace)
+	}
+
+	// Turn 3 says nothing new; turn 4, after switching off, says it's off.
+	h.m.Send(context.Background(), v.ID, "more")
+	h.waitIdle(v.ID)
+	h.m.SetUnattended(v.ID, false)
+	h.m.Send(context.Background(), v.ID, "back")
+	h.waitIdle(v.ID)
+	if told := toldPerTurn(h); told != "-,on,-,off" {
+		t.Errorf("directives per turn = %v", told)
+	}
+}
+
+// toldPerTurn is what each turn sent told the model about unattended mode.
+func toldPerTurn(h *harness) string {
+	var told []string
+	for _, l := range h.rt.lines() {
+		if !strings.Contains(l, `"type":"user"`) {
+			continue
+		}
+		switch {
+		case strings.Contains(l, "Unattended mode is on"):
+			told = append(told, "on")
+		case strings.Contains(l, "Unattended mode is off"):
+			told = append(told, "off")
+		default:
+			told = append(told, "-")
+		}
+	}
+	return strings.Join(told, ",")
+}

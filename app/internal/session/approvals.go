@@ -15,6 +15,10 @@ import (
 // otherwise the session keeps it until the user answers on its card
 // (Allow, Always allow…, Deny). Whatever is still waiting when the turn is
 // stopped is denied.
+//
+// Unattended mode is for when the user walks away: rules still answer
+// first, but anything that would wait for the user is declined at once,
+// with a message telling the model why and how to carry on without it.
 
 // Approval is a tool use waiting for the user's answer.
 type Approval struct {
@@ -38,7 +42,34 @@ const (
 const (
 	deniedByUser = "Denied by the user in UNCLI."
 	deniedByRule = "Denied by a rule for this project in UNCLI."
+
+	unattendedDeclined = "Declined automatically: the user is away (UNCLI unattended mode) and no rule allows this. " +
+		"Don't retry it as it is. Use tools and commands that are already allowed; run chained or piped commands " +
+		"as separate commands, since each part needs a rule of its own. If the task can't be finished without " +
+		"this, finish what you can and list what still needs the user at the end of your answer."
+	unattendedQuestion = "The user is away (UNCLI unattended mode) and can't answer questions. Make the most " +
+		"reasonable choice yourself, carry on, and say at the end of your answer which choices you made."
+	unattendedPlan = "The user is away (UNCLI unattended mode) and can't approve a plan. Give the plan in your " +
+		"answer and stop there; the user will review it when they're back."
+
+	// Told to the model at the start of a turn when the mode has changed.
+	unattendedOn = "Unattended mode is on: the user is away. Any tool use or command that would need their " +
+		"approval is declined automatically, and questions to them can't be answered. Prefer tools and commands " +
+		"that are already allowed, run chained or piped commands as separate commands, make reasonable choices " +
+		"yourself, and end your answer with what you decided and anything that still needs the user."
+	unattendedOff = "Unattended mode is off: the user is back and can approve tool uses and answer questions again."
 )
+
+// unattendedMessage is the reason given for a request declined in unattended mode.
+func unattendedMessage(tool string) string {
+	switch tool {
+	case "AskUserQuestion":
+		return unattendedQuestion
+	case "ExitPlanMode":
+		return unattendedPlan
+	}
+	return unattendedDeclined
+}
 
 func bashCommand(input json.RawMessage) string {
 	var in struct {
@@ -64,6 +95,11 @@ func (s *Session) askLocked(a core.ApprovalAsked) bool {
 		return false
 	case store.RuleDeny:
 		_ = s.replyLocked(a.RequestID, false, nil, deniedByRule)
+		s.markDeniedLocked(a.ToolUseID)
+		return false
+	}
+	if s.unattended {
+		_ = s.replyLocked(a.RequestID, false, nil, unattendedMessage(a.Tool))
 		s.markDeniedLocked(a.ToolUseID)
 		return false
 	}
@@ -120,15 +156,49 @@ func (s *Session) Answer(requestID, decision string, rule *store.ToolRule) error
 	} else {
 		s.markDeniedLocked(a.ToolUseID)
 	}
-	// Still waiting on others, or back to work.
+	s.resumeLocked()
+	s.changed()
+	return nil
+}
+
+// resumeLocked goes back to work once nothing waits for the user.
+func (s *Session) resumeLocked() {
 	if len(s.pending) == 0 && s.state == NeedsApproval {
 		s.state = Thinking
 		if s.runningTools > 0 {
 			s.state = RunningTools
 		}
 	}
+}
+
+// SetUnattended turns unattended mode on or off. Turning it on declines
+// whatever is already waiting, so the user can walk away from a card.
+func (s *Session) SetUnattended(on bool) View {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.unattended = on
+	if on {
+		for _, a := range s.pending {
+			_ = s.replyLocked(a.RequestID, false, nil, unattendedMessage(a.Tool))
+			s.markDeniedLocked(a.ToolUseID)
+		}
+		s.pending = nil
+		s.resumeLocked()
+	}
 	s.changed()
-	return nil
+	return s.viewLocked()
+}
+
+// unattendedDirective is what the next turn tells the model about the
+// mode, when it has changed since the model was last told. Caller holds s.mu.
+func (s *Session) unattendedDirective() []string {
+	if s.unattended == s.toldUnattended {
+		return nil
+	}
+	if s.unattended {
+		return []string{unattendedOn}
+	}
+	return []string{unattendedOff}
 }
 
 // SessionRules are the rules for this session only, kept until UNCLI quits.
