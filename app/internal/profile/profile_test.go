@@ -115,6 +115,9 @@ func TestRenderDirectives(t *testing.T) {
 	if !strings.Contains(got, `"Efficiency Mode" instruction no longer applies`) {
 		t.Errorf("switched off = %q", got)
 	}
+	if got := s.RenderDirectives("sonnet", nil, nil, "The user is away."); got != "<session_directives>\n- The user is away.\n</session_directives>" {
+		t.Errorf("extra lines = %q", got)
+	}
 	for _, model := range []string{"haiku", "claude-haiku-4-5-20251001"} {
 		if got := s.RenderDirectives(model, []string{"use-agents"}, nil); !strings.Contains(got, "Keep each delegation brief") {
 			t.Errorf("%s should get the haiku text: %q", model, got)

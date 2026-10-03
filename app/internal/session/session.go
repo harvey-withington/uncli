@@ -41,6 +41,10 @@ type Session struct {
 	lastSeq      int
 	pending      []Approval       // tool uses waiting for the user's answer
 	sessionRules []store.ToolRule // "for this session" rules, in memory only
+	// Unattended: anything that would wait for the user is declined
+	// (approvals.go). In memory only, so it's off after a restart.
+	unattended     bool
+	toldUnattended bool // what the model was last told about it
 }
 
 func newSession(m *Manager, rec store.Session) *Session {
@@ -60,7 +64,7 @@ func (s *Session) View() View {
 
 func (s *Session) viewLocked() View {
 	return View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err,
-		Approvals: append([]Approval{}, s.pending...)}
+		Approvals: append([]Approval{}, s.pending...), Unattended: s.unattended}
 }
 
 func (s *Session) changed() { s.m.d.Sink.SessionChanged(s.viewLocked()) }
@@ -189,7 +193,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		}
 	}
 
-	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods)
+	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods, s.unattendedDirective()...)
 	caps := s.m.d.Adapter.Capabilities()
 	for _, f := range files {
 		if strings.HasPrefix(f.MediaType, "image/") && !caps.Images || !strings.HasPrefix(f.MediaType, "image/") && !caps.Documents {
@@ -226,6 +230,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		s.stopLocked()
 		return err
 	}
+	s.toldUnattended = s.unattended
 	if s.state != Starting {
 		s.state = Thinking
 	}

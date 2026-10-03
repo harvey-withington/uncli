@@ -13,6 +13,7 @@
   import ChevronsRight from 'lucide-svelte/icons/chevrons-right'
   import CircleAlert from 'lucide-svelte/icons/circle-alert'
   import Code from 'lucide-svelte/icons/code'
+  import Coffee from 'lucide-svelte/icons/coffee'
   import Copy from 'lucide-svelte/icons/copy'
   import Download from 'lucide-svelte/icons/download'
   import File from 'lucide-svelte/icons/file'
@@ -60,7 +61,7 @@
   const ICONS = {
     'arrow-up': ArrowUp, 'bar-chart': BarChart, bookmark: Bookmark, 'bookmark-check': BookmarkCheck,
     briefcase: Briefcase, check: Check, 'chevron-down': ChevronDown, 'chevron-up': ChevronUp, 'chevron-left': ChevronLeft, 'chevron-right': ChevronRight,
-    'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code,
+    'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code, coffee: Coffee,
     copy: Copy, download: Download, file: File, 'file-text': FileText, image: ImageIcon, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,
     'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,
     plus: Plus, play: Play, rewind: Rewind, search: Search, shield: Shield, 'fast-forward': FastForward, settings: Settings, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,

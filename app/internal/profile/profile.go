@@ -251,8 +251,9 @@ func textFor(m Modifier, model string) string {
 
 // RenderDirectives builds the hidden block sent before the user's text. It
 // restates every active turn-scope modifier, and says when one switched off
-// since the previous turn no longer applies. Empty when there is nothing to say.
-func (s *Set) RenderDirectives(model string, active, previous []string) string {
+// since the previous turn no longer applies, then any extra lines the
+// session adds. Empty when there is nothing to say.
+func (s *Set) RenderDirectives(model string, active, previous []string, extra ...string) string {
 	var lines []string
 	for _, id := range active {
 		m, ok := s.Modifier(id)
@@ -270,6 +271,9 @@ func (s *Set) RenderDirectives(model string, active, previous []string) string {
 		if m, ok := s.Modifier(id); ok && m.Scope != "system" {
 			lines = append(lines, fmt.Sprintf("- The earlier %q instruction no longer applies; answer as you normally would.", m.Label))
 		}
+	}
+	for _, t := range extra {
+		lines = append(lines, "- "+t)
 	}
 	if len(lines) == 0 {
 		return ""

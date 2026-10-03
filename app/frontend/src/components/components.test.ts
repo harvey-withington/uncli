@@ -495,6 +495,26 @@ describe('Approvals', () => {
     expect(await screen.findByText(/Pushed/, {}, { timeout: 3000 })).toBeInTheDocument()
   })
 
+  it('Unattended declines a waiting card and the next request without asking', async () => {
+    const backend = mockBackend()
+    const answer = vi.spyOn(backend, 'answerApproval')
+    render(App, { props: { backend } })
+    await ask('push')
+    await screen.findByRole('alertdialog', {}, { timeout: 2000 })
+    const away = screen.getByRole('button', { name: 'Unattended' })
+    expect(away).toHaveAttribute('aria-pressed', 'false')
+    await fireEvent.click(away)
+    await waitFor(() => expect(card()).toBeNull())
+    expect(away).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText(/anything that would ask you is declined automatically/)).toBeInTheDocument()
+    expect(await screen.findByText(/you're away, so the push was declined/, {}, { timeout: 3000 })).toBeInTheDocument()
+    await ask('push again')
+    expect(await screen.findByText('Page 3', { selector: '.seq' }, { timeout: 3000 })).toBeInTheDocument()
+    expect(await screen.findByText(/you're away, so the push was declined/, {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(card()).toBeNull()
+    expect(answer).not.toHaveBeenCalled()
+  })
+
   it('Deny tells Claude no', async () => {
     render(App, { props: { backend: mockBackend() } })
     await ask('push it')

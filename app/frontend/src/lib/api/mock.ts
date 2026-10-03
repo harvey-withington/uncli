@@ -171,9 +171,9 @@ function session(id: string, profileId: string, title: string, state: ActivitySt
   }
 }
 
-export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
+export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; unattended?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
-    session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3 }),
+    session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended }),
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2 }),
     session('s-cowork', 'cowork', 'Summarise the Q3 planning notes', 'idle', { modifiers: ['efficiency'], sortOrder: 1 }),
   ]
@@ -311,16 +311,24 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
           ]
           const ruled = [...(sessionRules[s.id] ?? []), ...(rules[s.workdir] ?? [])].find(r => r.tool === 'Bash' && suggestions.some(x => x.prefix === r.prefix))
           let allowed = ruled?.action === 'allow'
+          let away = false
           if (!ruled || ruled.action === 'ask') {
-            const requestId = `req_${++requestSeq}`
-            s.approvals = [...(s.approvals ?? []), {
-              requestId, tool: 'Bash', input: { command: 'git push origin main', description: 'Push the branch to origin' },
-              toolUseId: `toolu_${requestSeq}`, suggestions, askedAt: Date.now(),
-            }]
-            setState(s, 'needs_approval')
-            allowed = await new Promise<boolean>(resolve => approvalWaits.set(requestId, resolve))
+            if (s.unattended) {
+              away = true // declined at once, as the real backend does
+            } else {
+              const requestId = `req_${++requestSeq}`
+              s.approvals = [...(s.approvals ?? []), {
+                requestId, tool: 'Bash', input: { command: 'git push origin main', description: 'Push the branch to origin' },
+                toolUseId: `toolu_${requestSeq}`, suggestions, askedAt: Date.now(),
+              }]
+              setState(s, 'needs_approval')
+              allowed = await new Promise<boolean>(resolve => approvalWaits.set(requestId, resolve))
+              away = !allowed && !!s.unattended
+            }
           }
-          answer = allowed ? 'Pushed **main** to origin.' : "I didn't push: the push was denied. The commit is still local."
+          answer = allowed ? 'Pushed **main** to origin.'
+            : away ? "I didn't push: you're away, so the push was declined. The commit is still local."
+            : "I didn't push: the push was denied. The commit is still local."
         }
         const words = answer.split(/(?<=\s)/)
         const ts: number[] = []
@@ -397,6 +405,19 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; l
       if (s.approvals.length === 0) setState(s, 'running_tools')
       else changed(s)
       approvalWaits.get(rid)?.(decision !== 'deny')
+    },
+    async setUnattended(sid, on) {
+      const s = find(sid)
+      s.unattended = on
+      if (on) {
+        // Whatever is waiting is declined, as the real backend does.
+        const waiting = s.approvals ?? []
+        s.approvals = []
+        if (waiting.length) setState(s, 'running_tools')
+        waiting.forEach(a => approvalWaits.get(a.requestId)?.(false))
+      }
+      changed(s)
+      return { ...s }
     },
     async toolRules(sid) { return [...(rules[find(sid).workdir] ?? [])] },
     async sessionToolRules(sid) { return [...(sessionRules[sid] ?? [])] },

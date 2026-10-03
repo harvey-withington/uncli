@@ -165,6 +165,15 @@ func (m *Manager) Answer(id, requestID, decision string, rule *store.ToolRule) e
 	return s.Answer(requestID, decision, rule)
 }
 
+// SetUnattended turns a session's unattended mode on or off.
+func (m *Manager) SetUnattended(id string, on bool) (View, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return View{}, err
+	}
+	return s.SetUnattended(on), nil
+}
+
 // SessionRules lists a session's own rules (kept until UNCLI quits).
 func (m *Manager) SessionRules(id string) ([]store.ToolRule, error) {
 	s, err := m.get(id)

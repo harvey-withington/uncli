@@ -32,6 +32,7 @@ export interface SessionView {
   busy: boolean
   error?: string
   approvals?: Approval[] // tool uses waiting for the user, oldest first
+  unattended?: boolean // requests that would wait for the user are declined
 }
 
 export interface TraceItem {
@@ -376,6 +377,7 @@ export interface Backend {
   describeAttachments(paths: string[]): Promise<AttachmentInfo[]>
   search(q: SearchQuery): Promise<SearchResult>
   answerApproval(sessionId: string, requestId: string, decision: ApprovalDecision, rule?: ToolRule): Promise<void>
+  setUnattended(sessionId: string, on: boolean): Promise<SessionView>
   toolRules(sessionId: string): Promise<ToolRule[]>
   sessionToolRules(sessionId: string): Promise<ToolRule[]>
   deleteSessionToolRule(sessionId: string, rule: ToolRule): Promise<ToolRule[]>
