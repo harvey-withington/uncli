@@ -119,3 +119,49 @@ func TestJudgements(t *testing.T) {
 		t.Errorf("judgement = %+v, %v", j, ok)
 	}
 }
+
+// A label is the user's own name for an entry: kept through verdict
+// changes, re-teaching from a card and moves, and cleared on request.
+func TestSafeLabels(t *testing.T) {
+	s := searchStore(t)
+	dir := `C:\work\site`
+	e := SafeEntry{Kind: KindCommand, Words: "npm run ship", Verdict: Unsafe, Folder: dir}
+	if err := s.SetSafeEntry(e); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetSafeLabel(e, " Deploys the site "); err != nil {
+		t.Fatal(err)
+	}
+	label := func() string {
+		list, _ := s.SafeList(dir)
+		for _, x := range list {
+			if x.Words == "npm run ship" {
+				return x.Label
+			}
+		}
+		return "(gone)"
+	}
+	if got := label(); got != "Deploys the site" {
+		t.Errorf("label = %q", got)
+	}
+	e.Verdict = Blocked // a verdict change from Settings, or teaching from a card, carries no label
+	s.SetSafeEntry(e)
+	if got := label(); got != "Deploys the site" {
+		t.Errorf("after a verdict change: %q", got)
+	}
+	e.Label = "Deploys the site"
+	if err := s.MoveSafeEntry(e, ""); err != nil {
+		t.Fatal(err)
+	}
+	e.Folder = ""
+	if got := label(); got != "Deploys the site" {
+		t.Errorf("after a move: %q", got)
+	}
+	s.SetSafeLabel(e, "")
+	if got := label(); got != "" {
+		t.Errorf("cleared: %q", got)
+	}
+	if err := s.SetSafeLabel(SafeEntry{Kind: KindCommand, Words: "nothing"}, "x"); err == nil {
+		t.Error("labelling a missing entry must fail")
+	}
+}

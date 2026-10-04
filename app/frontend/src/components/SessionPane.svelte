@@ -25,6 +25,24 @@
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   const page = $derived(app.currentPage)
   let scroller: HTMLElement | undefined = $state()
+  // The approval cards fade out under the page controls only while there is
+  // more of them below; a card that fits doesn't fade.
+  let approvalsEl: HTMLElement | undefined = $state()
+  let moreBelow = $state(false)
+  function measureApprovals() {
+    const el = approvalsEl
+    moreBelow = !!el && el.scrollHeight - el.scrollTop - el.clientHeight > 2
+  }
+  $effect(() => {
+    const el = approvalsEl
+    void cards.length // look again when cards come and go
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measureApprovals)
+    ro.observe(el)
+    for (const child of el.children) ro.observe(child)
+    measureApprovals()
+    return () => ro.disconnect()
+  })
   // Requests the quick-task model is still judging wait without a card.
   const cards = $derived((session.approvals ?? []).filter(a => !a.judging))
   const checking = $derived((session.approvals ?? []).some(a => a.judging))
@@ -130,7 +148,7 @@
         </div>
       </div>
       {#if cards.length || checking}
-        <div class="approvals">
+        <div class="approvals" class:more-below={moreBelow} bind:this={approvalsEl} onscroll={measureApprovals}>
           {#each cards as a (a.requestId)}
             <ApprovalCard {session} approval={a} />
           {/each}
@@ -252,7 +270,7 @@
      centred on it, half above and half below. */
   .dock {
     position: relative;
-    z-index: 4;
+    z-index: 6; /* above the approval cards, which fade out beneath it */
     height: 0;
     display: flex;
     align-items: flex-start; /* don't squash the pill to the row's zero height */
@@ -273,14 +291,27 @@
     color: var(--warning);
   }
   /* Approval cards sit just above the page controls, over the end of the
-     answer, so they're in view whatever page is showing. */
+     answer, so they're in view whatever page is showing. Like the answer,
+     they fade out beneath the page controls; the bottom padding leaves the
+     last card's buttons clear of them when scrolled to the end. */
   .approvals {
     position: relative;
     z-index: 5;
     max-height: 55%;
     overflow-y: auto;
-    padding: var(--space-2) var(--space-6) var(--space-5);
+    padding: var(--space-2) var(--space-6) calc(18px + var(--space-4));
     margin-top: calc(-1 * var(--space-4));
+  }
+  .approvals.more-below::after {
+    content: "";
+    position: sticky;
+    bottom: calc(-18px - var(--space-4)); /* to the panel's bottom edge, through the padding */
+    z-index: 1;
+    display: block;
+    height: 40px;
+    margin-top: -40px;
+    background: linear-gradient(to bottom, transparent, var(--bg) 85%);
+    pointer-events: none;
   }
   .checking {
     display: flex;

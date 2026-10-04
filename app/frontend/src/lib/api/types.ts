@@ -95,6 +95,7 @@ export interface SafeClass {
 export interface SafeEntry extends SafeClass {
   verdict: Verdict
   folder?: string // the project it belongs to; absent for all projects
+  label?: string // the user's own name for it ("Deploys the site")
 }
 // Where an entry applies: this session's project, or all projects.
 export type Scope = 'project' | 'all'
@@ -185,6 +186,8 @@ export interface Approval {
   class?: ToolClassView // what UNCLI takes it to do
   why?: TraceReason[] // what each part does, and why it needs the user
   judging?: boolean // the quick-task model is judging it: no card yet
+  marked?: boolean // "This is safe" is on: its classes are on the safe list, and it waits for Allow once or Deny
+  markedScope?: Scope
   askedAt: number
 }
 
@@ -307,11 +310,11 @@ export interface Preferences {
   decisionModel?: DecisionModel // answers "is this safe?"; the quick-task model unless set
 }
 
-// The app-level decision model (decision record 0006). Only the quick-task
-// model for now; a calibrated decider (Jev, Kev) adds an endpoint and a
-// pinned version, and the threshold says how sure "safe" must be.
+// The app-level decision model (decision record 0006): the quick-task
+// model, or a System One server (Kev, Jev) with its address, model and
+// pinned version; the threshold says how sure "safe" must be.
 export interface DecisionModel {
-  provider: 'quick-task' | string
+  provider: 'quick-task' | 'systemone'
   endpoint?: string
   model?: string
   version?: string
@@ -470,6 +473,8 @@ export interface Backend {
   setSafeEntry(sessionId: string, entry: SafeEntry, scope: Scope): Promise<SafeEntry[]>
   deleteSafeEntry(sessionId: string, entry: SafeEntry): Promise<SafeEntry[]>
   moveSafeEntry(sessionId: string, entry: SafeEntry, scope: Scope): Promise<SafeEntry[]>
+  setSafeLabel(sessionId: string, entry: SafeEntry, label: string): Promise<SafeEntry[]> // empty clears it
+  markSafe(sessionId: string, requestId: string, on: boolean, scope: Scope): Promise<void> // the "This is safe" toggle on a card
   teach(sessionId: string, classes: SafeClass[], verdict: Verdict, scope: Scope): Promise<void>
   previewClasses(sessionId: string, command: string): Promise<ClassPreview[]>
   knownTools(sessionId: string): Promise<string[]>
@@ -479,10 +484,26 @@ export interface Backend {
   setBookmark(sessionId: string, pageId: string, on: boolean): Promise<Page>
   focus(sessionId: string): Promise<void>
   setPreferences(p: Preferences): Promise<Preferences>
+  setDecisionKey(key: string): Promise<void> // the decision model's API key; never read back
+  hasDecisionKey(): Promise<boolean>
+  testDecisionModel(): Promise<DecisionTest> // a sample question to the decision model
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   openFolder(path: string): Promise<void>
   openURL(url: string): Promise<void>
   copyText(text: string): Promise<void>
   clipboardFiles(): Promise<string[]> // full paths of files copied in the file manager; [] if none
+}
+
+// What the decision model said about a sample command.
+export interface DecisionTest {
+  decider: string // which one answered, with its model and version
+  calibrated: boolean // its probabilities can be trusted
+  command: string
+  level: 'looks' | 'routine' | 'risky'
+  risk?: Risk
+  confidence: number // of the level
+  verdict: 'looks' | 'routine' | 'risky' // what UNCLI makes of it (risky when not sure enough)
+  reason?: string
+  millis: number
 }

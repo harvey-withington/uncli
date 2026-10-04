@@ -55,6 +55,14 @@ func (m *Manager) DeleteSafeEntry(id string, e store.SafeEntry) ([]store.SafeEnt
 	return m.SafeList(id)
 }
 
+// SetSafeLabel gives an entry the user's own name for it; empty clears it.
+func (m *Manager) SetSafeLabel(id string, e store.SafeEntry, label string) ([]store.SafeEntry, error) {
+	if err := m.d.Store.SetSafeLabel(e, label); err != nil {
+		return nil, err
+	}
+	return m.SafeList(id)
+}
+
 // MoveSafeEntry gives an entry another scope: "project" (the session's
 // folder) or "all". An entry already there for the same class takes the
 // moved entry's verdict.

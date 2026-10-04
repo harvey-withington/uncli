@@ -175,6 +175,20 @@ func (m *Manager) Answer(id, requestID, decision, scope string) error {
 	return s.Answer(requestID, decision, scope)
 }
 
+// MarkSafe toggles "This is safe" on a waiting card, then looks again at
+// every session's other waiting requests.
+func (m *Manager) MarkSafe(id, requestID string, on bool, scope string) error {
+	s, err := m.get(id)
+	if err != nil {
+		return err
+	}
+	if err := s.MarkSafe(requestID, on, scope); err != nil {
+		return err
+	}
+	m.rejudgeAll()
+	return nil
+}
+
 // SetUnattended turns a session's unattended mode on or off.
 func (m *Manager) SetUnattended(id string, on bool) (View, error) {
 	s, err := m.get(id)

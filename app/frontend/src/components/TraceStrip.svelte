@@ -2,16 +2,16 @@
   import { slide } from 'svelte/transition'
   import type { TraceItem } from '../lib/api'
   import { t } from '../lib/i18n.svelte'
-  import { approvedLabel, promptable, reasonLabel } from '../lib/approvals'
+  import { approvedLabel } from '../lib/approvals'
   import { failureGist } from '../lib/trace'
   import Icon from './Icon.svelte'
-  import ShouldPrompt from './ShouldPrompt.svelte'
+  import ReasonList from './ReasonList.svelte'
 
   // Each row says who let the call run when the CLI asked first. When
   // UNCLI answered on its own, that label (or "why" on a refused call)
   // opens the reason for each part of the command: only looking, judged
-  // safe, the safe list, the session type's list, Never… Parts that ran
-  // because UNCLI judged them safe offer "This should prompt".
+  // safe, the safe list, the session type's list, Never… (ReasonList: each
+  // part coloured, and "This should prompt" on a part UNCLI judged safe).
 
   interface Props {
     items: TraceItem[] | null
@@ -67,14 +67,7 @@
             {#if it.denied && it.output}<span class="why">{it.output}</span>{/if}
             {#if it.done && !it.ok && !it.denied && it.output && !shown[it.id]}<span class="why failed-why">{failureGist(it.output)}</span>{/if}
             {#if reasons[it.id] && it.why}
-              <ul class="parts" aria-label={t('trace.why')}>
-                {#each it.why as r, i (i)}
-                  <li class={r.by}>{#if r.part}<code>{r.part}</code>{/if}<span>{reasonLabel(r)}</span></li>
-                {/each}
-                {#if promptable(it.why).length > 0}
-                  <li><ShouldPrompt {sessionId} classes={promptable(it.why)} /></li>
-                {/if}
-              </ul>
+              <div class="reasons"><ReasonList reasons={it.why} label={t('trace.why')} {sessionId} /></div>
             {/if}
             {#if shown[it.id] && it.output}<pre class="output">{it.output}</pre>{/if}
           </li>
@@ -188,36 +181,9 @@
   button.who:hover {
     background: color-mix(in srgb, var(--accent) 18%, transparent);
   }
-  .parts {
+  .reasons {
     grid-column: 2;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
     margin: 2px 0 0;
-    padding: 6px 8px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-2);
-    list-style: none;
-    font-family: var(--font);
-    font-size: var(--text-xs);
-  }
-  .parts li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2);
-    padding: 0;
-    font-size: var(--text-xs);
-  }
-  .parts code {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text);
-  }
-  .parts .deny,
-  .parts .blocked,
-  .parts .readonly {
-    color: var(--danger);
   }
   .more {
     flex: none;

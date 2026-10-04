@@ -6,8 +6,8 @@
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
 
-  // Under a trace row that ran because UNCLI judged it safe: "This should
-  // prompt" marks those parts' classes unsafe on the safe list, for this
+  // On a part of a trace row that ran because UNCLI judged it safe: "This
+  // should prompt" marks that part's class unsafe on the safe list, for this
   // project or all projects (the scope the user last used), so learning
   // goes both ways.
   interface Props {
@@ -56,7 +56,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    margin-top: 4px;
+    margin-left: auto;
     font-family: var(--font);
   }
   .teach .btn {

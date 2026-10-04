@@ -10,6 +10,7 @@ export interface MockAsk {
   input: Record<string, unknown>
   class: ToolClassView
   why: TraceReason // why it's unsafe (or that UNCLI can't place it)
+  more?: TraceReason[] // the other parts of a chained command
   learn: SafeClass // what "This is safe" remembers
   answers: Record<Outcome, string>
 }
@@ -48,11 +49,39 @@ export const MOCK_ASKS: MockAsk[] = [
   },
 ]
 
+const COMMIT_MSG = 'fix cell selection count, Escape/deselectAll range clearing, and sort/filter field lookup\n\n' +
+  '- add SelectionModel.getSelectedCellCount using display order (correct after sort, filter, column moves; excludes row-header columns)\n' +
+  '- deselectAll now clears cell ranges too; drop redundant splice in Escape handler\n' +
+  '- ClientRowModel sorts/filters by def.field instead of the column key'
+const COMMIT_PART = `git commit -q -m "${COMMIT_MSG}"`
+const GIT_ENTRY: SafeEntry = { kind: 'command', words: 'git', verdict: 'unsafe' }
+
+// A chained commit with a long message, both working parts marked unsafe
+// by the user: the card names them briefly and shortens the message.
+MOCK_ASKS.push({
+  match: /\bcommit\b/i, tool: 'Bash',
+  input: { command: `cd "C:/Users/you/code" && git add packages/core/src && ${COMMIT_PART} && git log --oneline -2 && git status --short`, description: 'Stage and commit changes' },
+  class: { write: true, source: 'built-in' },
+  why: { part: 'git add packages/core/src', by: 'unsafe', entry: GIT_ENTRY, class: { kind: 'command', words: 'git add' } },
+  more: [
+    { part: COMMIT_PART, by: 'unsafe', entry: GIT_ENTRY, class: { kind: 'command', words: 'git commit' } },
+    { part: 'cd "C:/Users/you/code"', by: 'looks', class: { kind: 'command', words: 'cd' } },
+    { part: 'git log --oneline -2', by: 'looks', class: { kind: 'command', words: 'git log' } },
+    { part: 'git status --short', by: 'looks', class: { kind: 'command', words: 'git status' } },
+  ],
+  learn: { kind: 'command', words: 'git commit' },
+  answers: {
+    allow: 'Committed the changes.',
+    deny: "I didn't commit: the commit was denied. The changes are still staged.",
+    away: "I didn't commit: you're away, so it was declined.",
+  },
+})
+
 // The session types' lists, as in config/defaults/profiles.yaml.
 export const MOCK_ALLOWLISTS: Record<string, string[]> = {
   chat: ['WebSearch', 'WebFetch', 'Write(./artifacts/**)'],
   cowork: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
-  code: ['Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(npm test:*)', 'Bash(npm run:*)', 'Bash(go test:*)', 'Bash(go build:*)', 'Bash(go vet:*)'],
+  code: ['Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)'],
 }
 
 // The safe-list entry that applies to a class in a session's project:
@@ -95,7 +124,10 @@ export function mockJudge(s: SessionView, ask: MockAsk, list: SafeEntry[], setti
     if (setting === 'inside') return { action: 'allow', why: [{ ...base, by: 'inside' }], by: 'inside' }
     if (setting === 'model') return judged ? { action: 'ask', why: [JUDGED] } : { action: 'judge', why: [{ ...base, by: 'judging' }] }
   }
-  return { action: 'ask', why: [base] }
+  // In command order, as the real backend gives them.
+  const cmd = String(ask.input.command ?? '')
+  const at = (r: TraceReason) => (r.part ? cmd.indexOf(r.part) : -1)
+  return { action: 'ask', why: [base, ...(ask.more ?? [])].sort((a, b) => at(a) - at(b)) }
 }
 
 const LOOKS = /^(ls|dir|pwd|cat|echo|get-childitem|gci|get-content|test-path|git (status|diff|log|show)\b)/i

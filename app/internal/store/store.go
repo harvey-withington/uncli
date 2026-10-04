@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS safe_list (
   words      TEXT NOT NULL,            -- "npm run test", a git class "git:local", or a tool name
   flags      TEXT NOT NULL DEFAULT '', -- risk flags, sorted, space separated
   verdict    TEXT NOT NULL,            -- safe | unsafe | blocked
+  label      TEXT NOT NULL DEFAULT '', -- the user's own name for it
   created_at INTEGER,
   PRIMARY KEY (scope, kind, words, flags)
 );
@@ -110,6 +111,7 @@ func migrate(db *sql.DB) error {
 		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"},
 		{"sessions", "mode", "TEXT"},
 		{"risk_judgements", "decider", "TEXT"}, {"risk_judgements", "confidence", "REAL"},
+		{"safe_list", "label", "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if !has(c.table, c.col) {
 			if _, err := db.Exec("ALTER TABLE " + c.table + " ADD COLUMN " + c.col + " " + c.def); err != nil {

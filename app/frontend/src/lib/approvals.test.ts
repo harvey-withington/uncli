@@ -1,8 +1,36 @@
 import { describe, expect, it } from 'vitest'
 import type { Approval, TraceReason } from './api'
-import { MODES, allowLabel, approvedLabel, askingReasons, classLabel, describeApproval, fixedReason, mcpName, modeOf, promptable, reasonLabel, ruleLabel, scopeLabel } from './approvals'
+import { MODES, allowLabel, approvedLabel, askingReasons, classLabel, commandLines, describeApproval, fixedReason, mcpName, modeOf, promptable, reasonLabel, reasonTone, ruleLabel, scopeLabel, shortCommand } from './approvals'
 
 const approval = (tool: string, input: unknown, description = ''): Approval => ({ requestId: 'r', tool, input, description, learn: [], askedAt: 0 })
+
+describe('a command coloured by what UNCLI makes of it', () => {
+  const cmd = 'cd "C:/code" && git add src && git commit -q -m "fix the selection count, and more besides\n- details" && git log -2 | head'
+  const why: TraceReason[] = [
+    { part: 'cd "C:/code"', by: 'looks', class: { kind: 'command', words: 'cd' } },
+    { part: 'git add src', by: 'safe', class: { kind: 'command', words: 'git add' } },
+    { part: 'git commit -q -m "fix the selection count, and more besides\n- details"', by: 'unsafe', class: { kind: 'command', words: 'git commit' } },
+    { part: 'git log -2', by: 'looks', class: { kind: 'command', words: 'git log' } },
+  ]
+  const show = (lines: ReturnType<typeof commandLines>) =>
+    lines.map(l => l.map(s => (s.kind === 'class' ? `[${s.text}:${s.tone}]` : s.kind === 'sep' ? `<${s.text.trim()}>` : s.text)).join(''))
+
+  it('puts each part on its own line, its class words in its tone and the rest quiet', () => {
+    expect(show(commandLines(cmd, why, true))).toEqual([
+      '[cd:read] "C:/code" <&&>',
+      '[git:ran] [add:ran] src <&&>',
+      '[git:prompt] [commit:prompt] -q -m "fix the selection count, and…" <&&>',
+      '[git:read] [log:read] -2 <|>',
+      'head',
+    ])
+  })
+
+  it('shows long quoted text in full when asked, and leaves a part it can\'t find plain', () => {
+    expect(show(commandLines(cmd, why, false))[2]).toContain('and more besides')
+    expect(show(commandLines('echo $(date) && rm -rf x', [{ part: 'rm -rf x', by: 'unsafe', class: { kind: 'command', words: 'rm x', flags: '-f -r' } }], false)))
+      .toEqual(['echo $(date) <&&>', '[rm:prompt] -rf [x:prompt]'])
+  })
+})
 
 describe('approvals in plain words', () => {
   it('describes common tools', () => {
@@ -108,13 +136,57 @@ describe('why a card is asking', () => {
       ],
     }
     expect(askingReasons(a)).toEqual([
-      { part: 'git push', text: 'Sends or publishes something beyond this computer.' },
-      { part: 'frob', text: "UNCLI can't tell whether this is safe, and your setting is to prompt you about those." },
-      { part: 'wipe', text: 'Deletes the build cache.' },
-      { part: 'deploy', text: 'You marked this unsafe (This project).' },
+      { parts: ['git push'], text: 'Sends or publishes something beyond this computer.' },
+      { parts: ['frob'], text: "UNCLI can't tell whether this is safe, and your setting is to prompt you about those." },
+      { parts: ['wipe'], text: 'Deletes the build cache.' },
+      { parts: ['deploy'], text: 'You marked this unsafe (This project).' },
     ])
     const always: Approval = { ...a, why: [{ part: 'npm test', by: 'always' }, { part: 'git push', by: 'always' }] }
-    expect(askingReasons(always)).toEqual([{ text: 'You asked to be prompted before anything except reading.' }])
+    expect(askingReasons(always)).toEqual([{ parts: [], text: 'You asked to be prompted before anything except reading.' }])
+  })
+
+  it('names parts by their short form and groups those with the same reason', () => {
+    const entry = { kind: 'command' as const, words: 'git', verdict: 'unsafe' as const }
+    const commit = 'git commit -q -m "fix cell selection count, Escape/deselectAll range clearing\n\n- add SelectionModel.getSelectedCellCount"'
+    const a: Approval = {
+      ...approval('Bash', { command: `git add src && ${commit}` }),
+      why: [
+        { part: 'git add src', by: 'unsafe', entry, class: { kind: 'command', words: 'git add' } },
+        { part: commit, by: 'unsafe', entry, class: { kind: 'command', words: 'git commit' } },
+        { part: 'git log --oneline -2', by: 'looks' },
+      ],
+    }
+    expect(askingReasons(a)).toEqual([{ parts: ['git add', 'git commit'], text: 'You marked this unsafe (All projects).' }])
+    // Without a class, the part itself, with the long quoted text shortened.
+    expect(askingReasons({ ...a, why: [{ part: commit, by: 'unknown' }] })[0]?.parts).toEqual(['git commit -q -m "fix cell selection count,…"'])
+  })
+
+  it('shortens long quoted text in a command, keeping what it does', () => {
+    expect(shortCommand('git commit -m "wip"')).toBe('git commit -m "wip"')
+    expect(shortCommand('cd app && git commit -q -m "fix cell selection count, Escape range clearing\n- more" && git log -2'))
+      .toBe('cd app && git commit -q -m "fix cell selection count,…" && git log -2')
+    expect(shortCommand("node -e 'line one\nline two'")).toBe("node -e 'line one…'")
+  })
+
+  it('adds the decision model\'s reason to a judged part', () => {
     expect(reasonLabel({ by: 'routine', judged: 'haiku', note: 'Rebuilds the docs.' })).toBe('routine work in this folder: Rebuilds the docs. (judged by haiku)')
+  })
+})
+
+describe('reason tones and named entries', () => {
+  it('colours reasons by what happened, the judged ones apart', () => {
+    expect(reasonTone({ part: 'ls', by: 'looks' })).toBe('read')
+    expect(reasonTone({ part: 'go vet', by: 'safe' })).toBe('ran')
+    expect(reasonTone({ part: 'docgen', by: 'safe', judged: 'haiku', note: 'x' })).toBe('judged')
+    expect(reasonTone({ part: 'wipe', by: 'unsafe', judged: 'haiku', note: 'x' })).toBe('judged')
+    expect(reasonTone({ part: 'git push', by: 'unsafe' })).toBe('prompt')
+    expect(reasonTone({ part: 'rm -r', by: 'blocked' })).toBe('blocked')
+  })
+
+  it('names your own entries by their label', () => {
+    const entry = { kind: 'command' as const, words: 'npm run ship', verdict: 'safe' as const, folder: 'p', label: 'Deploys the site' }
+    expect(reasonLabel({ part: 'npm run ship', by: 'listed', entry })).toBe('on your safe list as “Deploys the site” (This project)')
+    expect(reasonLabel({ part: 'npm run ship', by: 'blocked', entry: { ...entry, verdict: 'blocked' } })).toBe('blocked by you: “Deploys the site” (This project)')
+    expect(reasonLabel({ part: 'npm run ship', by: 'listed', entry: { ...entry, label: undefined } })).toBe('on your safe list (This project)')
   })
 })

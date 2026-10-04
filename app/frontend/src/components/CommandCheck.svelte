@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { Explanation } from '../lib/api'
-  import { reasonLabel } from '../lib/approvals'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import ReasonList from './ReasonList.svelte'
 
   // "Check a command": what the session would do if Claude ran it now
   // (run it, ask, or refuse) and why for each part, so the user can see
@@ -41,11 +41,7 @@
 {#if result}
   <div class="result {result.action}" role="status" aria-label={t('check.resultFor', { command: checked })}>
     <p class="verdict"><Icon name={ICON[result.action]} size={14} />{t(`check.${result.action}`)}</p>
-    <ul>
-      {#each result.why as r, i (i)}
-        <li class={r.by}>{#if r.part}<code>{r.part}</code>{/if}<span>{reasonLabel(r)}</span></li>
-      {/each}
-    </ul>
+    <ReasonList reasons={result.why} label={t('check.reasons')} />
   </div>
 {/if}
 
@@ -92,30 +88,6 @@
     color: var(--warning);
   }
   .deny .verdict {
-    color: var(--danger);
-  }
-  ul {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    color: var(--text-muted);
-  }
-  li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2);
-  }
-  code {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text);
-  }
-  li.deny,
-  li.readonly {
     color: var(--danger);
   }
 </style>

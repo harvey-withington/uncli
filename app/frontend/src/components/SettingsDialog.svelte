@@ -4,13 +4,15 @@
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
+  import DecisionSection from './DecisionSection.svelte'
   import SafeSection from './SafeSection.svelte'
   import type { AutoSummary, Preferences } from '../lib/api'
   import { modelOptions } from '../lib/models'
   import { AUTO_SUMMARY_MIN_WORDS } from '../lib/outline'
 
   // Settings: the quick-task model, what counts as safe (SafeSection; the
-  // header's shield opens Settings there), and the CLI version (anything
+  // header's shield opens Settings there), the decision model
+  // (DecisionSection), and the CLI version (anything
   // but the pinned version is at the user's own risk).
   const app = useApp()
   let version = $state(app.cli?.version ?? '')
@@ -34,12 +36,14 @@
   const prefs = $derived(app.boot?.preferences)
   const quickModels = $derived(modelOptions(app.boot?.models ?? null, prefs?.quickTaskModel.model))
 
-  async function savePrefs(next: Preferences) {
+  async function savePrefs(next: Preferences): Promise<boolean> {
     try {
       const saved = await app.backend.setPreferences($state.snapshot(next)) // plain data, not reactive proxies
       if (app.boot) app.boot.preferences = saved
+      return true
     } catch (e) {
       showToast(String(e), 'error')
+      return false
     }
   }
 
@@ -94,6 +98,7 @@
     </section>
   {/if}
   <SafeSection {savePrefs} />
+  {#if prefs}<DecisionSection {prefs} {savePrefs} />{/if}
   <section>
     <h3>{t('settings.cliTitle')}</h3>
     <p class="muted">{t('settings.cliBody', { pinned })}</p>

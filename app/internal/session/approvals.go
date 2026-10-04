@@ -37,6 +37,21 @@ type Approval struct {
 	// Judging: the quick-task model is judging it; it waits without a card.
 	Judging bool  `json:"judging,omitempty"`
 	AskedAt int64 `json:"askedAt"`
+	// Marked: the user toggled "This is safe" on the card, in MarkedScope.
+	// The classes are on the safe list, and the card waits for Allow once or
+	// Deny instead of answering itself; toggling it off puts back what was
+	// there before (prior).
+	Marked      bool   `json:"marked,omitempty"`
+	MarkedScope string `json:"markedScope,omitempty"`
+	prior       []priorEntry
+}
+
+// priorEntry is what the safe list held for a class before a card marked
+// it safe: an entry (had) to restore, or none, so the mark is removed.
+type priorEntry struct {
+	at  store.SafeEntry // the class and scope that were marked
+	old store.SafeEntry
+	had bool
 }
 
 // Decisions the user can make on a card.
@@ -191,6 +206,10 @@ func (s *Session) rejudgeLocked() {
 	p := s.policyLocked()
 	still := s.pending[:0:0]
 	for _, a := range s.pending {
+		if a.Marked { // the user is answering this one on its card
+			still = append(still, a)
+			continue
+		}
 		v := p.judge(a.Action)
 		if !s.settleLocked(a.RequestID, a.ToolUseID, a.Action, a.Input, v) {
 			a.update(v)
@@ -205,6 +224,68 @@ func (s *Session) rejudgeLocked() {
 	if s.waitingForUserLocked() && s.page != nil {
 		s.state = NeedsApproval // a request the model was judging now needs the user
 	}
+}
+
+// MarkSafe toggles "This is safe" on a waiting card. On, each part that
+// prompted is marked safe in scope, remembering what was there; off puts
+// that back (an entry's old verdict, or no entry). The card itself keeps
+// waiting for Allow once or Deny. The caller looks again at the other
+// waiting requests.
+func (s *Session) MarkSafe(requestID string, on bool, scope string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := -1
+	for k, a := range s.pending {
+		if a.RequestID == requestID {
+			i = k
+		}
+	}
+	if i < 0 {
+		return errors.New("that request is no longer waiting for an answer")
+	}
+	a := &s.pending[i]
+	st := s.m.d.Store
+	if !on {
+		for _, pr := range a.prior {
+			var err error
+			if pr.had {
+				err = st.SetSafeEntry(pr.old)
+			} else {
+				err = st.DeleteSafeEntry(pr.at)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		a.Marked, a.MarkedScope, a.prior = false, "", nil
+		s.changed()
+		return nil
+	}
+	if a.Marked {
+		return nil
+	}
+	classes, ok := learnable(a.Why)
+	if !ok {
+		return errors.New("this can only be allowed once")
+	}
+	folder, err := s.scopeFolder(scope)
+	if err != nil {
+		return err
+	}
+	a.prior = nil
+	for _, c := range classes {
+		at := store.SafeEntry{Kind: c.Kind, Words: c.Words, Flags: c.Flags, Folder: folder}
+		old, had := st.SafeEntryAt(at)
+		a.prior = append(a.prior, priorEntry{at: at, old: old, had: had})
+		mark := at
+		mark.Verdict = store.Safe
+		if err := st.SetSafeEntry(mark); err != nil {
+			return err
+		}
+	}
+	a.Marked, a.MarkedScope = true, scope
+	s.changed()
+	return nil
 }
 
 // Answer gives the user's decision on a waiting request. Safe remembers

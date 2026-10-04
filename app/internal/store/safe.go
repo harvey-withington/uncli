@@ -35,6 +35,9 @@ type SafeEntry struct {
 	Verdict string `json:"verdict"`         // safe | unsafe | blocked
 	// Folder is the project the entry belongs to; empty means all projects.
 	Folder string `json:"folder,omitempty"`
+	// Label is the user's own name for it ("Deploys the site"), to remember
+	// what the command does; empty shows the command.
+	Label string `json:"label,omitempty"`
 }
 
 // SafeClass is what an entry covers, without its verdict and scope.
@@ -83,7 +86,7 @@ func scopeOf(folder string) string {
 // SafeList lists the entries that apply in a project: its own, then those
 // for all projects.
 func (s *Store) SafeList(workdir string) ([]SafeEntry, error) {
-	rows, err := s.db.Query(`SELECT folder, kind, words, flags, verdict FROM safe_list WHERE scope=? OR scope=''
+	rows, err := s.db.Query(`SELECT folder, kind, words, flags, verdict, label FROM safe_list WHERE scope=? OR scope=''
 		ORDER BY scope='' , kind, words, flags`, projectKey(workdir))
 	if err != nil {
 		return nil, err
@@ -92,7 +95,7 @@ func (s *Store) SafeList(workdir string) ([]SafeEntry, error) {
 	out := []SafeEntry{}
 	for rows.Next() {
 		var e SafeEntry
-		if err := rows.Scan(&e.Folder, &e.Kind, &e.Words, &e.Flags, &e.Verdict); err != nil {
+		if err := rows.Scan(&e.Folder, &e.Kind, &e.Words, &e.Flags, &e.Verdict, &e.Label); err != nil {
 			return nil, err
 		}
 		out = append(out, e)
@@ -101,7 +104,8 @@ func (s *Store) SafeList(workdir string) ([]SafeEntry, error) {
 }
 
 // SetSafeEntry adds an entry, or changes the verdict of the one for the
-// same class and scope.
+// same class and scope. A label given replaces the entry's; none keeps it
+// (teaching from a card has none), and SetSafeLabel clears it.
 func (s *Store) SetSafeEntry(e SafeEntry) error {
 	e.Words, e.Flags = normWords(e.Words), NormFlags(e.Flags)
 	switch {
@@ -112,10 +116,32 @@ func (s *Store) SetSafeEntry(e SafeEntry) error {
 	case e.Verdict != Safe && e.Verdict != Unsafe && e.Verdict != Blocked:
 		return errors.New("an entry is safe, unsafe or blocked")
 	}
-	_, err := s.db.Exec(`INSERT INTO safe_list (scope, folder, kind, words, flags, verdict, created_at) VALUES (?,?,?,?,?,?,?)
-		ON CONFLICT(scope, kind, words, flags) DO UPDATE SET verdict=excluded.verdict, folder=excluded.folder`,
-		scopeOf(e.Folder), e.Folder, e.Kind, e.Words, e.Flags, e.Verdict, now())
+	_, err := s.db.Exec(`INSERT INTO safe_list (scope, folder, kind, words, flags, verdict, label, created_at) VALUES (?,?,?,?,?,?,?,?)
+		ON CONFLICT(scope, kind, words, flags) DO UPDATE SET verdict=excluded.verdict, folder=excluded.folder,
+		label=CASE WHEN excluded.label<>'' THEN excluded.label ELSE label END`,
+		scopeOf(e.Folder), e.Folder, e.Kind, e.Words, e.Flags, e.Verdict, strings.TrimSpace(e.Label), now())
 	return err
+}
+
+// SafeEntryAt is the entry for exactly this class and scope, if there is one.
+func (s *Store) SafeEntryAt(e SafeEntry) (SafeEntry, bool) {
+	out := SafeEntry{Kind: e.Kind, Words: normWords(e.Words), Flags: NormFlags(e.Flags), Folder: e.Folder}
+	err := s.db.QueryRow(`SELECT verdict, label FROM safe_list WHERE scope=? AND kind=? AND words=? AND flags=?`,
+		scopeOf(e.Folder), out.Kind, out.Words, out.Flags).Scan(&out.Verdict, &out.Label)
+	return out, err == nil
+}
+
+// SetSafeLabel gives an entry the user's own name for it; empty clears it.
+func (s *Store) SetSafeLabel(e SafeEntry, label string) error {
+	res, err := s.db.Exec(`UPDATE safe_list SET label=? WHERE scope=? AND kind=? AND words=? AND flags=?`,
+		strings.TrimSpace(label), scopeOf(e.Folder), e.Kind, normWords(e.Words), NormFlags(e.Flags))
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("that entry isn't on the safe list any more")
+	}
+	return nil
 }
 
 // DeleteSafeEntry removes an entry.
@@ -138,9 +164,10 @@ func (s *Store) MoveSafeEntry(e SafeEntry, folder string) error {
 		scopeOf(e.Folder), e.Kind, normWords(e.Words), NormFlags(e.Flags)); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`INSERT INTO safe_list (scope, folder, kind, words, flags, verdict, created_at) VALUES (?,?,?,?,?,?,?)
-		ON CONFLICT(scope, kind, words, flags) DO UPDATE SET verdict=excluded.verdict`,
-		scopeOf(folder), folder, e.Kind, normWords(e.Words), NormFlags(e.Flags), e.Verdict, now()); err != nil {
+	if _, err := tx.Exec(`INSERT INTO safe_list (scope, folder, kind, words, flags, verdict, label, created_at) VALUES (?,?,?,?,?,?,?,?)
+		ON CONFLICT(scope, kind, words, flags) DO UPDATE SET verdict=excluded.verdict,
+		label=CASE WHEN excluded.label<>'' THEN excluded.label ELSE label END`,
+		scopeOf(folder), folder, e.Kind, normWords(e.Words), NormFlags(e.Flags), e.Verdict, strings.TrimSpace(e.Label), now()); err != nil {
 		return err
 	}
 	return tx.Commit()

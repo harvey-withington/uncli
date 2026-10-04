@@ -1,18 +1,22 @@
 <script lang="ts">
-  import type { Approval, ApprovalDecision, Scope, SessionView } from '../lib/api'
-  import { askingReasons, classLabel, describeApproval, fixedReason, loadScope, modeOf, saveScope } from '../lib/approvals'
+  import type { Approval, Scope, SessionView } from '../lib/api'
+  import { cardNotes, classLabel, describeApproval, fixedReason, isShell, loadScope, modeOf, saveScope } from '../lib/approvals'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
+  import CommandView from './CommandView.svelte'
   import Icon from './Icon.svelte'
 
-  // A tool use waiting for the user's answer: why Claude is asking, what it
-  // wants to do in plain words, and Allow once / This is safe / Deny.
-  // "This is safe" remembers the class of each part that prompted (shown
-  // under the buttons) on the safe list, for this project or all projects;
-  // the scope starts where the user last left it. Under Always there is no
-  // "This is safe" (the user asked to be prompted), and a part whose risk
-  // comes from what it touches can only be allowed once, which a line says.
+  // A tool use waiting for the user's answer: what Claude wants to do (a
+  // command coloured part by part, CommandView), a line on why when the
+  // colours can't say it (what an unsafe part could do, the decision
+  // model's reason), and Allow once / This is safe / Deny. "This is safe"
+  // is a toggle: on, the classes of the parts that prompted are on the safe
+  // list (in the scope beside it, where the user last left it) and the card
+  // waits for Allow once or Deny; off, the list is as it was. Under Always
+  // there is no "This is safe" (the user asked to be prompted), and a part
+  // whose risk comes from what it touches can only be allowed once, which
+  // a line says.
   interface Props {
     session: SessionView
     approval: Approval
@@ -21,25 +25,29 @@
   let { session, approval }: Props = $props()
   const app = useApp()
   const view = $derived(describeApproval(approval))
-  // Why it needs the user, in plain words, before the command itself.
-  const reasons = $derived(askingReasons(approval))
+  const notes = $derived(cardNotes(approval))
   const always = $derived(modeOf(session) === 'always')
   const learn = $derived(always ? [] : approval.learn)
   const fixed = $derived(always || learn.length > 0 ? undefined : fixedReason(approval))
+  const marked = $derived(!!approval.marked)
   let scope = $state<Scope>(loadScope())
   let busy = $state(false)
 
-  async function answer(decision: ApprovalDecision) {
+  async function act(f: () => Promise<void>) {
     if (busy) return
     busy = true
     try {
-      if (decision === 'safe') saveScope(scope)
-      await app.backend.answerApproval(session.id, approval.requestId, decision, decision === 'safe' ? scope : undefined)
+      await f()
     } catch (e) {
       showToast(String(e), 'error')
     } finally {
       busy = false
     }
+  }
+  const answer = (decision: 'allow' | 'deny') => act(() => app.backend.answerApproval(session.id, approval.requestId, decision))
+  function toggleSafe() {
+    if (!marked) saveScope(scope)
+    void act(() => app.backend.markSafe(session.id, approval.requestId, !marked, scope))
   }
 </script>
 
@@ -49,19 +57,13 @@
     <span class="title">{view.title}</span>
     <span class="hint">{t('approval.waiting')}</span>
   </div>
-  {#if reasons.length > 0}
-    <div class="asking" aria-label={t('asking.title')}>
-      <Icon name="triangle-alert" size={14} />
-      <ul>
-        {#each reasons as r, i (i)}
-          <li>{#if r.part && reasons.length > 1}<code>{r.part}</code> {/if}{r.text}</li>
-        {/each}
-      </ul>
-    </div>
+  {#if notes.length > 0}
+    <p class="asking" aria-label={t('asking.title')}><Icon name="triangle-alert" size={13} /><span>{notes.join(' ')}</span></p>
   {/if}
   <div class="what" id="approval-{approval.requestId}">
-    {#if view.target}<code class="target">{view.target}</code>{/if}
-    {#if view.note}<span class="note">{view.note}</span>{/if}
+    {#if view.target}
+      <CommandView command={view.target} why={approval.why} shell={isShell(approval.tool)} note={view.note} />
+    {:else if view.note}<span class="note">{view.note}</span>{/if}
     {#if view.body}
       {#if view.bodyLabel}<span class="label">{view.bodyLabel}</span>{/if}
       <pre class="body" class:diff={view.lang === 'diff'}>{view.body}</pre>
@@ -71,8 +73,10 @@
     <button class="btn primary small" onclick={() => answer('allow')} disabled={busy}>{t('approval.allowOnce')}</button>
     {#if learn.length > 0}
       <span class="safe">
-        <button class="btn small" onclick={() => answer('safe')} disabled={busy}><Icon name="shield-check" size={13} />{t('approval.safe')}</button>
-        <select class="scope" bind:value={scope} aria-label={t('scope.label')} disabled={busy}>
+        <button class="btn small" class:on={marked} aria-pressed={marked} onclick={toggleSafe} disabled={busy}>
+          <Icon name="shield-check" size={13} />{t('approval.safe')}
+        </button>
+        <select class="scope" value={marked ? approval.markedScope ?? scope : scope} onchange={e => (scope = e.currentTarget.value as Scope)} aria-label={t('scope.label')} disabled={busy || marked}>
           <option value="project">{t('scope.project')}</option>
           <option value="all">{t('scope.all')}</option>
         </select>
@@ -82,9 +86,10 @@
   </div>
   {#if learn.length > 0}
     <p class="remember">
-      {t('approval.willRemember')}
-      {#each learn as c, i (i)}{#if i > 0}, {/if}<code>{classLabel(c)}</code>{/each}
+      {t(marked ? 'approval.markedSafe' : 'approval.willRemember')}
+      {#each learn as c, i (i)}{#if i > 0}{', '}{/if}<code>{classLabel(c)}</code>{/each}
       {#if learn.some(c => c.kind === 'command')}<span class="any">{t('approval.anyFiles')}</span>{/if}
+      {#if marked}<span class="undo">{t('approval.undoSafe')}</span>{/if}
     </p>
   {:else if fixed}
     <p class="remember">{fixed}</p>
@@ -120,29 +125,17 @@
   }
   .asking {
     display: flex;
+    align-items: baseline;
     gap: var(--space-2);
-    margin-top: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
+    margin: var(--space-2) 0 0;
     font-size: var(--text-sm);
-    font-weight: 520;
+    color: var(--text);
   }
   .asking :global(svg) {
     flex: none;
-    margin-top: 2px;
+    position: relative;
+    top: 2px;
     color: var(--warning);
-  }
-  .asking ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  .asking code {
-    font-family: var(--mono);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
   }
   .what {
     display: flex;
@@ -150,17 +143,6 @@
     gap: 4px;
     margin: var(--space-2) 0 var(--space-3);
     min-width: 0;
-  }
-  .target {
-    display: block;
-    padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    font-family: var(--mono);
-    font-size: var(--text-sm);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
   }
   .note {
     font-size: var(--text-sm);
@@ -197,6 +179,15 @@
   }
   .safe .btn {
     gap: 5px;
+  }
+  .safe .btn.on {
+    border-color: color-mix(in srgb, var(--success) 60%, var(--border));
+    background: color-mix(in srgb, var(--success) 14%, var(--surface));
+    color: var(--success);
+  }
+  .undo {
+    margin-left: var(--space-2);
+    color: var(--text-faint);
   }
   .scope {
     height: 26px;

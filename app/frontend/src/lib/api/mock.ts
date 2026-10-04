@@ -185,10 +185,11 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
         trace: [
           { id: 't1', name: 'Read', summary: 'Read parser.go', done: true, ok: true },
           {
-            id: 't2', name: 'PowerShell', summary: 'PowerShell git status --short; go vet ./internal/adapter/...', done: true, ok: true, approved: 'safe',
+            id: 't2', name: 'PowerShell', summary: 'PowerShell git status --short; go vet ./internal/adapter/...; docgen --check', done: true, ok: true, approved: 'safe',
             why: [
               { part: 'git status --short', by: 'looks' },
               { part: 'go vet ./internal/adapter/...', by: 'safe', class: { kind: 'command', words: 'go vet' } },
+              { part: 'docgen --check', by: 'safe', judged: 'haiku', note: "Checks the project's documentation is up to date.", class: { kind: 'command', words: 'docgen' } },
             ],
           },
           { id: 't3', name: 'Edit', summary: 'Edit parser.go', done: true, ok: true },
@@ -215,12 +216,14 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
   let cli: CLIStatus = { installed: true, version: '2.1.285', pinned: '2.1.285', custom: false, loggedIn: true, email: 'you@example.com', subscription: 'max', ...opts.cli }
   let h: Handlers | null = null
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
+  let decisionKey = ''
   let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }
   const timers = new Map<string, number[]>()
   // Approvals: a question that mentions "push" asks to run git push first,
   // one that mentions a "note" to save it with an MCP tool (mock-access.ts).
   const safe: SafeEntry[] = [] // the safe list, every project's
   const judged = new Set<string>() // tools the quick-task model has looked at
+  const priors = new Map<string, { at: SafeEntry; old?: SafeEntry }[]>() // what "This is safe" replaced, by request
   const approvalWaits = new Map<string, (o: Outcome) => void>()
   let requestSeq = 0
 
@@ -231,11 +234,16 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
   // project entries for the same class.
   const put = (s: SessionView, e: SafeEntry, scope: Scope) => {
     const folder = scope === 'all' ? undefined : s.workdir
+    let kept = ''
     for (let i = safe.length - 1; i >= 0; i--) {
       const x = safe[i] as SafeEntry
-      if (sameClass(x, e) && (x.folder === folder || scope === 'all')) safe.splice(i, 1)
+      if (sameClass(x, e) && (x.folder === folder || scope === 'all')) {
+        kept ||= x.label ?? ''
+        safe.splice(i, 1)
+      }
     }
-    safe.push({ kind: e.kind, words: e.words, flags: e.flags || undefined, verdict: e.verdict, folder })
+    const label = e.label?.trim() || kept
+    safe.push({ kind: e.kind, words: e.words, flags: e.flags || undefined, verdict: e.verdict, folder, label: label || undefined })
   }
   const drop = (e: SafeEntry) => {
     const i = safe.findIndex(x => sameClass(x, e) && x.folder === e.folder)
@@ -245,6 +253,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
   const rejudge = (s: SessionView) => {
     const waiting = s.approvals ?? []
     const still = waiting.filter(a => {
+      if (a.marked) return true // waits for Allow once or Deny
       const ask = MOCK_ASKS.find(x => x.tool === a.tool)
       if (!ask) return true
       const v = judgeAsk(s, ask)
@@ -483,6 +492,36 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       rejudgeAll()
       return listFor(s).map(e => ({ ...e }))
     },
+    async markSafe(sid, rid, on, scope) {
+      const s = find(sid)
+      const a = (s.approvals ?? []).find(x => x.requestId === rid)
+      if (!a) throw new Error('that request is no longer waiting for an answer')
+      if (on && !a.marked) {
+        const folder = scope === 'all' ? undefined : s.workdir
+        priors.set(rid, a.learn.map(c => {
+          const old = safe.find(x => sameClass(x, { ...c, verdict: 'safe' }) && x.folder === folder)
+          return { at: { ...c, verdict: 'safe' as const, folder }, old: old ? { ...old } : undefined }
+        }))
+        a.learn.forEach(c => put(s, { ...c, verdict: 'safe' }, scope))
+        a.marked = true
+        a.markedScope = scope
+      } else if (!on && a.marked) {
+        for (const p of priors.get(rid) ?? []) {
+          drop(p.at)
+          if (p.old) safe.push(p.old)
+        }
+        priors.delete(rid)
+        a.marked = false
+        a.markedScope = undefined
+      }
+      rejudgeAll()
+    },
+    async setSafeLabel(sid, entry, label) {
+      const x = safe.find(y => sameClass(y, entry) && y.folder === entry.folder)
+      if (!x) throw new Error("that entry isn't on the safe list any more")
+      x.label = label.trim() || undefined
+      return listFor(find(sid)).map(e => ({ ...e }))
+    },
     async teach(sid, classes, verdict, scope) {
       const s = find(sid)
       classes.forEach(c => put(s, { ...c, verdict }, scope))
@@ -536,8 +575,23 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       if (s && s.state === 'unread') setState(s, 'idle')
     },
     async setPreferences(p) {
+      const d = p.decisionModel
+      if (d?.provider === 'systemone' && !/^https?:\/\/./.test(d.endpoint ?? '')) {
+        throw new Error("enter the decision model's address, such as http://localhost:8009")
+      }
+      if (d?.provider === 'systemone' && !d.model?.trim()) throw new Error("enter the decision model's name, such as kev-latest or jev-1.13")
       prefs = structuredClone(p)
       return structuredClone(prefs)
+    },
+    async setDecisionKey(k) { decisionKey = k.trim() },
+    async hasDecisionKey() { return decisionKey !== '' },
+    async testDecisionModel() {
+      await new Promise(r => setTimeout(r, 150))
+      const d = prefs.decisionModel
+      if (d?.provider === 'systemone') {
+        return { decider: `systemone/${d.model}@${d.version ?? ''}`, calibrated: true, command: 'npm test', level: 'routine', confidence: 0.95, verdict: (d.threshold ?? 0.9) <= 0.95 ? 'routine' : 'risky', millis: 95 }
+      }
+      return { decider: `quick-task/${prefs.quickTaskModel.model}@`, calibrated: false, command: 'npm test', level: 'routine', confidence: 1, verdict: 'routine', reason: "Runs the project's tests.", millis: 2400 }
     },
     async summarisePage(sid, pid, blocks) {
       const p = pages[sid]?.find(x => x.id === pid)

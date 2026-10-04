@@ -76,9 +76,18 @@ describe('What ran, and why', () => {
     expect(within(parts).getByText('git status --short')).toBeInTheDocument()
     expect(within(parts).getByText('only reads, so it runs')).toBeInTheDocument()
     expect(within(parts).getByText('safe: routine work in this folder')).toBeInTheDocument()
-    await fireEvent.click(within(parts).getByRole('button', { name: 'This should prompt' }))
+    // Each part UNCLI judged safe has its own button; reading has none.
+    const lines = within(parts).getAllByRole('listitem')
+    expect(within(lines[0] as HTMLElement).queryByRole('button', { name: 'This should prompt' })).toBeNull()
+    // The part the decision model judged is highlighted, with its reason.
+    const judged = lines[2] as HTMLElement
+    expect(judged).toHaveClass('tone-judged')
+    expect(judged).toHaveTextContent("Checks the project's documentation is up to date. (judged by haiku)")
+    expect(lines[1]).toHaveClass('tone-ran')
+    await fireEvent.click(within(lines[1] as HTMLElement).getByRole('button', { name: 'This should prompt' }))
     await waitFor(() => expect(teach).toHaveBeenCalledWith('s-code', [{ kind: 'command', words: 'go vet' }], 'unsafe', 'project'))
     expect(await within(parts).findByText('Claude will prompt before go vet from now on.')).toBeInTheDocument()
+    expect(within(judged).getByRole('button', { name: 'This should prompt' })).toBeInTheDocument() // only go vet was taught
   })
 
   it('Settings shows the session type list and checks a command part by part', async () => {
@@ -88,14 +97,14 @@ describe('What ran, and why', () => {
     await fireEvent.click(await screen.findByRole('button', { name: 'Safe and unsafe' }))
     const dlg = await screen.findByRole('dialog', { name: 'Settings' })
     const builtin = await within(dlg).findByRole('list', { name: 'Safe in Code sessions (built in)' })
-    expect(within(builtin).getByText('npm test …')).toBeInTheDocument()
+    expect(within(builtin).getByText('git status …')).toBeInTheDocument()
 
     await fireEvent.input(within(dlg).getByRole('textbox', { name: 'A command to check' }), { target: { value: 'git status --short; npm test; npm publish' } })
     await fireEvent.click(within(dlg).getByRole('button', { name: 'Check' }))
     expect(explain).toHaveBeenCalledWith('s-code', 'git status --short; npm test; npm publish')
     const result = await within(dlg).findByRole('status', { name: 'What would happen to git status --short; npm test; npm publish' })
     expect(within(result).getByText('Claude prompts you first')).toBeInTheDocument()
-    expect(within(result).getByText('the session type allows npm test …')).toBeInTheDocument()
+    expect(within(result).getByText('safe: routine work in this folder')).toBeInTheDocument()
     expect(within(result).getByText('unsafe: it sends or publishes something beyond this computer')).toBeInTheDocument()
   })
 })
@@ -108,7 +117,9 @@ describe('Prompting only when unsafe', () => {
     const why = within(c).getByLabelText('Why Claude is asking')
     expect(why).toHaveTextContent('Sends or publishes something beyond this computer.')
     // The reason comes before the command.
-    expect(why.compareDocumentPosition(within(c).getByText('git push origin main')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const command = c.querySelector('.target') as HTMLElement
+    expect(command).toHaveTextContent('git push origin main')
+    expect(why.compareDocumentPosition(command) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('a tool UNCLI can not place is checked by the quick-task model first, without a card', async () => {

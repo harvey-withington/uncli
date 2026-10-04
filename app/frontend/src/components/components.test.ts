@@ -487,10 +487,10 @@ describe('Approvals', () => {
     render(App, { props: { backend } })
     await ask('commit and push')
     const c = await screen.findByRole('alertdialog', { name: 'Run a command' }, { timeout: 2000 })
-    expect(within(c).getByText('git push origin main')).toBeInTheDocument()
+    expect(c.querySelector('.target')).toHaveTextContent('git push origin main')
     expect(await screen.findByText('Needs approval', { selector: '.sidebar *' })).toBeInTheDocument()
     await fireEvent.click(within(c).getByRole('button', { name: 'Allow once' }))
-    expect(answer).toHaveBeenCalledWith(expect.any(String), 'req_1', 'allow', undefined)
+    expect(answer).toHaveBeenCalledWith(expect.any(String), 'req_1', 'allow')
     await waitFor(() => expect(card()).toBeNull())
     expect(await screen.findByText(/Pushed/, {}, { timeout: 3000 })).toBeInTheDocument()
   })
@@ -523,17 +523,35 @@ describe('Approvals', () => {
     expect(await screen.findByText(/the push was denied/, {}, { timeout: 3000 })).toBeInTheDocument()
   })
 
-  it('This is safe remembers the class for this project, and the next push runs without a card', async () => {
+  it('This is safe is a toggle: on marks the class safe and the card waits; off puts the list back', async () => {
     localStorage.clear()
     const backend = mockBackend()
     const answer = vi.spyOn(backend, 'answerApproval')
+    const mark = vi.spyOn(backend, 'markSafe')
     render(App, { props: { backend } })
     await ask('push')
     const c = await screen.findByRole('alertdialog', {}, { timeout: 2000 })
     expect(within(c).getByRole('combobox', { name: 'Where it applies' })).toHaveValue('project')
     expect(within(c).getByText('Will remember as safe:', { exact: false })).toHaveTextContent('Will remember as safe: git push (any files and options)')
+    const safe = within(c).getByRole('button', { name: 'This is safe' })
+    expect(safe).toHaveAttribute('aria-pressed', 'false')
+
+    // On: marked, the card stays, the scope is fixed while it's on.
+    await fireEvent.click(safe)
+    expect(mark).toHaveBeenLastCalledWith(expect.any(String), 'req_1', true, 'project')
+    await waitFor(() => expect(within(c).getByRole('button', { name: 'This is safe' })).toHaveAttribute('aria-pressed', 'true'))
+    expect(within(c).getByText('Marked as safe:', { exact: false })).toHaveTextContent('Click This is safe again to undo.')
+    expect(within(c).getByRole('combobox', { name: 'Where it applies' })).toBeDisabled()
+    expect(card()).not.toBeNull()
+
+    // Off: back as it was; on again, then Allow once runs it.
     await fireEvent.click(within(c).getByRole('button', { name: 'This is safe' }))
-    expect(answer).toHaveBeenLastCalledWith(expect.any(String), 'req_1', 'safe', 'project')
+    expect(mark).toHaveBeenLastCalledWith(expect.any(String), 'req_1', false, 'project')
+    await waitFor(() => expect(within(c).getByRole('button', { name: 'This is safe' })).toHaveAttribute('aria-pressed', 'false'))
+    expect(await backend.safeList('s-code')).toEqual([])
+    await fireEvent.click(within(c).getByRole('button', { name: 'This is safe' }))
+    await waitFor(() => expect(within(c).getByRole('button', { name: 'This is safe' })).toHaveAttribute('aria-pressed', 'true'))
+    await fireEvent.click(within(c).getByRole('button', { name: 'Allow once' }))
     await screen.findByText(/Pushed/, {}, { timeout: 3000 })
     await ask('push again')
     expect(await screen.findByText('Page 3', { selector: '.seq' }, { timeout: 3000 })).toBeInTheDocument()
@@ -545,13 +563,13 @@ describe('Approvals', () => {
   it('the next card starts at the scope used last', async () => {
     localStorage.clear()
     const backend = mockBackend()
-    const answer = vi.spyOn(backend, 'answerApproval')
     render(App, { props: { backend } })
     await ask('push')
     let c = await screen.findByRole('alertdialog', {}, { timeout: 2000 })
     await fireEvent.change(within(c).getByRole('combobox', { name: 'Where it applies' }), { target: { value: 'all' } })
     await fireEvent.click(within(c).getByRole('button', { name: 'This is safe' }))
-    expect(answer).toHaveBeenLastCalledWith(expect.any(String), 'req_1', 'safe', 'all')
+    await waitFor(() => expect(within(c).getByRole('button', { name: 'This is safe' })).toHaveAttribute('aria-pressed', 'true'))
+    await fireEvent.click(within(c).getByRole('button', { name: 'Allow once' }))
     await screen.findByText(/Pushed/, {}, { timeout: 3000 })
     await ask('save a note')
     c = await screen.findByRole('alertdialog', { name: 'Use touch_note (notes)' }, { timeout: 4000 })
@@ -579,6 +597,13 @@ describe('Approvals', () => {
     await fireEvent.change(within(list).getByRole('combobox', { name: 'Where npm run lint applies' }), { target: { value: 'all' } })
     await waitFor(() => expect(move).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ words: 'npm run lint' }), 'all'))
     await waitFor(() => expect(within(list).getByRole('combobox', { name: 'Where npm run lint applies' })).toHaveValue('all'))
+    // A label: the user's own name for it, shown first, with the command beside it.
+    await fireEvent.click(within(list).getByRole('button', { name: 'Add a label to npm run lint' }))
+    const input = within(list).getByRole('textbox', { name: 'Label for npm run lint' })
+    await fireEvent.input(input, { target: { value: 'Checks code style' } })
+    await fireEvent.keyDown(input, { key: 'Enter' })
+    expect(await within(list).findByText('Checks code style')).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: 'Change the label of npm run lint' })).toBeInTheDocument()
     await fireEvent.click(within(list).getByRole('button', { name: 'Remove npm run lint' }))
     expect(await within(dlg).findByText(/Nothing here yet/)).toBeInTheDocument()
   })
@@ -799,5 +824,40 @@ describe('Dropping files and folders', () => {
     expect(got).toHaveBeenCalledWith(['C:/My Docs/b.md'])
     expect(s.newSessionOpen).toBe(false)
     composer.remove()
+  })
+})
+
+describe('Decision model', () => {
+  it('switches to a System One server, saves its key apart, and tests it', async () => {
+    const backend = mockBackend()
+    const save = vi.spyOn(backend, 'setPreferences')
+    const setKey = vi.spyOn(backend, 'setDecisionKey')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: /Claude CLI/ }))
+    const dlg = await screen.findByRole('dialog', { name: 'Settings' })
+    const use = within(dlg).getByRole('combobox', { name: 'Decision model' })
+    expect(use).toHaveValue('quick-task')
+
+    // The quick-task model answers the test, uncalibrated, with a reason.
+    await fireEvent.click(within(dlg).getByRole('button', { name: 'Test' }))
+    expect(await within(dlg).findByRole('status', { name: 'What the decision model said' })).toHaveTextContent("Runs the project's tests.")
+
+    await fireEvent.change(use, { target: { value: 'systemone' } })
+    await fireEvent.input(within(dlg).getByRole('textbox', { name: 'Address' }), { target: { value: 'http://localhost:8009' } })
+    await fireEvent.input(within(dlg).getByRole('textbox', { name: 'Model' }), { target: { value: 'kev-0.8b' } })
+    await fireEvent.click(within(dlg).getByRole('checkbox', { name: 'Only on this computer or my network' }))
+    await fireEvent.click(within(dlg).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith(expect.objectContaining({
+      decisionModel: expect.objectContaining({ provider: 'systemone', endpoint: 'http://localhost:8009', model: 'kev-0.8b', localOnly: true }),
+    })))
+
+    await fireEvent.input(within(dlg).getByLabelText('API key'), { target: { value: 'sk-test' } })
+    await fireEvent.click(within(dlg).getByRole('button', { name: 'Save key' }))
+    await waitFor(() => expect(setKey).toHaveBeenCalledWith('sk-test'))
+    expect(save).not.toHaveBeenCalledWith(expect.objectContaining({ decisionModel: expect.objectContaining({ apiKey: expect.anything() }) }))
+    expect(await within(dlg).findByPlaceholderText(/A key is saved/)).toHaveValue('')
+
+    await fireEvent.click(within(dlg).getByRole('button', { name: 'Test' }))
+    expect(await within(dlg).findByRole('status', { name: 'What the decision model said' })).toHaveTextContent('safe (95% sure)')
   })
 })

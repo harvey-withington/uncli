@@ -127,9 +127,13 @@ export function reasonLabel(r: TraceReason): string {
   const scope = r.entry ? scopeLabel(r.entry) : ''
   let text: string
   switch (r.by) {
-    case 'listed': text = t('why.listed', { scope }); break
-    case 'blocked': text = t('why.blocked', { scope }); break
-    case 'unsafe': text = r.entry ? t('why.marked', { scope }) : t('why.unsafe', { risk: riskLabel(r.risk) }); break
+    case 'listed': text = t(r.entry?.label ? 'why.listedNamed' : 'why.listed', { scope, label: r.entry?.label ?? '' }); break
+    case 'blocked': text = t(r.entry?.label ? 'why.blockedNamed' : 'why.blocked', { scope, label: r.entry?.label ?? '' }); break
+    case 'unsafe':
+      text = r.entry
+        ? t(r.entry.label ? 'why.markedNamed' : 'why.marked', { scope, label: r.entry.label ?? '' })
+        : t('why.unsafe', { risk: riskLabel(r.risk) })
+      break
     case 'builtin':
     case 'profile': text = t('why.profile', { entry: allowLabel(r.allow ?? '') }); break
     case 'rule': text = t('why.rule', { rule }); break
@@ -142,11 +146,23 @@ export function reasonLabel(r: TraceReason): string {
   return r.judged && r.note ? t('why.judged', { text, note: r.note, model: r.judged }) : text
 }
 
-// The reasons a card is waiting for the user, in plain words: each part
-// that needs them, with what it could do. Parts that would just run aren't
-// listed; under Always one line says why everything prompts.
-export function askingReasons(a: Approval): { part?: string; text: string }[] {
-  const out: { part?: string; text: string }[] = []
+// The reasons a card is waiting for the user, in plain words: what each
+// part that needs them could do, with the parts that share a reason named
+// together by their short form ("git add, git commit"), so a long commit
+// message isn't repeated. Parts that would just run aren't listed; under
+// Always one line says why everything prompts.
+export interface AskingReason {
+  parts: string[] // the parts it's about, short; empty for the whole tool use
+  text: string
+}
+
+export function askingReasons(a: Approval): AskingReason[] {
+  const out: AskingReason[] = []
+  const add = (text: string, part?: string) => {
+    let g = out.find(o => o.text === text)
+    if (!g) out.push((g = { parts: [], text }))
+    if (part && !g.parts.includes(part)) g.parts.push(part)
+  }
   for (const r of a.why ?? []) {
     let text = ''
     switch (r.by) {
@@ -156,15 +172,119 @@ export function askingReasons(a: Approval): { part?: string; text: string }[] {
       case 'risky': text = r.note || capital(riskLabel(r.risk)) + '.'; break
       case 'unknown': text = t('asking.unknown'); break
       case 'always':
-        if (!out.some(o => !o.part)) out.unshift({ text: t('asking.always') })
+        if (!out.some(o => o.text === t('asking.always'))) out.unshift({ parts: [], text: t('asking.always') })
         continue
       case 'ask': text = t('why.ask', { rule: r.rule ? ruleLabel(r.rule) : '' }); break
       case 'outside': text = t('asking.outside'); break
       default: continue
     }
-    out.push({ part: r.part, text })
+    add(text, r.part ? partName(r) : undefined)
   }
   return out
+}
+
+// partName is a part's short form: its class as the safe list names it
+// ("git commit"), or else the part with long quoted text shortened.
+function partName(r: TraceReason): string {
+  if (r.class) return classLabel(r.class)
+  const s = shortCommand(r.part ?? '').replace(/\s+/g, ' ')
+  return s.length > 60 ? s.slice(0, 57).trimEnd() + '…' : s
+}
+
+// A command split for colouring, one line per working part: the
+// separators (&&, ||, ;, |), the words of each part's class (the program,
+// its subcommand, its risk flags) in the part's tone, and the rest (files,
+// messages, options) quiet.
+export interface CommandSeg {
+  text: string
+  kind: 'sep' | 'class' | 'rest'
+  tone?: ReasonTone
+  title?: string // a class word's reason, for a tooltip
+}
+
+const SEP = /(&&|\|\||;|\|)/
+
+// commandLines colours a command by its reasons. Each part is found in the
+// command in order; a part that can't be found (rewritten by the reader)
+// stays plain. With short, long quoted text is shortened first.
+export function commandLines(cmd: string, why: TraceReason[], short: boolean): CommandSeg[][] {
+  const fit = (s: string) => (short ? shortCommand(s) : s)
+  const text = fit(cmd)
+  const lines: CommandSeg[][] = [[]]
+  const push = (seg: CommandSeg) => {
+    if (seg.text) (lines[lines.length - 1] as CommandSeg[]).push(seg)
+  }
+  // Text between parts: separators end a line, the rest is quiet.
+  const gap = (s: string) => {
+    for (const piece of s.split(SEP)) {
+      if (!piece) continue
+      if (/^(&&|\|\||;|\|)$/.test(piece)) {
+        push({ text: piece, kind: 'sep' })
+        lines.push([])
+      } else {
+        push({ text: lines[lines.length - 1]?.length ? piece : piece.trimStart(), kind: 'rest' })
+      }
+    }
+  }
+  let at = 0
+  for (const r of why) {
+    if (!r.part) continue
+    const p = fit(r.part)
+    const i = text.indexOf(p, at)
+    if (i < 0) continue
+    gap(text.slice(at, i))
+    partSegments(p, r).forEach(push)
+    at = i + p.length
+  }
+  gap(text.slice(at))
+  return lines.filter(l => l.length > 0)
+}
+
+// partSegments colours one part: its class words (and risk flags) in its
+// tone, in order, and everything else quiet. A part with no class has its
+// first word coloured.
+function partSegments(part: string, r: TraceReason): CommandSeg[] {
+  const tone = reasonTone(r)
+  const want = (r.class?.words ?? '').split(' ').filter(w => w && !w.includes(':'))
+  const flags = new Set((r.class?.flags ?? '').split(' ').filter(Boolean).map(f => f.toLowerCase()))
+  const tokens = part.split(/(\s+)/)
+  const out: CommandSeg[] = []
+  let next = 0
+  let first = true
+  for (const tok of tokens) {
+    if (!tok) continue
+    if (/^\s+$/.test(tok)) {
+      out.push({ text: tok, kind: 'rest' })
+      continue
+    }
+    const bare = tok.replace(/^["']|["']$/g, '').replace(/^.*[\\/]/, '').replace(/\.exe$/i, '').toLowerCase()
+    const isClass = want.length ? next < want.length && bare === want[next]?.toLowerCase() : first
+    if (isClass) next++
+    first = false
+    const cls = isClass || flags.has(tok.toLowerCase())
+    out.push({ text: tok, kind: cls ? 'class' : 'rest', tone, title: cls ? reasonLabel(r) : undefined })
+  }
+  return out
+}
+
+// shortCommand shortens a command for a card without losing what it does:
+// long quoted text (a commit message, a script) keeps its first few words.
+export function shortCommand(cmd: string): string {
+  return cmd.replace(/(["'])([\s\S]*?)\1/g, (all, q: string, body: string) => {
+    if (body.length <= 40 && !body.includes('\n')) return all
+    const first = (body.split('\n')[0] ?? '').trim()
+    const cut = first.length > 30 ? first.slice(0, 30).replace(/\s+\S*$/, '') : first
+    return `${q}${cut}…${q}`
+  })
+}
+
+// cardNotes are the reasons worth a line on a card, besides the coloured
+// command: what an unsafe part could do, the decision model's reason, or
+// that UNCLI can't tell. "You marked this unsafe" isn't repeated: the
+// colours already say which parts need the user.
+export function cardNotes(a: Approval): string[] {
+  const why = (a.why ?? []).filter(r => !(r.entry && (r.by === 'unsafe' || r.by === 'blocked')))
+  return askingReasons({ ...a, why }).map(r => r.text)
 }
 
 // fixedReason says why a card can only be allowed once: a part whose risk
@@ -219,4 +339,33 @@ export function saveScope(scope: Scope) {
   } catch {
     // only a convenience
   }
+}
+
+// reasonTone colours a reason: what only read, what ran as safe, what the
+// decision model judged (highlighted, whichever way it went), what
+// prompted, and what was blocked.
+export type ReasonTone = 'read' | 'ran' | 'judged' | 'prompt' | 'blocked'
+
+export function reasonTone(r: TraceReason): ReasonTone {
+  if (r.judged) return 'judged'
+  switch (r.by) {
+    case 'looks':
+      return 'read'
+    case 'blocked':
+    case 'deny':
+    case 'readonly':
+      return 'blocked'
+    case 'unsafe':
+    case 'unknown':
+    case 'always':
+    case 'judging':
+    case 'user':
+    case 'ask':
+    case 'risky':
+    case 'outside':
+    case 'none':
+    case 'complex':
+      return 'prompt'
+  }
+  return 'ran'
 }

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -177,6 +178,11 @@ func (a *App) DeleteSafeEntry(sessionID string, e store.SafeEntry) ([]store.Safe
 	return a.svc.Sessions.DeleteSafeEntry(sessionID, e)
 }
 
+// SetSafeLabel gives a safe-list entry the user's own name for it.
+func (a *App) SetSafeLabel(sessionID string, e store.SafeEntry, label string) ([]store.SafeEntry, error) {
+	return a.svc.Sessions.SetSafeLabel(sessionID, e, label)
+}
+
 // MoveSafeEntry gives a safe-list entry another scope: "project" or "all".
 func (a *App) MoveSafeEntry(sessionID string, e store.SafeEntry, scope string) ([]store.SafeEntry, error) {
 	return a.svc.Sessions.MoveSafeEntry(sessionID, e, scope)
@@ -241,6 +247,23 @@ func (a *App) SetBookmark(sessionID, pageID string, on bool) (store.Page, error)
 
 func (a *App) SetPreferences(p app.Preferences) (app.Preferences, error) {
 	return a.svc.SetPreferences(p)
+}
+
+// MarkSafe toggles "This is safe" on a waiting approval card.
+func (a *App) MarkSafe(sessionID, requestID string, on bool, scope string) error {
+	return a.svc.Sessions.MarkSafe(sessionID, requestID, on, scope)
+}
+
+// SetDecisionKey saves the decision model's API key; HasDecisionKey says
+// whether one is saved (the key itself never comes back).
+func (a *App) SetDecisionKey(key string) error { return a.svc.SetDecisionKey(key) }
+func (a *App) HasDecisionKey() bool            { return a.svc.HasDecisionKey() }
+
+// TestDecisionModel asks the decision model about a sample command.
+func (a *App) TestDecisionModel() (app.DecisionTest, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	return a.svc.TestDecisionModel(ctx)
 }
 
 // SummarisePage asks the quick-task model for a table of contents of a

@@ -46,6 +46,29 @@
   }
   const key = (e: SafeEntry) => `${e.folder ?? ''}|${e.kind}|${e.words}|${e.flags ?? ''}`
 
+  // Labels: the user's own name for an entry, edited in place.
+  let editing = $state('') // the key of the entry being labelled
+  let draftLabel = $state('')
+  function startLabel(e: SafeEntry) {
+    editing = key(e)
+    draftLabel = e.label ?? ''
+  }
+  async function saveLabel(e: SafeEntry) {
+    if (editing !== key(e)) return
+    editing = ''
+    if ((e.label ?? '') !== draftLabel.trim()) await run(() => app.backend.setSafeLabel(sessionId, e, draftLabel))
+  }
+  function labelKeys(ev: KeyboardEvent, e: SafeEntry) {
+    if (ev.key === 'Enter') {
+      ev.preventDefault()
+      void saveLabel(e)
+    } else if (ev.key === 'Escape') {
+      ev.stopPropagation() // not the dialog
+      editing = ''
+    }
+  }
+  const focus = (el: HTMLInputElement) => el.focus()
+
   // Adding: an example, the classes it becomes, a verdict and a scope.
   let example = $state('')
   let preview = $state<ClassPreview[]>([])
@@ -93,9 +116,19 @@
     {#each shown as e (key(e))}
       {@const what = classLabel(e)}
       <li>
-        <span class="what" title={e.kind === 'tool' ? e.words : what}>
-          {#if e.kind === 'tool'}<Icon name="wrench" size={12} />{/if}<code>{what}</code>
-        </span>
+        {#if editing === key(e)}
+          <input class="input small label-edit" bind:value={draftLabel} use:focus maxlength="80"
+            aria-label={t('safe.labelFor', { what })} placeholder={t('safe.labelPlaceholder')}
+            onkeydown={ev => labelKeys(ev, e)} onblur={() => saveLabel(e)} />
+        {:else}
+          <span class="what" title={e.kind === 'tool' ? e.words : what}>
+            {#if e.kind === 'tool'}<Icon name="wrench" size={12} />{/if}
+            {#if e.label}<span class="label">{e.label}</span><code class="aside">{what}</code>{:else}<code>{what}</code>{/if}
+          </span>
+          <button class="btn ghost small icon" onclick={() => startLabel(e)} aria-label={t(e.label ? 'safe.renameLabel' : 'safe.addLabel', { what })} title={t(e.label ? 'safe.renameLabel' : 'safe.addLabel', { what })}>
+            <Icon name="pencil" size={13} />
+          </button>
+        {/if}
         <select class="select small {e.verdict}" value={e.verdict} aria-label={t('safe.verdictFor', { what })}
           onchange={ev => run(() => app.backend.setSafeEntry(sessionId, { ...e, verdict: ev.currentTarget.value as Verdict }, scopeOf(e)))}>
           {#each VERDICTS as v (v)}<option value={v}>{t(`verdict.${v}`)}</option>{/each}
@@ -183,6 +216,22 @@
     font-family: var(--mono);
     font-size: var(--text-xs);
     color: var(--text);
+  }
+  .what .label {
+    flex: none;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+    color: var(--text);
+  }
+  .what code.aside {
+    color: var(--text-faint);
+  }
+  .label-edit {
+    flex: 1;
+    min-width: 0;
   }
   .small {
     height: 28px;

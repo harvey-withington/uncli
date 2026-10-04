@@ -46,6 +46,16 @@
   --kind-warning: #cc2200;
   --kind-conclusion: #cc003d;
 
+  /* A command on an approval card, coloured by what UNCLI makes of each
+     part. Aliases, so they follow the theme. */
+  --cmd-sep: var(--kind-example);
+  --cmd-read: var(--kind-overview);
+  --cmd-safe: var(--success);
+  --cmd-judged: var(--accent);
+  --cmd-unsafe: var(--warning);
+  --cmd-blocked: var(--danger);
+  --cmd-rest: var(--text-faint);
+
   --font: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Consolas, monospace;
   --text-xs: 11.5px;

@@ -292,3 +292,58 @@ func TestPromptLevelDirectives(t *testing.T) {
 		t.Errorf("after restore = %v, then %v", told, again)
 	}
 }
+
+// "This is safe" toggles on the card: on, the class is on the safe list
+// and the card waits for the user; off, the list is as it was before.
+func TestMarkSafeToggle(t *testing.T) {
+	h := newHarness(t, "perm-stdio-allow")
+	h.rt.onControl = true
+	push := map[string]string{"command": "git push origin main"}
+	h.rt.turns = [][]byte{
+		seg(toolUseLine("toolu_1", "PowerShell", push), askLine("req_1", "toolu_1", "PowerShell", push)),
+		seg(toolResultLine("toolu_1", "ok", false), scriptedResult),
+	}
+	dir := t.TempDir()
+	v, _ := h.m.Create("code", dir, "")
+	s, _ := h.m.get(v.ID)
+	h.m.Send(context.Background(), v.ID, "push")
+	waitUntil(t, "the card", func() bool { return len(s.View().Approvals) == 1 })
+	rid := s.View().Approvals[0].RequestID
+	list := func() []store.SafeEntry { l, _ := h.m.SafeList(v.ID); return l }
+
+	// No entry before: on adds one, the card stays; off removes it again.
+	if err := h.m.MarkSafe(v.ID, rid, true, ScopeAll); err != nil {
+		t.Fatal(err)
+	}
+	if l := list(); len(l) != 1 || l[0].Verdict != store.Safe || l[0].Folder != "" {
+		t.Fatalf("marked = %+v", l)
+	}
+	if a := s.View().Approvals; len(a) != 1 || !a[0].Marked || a[0].MarkedScope != ScopeAll {
+		t.Fatalf("the card must keep waiting, marked: %+v", a)
+	}
+	h.m.MarkSafe(v.ID, rid, false, "")
+	if l := list(); len(l) != 0 {
+		t.Errorf("unmarked = %+v", l)
+	}
+
+	// An Unsafe entry before (with a label): on makes it Safe, off puts it back.
+	h.m.SetSafeEntry(v.ID, store.SafeEntry{Kind: store.KindCommand, Words: "git push", Verdict: store.Unsafe, Label: "Publishes"}, ScopeProject)
+	h.m.MarkSafe(v.ID, rid, true, ScopeProject)
+	if l := list(); len(l) != 1 || l[0].Verdict != store.Safe {
+		t.Fatalf("marked over unsafe = %+v", l)
+	}
+	h.m.MarkSafe(v.ID, rid, false, "")
+	if l := list(); len(l) != 1 || l[0].Verdict != store.Unsafe || l[0].Label != "Publishes" {
+		t.Errorf("restored = %+v", l)
+	}
+
+	// Marked, then allowed once: the push runs and the mark stays.
+	h.m.MarkSafe(v.ID, rid, true, ScopeProject)
+	if err := h.m.Answer(v.ID, rid, Allow, ""); err != nil {
+		t.Fatal(err)
+	}
+	h.waitIdle(v.ID)
+	if !strings.Contains(answerTo(h, rid), `"behavior":"allow"`) || list()[0].Verdict != store.Safe {
+		t.Errorf("answer = %s, list = %+v", answerTo(h, rid), list())
+	}
+}
