@@ -95,16 +95,42 @@ func classOf(p part) (store.SafeClass, string) {
 			}
 		}
 		words = append(words, host) // ssh me@server, not every connection
+	case toolchain(prog):
+		// Any stack's build tool or task runner: its task is the class
+		// (mvn deploy, gradle test), files aren't (pytest tests/a.py).
+		if sub != "" && taskWord(sub) {
+			words = append(words, strings.ToLower(sub))
+		} else {
+			for _, w := range pos { // mvn -B deploy: the publishing task, after the options
+				if taskWord(w) && publishing(prog, []string{w}) {
+					words = append(words, strings.ToLower(w))
+					break
+				}
+			}
+		}
 	case strings.Contains(prog, "-"), lookCommands[prog], outputFilters[prog], fileCommands[prog],
-		buildTools[prog], downloaders[prog], systemCommands[prog], stopCommands[prog], remoteCommands[prog], osInstallers[prog]:
+		downloaders[prog], systemCommands[prog], stopCommands[prog], remoteCommands[prog], osInstallers[prog]:
 		// The program alone; its risk flags say the rest.
 	default: // a program UNCLI doesn't know: its first word, unless that's a file
 		if sub != "" && !pathLike(sub) {
 			words = append(words, sub)
 		}
 	}
+	flags := riskFlags(prog, sub, args)
+	// Publishing the words don't show (docker buildx build --push, gradle
+	// build publish): a flag, so an entry without it never covers it.
+	m := indexOf(args, "-m")
+	if (toolchain(prog) && publishing(prog, args) || interpreters[prog] && m >= 0 && publishing(prog, args[m+1:])) &&
+		!publishing(prog, words[1:]) {
+		flags = append(flags, "--publish")
+		sort.Strings(flags)
+	}
+	if toolchain(prog) && installsSystemWide(prog, args) && !hasWord(words[1:], "install", "global") {
+		flags = append(flags, "--install") // cmake --install
+		sort.Strings(flags)
+	}
 	return store.SafeClass{Kind: store.KindCommand, Words: strings.Join(words, " "),
-		Flags: strings.Join(riskFlags(prog, sub, args), " ")}, fixed
+		Flags: strings.Join(flags, " ")}, fixed
 }
 
 // riskFlags are the options that change what a command can do, in a
@@ -261,7 +287,9 @@ func matchEntry(list []store.SafeEntry, a core.ToolAction, class store.SafeClass
 			}
 		case shell && e.Kind == store.KindCommand:
 			ew := strings.Fields(e.Words)
-			if len(ew) <= len(cw) && wordsMatch(ew, cw) && flagsCovered(class.Flags, e.Flags) {
+			// Risk flags only narrow what Safe covers: a Blocked or Unsafe
+			// "git push" also covers "git push --force".
+			if len(ew) <= len(cw) && wordsMatch(ew, cw) && (e.Verdict != store.Safe || flagsCovered(class.Flags, e.Flags)) {
 				s = 10*len(ew) + len(strings.Fields(e.Flags))
 			}
 		}

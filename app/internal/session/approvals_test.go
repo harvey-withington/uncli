@@ -225,7 +225,7 @@ func TestUnattended(t *testing.T) {
 	if !strings.Contains(answerTo(h, "req_3"), "separate commands") || !strings.Contains(answerTo(h, "req_4"), "can't answer questions") {
 		t.Errorf("push = %s\nquestion = %s", answerTo(h, "req_3"), answerTo(h, "req_4"))
 	}
-	if p := pages[len(pages)-1]; p.Trace[0].Approved != "builtin" || !p.Trace[1].Denied || !p.Trace[2].Denied {
+	if p := pages[len(pages)-1]; p.Trace[0].Approved != "safe" || !p.Trace[1].Denied || !p.Trace[2].Denied {
 		t.Errorf("turn 2 = %+v", p.Trace)
 	}
 

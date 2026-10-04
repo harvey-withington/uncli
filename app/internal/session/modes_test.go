@@ -205,9 +205,9 @@ func TestJudgeWhy(t *testing.T) {
 	if _, ok := learnable(v.why); ok {
 		t.Error("inline code can't be learned, so neither can the whole command")
 	}
-	v = p.judgeTool("Bash", cmd("git push; npm run deploy; npm publish")) // the script is safe
+	v = p.judgeTool("Bash", cmd("git push; npm run lint; npm run deploy")) // a deploy script publishes; lint is safe
 	classes, ok := learnable(v.why)
-	if !ok || len(classes) != 2 || classes[1].Words != "npm publish" {
+	if !ok || len(classes) != 2 || classes[1].Words != "npm run deploy" {
 		t.Errorf("learn = %+v %v", classes, ok)
 	}
 }
@@ -296,4 +296,23 @@ func TestClassOf(t *testing.T) {
 		t.Error("flagsCovered")
 	}
 	_ = filepath.Join
+}
+
+// Risk flags only narrow Safe entries: a Blocked or Unsafe entry covers the
+// riskier variants too, and a Safe one doesn't.
+func TestEntryFlags(t *testing.T) {
+	run := func(verdict, c string) string {
+		p := policy{mode: ModeUnsafe, unknown: UnknownAsk, workdir: "/repo",
+			safe: []store.SafeEntry{{Kind: store.KindCommand, Words: "git push", Verdict: verdict}}}
+		return p.judgeTool("Bash", cmd(c)).action
+	}
+	if got := run(store.Blocked, "git push --force"); got != actionBlock {
+		t.Errorf("blocked git push, then git push --force: %s", got)
+	}
+	if got := run(store.Safe, "git push"); got != actionRun {
+		t.Errorf("safe git push: %s", got)
+	}
+	if got := run(store.Safe, "git push --force"); got != actionPrompt {
+		t.Errorf("safe git push, then git push --force: %s", got)
+	}
 }

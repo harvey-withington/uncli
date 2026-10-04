@@ -306,6 +306,7 @@
   "mode.unsafe.hint": "Reading and safe work just run; Claude prompts you before anything unsafe (deleting for good, publishing, installing, working outside this folder…). Your safe list can change what counts as safe",
   "mode.never.hint": "Everything runs without prompting you, except what you've blocked. Questions and plans still come to you",
   "mode.always.on": "Claude prompts you before anything except reading.",
+  "mode.unsafe.on": "Claude prompts you before anything unsafe; reading and safe work just run.",
   "mode.never.on": "Claude runs everything without prompting you, except what you've blocked.",
   "scope.label": "Where it applies",
   "scope.project": "This project",

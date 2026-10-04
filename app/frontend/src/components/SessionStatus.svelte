@@ -4,8 +4,8 @@
   import { t } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
 
-  // One line under the session's folder for each way the session departs
-  // from the usual: when Claude prompts, and whether the user is away.
+  // Lines under the session's folder: when Claude prompts (every level has
+  // one, the default in the quietest tone), and whether the user is away.
   interface Props {
     session: SessionView
   }
@@ -15,6 +15,7 @@
   const lines = $derived(
     [
       mode === 'always' && { icon: 'hand', text: t('mode.always.on'), tone: 'info' },
+      mode === 'unsafe' && { icon: 'shield', text: t('mode.unsafe.on'), tone: 'muted' },
       mode === 'never' && { icon: 'zap', text: t('mode.never.on'), tone: 'warn' },
       session.unattended && { icon: 'coffee', text: t('unattended.on'), tone: 'warn' },
     ].filter(l => !!l),
@@ -32,6 +33,9 @@
     gap: var(--space-2);
     margin: 0 0 0 38px;
     font-size: var(--text-xs);
+  }
+  .muted {
+    color: var(--text-muted);
   }
   .info {
     color: var(--accent);

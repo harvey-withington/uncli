@@ -134,7 +134,13 @@ var (
 		"ruff", "black", "isort", "flake8", "pylint", "gofmt", "goimports", "golangci-lint", "staticcheck", "rustfmt",
 		"gradle", "gradlew", "mvn", "msbuild", "wails", "vite", "webpack", "rollup", "esbuild", "svelte-check", "playwright",
 		"tox", "nox", "bundle", "rake", "rspec", "phpunit", "composer", "swift", "xcodebuild", "flutter", "dart", "deno",
-		"biome", "turbo", "nx", "lerna", "storybook", "tailwindcss", "sass", "dotnet-format", "npx", "pnpx", "bunx", "uvx")
+		"biome", "turbo", "nx", "lerna", "storybook", "tailwindcss", "sass", "dotnet-format", "npx", "pnpx", "bunx", "uvx",
+		// Other stacks: JVM, Ruby, PHP, Elixir, Erlang, Haskell, Clojure, Swift/iOS, C/C++, Zig, Elm, Nim, monorepos.
+		"sbt", "lein", "clj", "bundler", "mix", "rebar3", "stack", "cabal", "pod", "fastlane", "carthage", "meson",
+		"bazel", "bazelisk", "buck2", "pants", "just", "mage", "zig", "elm", "nimble", "gcc", "g++", "clang", "clang++",
+		"cl", "rustc", "javac", "kotlinc", "ctest", "cargo-nextest", "rush", "ng", "next", "nuxt",
+		"astro", "expo", "eas", "tsx", "ts-node", "nodemon", "jasmine", "karma", "cypress", "pre-commit",
+		"twine", "flit", "hatch", "pdm", "pipenv", "rye", "gem", "vsce", "ovsx", "electron-builder", "electron-forge")
 	fileCommands = set("mkdir", "md", "touch", "cp", "copy", "mv", "move", "ren", "rename", "ln", "chmod", "chown",
 		"new-item", "ni", "copy-item", "cpi", "move-item", "mi", "rename-item", "rni", "set-content", "add-content", "ac",
 		"out-file", "expand-archive", "compress-archive", "tee-object", "tar", "zip", "unzip", "7z", "patch", "sed", "awk")
@@ -150,6 +156,7 @@ var (
 	cloudCLIs      = set("kubectl", "helm", "terraform", "az", "aws", "gcloud", "pulumi", "vercel", "netlify", "fly", "heroku", "firebase", "wrangler")
 	interpreters   = set("node", "python", "python3", "py", "ruby", "perl", "php", "pwsh", "powershell", "bash", "sh", "zsh", "cmd", "deno")
 	codeRunners    = set("iex", "invoke-expression")
+	envManagers    = set("conda", "mamba", "micromamba")
 	downloaders    = set("curl", "wget", "invoke-webrequest", "iwr", "invoke-restmethod", "irm")
 )
 
@@ -163,8 +170,9 @@ var inlineCode = []string{"-e", "--eval", "-c", "-p", "--print", "-Command", "-c
 // PowerShell verbs.
 var (
 	lookVerbs    = set("get", "test", "select", "measure", "format", "find", "show", "compare", "convertto", "convertfrom", "write", "resolve", "split", "join", "sort", "group", "where", "foreach", "out-string", "out-host", "trace", "search", "read", "wait", "start-sleep")
-	routineVerbs = set("set", "new", "add", "copy", "move", "rename", "out", "export", "import", "expand", "compress", "convert", "push", "pop", "update", "start", "invoke-pester", "save", "merge", "checkpoint", "edit")
-	verbWhy      = map[string]string{
+	routineVerbs = set("set", "new", "add", "copy", "move", "rename", "out", "export", "import", "expand", "compress", "convert", "push", "pop", "update", "start", "invoke-pester", "save", "merge", "checkpoint", "edit",
+		"receive-job", "stop-job", "remove-job") // Claude's own background jobs
+	verbWhy = map[string]string{
 		"remove": WhyDeletes, "clear": WhyDeletes, "reset": WhyDeletes,
 		"stop": WhyStops, "restart": WhyStops, "disable": WhyStops, "suspend": WhyStops,
 		"install": WhyInstalls, "uninstall": WhyInstalls, "register": WhyInstalls, "unregister": WhyInstalls, "enable": WhySystem,
@@ -183,6 +191,12 @@ func programRisk(prog string, args []string, piped bool) Risk {
 		return gitRisk(args)
 	case codeRunners[prog]:
 		return risky(WhyRunsCode)
+	case toolchain(prog) && publishing(prog, args):
+		// Any stack's build tool, package manager or task runner: what it
+		// does in the folder is safe, but publishing or deploying isn't.
+		return risky(WhyPublishes)
+	case toolchain(prog) && installsSystemWide(prog, args):
+		return risky(WhyInstalls)
 	case interpreters[prog]:
 		switch {
 		case piped || len(args) == 0 || has(args, inlineCode...) || has(args, "-"):
@@ -190,9 +204,37 @@ func programRisk(prog string, args []string, piped bool) Risk {
 		case (prog == "python" || prog == "python3" || prog == "py") && has(args, "-m") && hasWord(args, "pip"):
 			return pipRisk(args)
 		}
+		if i := indexOf(args, "-m"); i >= 0 && publishing(prog, args[i+1:]) {
+			return risky(WhyPublishes) // python -m twine upload
+		}
 		return routine // a script, a module, a version check
-	case prog == "pip" || prog == "pip3" || prog == "uv" || prog == "poetry" || prog == "pipx":
+	case prog == "pip" || prog == "pip3" || prog == "pipx":
 		return pipRisk(args)
+	case prog == "uv":
+		switch sub {
+		case "pip":
+			return pipRisk(args[1:])
+		case "tool":
+			if hasWord(args, "install", "upgrade") {
+				return risky(WhyInstalls)
+			}
+		}
+		return routine // the project's own environment: sync, add, run, lock
+	case prog == "poetry" || prog == "pipenv" || prog == "pdm" || prog == "hatch" || prog == "rye" || prog == "flit":
+		if sub == "self" {
+			return risky(WhyInstalls)
+		}
+		return routine // the project's own environment
+	case envManagers[prog]:
+		if hasWord(args, "install", "create", "remove", "update", "uninstall") {
+			return risky(WhyInstalls)
+		}
+		return looks
+	case prog == "gem":
+		if hasWord(args, "install", "uninstall", "update") {
+			return risky(WhyInstalls)
+		}
+		return routine
 	case lookCommands[prog], outputFilters[prog]:
 		if prog == "find" && has(args, findActions...) {
 			return risky(WhyDeletes)
@@ -240,6 +282,9 @@ func programRisk(prog string, args []string, piped bool) Risk {
 		}
 		return routine
 	case prog == "docker" || prog == "podman":
+		if has(args, "--push") || (sub == "compose" || sub == "buildx") && hasWord(args, "push") {
+			return risky(WhyPublishes)
+		}
 		switch sub {
 		case "push", "login":
 			return risky(WhyPublishes)
@@ -335,6 +380,85 @@ func gitRisk(args []string) Risk {
 	return unknown
 }
 
+// toolchain: a build tool, package manager or task runner, whatever the
+// stack. Its work in the folder is safe; publishing isn't.
+func toolchain(prog string) bool {
+	return buildTools[prog] || packageManagers[prog] || prog == "go" || prog == "cargo" || prog == "dotnet" ||
+		prog == "uv" || prog == "poetry" || prog == "pip" || prog == "pip3" || prog == "pipx" || prog == "deno"
+}
+
+// The words that name publishing or deploying, as a subcommand, task, goal
+// or script: npm run deploy, mvn deploy, gradle :app:publish, mix
+// hex.publish, twine upload, gem push, rake release.
+var publishWords = []string{"publish", "deploy", "release", "upload", "unpublish", "yank"}
+
+// Files a task word can't be: deploy.js and release.py are scripts, judged
+// by what runs them.
+var fileExts = set(".js", ".mjs", ".cjs", ".ts", ".mts", ".py", ".rb", ".sh", ".ps1", ".psm1", ".bat", ".cmd", ".go",
+	".rs", ".java", ".kt", ".kts", ".php", ".pl", ".lua", ".exe", ".json", ".yaml", ".yml", ".toml", ".cfg", ".ini",
+	".txt", ".md", ".csv", ".xml", ".gradle", ".mk", ".cs", ".csproj", ".sln", ".swift", ".dart", ".ex", ".exs")
+
+// taskWord reports whether a word could name a subcommand, task or script
+// rather than a file or folder.
+func taskWord(w string) bool {
+	return w != "" && !strings.HasPrefix(w, "-") && !strings.ContainsAny(w, "/\\~*=$") &&
+		!fileExts[strings.ToLower(filepath.Ext(w))]
+}
+
+// publishing reports whether a toolchain command publishes or deploys: a
+// task word made of a publish word (split at : and ., so build:release
+// counts too, which errs towards prompting), or --publish, --deploy or
+// --push. "release" as an option's value (-c release, --config Release) is
+// a build configuration, and dotnet publish only builds locally.
+func publishing(prog string, args []string) bool {
+	if prog == "dotnet" && len(args) > 0 && strings.EqualFold(args[0], "publish") {
+		return false
+	}
+	for i, a := range args {
+		l := strings.ToLower(a)
+		if strings.HasPrefix(l, "-") {
+			name, _, _ := strings.Cut(l, "=")
+			if name == "--publish" || name == "--deploy" || name == "--push" {
+				return true
+			}
+			continue
+		}
+		if !taskWord(l) {
+			continue
+		}
+		for _, t := range strings.FieldsFunc(l, func(r rune) bool { return r == ':' || r == '.' }) {
+			switch {
+			case t == "release" && i > 0 && strings.HasPrefix(args[i-1], "-"):
+				continue // -c release: a build configuration
+			case strings.HasSuffix(t, "tomavenlocal"):
+				continue // publishToMavenLocal stays on this computer
+			case t == "push":
+				return true
+			}
+			for _, w := range publishWords {
+				if strings.HasPrefix(t, w) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// installsSystemWide: make install, ninja install, meson install, cmake
+// --install, and composer's global packages put things outside the project.
+func installsSystemWide(prog string, args []string) bool {
+	switch prog {
+	case "make", "ninja", "meson", "just":
+		return hasWord(positional(args), "install")
+	case "cmake":
+		return has(args, "--install")
+	case "composer":
+		return len(args) > 0 && strings.EqualFold(args[0], "global")
+	}
+	return false
+}
+
 func packageRisk(sub string, args []string) Risk {
 	global := has(args, "-g", "--global", "--location=global")
 	switch sub {
@@ -361,7 +485,12 @@ func pipRisk(args []string) Risk {
 // Folders that builds and tools make again: deleting them loses nothing.
 var generatedFolders = set("node_modules", "dist", "build", "out", "target", "coverage", ".next", ".nuxt", ".svelte-kit",
 	".turbo", ".cache", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".parcel-cache", ".vite", "tmp",
-	"temp", "bin", "obj", ".gradle", "storybook-static", "test-results", "playwright-report", ".angular")
+	"temp", "bin", "obj", ".gradle", "storybook-static", "test-results", "playwright-report", ".angular",
+	// Other stacks.
+	".venv", "venv", ".tox", ".nox", ".eggs", "htmlcov", "vendor", "pods", ".dart_tool", "_build", "deps", ".build",
+	"deriveddata", ".terraform", ".stack-work", "dist-newstyle", "elm-stuff", "zig-cache", ".zig-cache", "zig-out",
+	".output", ".astro", ".docusaurus", ".expo", "bower_components", ".pnpm-store", ".bundle", ".sass-cache",
+	".nyc_output")
 
 // allTemp: every path is in the temp folder.
 func allTemp(paths []string) bool {
@@ -379,7 +508,8 @@ func allGenerated(paths []string) bool {
 		if strings.Contains(p, "..") || filepath.IsAbs(p) || drivePath.MatchString(p) {
 			return false
 		}
-		if !generatedFolders[strings.ToLower(filepath.Base(p))] {
+		base := strings.ToLower(filepath.Base(p))
+		if !generatedFolders[base] && !strings.HasPrefix(base, "cmake-build-") && !strings.HasSuffix(base, ".egg-info") {
 			return false
 		}
 	}
@@ -529,6 +659,9 @@ func (at place) harmless(p string) bool {
 // harmlessPath: places a command may name without risk (null devices,
 // temp folders).
 func harmlessPath(p string) bool {
+	if gitBashDrive.MatchString(p) { // /c/Users/… is C:/Users/…
+		p = p[1:2] + ":" + p[2:]
+	}
 	l := strings.ToLower(p)
 	tmp := strings.ToLower(filepath.ToSlash(os.TempDir()))
 	return l == "/dev/null" || l == "nul" || strings.HasPrefix(l, "/tmp/") || tmp != "" && strings.HasPrefix(l, tmp+"/")

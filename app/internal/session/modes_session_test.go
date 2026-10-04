@@ -125,7 +125,7 @@ func TestExplainCommand(t *testing.T) {
 	if err != nil || e.Action != actionRun || len(e.Why) != 3 {
 		t.Fatalf("explanation = %+v, %v", e, err)
 	}
-	if e.Why[0].By != "looks" || e.Why[1].By != "builtin" || e.Why[1].Allow != "Bash(npm test:*)" {
+	if e.Why[0].By != "looks" || e.Why[1].By != "safe" || e.Why[2].By != "safe" { // the same for every stack
 		t.Errorf("why = %+v", e.Why)
 	}
 	h.m.SetSafeEntry(v.ID, store.SafeEntry{Kind: store.KindCommand, Words: "npm run lint", Verdict: store.Unsafe}, ScopeProject)

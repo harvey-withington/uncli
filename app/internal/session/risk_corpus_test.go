@@ -183,6 +183,125 @@ var corpus = []struct{ dialect, command, want string }{
 	{"bash", "python ../other/gen.py", "prompt !context"},
 	{"powershell", ".\\build.ps1", "unknown"},
 
+	// Every common stack: its usual work runs, publishing and deploying
+	// prompts, and so do installs outside the project (brief: Defaults for
+	// every stack).
+	// JavaScript / TypeScript.
+	{"bash", "pnpm --filter web build", "run"},
+	{"bash", "yarn workspace api test", "run"},
+	{"bash", "bun install", "run"},
+	{"bash", "bun run dev", "run"},
+	{"bash", "deno task test", "run"},
+	{"bash", "npx eslint src --fix", "run"},
+	{"bash", "npx tsc --noEmit", "run"},
+	{"bash", "npx playwright test", "run"},
+	{"bash", "npm run build:release", "prompt npm run build:release|"}, // errs towards prompting
+	{"bash", "npm run deploy", "prompt npm run deploy|"},
+	{"bash", "pnpm publish --access public", "prompt pnpm publish|"},
+	{"bash", "npx vsce publish", "prompt npx vsce|--publish"},
+	{"powershell", "npm run deploy:prod", "prompt npm run deploy:prod|"},
+	// Python.
+	{"bash", "python -m venv .venv", "run"},
+	{"bash", "uv sync", "run"},
+	{"bash", "uv add httpx", "run"},
+	{"bash", "uv run pytest -q", "run"},
+	{"bash", "poetry install", "run"},
+	{"bash", "poetry run pytest", "run"},
+	{"bash", "pipenv install --dev", "run"},
+	{"bash", "tox -e py312", "run"},
+	{"bash", "ruff check . --fix", "run"},
+	{"bash", "mypy src", "run"},
+	{"bash", "python manage.py migrate", "run"},
+	{"bash", "pip install -r requirements.txt", "prompt pip install|"}, // may be the system Python
+	{"bash", "uv pip install requests", "prompt uv pip|"},
+	{"bash", "uv tool install ruff", "prompt uv tool|"},
+	{"bash", "conda install numpy", "prompt conda install|"},
+	{"bash", "poetry publish --build", "prompt poetry publish|"},
+	{"bash", "twine upload dist/*", "prompt twine upload|"},
+	{"bash", "python -m twine upload dist/*", "prompt python -m twine upload|"},
+	{"bash", "rm -rf .venv .pytest_cache", "run"},
+	{"powershell", ".venv\\Scripts\\python -m pytest", "run"},
+	// Go.
+	{"bash", "go run ./cmd/server", "run"},
+	{"bash", "golangci-lint run", "run"},
+	{"bash", "go install golang.org/x/tools/gopls@latest", "prompt go install|"},
+	// Rust.
+	{"bash", "cargo build --release", "run"},
+	{"bash", "cargo clippy -- -D warnings", "run"},
+	{"bash", "cargo fmt", "run"},
+	{"bash", "cargo publish", "prompt cargo publish|"},
+	{"bash", "cargo install ripgrep", "prompt cargo install|"},
+	// Java / Kotlin.
+	{"bash", "mvn -B verify", "run"},
+	{"bash", "mvn clean package -DskipTests", "run"},
+	{"bash", "./gradlew build", "run"},
+	{"bash", "gradle test --info", "run"},
+	{"bash", "gradle publishToMavenLocal", "run"},
+	{"bash", "mvn -B deploy", "prompt mvn deploy|"},
+	{"bash", "mvn release:prepare release:perform", "prompt mvn release:prepare|"},
+	{"bash", "gradle :app:publish", "prompt gradle :app:publish|"},
+	{"bash", "gradle build publish", "prompt gradle build|--publish"},
+	{"powershell", "mvn -B deploy -DskipTests", "prompt mvn deploy|"},
+	// .NET.
+	{"bash", "dotnet restore", "run"},
+	{"bash", "dotnet build -c Release", "run"},
+	{"bash", "dotnet publish -c Release -o out", "run"}, // builds the output folder here
+	{"bash", "dotnet nuget push bin/App.nupkg --source nuget.org", "prompt dotnet nuget|--publish"},
+	{"powershell", "dotnet test --no-build", "run"},
+	// Ruby.
+	{"bash", "bundle install", "run"},
+	{"bash", "bundle exec rspec", "run"},
+	{"bash", "bundle exec rails db:migrate", "run"},
+	{"bash", "rake test", "run"},
+	{"bash", "gem build app.gemspec", "run"},
+	{"bash", "gem install rails", "prompt gem install|"},
+	{"bash", "gem push app-1.0.gem", "prompt gem push|"},
+	{"bash", "rake release", "prompt rake release|"},
+	{"bash", "bundle exec cap production deploy", "prompt bundle exec|--publish"},
+	// PHP.
+	{"bash", "composer install", "run"},
+	{"bash", "composer require guzzlehttp/guzzle", "run"},
+	{"bash", "php artisan migrate", "run"},
+	{"bash", "vendor/bin/phpunit", "run"}, // the project's own copy of phpunit
+	{"bash", "composer global require laravel/installer", "prompt composer global|"},
+	// Swift / iOS.
+	{"bash", "swift build -c release", "run"},
+	{"bash", "swift test", "run"},
+	{"bash", "pod install", "run"},
+	{"bash", "xcodebuild -scheme App -configuration Release build", "run"},
+	{"bash", "fastlane release", "prompt fastlane release|"},
+	{"bash", "rm -rf Pods DerivedData", "run"},
+	// Dart / Flutter.
+	{"bash", "flutter pub get", "run"},
+	{"bash", "flutter test", "run"},
+	{"bash", "flutter build apk --release", "run"},
+	{"bash", "dart pub publish", "prompt dart pub|--publish"},
+	{"bash", "rm -rf .dart_tool build", "run"},
+	// C / C++.
+	{"bash", "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release", "run"},
+	{"bash", "cmake --build build --config Release", "run"},
+	{"bash", "ctest --test-dir build", "run"},
+	{"bash", "make -j8", "run"},
+	{"bash", "ninja -C build", "run"},
+	{"bash", "make install", "prompt make install|"},
+	{"bash", "cmake --install build", "prompt cmake|--install"},
+	{"bash", "rm -rf cmake-build-debug", "run"},
+	// Elixir.
+	{"bash", "mix deps.get", "run"},
+	{"bash", "mix test", "run"},
+	{"bash", "mix hex.publish", "prompt mix hex.publish|"},
+	{"bash", "rm -rf _build deps", "run"},
+	// Containers.
+	{"bash", "docker build -t app .", "run"},
+	{"bash", "docker compose up -d", "run"},
+	{"bash", "docker compose push", "prompt docker compose|"},
+	{"bash", "docker buildx build --push -t me/app .", "prompt docker buildx|"},
+
+	// Shell housekeeping.
+	{"bash", "read -r line < notes.txt", "run"},
+	{"bash", "npm run dev & disown", "run"},
+	{"powershell", "Receive-Job -Id 3; Remove-Job -Id 3", "run"},
+
 	// Programs UNCLI doesn't know.
 	{"bash", "frobnicate sync --all", "unknown"},
 	{"powershell", "mytool export --out report.csv", "unknown"},

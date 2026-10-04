@@ -88,7 +88,7 @@ func shellClass(cmd, dialect string) Class {
 
 // Programs that only look (besides the output filters in rules.go), and
 // the ones that change the shell's own folder, which touches nothing.
-var lookCommands = set("ls", "dir", "pwd", "echo", "exit", "throw", "printf", "whoami", "hostname", "date", "tree", "stat", "file",
+var lookCommands = set("ls", "dir", "pwd", "echo", "exit", "throw", "read", "disown", "wait", "jobs", "unset", "shift", "printf", "whoami", "hostname", "date", "tree", "stat", "file",
 	"du", "df", "uname", "which", "where", "type", "find", "rg", "fd", "diff", "cmp", "realpath", "dirname", "basename",
 	"cd", "pushd", "popd", "true", "false", "comm", "tr", "seq", "sleep", "start-sleep", "cygpath", "netstat", "[", "[[", "test",
 	"readlink", "id", "ps", "tasklist", "env", "printenv", "awk", "sed", "jq", "yq", "xxd", "od", "hexdump", "md5sum",

@@ -21,6 +21,7 @@ describe('Prompt me', () => {
     await ask('push')
     await screen.findByRole('alertdialog', { name: 'Run a command' }, { timeout: 2000 })
     expect(within(modes()).getByRole('radio', { name: 'When unsafe' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('Claude prompts you before anything unsafe; reading and safe work just run.')).toBeInTheDocument()
 
     await fireEvent.click(within(modes()).getByRole('radio', { name: 'Never' }))
     expect(setMode).toHaveBeenCalledWith('s-code', 'never')

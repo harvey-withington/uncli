@@ -238,5 +238,5 @@ func wordsMatch(prefix, words []string) bool {
 var subcommandStyle = map[string]bool{
 	"git": true, "npm": true, "pnpm": true, "yarn": true, "bun": true, "go": true, "cargo": true, "dotnet": true,
 	"docker": true, "kubectl": true, "helm": true, "gh": true, "pip": true, "uv": true, "poetry": true,
-	"terraform": true, "az": true, "aws": true, "gcloud": true, "wails": true, "make": true,
+	"terraform": true, "az": true, "aws": true, "gcloud": true, "wails": true, "make": true, "twine": true,
 }

@@ -39,10 +39,9 @@ profiles:
       - "Bash(git diff:*)"
       - "Bash(git log:*)"
       - "Bash(git show:*)"
-      - "Bash(npm test:*)"
-      - "Bash(npm run:*)"
-      - "Bash(go test:*)"
-      - "Bash(go build:*)"
-      - "Bash(go vet:*)"
+      # No stack's commands here: UNCLI judges builds, tests and scripts the
+      # same way for every stack (brief: Defaults for every stack). An entry
+      # here overrides that judgement, so Bash(npm run:*) would also let
+      # npm run deploy run unprompted.
     permission_mode: acceptEdits
     ide_links: true

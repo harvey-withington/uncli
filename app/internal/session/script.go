@@ -444,6 +444,11 @@ func (r *reader) part(text string, piped bool) []part {
 	}
 	// Keywords and nested code: what follows them may still be a command
 	// (do X, then X, if X; } else { … }).
+	// PowerShell's unary comma makes an array of a value (,$c.properties):
+	// data, not a command.
+	if len(words) == 1 && r.dialect == DialectPowerShell && strings.HasPrefix(words[0], ",$") && !strings.Contains(words[0], "(") {
+		return []part{{text: text, kind: "assign"}}
+	}
 	for len(words) > 0 && (keywords[strings.ToLower(words[0])] || words[0] == "$BLOCK" || words[0] == "$SUB" || words[0] == ",") {
 		switch strings.ToLower(words[0]) {
 		case "function":
