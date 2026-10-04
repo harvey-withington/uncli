@@ -108,6 +108,7 @@ export interface ClassPreview {
 
 // How something risky could do harm.
 export type Risk = 'deletes' | 'discards' | 'outside' | 'publishes' | 'installs' | 'system' | 'stops' | 'remote' | 'secrets' | 'runs-code' | 'cloud'
+  | 'unsure' // the decision model wasn't sure enough that it's safe
 
 // What "Prompt when unsafe" does with a command UNCLI can't place.
 export type UnknownCommands = 'model' | 'inside' | 'ask'
@@ -303,6 +304,19 @@ export interface Preferences {
   quickTaskModel: ModelRef
   autoSummary: AutoSummary // which answers summarise themselves as they finish
   unknownCommands?: UnknownCommands // Ask mode and commands UNCLI doesn't recognise (default model)
+  decisionModel?: DecisionModel // answers "is this safe?"; the quick-task model unless set
+}
+
+// The app-level decision model (decision record 0006). Only the quick-task
+// model for now; a calibrated decider (Jev, Kev) adds an endpoint and a
+// pinned version, and the threshold says how sure "safe" must be.
+export interface DecisionModel {
+  provider: 'quick-task' | string
+  endpoint?: string
+  model?: string
+  version?: string
+  localOnly?: boolean
+  threshold?: number // 0.5 to 1; default 0.9
 }
 
 export interface Provider {

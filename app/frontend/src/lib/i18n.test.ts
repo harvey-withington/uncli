@@ -39,7 +39,7 @@ describe('i18n', () => {
     for (const f of ['any', 'project', 'all', 'builtin']) expect(dict).toHaveProperty(`safe.filter.${f}`)
     for (const b of ['looks', 'safe', 'inside', 'never', 'always', 'unknown', 'judging', 'user']) expect(dict).toHaveProperty(`why.${b}`)
     for (const a of ['you', 'listed', 'builtin', 'safe', 'looks', 'inside', 'never', 'mixed']) expect(dict).toHaveProperty(`trace.allowed.${a}`)
-    for (const r of ['deletes', 'discards', 'outside', 'publishes', 'installs', 'system', 'stops', 'remote', 'secrets', 'runs-code', 'cloud']) expect(dict).toHaveProperty(`risk.${r}`)
+    for (const r of ['deletes', 'discards', 'outside', 'publishes', 'installs', 'system', 'stops', 'remote', 'secrets', 'runs-code', 'cloud', 'unsure']) expect(dict).toHaveProperty(`risk.${r}`)
   })
 
   it('fills parameters', () => {

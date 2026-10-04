@@ -33,6 +33,9 @@ type Preferences struct {
 	// recognise: model (the quick-task model judges it), inside (it runs if
 	// it stays in the session folder) or ask.
 	UnknownCommands string `json:"unknownCommands"`
+	// DecisionModel answers fixed-answer questions such as "is this safe?"
+	// (decide.go); the quick-task model unless set.
+	DecisionModel DecisionModel `json:"decisionModel"`
 }
 
 // Automatic summaries: none, answers long enough to need one (the UI
@@ -55,7 +58,8 @@ type Provider struct {
 const settingPrefs = "prefs"
 
 func defaultPreferences() Preferences {
-	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}, AutoSummary: SummaryOff, UnknownCommands: session.UnknownModel}
+	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}, AutoSummary: SummaryOff, UnknownCommands: session.UnknownModel,
+		DecisionModel: DecisionModel{Provider: DeciderQuickTask}}
 }
 
 func (s *Service) Preferences() Preferences {
@@ -80,6 +84,9 @@ func (s *Service) Preferences() Preferences {
 	if !session.ValidUnknown(p.UnknownCommands) {
 		p.UnknownCommands = session.UnknownModel
 	}
+	if p.DecisionModel.Provider == "" || validDecisionModel(p.DecisionModel) != nil {
+		p.DecisionModel = defaultPreferences().DecisionModel
+	}
 	return p
 }
 
@@ -98,6 +105,12 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 	}
 	if !session.ValidUnknown(p.UnknownCommands) {
 		return s.Preferences(), fmt.Errorf("unknown setting for unrecognised commands %q", p.UnknownCommands)
+	}
+	if p.DecisionModel.Provider == "" {
+		p.DecisionModel.Provider = DeciderQuickTask
+	}
+	if err := validDecisionModel(p.DecisionModel); err != nil {
+		return s.Preferences(), err
 	}
 	b, err := json.Marshal(p)
 	if err != nil {

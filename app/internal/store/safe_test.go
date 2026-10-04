@@ -112,4 +112,10 @@ func TestJudgements(t *testing.T) {
 	if j, ok := s.Judgement("cmd:frob"); !ok || j != (Judgement{Level: "routine", Note: "Builds the docs.", Model: "haiku"}) {
 		t.Errorf("judgement = %+v, %v", j, ok)
 	}
+	// Which decision model said it, and how sure it was.
+	want := Judgement{Level: "risky", Risk: "unsure", Model: "jev", Decider: "systemone/jev@1.13", Confidence: 0.72}
+	s.SetJudgement("class:frob sync|", want)
+	if j, ok := s.Judgement("class:frob sync|"); !ok || j != want {
+		t.Errorf("judgement = %+v, %v", j, ok)
+	}
 }

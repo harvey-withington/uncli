@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 // session then looks again at what it has waiting. If the model can't
 // judge it, the user is asked, as with UnknownAsk.
 
-// JudgeFunc asks the quick-task model about one command part or tool.
+// JudgeFunc asks the decision model about one command part or tool.
 type JudgeFunc func(ctx context.Context, q JudgeQuery) (store.Judgement, error)
 
 // judgeTimeout bounds one judgement; past it the user is asked instead.
@@ -85,6 +86,23 @@ func (m *Manager) judgeNow(q JudgeQuery) {
 		m.judge.failed[q.Key] = true
 	}
 	m.judge.mu.Unlock()
+}
+
+// judged is an earlier judgement, if the current decision model gave it.
+// Judgements from before decision models were the quick-task model's.
+func (m *Manager) judged(key string) (store.Judgement, bool) {
+	j, ok := m.d.Store.Judgement(key)
+	if !ok || m.d.DeciderKey == nil {
+		return j, ok
+	}
+	want := m.d.DeciderKey()
+	switch {
+	case want == "" || j.Decider == want:
+		return j, true
+	case j.Decider == "":
+		return j, strings.HasPrefix(want, "quick-task/")
+	}
+	return store.Judgement{}, false
 }
 
 // waitingForUserLocked reports whether a card is waiting for the user

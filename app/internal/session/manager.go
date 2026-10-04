@@ -31,11 +31,14 @@ type Deps struct {
 	Binary     BinaryFunc
 	Sink       Sink
 	ScratchDir string // chat sessions get <ScratchDir>/<session id>
-	// Judge asks the quick-task model about commands UNCLI doesn't
+	// Judge asks the app's decision model about commands UNCLI doesn't
 	// recognise, and Unknown says what the user wants done with them
-	// (UnknownModel, UnknownInside, UnknownAsk). Either may be nil.
-	Judge   JudgeFunc
-	Unknown func() string
+	// (UnknownModel, UnknownInside, UnknownAsk). DeciderKey names the
+	// current decision model (core.DeciderInfo.Key), so answers cached from
+	// another one are asked again. Any may be nil.
+	Judge      JudgeFunc
+	Unknown    func() string
+	DeciderKey func() string
 }
 
 // ErrNoCLI means the CLI isn't installed yet; the UI shows the setup screen.

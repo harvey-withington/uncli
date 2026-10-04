@@ -41,6 +41,7 @@ const (
 	WhySecrets   = "secrets"   // touches passwords, keys or other secrets
 	WhyRunsCode  = "runs-code" // runs code it was handed
 	WhyCloud     = "cloud"     // changes things in a cloud account
+	WhyUnsure    = "unsure"    // the decision model wasn't sure enough it's safe
 )
 
 // Risk is the risk of one tool use or command part.

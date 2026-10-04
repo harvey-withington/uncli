@@ -177,7 +177,7 @@ func (s *Session) policyLocked() policy {
 		allowlist = parseAllowlist(s.m.Allowlist(s.rec.ProfileID), s.rec.Workdir)
 	}
 	return policy{mode: s.rec.Mode, unknown: s.m.unknownSetting(), safe: safe, profile: allowlist,
-		workdir: s.rec.Workdir, cwd: s.shellCwd, state: s.m.statePaths(), hints: s.hints, judged: s.m.d.Store.Judgement, failed: s.m.judge.isFailed}
+		workdir: s.rec.Workdir, cwd: s.shellCwd, state: s.m.statePaths(), hints: s.hints, judged: s.m.judged, failed: s.m.judge.isFailed}
 }
 
 // rejudgeLocked looks again at the requests waiting for the user after

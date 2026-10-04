@@ -283,6 +283,7 @@
   "risk.remote": "connects to another computer",
   "risk.secrets": "touches passwords, keys or other secrets",
   "risk.runs-code": "runs code it was handed, which UNCLI can't check",
+  "risk.unsure": "may not be safe: UNCLI's decision model wasn't sure enough",
   "risk.cloud": "changes things in a cloud account",
   "asking.title": "Why Claude is asking",
   "asking.unknown": "UNCLI can't tell whether this is safe, and your setting is to prompt you about those.",

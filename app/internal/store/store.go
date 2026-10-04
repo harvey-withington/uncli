@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS risk_judgements (
   risk       TEXT,
   note       TEXT,
   model      TEXT,
+  decider    TEXT,               -- which decision model said it (core.DeciderInfo.Key)
+  confidence REAL,               -- how sure, of the level
   created_at INTEGER
 );
 `
@@ -107,6 +109,7 @@ func migrate(db *sql.DB) error {
 	for _, c := range []struct{ table, col, def string }{
 		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"},
 		{"sessions", "mode", "TEXT"},
+		{"risk_judgements", "decider", "TEXT"}, {"risk_judgements", "confidence", "REAL"},
 	} {
 		if !has(c.table, c.col) {
 			if _, err := db.Exec("ALTER TABLE " + c.table + " ADD COLUMN " + c.col + " " + c.def); err != nil {

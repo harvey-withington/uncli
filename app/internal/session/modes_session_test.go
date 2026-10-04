@@ -207,3 +207,26 @@ func TestModelJudgesUnknownCommands(t *testing.T) {
 		t.Error("the cached verdict should allow it")
 	}
 }
+
+// A cached judgement counts only if the current decision model gave it, so
+// switching models judges again; older ones were the quick-task model's.
+func TestJudgedByCurrentDecider(t *testing.T) {
+	h := newHarness(t, "perm-stdio-allow")
+	h.m.d.Store.SetJudgement("class:old|", store.Judgement{Level: RiskRoutine, Model: "haiku"})
+	h.m.d.Store.SetJudgement("class:jev|", store.Judgement{Level: RiskRoutine, Decider: "systemone/jev@1.13", Confidence: 0.98})
+	key := "quick-task/haiku@"
+	h.m.d.DeciderKey = func() string { return key }
+	if _, ok := h.m.judged("class:old|"); !ok {
+		t.Error("an older judgement is the quick-task model's")
+	}
+	if _, ok := h.m.judged("class:jev|"); ok {
+		t.Error("another decider's judgement must be asked again")
+	}
+	key = "systemone/jev@1.13"
+	if _, ok := h.m.judged("class:old|"); ok {
+		t.Error("the quick-task model's judgement must be asked again of a new decider")
+	}
+	if j, ok := h.m.judged("class:jev|"); !ok || j.Confidence != 0.98 {
+		t.Errorf("own judgement = %+v, %v", j, ok)
+	}
+}

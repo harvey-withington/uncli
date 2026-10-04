@@ -199,32 +199,38 @@ func migrateSafeList(db *sql.DB) error {
 	return nil
 }
 
-// Judgement is what the quick-task model said about a command (or tool)
+// Judgement is what the decision model said about a command (or tool)
 // UNCLI didn't recognise: looks, routine or risky, how it could do harm,
-// and a one-line reason for the user.
+// a one-line reason for the user when it gave one, and which decider said
+// it and how sure it was.
 type Judgement struct {
-	Level string `json:"level"`
-	Risk  string `json:"risk,omitempty"`
-	Note  string `json:"note,omitempty"`
-	Model string `json:"model,omitempty"`
+	Level      string  `json:"level"`
+	Risk       string  `json:"risk,omitempty"`
+	Note       string  `json:"note,omitempty"`
+	Model      string  `json:"model,omitempty"`
+	Decider    string  `json:"decider,omitempty"`    // core.DeciderInfo.Key; empty before deciders
+	Confidence float64 `json:"confidence,omitempty"` // of the level; 1 from an uncalibrated decider
 }
 
 // Judgement looks up an earlier judgement.
 func (s *Store) Judgement(key string) (Judgement, bool) {
 	var j Judgement
-	var risk, note, model sql.NullString
-	err := s.db.QueryRow(`SELECT level, risk, note, model FROM risk_judgements WHERE key=?`, key).Scan(&j.Level, &risk, &note, &model)
+	var risk, note, model, decider sql.NullString
+	var confidence sql.NullFloat64
+	err := s.db.QueryRow(`SELECT level, risk, note, model, decider, confidence FROM risk_judgements WHERE key=?`, key).
+		Scan(&j.Level, &risk, &note, &model, &decider, &confidence)
 	if err != nil {
 		return Judgement{}, false
 	}
-	j.Risk, j.Note, j.Model = risk.String, note.String, model.String
+	j.Risk, j.Note, j.Model, j.Decider, j.Confidence = risk.String, note.String, model.String, decider.String, confidence.Float64
 	return j, true
 }
 
 // SetJudgement records a judgement.
 func (s *Store) SetJudgement(key string, j Judgement) error {
-	_, err := s.db.Exec(`INSERT INTO risk_judgements (key, level, risk, note, model, created_at) VALUES (?,?,?,?,?,?)
-		ON CONFLICT(key) DO UPDATE SET level=excluded.level, risk=excluded.risk, note=excluded.note, model=excluded.model`,
-		key, j.Level, nullStr(j.Risk), nullStr(j.Note), nullStr(j.Model), now())
+	_, err := s.db.Exec(`INSERT INTO risk_judgements (key, level, risk, note, model, decider, confidence, created_at) VALUES (?,?,?,?,?,?,?,?)
+		ON CONFLICT(key) DO UPDATE SET level=excluded.level, risk=excluded.risk, note=excluded.note, model=excluded.model,
+		decider=excluded.decider, confidence=excluded.confidence, created_at=excluded.created_at`,
+		key, j.Level, nullStr(j.Risk), nullStr(j.Note), nullStr(j.Model), nullStr(j.Decider), j.Confidence, now())
 	return err
 }
