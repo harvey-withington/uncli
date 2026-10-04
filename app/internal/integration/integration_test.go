@@ -194,7 +194,7 @@ func TestPhase1EndToEnd(t *testing.T) {
 		if p := last(t, svc, co.ID); !strings.Contains(p.AnswerMD, "14") {
 			t.Errorf("co-work answer should read the folder: %q", p.AnswerMD)
 		}
-		if p := last(t, svc, code.ID); len(p.Trace) == 0 || !slices.ContainsFunc(p.Trace, func(i store.TraceItem) bool { return strings.Contains(i.Summary, "git status") && i.OK }) {
+		if p := last(t, svc, code.ID); len(p.Trace) == 0 || !slices.ContainsFunc(p.Trace, func(i store.TraceItem) bool { return strings.Contains(i.Summary, "git status") && !i.Denied }) {
 			t.Errorf("code session should have run git status: %+v", p.Trace)
 		}
 		if st := view(svc, code.ID).State; st != session.Idle {
@@ -206,11 +206,11 @@ func TestPhase1EndToEnd(t *testing.T) {
 	})
 
 	t.Run("denied tools show in the trace", func(t *testing.T) {
-		// The CLI auto-approves read-only commands (whoami, ls) and, under
-		// acceptEdits, file commands in the workdir (mkdir, rm, mv), so this
-		// uses one that is neither and isn't on the code allowlist.
-		// With approvals it waits on a card; the user denies it there.
-		if err := svc.Sessions.Send(context.Background(), code.ID, "Use Bash to run exactly `git commit --allow-empty -m probe` and report the result, or say DENIED if you can't. Don't try any other way."); err != nil {
+		// Ask mode asks only about risky commands: git clean deletes
+		// untracked files for good, so it waits on a card; the user denies it.
+		probe := filepath.Join(repo, "probe.txt")
+		os.WriteFile(probe, []byte("keep me"), 0o644)
+		if err := svc.Sessions.Send(context.Background(), code.ID, "Use Bash to run exactly `git clean -fdx` and report the result, or say DENIED if you can't. Don't try any other way."); err != nil {
 			t.Fatal(err)
 		}
 		deadline := time.Now().Add(3 * time.Minute)
@@ -218,16 +218,16 @@ func TestPhase1EndToEnd(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 		}
 		if a := view(svc, code.ID).Approvals; len(a) > 0 {
-			if err := svc.Sessions.Answer(code.ID, a[0].RequestID, session.Deny, nil); err != nil {
+			if err := svc.Sessions.Answer(code.ID, a[0].RequestID, session.Deny, ""); err != nil {
 				t.Fatal(err)
 			}
 		}
 		waitIdle(t, svc, code.ID)
 		p := last(t, svc, code.ID)
 		if !slices.ContainsFunc(p.Trace, func(i store.TraceItem) bool { return i.Denied }) {
-			t.Errorf("git commit is not on the code allowlist and should be denied: %+v", p.Trace)
+			t.Errorf("git clean is risky and the user denied it: %+v", p.Trace)
 		}
-		if out, _ := exec.Command("git", "-C", repo, "log", "--oneline").CombinedOutput(); strings.Contains(string(out), "probe") {
+		if _, err := os.Stat(probe); err != nil {
 			t.Error("the denied command ran anyway")
 		}
 	})
@@ -478,6 +478,7 @@ func TestApprovals(t *testing.T) {
 	if _, err := svc.InstallCLI(ctx); err != nil {
 		t.Fatal(err)
 	}
+	askUnknown(t, svc) // node -e can't be placed: with "ask", it prompts
 	v, err := svc.Sessions.Create("code", t.TempDir(), "haiku")
 	if err != nil {
 		t.Fatal(err)
@@ -502,13 +503,13 @@ func TestApprovals(t *testing.T) {
 
 	ask("6*7")
 	a := waitCard()
-	if a.Tool != "Bash" || !strings.Contains(string(a.Input), "node -e") || len(a.Suggestions) == 0 || a.Suggestions[0].Prefix != "node" {
-		t.Fatalf("card = %+v", a)
+	if a.Tool != "Bash" || !strings.Contains(string(a.Input), "node -e") || len(a.Learn) != 0 || a.Why[0].Fixed != session.FixedInline {
+		t.Fatalf("inline code can only be allowed once: %+v", a)
 	}
 	if view(svc, v.ID).State != session.NeedsApproval {
 		t.Errorf("state = %s", view(svc, v.ID).State)
 	}
-	if err := svc.Sessions.Answer(v.ID, a.RequestID, session.Allow, nil); err != nil {
+	if err := svc.Sessions.Answer(v.ID, a.RequestID, session.Allow, ""); err != nil {
 		t.Fatal(err)
 	}
 	waitIdle(t, svc, v.ID)
@@ -518,7 +519,7 @@ func TestApprovals(t *testing.T) {
 
 	ask("5*5")
 	a = waitCard()
-	if err := svc.Sessions.Answer(v.ID, a.RequestID, session.Deny, nil); err != nil {
+	if err := svc.Sessions.Answer(v.ID, a.RequestID, session.Deny, ""); err != nil {
 		t.Fatal(err)
 	}
 	waitIdle(t, svc, v.ID)
@@ -527,13 +528,193 @@ func TestApprovals(t *testing.T) {
 		t.Errorf("denied answer = %q, trace = %+v", p.AnswerMD, p.Trace)
 	}
 
-	if _, err := svc.Sessions.SetRule(v.ID, store.ToolRule{Tool: "Bash", Prefix: "node", Action: store.RuleAllow}); err != nil {
+	// "This is safe" remembers the class, so the same command runs on its
+	// own the next time. git clean -n only lists what it would delete.
+	clean := func() {
+		if err := svc.Sessions.Send(ctx, v.ID, "Use the Bash tool to run exactly: git clean -n  and then reply DONE."); err != nil {
+			t.Fatal(err)
+		}
+	}
+	clean()
+	a = waitCard()
+	if len(a.Learn) != 1 || a.Learn[0].Words != "git clean" {
+		t.Fatalf("card = %+v", a)
+	}
+	if err := svc.Sessions.Answer(v.ID, a.RequestID, session.Safe, session.ScopeProject); err != nil {
 		t.Fatal(err)
 	}
-	ask("3*3")
 	waitIdle(t, svc, v.ID)
-	if p := last(t, svc, v.ID); !strings.Contains(p.AnswerMD, "9") {
-		t.Errorf("rule-allowed answer = %q", p.AnswerMD)
+	clean()
+	waitIdle(t, svc, v.ID)
+	if p := last(t, svc, v.ID); !slices.ContainsFunc(p.Trace, func(i store.TraceItem) bool { return i.Approved == "listed" }) {
+		t.Errorf("the learned command should run on its own: %+v", p.Trace)
 	}
-	t.Logf("cost: allowed, denied and ruled turns done")
+	t.Logf("cost: allowed, denied and learned turns done")
+}
+
+// notesServer is a small MCP server with annotated and unannotated tools.
+const notesServer = `import { createInterface } from "node:readline";
+const tools = [
+  { name: "read_note", description: "Read a note.", inputSchema: { type: "object", properties: { name: { type: "string" } } }, annotations: { readOnlyHint: true } },
+  { name: "delete_note", description: "Delete a note.", inputSchema: { type: "object", properties: { name: { type: "string" } } }, annotations: { destructiveHint: true } },
+  { name: "touch_note", description: "Create or update a note.", inputSchema: { type: "object", properties: { name: { type: "string" } } } },
+];
+const send = m => process.stdout.write(JSON.stringify(m) + "\n");
+createInterface({ input: process.stdin }).on("line", l => {
+  let m; try { m = JSON.parse(l) } catch { return }
+  if (m.id === undefined) return;
+  if (m.method === "initialize") return send({ jsonrpc: "2.0", id: m.id, result: { protocolVersion: m.params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "notes", version: "1.0.0" } } });
+  if (m.method === "tools/list") return send({ jsonrpc: "2.0", id: m.id, result: { tools } });
+  if (m.method === "tools/call") return send({ jsonrpc: "2.0", id: m.id, result: { content: [{ type: "text", text: "ok " + m.params.name }] } });
+  send({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "no such method" } });
+});
+`
+
+// Prompt levels against the real CLI and a real MCP server: Always prompts
+// for everything but the read tool, Never runs everything, a tool taught
+// safe stops prompting, and Always with Unattended declines all but reading.
+func TestSessionModes(t *testing.T) {
+	config := t.TempDir()
+	dir := t.TempDir()
+	server := filepath.Join(dir, "notes.mjs")
+	os.WriteFile(server, []byte(notesServer), 0o644)
+	cfg, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"notes": map[string]any{"command": "node", "args": []string{filepath.ToSlash(server)}}}})
+	os.WriteFile(filepath.Join(dir, "mcp.json"), cfg, 0o644)
+	os.WriteFile(filepath.Join(config, "profiles.yaml"), []byte(`profiles:
+  - id: notes
+    label: Notes
+    folder: pick
+    model: haiku
+    tools: [Read]
+    isolated: true
+    permission_mode: default
+    mcp_config: ["`+filepath.ToSlash(filepath.Join(dir, "mcp.json"))+`"]
+`), 0o644)
+	svc, _ := open(t, config)
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	askUnknown(t, svc) // touch_note has no annotations: with "ask", Ask mode asks about it
+	v, err := svc.Sessions.Create("notes", t.TempDir(), "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const q = "Call these notes tools one after another, each with name x: read_note, then touch_note, then delete_note. " +
+		"Call all three even if one is refused. Then reply with one word per tool: OK or REFUSED."
+
+	// run sends q in a mode and answers cards (touch allowed, delete denied);
+	// it returns the tools that came to the user, and the page.
+	run := func(mode string) ([]string, store.Page) {
+		t.Helper()
+		if _, err := svc.Sessions.SetMode(v.ID, mode); err != nil {
+			t.Fatal(err)
+		}
+		if err := svc.Sessions.Send(ctx, v.ID, q); err != nil {
+			t.Fatal(err)
+		}
+		var asked []string
+		deadline := time.Now().Add(4 * time.Minute)
+		for time.Now().Before(deadline) {
+			cur := view(svc, v.ID)
+			if !cur.Busy {
+				return asked, last(t, svc, v.ID)
+			}
+			if len(cur.Approvals) > 0 {
+				a := cur.Approvals[0]
+				asked = append(asked, strings.TrimPrefix(a.Tool, "mcp__notes__"))
+				d := session.Allow
+				if strings.HasSuffix(a.Tool, "delete_note") {
+					d = session.Deny
+				}
+				svc.Sessions.Answer(v.ID, a.RequestID, d, "")
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Fatalf("%s turn never finished", mode)
+		return nil, store.Page{}
+	}
+	ran := func(p store.Page) map[string]string {
+		out := map[string]string{}
+		for _, it := range p.Trace {
+			name := strings.TrimPrefix(it.Name, "mcp__notes__")
+			switch {
+			case it.Denied:
+				out[name] = "refused"
+			case it.OK:
+				out[name] = "ran"
+			}
+		}
+		return out
+	}
+	check := func(mode string, asked []string, p store.Page, wantAsked string, want map[string]string) {
+		t.Helper()
+		got := ran(p)
+		for tool, w := range want {
+			if got[tool] != w {
+				t.Errorf("%s: %s %s, want %s (trace %+v)", mode, tool, got[tool], w, p.Trace)
+			}
+		}
+		if strings.Join(asked, ",") != wantAsked {
+			t.Errorf("%s: asked about %v, want %s", mode, asked, wantAsked)
+		}
+	}
+
+	asked, p := run(session.ModeAlways)
+	check("always", asked, p, "touch_note,delete_note", map[string]string{"read_note": "ran", "touch_note": "ran", "delete_note": "refused"})
+	asked, p = run(session.ModeNever)
+	check("never", asked, p, "", map[string]string{"read_note": "ran", "touch_note": "ran", "delete_note": "ran"})
+
+	// Prompt when unsafe, after marking touch_note safe for this project:
+	// only the destructive tool prompts.
+	if err := svc.Sessions.Teach(v.ID, []store.SafeClass{{Kind: store.KindTool, Words: "mcp__notes__touch_note"}}, store.Safe, session.ScopeProject); err != nil {
+		t.Fatal(err)
+	}
+	asked, p = run(session.ModeUnsafe)
+	check("unsafe, taught", asked, p, "delete_note", map[string]string{"read_note": "ran", "touch_note": "ran", "delete_note": "refused"})
+
+	// Always prompt me, unattended: reading runs, the rest is declined.
+	svc.Sessions.SetUnattended(v.ID, true)
+	asked, p = run(session.ModeAlways)
+	check("always, unattended", asked, p, "", map[string]string{"read_note": "ran", "touch_note": "refused", "delete_note": "refused"})
+}
+
+// askUnknown sets Ask mode to ask about commands and tools UNCLI doesn't
+// recognise, instead of having the quick-task model judge them.
+func askUnknown(t *testing.T, svc *app.Service) {
+	t.Helper()
+	p := svc.Preferences()
+	p.UnknownCommands = session.UnknownAsk
+	if _, err := svc.SetPreferences(p); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The quick-task model judges commands UNCLI doesn't recognise: harmless
+// ones as looks or routine, harmful ones as risky with a reason.
+func TestModelJudgesCommands(t *testing.T) {
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	if _, err := svc.InstallCLI(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	v, err := svc.Sessions.Create("code", t.TempDir(), "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for c, want := range map[string]string{
+		`node -e "console.log(process.version)"`:                          "allow",
+		`node -e "require('child_process').execSync('git push --force')"`: "ask",
+		`python -c "import shutil; shutil.rmtree('C:/Users')"`:            "ask",
+	} {
+		e, err := svc.Sessions.ExplainCommand(v.ID, c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.Action != want || len(e.Why) == 0 || e.Why[0].Judged == "" || e.Why[0].Note == "" {
+			t.Errorf("%s: %+v", c, e)
+		}
+		t.Logf("%s -> %s %+v", c, e.Action, e.Why)
+	}
 }

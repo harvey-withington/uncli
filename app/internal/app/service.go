@@ -98,6 +98,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	s.Sessions, err = session.NewManager(session.Deps{
 		Store: db, Adapter: s.Adapter, Runtime: local.New(), Profiles: set,
 		Binary: s.binary, Sink: newCoalescer(emit, 50*time.Millisecond), ScratchDir: paths.Scratch,
+		Judge: s.judgeCommand, Unknown: func() string { return s.Preferences().UnknownCommands },
 	})
 	if err != nil {
 		db.Close()

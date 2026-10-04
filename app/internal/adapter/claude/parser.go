@@ -263,6 +263,7 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 		if req.Subtype == "can_use_tool" {
 			return []core.Event{ev(core.EvApprovalAsked, core.ApprovalAsked{
 				RequestID: l.RequestID, Tool: req.ToolName, Input: req.Input, Description: req.Description, ToolUseID: req.ToolUseID,
+				Action: ActionOf(req.ToolName, req.Input),
 			})}, nil
 		}
 		return unknown(), nil
@@ -276,11 +277,15 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 				Account *struct {
 					SubscriptionType string `json:"subscriptionType"`
 				} `json:"account"`
+				MCPServers []mcpServer `json:"mcpServers"`
 			} `json:"response"`
 		}
 		_ = json.Unmarshal(l.Response, &resp)
 		if resp.Subtype == "error" {
 			return []core.Event{ev(core.EvError, core.ErrorInfo{Message: resp.Error})}, nil
+		}
+		if resp.Response != nil && resp.Response.MCPServers != nil {
+			return []core.Event{ev(core.EvToolHints, toolHints(resp.Response.MCPServers))}, nil
 		}
 		if resp.Response != nil && len(resp.Response.Models) > 0 {
 			a := core.Account{}
@@ -304,6 +309,37 @@ type initModel struct {
 	DisplayName           string   `json:"displayName"`
 	Description           string   `json:"description"`
 	SupportedEffortLevels []string `json:"supportedEffortLevels"`
+}
+
+// mcpServer is one server in the answer to mcp_status. The CLI reports
+// each tool's annotations without the "Hint" suffix and leaves out the
+// false ones.
+type mcpServer struct {
+	Name  string `json:"name"`
+	Tools []struct {
+		Name        string `json:"name"`
+		Annotations struct {
+			ReadOnly    bool `json:"readOnly"`
+			Destructive bool `json:"destructive"`
+			OpenWorld   bool `json:"openWorld"`
+		} `json:"annotations"`
+	} `json:"tools"`
+}
+
+// mcpUnsafe is what the CLI replaces in a server or tool name to build
+// the tool's name ("mcp__<server>__<tool>").
+var mcpUnsafe = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
+
+func toolHints(servers []mcpServer) core.ToolHints {
+	out := core.ToolHints{Tools: map[string]core.ToolHint{}}
+	for _, s := range servers {
+		for _, t := range s.Tools {
+			name := "mcp__" + mcpUnsafe.ReplaceAllString(s.Name, "_") + "__" + mcpUnsafe.ReplaceAllString(t.Name, "_")
+			a := t.Annotations
+			out.Tools[name] = core.ToolHint{ReadOnly: a.ReadOnly, Destructive: a.Destructive, OpenWorld: a.OpenWorld}
+		}
+	}
+	return out
 }
 
 var localStdout = regexp.MustCompile(`(?s)^<local-command-stdout>(.*)</local-command-stdout>$`)

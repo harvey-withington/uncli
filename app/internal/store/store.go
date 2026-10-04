@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   modifiers     TEXT NOT NULL DEFAULT '[]',
   sort_order    REAL,
   archived      INTEGER DEFAULT 0,
+  mode          TEXT,              -- when to prompt: always | unsafe | never (NULL = unsafe)
   created_at    INTEGER, updated_at INTEGER
 );
 
@@ -61,15 +62,29 @@ CREATE TABLE IF NOT EXISTS events (
 
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 
--- Tool permission rules per project (a session's working folder): allow,
--- ask or deny a tool, or for Bash a command prefix ("git", "git push").
-CREATE TABLE IF NOT EXISTS tool_rules (
-  workdir TEXT NOT NULL,
-  tool    TEXT NOT NULL,
-  prefix  TEXT NOT NULL DEFAULT '',
-  action  TEXT NOT NULL,
+-- The user's safe list: corrections to what UNCLI counts as safe. Each
+-- entry is a command class (words and risk flags) or a tool, with a
+-- verdict (safe, unsafe, blocked), for one project ('' = all projects).
+CREATE TABLE IF NOT EXISTS safe_list (
+  scope      TEXT NOT NULL,            -- '' or the project key (projectKey)
+  folder     TEXT NOT NULL DEFAULT '', -- the project folder as the user knows it
+  kind       TEXT NOT NULL,            -- command | tool
+  words      TEXT NOT NULL,            -- "npm run test", a git class "git:local", or a tool name
+  flags      TEXT NOT NULL DEFAULT '', -- risk flags, sorted, space separated
+  verdict    TEXT NOT NULL,            -- safe | unsafe | blocked
   created_at INTEGER,
-  PRIMARY KEY (workdir, tool, prefix)
+  PRIMARY KEY (scope, kind, words, flags)
+);
+
+-- What the quick-task model said about commands UNCLI didn't recognise,
+-- so each (command class, where one can be told) is judged once.
+CREATE TABLE IF NOT EXISTS risk_judgements (
+  key        TEXT PRIMARY KEY,
+  level      TEXT NOT NULL,
+  risk       TEXT,
+  note       TEXT,
+  model      TEXT,
+  created_at INTEGER
 );
 `
 
@@ -89,14 +104,23 @@ func migrate(db *sql.DB) error {
 		}
 		return false
 	}
-	for _, col := range []string{"outline", "attachments"} {
-		if !has("pages", col) {
-			if _, err := db.Exec("ALTER TABLE pages ADD COLUMN " + col + " TEXT"); err != nil {
+	for _, c := range []struct{ table, col, def string }{
+		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"},
+		{"sessions", "mode", "TEXT"},
+	} {
+		if !has(c.table, c.col) {
+			if _, err := db.Exec("ALTER TABLE " + c.table + " ADD COLUMN " + c.col + " " + c.def); err != nil {
 				return err
 			}
 		}
 	}
-	return nil
+	// Session modes before "when to prompt": Read-only, Ask and Full.
+	for old, level := range map[string]string{"readonly": "always", "ask": "unsafe", "full": "never"} {
+		if _, err := db.Exec("UPDATE sessions SET mode=? WHERE mode=?", level, old); err != nil {
+			return err
+		}
+	}
+	return migrateSafeList(db)
 }
 
 type Store struct {
@@ -141,8 +165,11 @@ type Session struct {
 	Modifiers   []string `json:"modifiers"`
 	SortOrder   float64  `json:"sortOrder"`
 	Archived    bool     `json:"archived"`
-	CreatedAt   int64    `json:"createdAt"`
-	UpdatedAt   int64    `json:"updatedAt"`
+	// Mode is when Claude stops to prompt the user: always (anything but
+	// reading), unsafe (only what's unsafe; empty means this) or never.
+	Mode      string `json:"mode"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 func now() int64 { return time.Now().UnixMilli() }
@@ -172,9 +199,9 @@ func (s *Store) CreateSession(x *Session) error {
 		x.SortOrder = max.Float64 + 1
 	}
 	_, err := s.db.Exec(`INSERT INTO sessions (id, title, adapter, runtime, profile_id, workdir, provider_sid, cli_version,
-		model, modifiers, sort_order, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		model, modifiers, sort_order, archived, mode, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		x.ID, x.Title, x.Adapter, x.Runtime, x.ProfileID, x.Workdir, nullStr(x.ProviderSID), nullStr(x.CLIVersion),
-		x.Model, jsonList(x.Modifiers), x.SortOrder, x.Archived, x.CreatedAt, x.UpdatedAt)
+		x.Model, jsonList(x.Modifiers), x.SortOrder, x.Archived, nullStr(x.Mode), x.CreatedAt, x.UpdatedAt)
 	return err
 }
 
@@ -183,9 +210,9 @@ func (s *Store) UpdateSession(x *Session) error {
 	var old sql.NullString
 	_ = s.db.QueryRow(`SELECT title FROM sessions WHERE id=?`, x.ID).Scan(&old)
 	_, err := s.db.Exec(`UPDATE sessions SET title=?, workdir=?, provider_sid=?, cli_version=?, model=?, modifiers=?,
-		sort_order=?, archived=?, updated_at=? WHERE id=?`,
+		sort_order=?, archived=?, mode=?, updated_at=? WHERE id=?`,
 		x.Title, x.Workdir, nullStr(x.ProviderSID), nullStr(x.CLIVersion), x.Model, jsonList(x.Modifiers),
-		x.SortOrder, x.Archived, x.UpdatedAt, x.ID)
+		x.SortOrder, x.Archived, nullStr(x.Mode), x.UpdatedAt, x.ID)
 	if err == nil && old.String != x.Title {
 		err = retitleSession(s.db, x.ID, x.Title)
 	}
@@ -193,17 +220,17 @@ func (s *Store) UpdateSession(x *Session) error {
 }
 
 const sessionCols = `id, title, adapter, runtime, profile_id, workdir, provider_sid, cli_version, model, modifiers,
-	sort_order, archived, created_at, updated_at`
+	sort_order, archived, mode, created_at, updated_at`
 
 func scanSession(r interface{ Scan(...any) error }) (Session, error) {
 	var x Session
-	var title, sid, ver, mods sql.NullString
+	var title, sid, ver, mods, mode sql.NullString
 	var order sql.NullFloat64
 	var archived sql.NullBool
 	var created, updated sql.NullInt64
 	err := r.Scan(&x.ID, &title, &x.Adapter, &x.Runtime, &x.ProfileID, &x.Workdir, &sid, &ver, &x.Model, &mods,
-		&order, &archived, &created, &updated)
-	x.Title, x.ProviderSID, x.CLIVersion = title.String, sid.String, ver.String
+		&order, &archived, &mode, &created, &updated)
+	x.Title, x.ProviderSID, x.CLIVersion, x.Mode = title.String, sid.String, ver.String, mode.String
 	x.Modifiers = parseList(mods)
 	x.SortOrder, x.Archived, x.CreatedAt, x.UpdatedAt = order.Float64, archived.Bool, created.Int64, updated.Int64
 	return x, err
@@ -257,9 +284,42 @@ type TraceItem struct {
 	OK      bool   `json:"ok"`
 	Denied  bool   `json:"denied,omitempty"`
 	Output  string `json:"output,omitempty"`
-	// Approved says who let a tool use run when the CLI asked first:
-	// "you" (on its card) or "rule" (a project rule). Empty when it didn't ask.
+	// Approved says who let a tool use run when the CLI asked first: "you"
+	// (on its card), "rule" (a project rule), "session" (a session rule),
+	// "profile" (the session type's allowlist), "looks" (it only looks),
+	// "full" (Full mode) or "mixed" (a command whose parts were allowed for
+	// different reasons). Empty when it didn't ask.
 	Approved string `json:"approved,omitempty"`
+	// Why gives the reason for each part of a command (or the tool) when
+	// UNCLI answered without the user, allowed or denied.
+	Why []TraceReason `json:"why,omitempty"`
+}
+
+// TraceReason is why one part of a command (or a whole tool use) was
+// allowed, asked about or refused.
+type TraceReason struct {
+	Part string `json:"part,omitempty"` // the part of the command; empty for a whole tool use
+	// By says what decided it. It ran: looks (reading), safe (UNCLI or the
+	// quick-task model judged it safe), listed (the user's safe list),
+	// builtin (the session type's list), never (Run without prompting).
+	// It prompted: always (Always prompt me), unsafe, unknown (UNCLI can't
+	// tell), judging (the model is checking it), user (a question for the
+	// user). blocked: the user's safe list blocks it. (Older traces also
+	// hold rule, session, profile, routine, full, deny, readonly, ask…)
+	By    string     `json:"by"`
+	Entry *SafeEntry `json:"entry,omitempty"` // the safe-list entry that decided it
+	Allow string     `json:"allow,omitempty"` // the session type's entry that matched (builtin), as written
+	// Class is what "This is safe" or "This should prompt" would remember;
+	// Fixed says why nothing can be (inline code, too complex, or unsafe
+	// because of where it works rather than what it is).
+	Class *SafeClass `json:"class,omitempty"`
+	Fixed string     `json:"fixed,omitempty"`
+	// Risk says how an unsafe part could do harm (deletes, outside, publishes…).
+	Risk string `json:"risk,omitempty"`
+	// Judged names the model that judged a part UNCLI didn't recognise, and
+	// Note is its one-line reason.
+	Judged string `json:"judged,omitempty"`
+	Note   string `json:"note,omitempty"`
 }
 
 type TouchedFile struct {

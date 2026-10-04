@@ -174,6 +174,7 @@ type LaunchSpec struct {
     PermissionMode  string            // default | acceptEdits | dontAsk | plan; never bypass
     Approvals       bool              // phase 2: route prompts to UNCLI; false = deny automatically
     Isolated        bool              // ignore user settings, MCP servers and skills (chat)
+    MCPConfig       []string          // extra MCP server config files (--mcp-config)
     Env             map[string]string
 }
 
@@ -211,9 +212,46 @@ type Attachment struct {
 
 **Approvals** (adapter, phase 2). With `--permission-prompt-tool stdio`, the CLI writes a `control_request` with subtype `can_use_tool` (tool name, input, a description and permission suggestions) to stdout and waits for a `control_response` on stdin with `behavior: allow` (plus `updatedInput`) or `behavior: deny` (plus a message). The parser turns the request into `EvApprovalAsked`, and the answer goes back through `EncodeControl`. No local server, port or token is involved, so there is nothing for a web page to reach. The session shows Needs approval until the UI answers.
 
-Rules (`session/rules.go`, table `tool_rules`) answer requests without a card. A rule is per project (the session's working folder, case-insensitive on Windows) and allows, asks or denies a tool, or for a shell tool (Bash, and PowerShell, which the CLI uses on Windows; a rule written for one covers both) a command: a word prefix (`git`, `git push`) or a git class: `git:read` (status, diff, log…), `git:local` (add, switch, fetch, stash, remote set-url, config…), `git:commit` (commit, merge, tag, pull…), `git:publish` (push) or `git:destructive` (reset --hard, clean, rebase, force push, branch -D…). Git's global options (`-C dir`) don't hide the subcommand, and a command that could be a branch switch or a file restore (`git checkout name`) isn't classed. The most specific rule wins: a prefix of two or more words, then a class, then the program, then the whole tool; no rule asks. A command line is split at pipes and chains (`|`, `||`, `&&`, `;`) outside quotes, after dropping harmless redirects (`2>&1`, `2>$null`, `>/dev/null`). Parts that only filter output (`head`, `tail`, `grep`, `Select-Object`, `Select-String`, `Format-*`…) need no rule; every other part must be covered on its own, so `git status && rm -rf .` never rides on a git rule, and a denied part denies the whole. Command substitution (`$(`, backticks), braces, redirects to or from files and `VAR=` prefixes are never covered and always ask. A card's "Always allow" offers rules for the command's one working part (with its subcommand, its git class, the program), most specific first, so allowing `npm test` also covers `npm test 2>&1 | Select-Object -Last 40`; a shell is never allowed wholesale from a card, and a command with several working parts can only be allowed once (the card says so). Stopping a turn denies anything still waiting before it interrupts. The trace records who let each asked-for call run (`approved`: you or a rule), and a failed call shows its exit code and the line that says what went wrong, with its full output on request.
+The session answers requests without a card when it can (see When to prompt below). A command line is read part by part by UNCLI's own reader (`session/script.go`), for bash and PowerShell alike; the dialect comes from the tool use, not from the computer UNCLI runs on, so the same rules hold on macOS and Linux, where Claude uses bash. The reader splits at pipes and chains (`|`, `||`, `&&`, `;`) outside quotes; reads `$( )`, backticks, `{ }` and `( )` blocks recursively; treats heredocs, assignments, keywords (`if`, `foreach`, `exit`…), in-line functions and PowerShell hashtables as structure; looks through wrappers (`timeout`, `env`, `xargs`, the PowerShell call operator `&`); expands variables it saw assigned; follows `cd` so later parts know their folder; and drops harmless redirects (`2>&1`, `2>$null`, `>/dev/null`) and output filters (`head`, `grep`, `Select-Object`, `ForEach-Object`…). Every other part is judged on its own, so `git status && rm -rf .` never rides on `git status`. What it can't read reliably prompts. Stopping a turn denies anything still waiting before it interrupts. The trace records who let each asked-for call run (`approved`: you, your safe list, the session type, judged safe, only reading, Never, or `mixed`) and the reason for each part (`why`); a failed call shows its exit code and the line that says what went wrong, with its full output on request.
 
-**Unattended mode** (landed 2026-10-03; `session/approvals.go`). A per-session switch in the session header, for when the user walks away and wants the work to keep going. Rules still answer first (allow and deny as usual), but a request that would show a card is declined at once instead, with a message telling the model the user is away, not to retry, to use what's already allowed, to run chained or piped commands as separate commands (each part needs its own rule) and to list what still needs the user at the end of its answer. `AskUserQuestion` is declined with "make the most reasonable choice and say which", and `ExitPlanMode` with "give the plan and stop". Turning it on declines any card already waiting. The model is also told at the start of the next turn, as a line in `<session_directives>`, when the mode changes (on, then off once when it's switched back); the told state only advances once a turn is actually sent. Declined requests are marked denied in the trace, with the reason. The mode is in memory on the UNCLI session, like session rules, so it's off after a restart. It is not the CLI's bypass mode: the CLI still asks UNCLI about every tool use outside its allowlist, and nothing is allowed that a rule or the profile doesn't allow.
+**Provider seam for tool uses** (`core.ToolAction`). The session never reads a provider's tool names or inputs. An adapter turns each request into a `ToolAction`: a kind (`shell`, `read`, `search`, `write`, `edit`, `web`, `mcp`, `question`, `plan`, `agent`, `internal`, `other`), the tool's name, and for a shell its dialect (`bash` or `powershell`) and command, or for a file tool its path. Claude's mapping is `claude.ActionOf`; another CLI adds its own table. An adapter may also implement `core.StatePather` to name the CLI's own state folders, where writes are harmless (Claude: `plans`, `projects` and `todos` under `~/.claude` or `CLAUDE_CONFIG_DIR`), so a plan file never counts as writing outside the project.
+
+**Unattended mode** (landed 2026-10-03; `session/approvals.go`). A per-session switch in the session header, for when the user walks away and wants the work to keep going: Claude is never prompted for, but anything that would have prompted is declined at once, with a message telling the model the user is away, not to retry, to use what runs without prompting, to run chained or piped commands as separate commands and to list what still needs the user at the end of its answer. `AskUserQuestion` is declined with "make the most reasonable choice and say which", and `ExitPlanMode` with "give the plan and stop". Turning it on declines any card already waiting. The model is told at the start of the next turn, as a line in `<session_directives>`, when the mode changes (on, then off once when it's switched back); the told state only advances once a turn is actually sent. Declined requests are marked denied in the trace, with the reason. The switch is in memory on the UNCLI session, so it's off after a restart. It is not the CLI's bypass mode: the CLI still asks UNCLI about every tool use outside its allowlist. Always plus Unattended is the old Read-only: reading runs, everything else is declined.
+
+**When to prompt** (landed 2026-10-04, redesigned the same day; `session/modes.go`, `risk.go`, `class.go`, decision records 0004 and 0005). The header reads **Prompt me: Always · When unsafe · Never**. Switching applies to the next request and to any card already waiting (each is judged again, as it is when the safe list or Unattended changes).
+
+| | Reading | Safe | Unsafe | Can't tell |
+|---|---|---|---|---|
+| Always | runs | prompts | prompts | prompts |
+| When unsafe (default) | runs | runs | prompts | the user's setting |
+| Never | runs | runs | runs | runs |
+
+Blocked entries never run, at any level; questions and plans always go to the user. Under Always the CLI is switched to its `default` permission mode (`set_permission_mode`, live) so edits reach UNCLI; otherwise it runs in the profile's own mode. Never is never the CLI's bypass mode: the CLI still asks UNCLI. A shell command is judged part by part: it runs only when every part would, and one blocked part blocks it. The model is told the level in `<session_directives>` when it changes, and once on the first turn after a session is restored, each time with a note that there is no read-only restriction; without it, a conversation told it was read-only by the old mode kept refusing to try tools (found 2026-10-04).
+
+**Risk** (`session/risk.go`). Each tool use, or each working part of a command, is:
+
+- **reading**: `ls`, `cat`, `Get-*`, read-only git, output filters, Read, Grep, Glob, WebSearch, WebFetch. Reading the web counts as reading.
+- **safe**: work inside the session's folder that can be undone or redone: file edits there, builds, tests, linters and formatters, package scripts and local installs, the project's own scripts run by an interpreter (`python tools/gen.py`), local git (add, commit, switch, pull, merge, tag), single-file deletes and deletes of generated folders (`node_modules`, `dist`, `build`…) or temp files, PowerShell `Set-`/`New-`/`Copy-`/`Move-` verbs.
+- **unsafe**, with a plain reason: `deletes` (recursive or wildcard deletes, `git reset --hard`, `git clean`, `find -delete`), `discards` (`git checkout -- file`, `git restore`, `git checkout name`, which may be a file), `outside` (a change naming a path outside the folder, the temp and CLI state folders excepted), `publishes` (sending or publishing beyond this computer: git push, npm/cargo publish, docker push, uploads and POSTs, `gh` changes, MCP tools that write and reach outside), `installs` (global installs, pip, OS package managers), `system` (admin, registry, services), `stops` (kill, `Stop-*`), `remote` (ssh, scp), `secrets` (`.ssh`, `.aws`, credentials, `.env` files but not `.env.example`), `runs-code` (`iex`, an interpreter fed by a pipe), `cloud` (kubectl, terraform, az… except reads).
+- **can't tell**: anything else, including code passed inline (`node -e`, `python -c`) and MCP tools whose server gave no annotations (the CLI drops false hints, so silence can't be told from "harmless").
+
+A risk comes either from the **program** (`git push` publishes wherever it runs) or from the **context** (this `cp` writes outside the folder, this `cat` reads a secret). Only program risks can be corrected by the user.
+
+**Defaults for every stack** (requirement, planned; BRUV "Stack-neutral defaults"). UNCLI was built and measured on Go, Svelte and PowerShell work, but its defaults must not assume any stack: a project in any common stack (JavaScript/TypeScript, Python, Go, Rust, Java/Kotlin, .NET, Ruby, PHP, Swift, Dart/Flutter, C/C++, Elixir, containers) should run its usual build, test, lint, format and dependency commands without prompting, and prompt before publishing, deploying, global installs or system changes, with no setup. The rule is stack-neutral rather than a table per stack: the publish, deploy, release, push and upload subcommands of any build or package tool are unsafe, and anything else such a tool does in the folder is safe, with per-tool tables kept for the exceptions. The Code profile's built-in list follows the same rule rather than naming git, npm and Go. Today only npm and its kin, go, cargo, dotnet and pip are judged per subcommand, so `mvn deploy` or `gem push` would run unprompted; the corpus and the replay must cover other stacks before this is done.
+
+**What "can't tell" does** is a preference (`unknownCommands`, Settings): `model` (default, "Let the quick-task model decide"): the quick-task model judges it (reading / safe / unsafe, how, and a one-line reason for a non-technical reader), cached in `risk_judgements` by class (below), so `mytool sync --a` and `mytool sync --b` are judged once; meanwhile the request waits without a card (the pane shows "Checking whether a command is safe to run…"), and if the model fails the user is prompted. `inside` ("Treat it as safe if it stays in this folder"). `ask` ("Treat it as unsafe and prompt me"). Quick tasks run in an empty folder of their own (`<cache>/quick-tasks`), so a judgement or summary never reads a project's `CLAUDE.md` or memory.
+
+**The safe list** (`store/safe.go`, table `safe_list`). The user's corrections to what counts as safe. Each entry is a **class** (a command class or a tool), a **verdict** (Safe, Unsafe or Blocked) and a **scope** (This project, the session's folder, or All projects). User entries beat the built-in tables and the model; the most specific matching entry wins, and on a tie This project beats All projects. An entry covers a part when its words are a prefix of the part's class words and the part has no risk flag the entry lacks, so `npm` covers every npm command except the risky-flag variants. The session type's `allowed_tools` stay as a read-only built-in list ("Safe in Code sessions"); an Unsafe or Blocked entry still wins over it. The list replaced the per-project rules, session rules and per-tool classes; a migration turned old rules into entries (allow → Safe, ask → Unsafe, deny → Blocked, This project) and old tool classes into All-projects entries.
+
+**A command's class** (`classOf`) is its identity without what varies from run to run: the program (path and `.exe` dropped, lower case, global options such as `--prefix dir` or `-C dir` skipped); subcommand words for programs that have them (npm, pnpm and yarn `run` keep the script, so `npm run lint` isn't `npm run deploy`; git, go, cargo, dotnet, docker, kubectl, terraform, cloud CLIs, OS package managers and system tools such as `reg` and `sc` take one word; `gh` two); for an interpreter, the script (`python tools/gen.py`) or module (`python -m pytest`); for deletes, kills and `ssh`/`scp`, their targets (`rm node_modules`, `ssh me@server`), so marking one delete safe doesn't cover every recursive delete; and **risk flags** that change what it does (`git push --force`, `git reset --hard`, `git checkout --discard`, `npm install --global`, `rm -f -r`, `curl --send`, `find -delete`). Files, messages, filters and other options are dropped. No class can be learned for inline code, for a part too complex to read, for a delete whose target is only known when it runs (`rm -rf $OUT`), or for a context risk; the card then says why and offers Allow once and Deny only. A non-shell tool's class is its name.
+
+**Cards.** A card leads with why Claude is asking, in plain words (the model's reason when it judged, the risk otherwise, or "You marked this unsafe"), then the command. Buttons: **Allow once**, **This is safe** with a **Scope** choice (This project / All projects; the last scope used is remembered per viewer, This project the first time) and **Deny**. A line under them names exactly what will be remembered ("Will remember as safe: `git push` (any files and options)"); a chained command teaches every unsafe part's class in one click. Teaching re-judges every waiting card, so others it covers are answered too. Under Always there is no "This is safe": the card says "You asked to be prompted before anything except reading".
+
+**Teaching from the trace.** A trace row's reason label opens the reason for each part. A part that ran because UNCLI judged it safe (or the session type allowed it, or the setting let it run) offers **This should prompt**, which marks its class Unsafe with the same scope choice. Learning goes both ways.
+
+**Settings → Safe and unsafe.** The header's shield opens Settings here. One list for the current project and all projects, filtered by Everything / This project / All projects / Built in, with each entry's verdict and scope changed in place (moving an entry to All projects promotes it and merges duplicates) and a remove button; **Add** takes an example command (or a tool name, offered from the session's known tools) and shows the class it becomes before saving; **Check a command** runs the session's judgement on a typed command without running it (`ExplainCommand`), giving runs / prompts / blocked and the reason for each part; and the "can't tell" setting.
+
+**Measuring it.** `TestReplayPrompts` (dev only; `UNCLI_REPLAY_TRANSCRIPTS` or `UNCLI_REPLAY_DB`) replays real tool uses from Claude Code transcripts or a UNCLI database against each level. On 7,587 real tool uses, When unsafe prompts for 18.6% when what it can't tell prompts (12% after teaching each class once) and 3.5% when it is treated as safe inside the folder (2% after teaching); Always prompts for 55%, Never for 0.2% (questions and plans). `TestRiskCorpus` (committed) pins about 170 representative commands, bash and PowerShell, to their expected outcome and class.
 
 **Attachments** (`attach`, `clipfiles`). Files dropped on the message box, or pasted there after copying them in Explorer, attach to the next turn. The UI sends paths, and Go reads the files, so large files never cross the bridge. A pasted image with no file behind it (a screenshot) travels as base64 data. Images (PNG, JPEG, GIF, WebP, up to 5 MB) become `image` blocks. PDFs (up to 32 MB) and UTF-8 text files with no NUL bytes (up to 512 KB) become `document` blocks titled with the file name: base64 for PDFs, a text source for text. Folders, other binaries and oversized files can't be attached; the UI inserts their path instead and says why. A page stores what was attached (name, path, media type, size) but not the content, which lives in the CLI's transcript. Explorer copies reach the page only as file names, so the paths come from the OS clipboard's file list (`CF_HDROP` on Windows; macOS and Linux to follow). On Windows, Wails delivers dropped files through the WebView's own drop events, so `DisableWebViewDrop` must stay off; the page cancels file drags itself so a drop can't navigate the window.
 
@@ -246,6 +284,7 @@ const (
     EvToolFinished  EventKind = "tool_finished"   // id, ok, denied, summary, output (truncated)
     EvFileTouched   EventKind = "file_touched"    // path, line, how (edit/write/bash-detected)
     EvApprovalAsked EventKind = "approval_asked"  // request id, tool, input (phase 2)
+    EvToolHints     EventKind = "tool_hints"      // what the MCP servers say about their tools (annotations)
     EvNotice        EventKind = "notice"          // model changed, compacted, conversation reset, command output
     EvUsageLimit    EventKind = "usage_limit"     // subscription window utilisation and reset times
     EvTurnResult    EventKind = "turn_result"     // usage, cost, duration, is_error, error code
@@ -285,7 +324,8 @@ type Event struct {
 | `rate_limit_event` | `EvUsageLimit` |
 | `result` | `EvTurnResult`; `is_error` can be true while `subtype` is `success`, and an interrupt gives `error_during_execution` |
 | `control_response` to `initialize` | `EvAccount` (the model list for the picker) |
-| other `control_response` | nothing (acknowledges interrupt and set_model) |
+| `control_response` to `mcp_status` | `EvToolHints`: each tool of each connected server as `mcp__<server>__<tool>` (characters outside `[A-Za-z0-9_-]` become `_`) with its `readOnly`, `destructive` and `openWorld` annotations |
+| other `control_response` | nothing (acknowledges interrupt, set_model and set_permission_mode) |
 | anything else | `EvUnknown` |
 
 ### Activity state machine
@@ -312,6 +352,8 @@ type Capabilities struct {
     LiveModelSwitch  bool // control message instead of respawn
     Interrupt        bool
     Approvals        bool // permission prompt routing
+    LivePermissionMode bool // the CLI's permission mode changes without a respawn (set_permission_mode)
+    ToolHints        bool // the CLI reports its MCP tools' annotations (mcp_status)
     Images           bool
     Documents        bool // PDF and text attachments
     UsageReporting   bool
@@ -344,6 +386,7 @@ CREATE TABLE sessions (
   modifiers     TEXT NOT NULL DEFAULT '[]',  -- active modifier ids, JSON
   sort_order    REAL,
   archived      INTEGER DEFAULT 0,
+  mode          TEXT,               -- when to prompt: always | unsafe | never (NULL = unsafe); added by migration
   created_at    INTEGER, updated_at INTEGER
 );
 
@@ -377,6 +420,21 @@ CREATE TABLE events (            -- raw log: replay, debugging, fixture capture
 );
 
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
+
+CREATE TABLE safe_list (         -- the user's corrections to what counts as safe
+  scope      TEXT NOT NULL,            -- '' for all projects, else the project's key
+  folder     TEXT NOT NULL DEFAULT '', -- the project folder as the user knows it
+  kind       TEXT NOT NULL,            -- command | tool
+  words      TEXT NOT NULL,            -- "npm run test", a git class "git:local", or a tool name
+  flags      TEXT NOT NULL DEFAULT '', -- risk flags, sorted ("-f -r")
+  verdict    TEXT NOT NULL,            -- safe | unsafe | blocked
+  created_at INTEGER,
+  PRIMARY KEY (scope, kind, words, flags)
+);
+
+CREATE TABLE risk_judgements (   -- the quick-task model's verdicts, by class key ("class:npm run gen|"), else the command or tool
+  key TEXT PRIMARY KEY, level TEXT NOT NULL, risk TEXT, note TEXT, model TEXT, created_at INTEGER
+);
 ```
 
 The `events` table can grow large. Keep it, but cap it per session (configurable) and prune oldest pages first.
@@ -419,6 +477,8 @@ profiles:
     permission_mode: acceptEdits
     ide_links: true
 ```
+
+Optional on any profile: `mcp_config`, a list of MCP server config files passed as `--mcp-config` (relative paths are from the session folder), besides the user's own servers (or instead of them, with `isolated`). When the CLI routes its prompts to UNCLI (`Approvals`), `allowed_tools` is not passed to the CLI: UNCLI applies it itself, as the built-in part of the safe list, under When unsafe and after the user's own entries (see When to prompt under Components). It keeps the CLI's syntax: a tool, `Bash(git status:*)` (commands starting with those words, for any shell), `Bash(npm test)` (that command exactly), or a file tool with a glob (`Write(./artifacts/**)`: relative to the session folder; `//` absolute; `~/` home). Other qualified forms such as `WebFetch(domain:…)` never match.
 
 ### Modifiers (`modifiers.yaml`)
 
@@ -540,11 +600,11 @@ Each phase is a new implementation behind an existing seam; none of them changes
 
 The goal is that UNCLI replaces the terminal for real work.
 
-- **Approvals** (landed 2026-10-03): `--permission-prompt-tool stdio` replaces `--permission-prompts none` whenever the adapter has the `Approvals` capability; `can_use_tool` control requests become approval cards with Allow, Always allow… and Deny (see Approvals under Components). "Always" rules belong to the **project** (the session's working folder), not the session, and can allow, ask or deny. Profile allowlists stay, so routine tools never ask. **"Allow for this session"** (landed 2026-10-03) sits between once and always: the card's Always choice has a scope, this session (the default) or this project. Session rules live in memory on the UNCLI session until UNCLI quits, answer requests like project rules (tagged "allowed for this session" in the trace), win ties against equally specific project rules (a more specific project rule still wins), and are listed as their own group in the Permissions dialog with remove and "Make permanent". **Unattended mode** (landed 2026-10-03) declines whatever would wait for the user, with a note to the model (see Approvals under Components).
+- **Approvals** (landed 2026-10-03): `--permission-prompt-tool stdio` replaces `--permission-prompts none` whenever the adapter has the `Approvals` capability; `can_use_tool` control requests become approval cards (see Approvals under Components). Since 2026-10-04 the cards offer Allow once, This is safe (with a scope, This project or All projects) and Deny, and what they teach goes on the safe list (see When to prompt); the earlier project and session rules were migrated into it. Profile allowlists stay, applied by UNCLI itself. **Unattended mode** (landed 2026-10-03) declines whatever would wait for the user, with a note to the model (see Approvals under Components).
 - **Artifact pane:** watcher on `./artifacts/`, sandboxed iframe renderer with strict CSP for HTML, SVG and Mermaid, markdown viewer. The artifacts folder is a git repo, auto-committed at turn end; each page links to the artifact versions it produced, so paging back pages the artifact back too.
 - **Touched files + IDE links:** `EvFileTouched` from tool inputs plus the repo watcher; a per-page list with open-in-IDE buttons using the `ide` presets.
 - **Desktop notifications** when a background session finishes or needs approval.
-- **Tool classification and session modes:** a session mode (Read-only, Ask, Full; never bypass) decides UNCLI's answer to each `can_use_tool` request, live. Read tools run in every mode; write tools are refused (Read-only), asked about (Ask) or run (Full); open-world tools have their own switch. A tool's class comes from, in order: the user's override; a built-in table for Claude's own tools (Bash by command pattern); the MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`, hints only); otherwise write. The quick-task model then suggests classes for unannotated tools, applied only when the user confirms.
+- **When to prompt and the safe list** (landed 2026-10-04; see When to prompt under Components): Prompt me Always / When unsafe / Never (never bypass) decides UNCLI's answer to each `can_use_tool` request, live, by risk rather than by command, so the user never needs to know commands or how a shell chains them. Reading runs at every level. The safe list lets the user correct the judgement per class, from a card ("This is safe"), from the trace ("This should prompt") or in Settings, for this project or all projects. MCP tools are judged from their annotations (`readOnlyHint`, `destructiveHint`, `openWorldHint`, hints only); an unannotated tool is something UNCLI can't tell, which the quick-task model judges by default.
 
 ### Phase 3: comfort
 
@@ -565,6 +625,7 @@ The goal is that UNCLI replaces the terminal for real work.
 - **System-scope modifiers** (long personas or house styles), applied by respawn. The CLI records the system prompt on a conversation's first request and reuses it on every resume (`--system-prompt-snapshot on` is the default), so a respawn alone does not change it: these modifiers need `--system-prompt-snapshot off` (fresh prompt every request, more cache writes) or must apply only to new sessions.
 - **CLI version manager:** see installed versions, try `stable` or `latest` at your own risk, return to the pinned version.
 - Cost hint on the model picker: estimated tokens to re-read after a cache-invalidating switch.
+- **Project scaffolding** (idea, not yet a requirement): start a new project from a template, integrating Folder Templates 2.0. A template could carry **tooling hints** for its stack, much as a VS Code workspace recommends extensions: the commands and scripts it considers safe, its generated folders, and its build and test entry points. These would be offered to the safe list (This project) when the project is created, so a new project prompts less from its first turn. The stack-neutral defaults (see Risk) must still work without any hints.
 
 (`LiveModelSwitch` moved into phase 1: the spike found the `set_model` control request.)
 
@@ -616,6 +677,8 @@ The phase 1 spike checked the CLI facts this brief assumed against Claude Code 2
 - [x] Phase 3: image content blocks (`{"type":"image","source":{"type":"base64",...}}`) work on stream-json input.
 - [x] Document content blocks work on stream-json input (2026-10-03, fixture `document-input`): `{"type":"document","title":"brief.pdf","source":{"type":"base64","media_type":"application/pdf",...}}` and `{"type":"document","title":"notes.txt","source":{"type":"text","media_type":"text/plain","data":"..."}}`. Haiku read both and named each title.
 - [x] Phase 4: a live model switch exists: control request `{"subtype":"set_model","model":"sonnet"}`.
+- [x] Phase 2 (2026-10-04, fixture `set-permission-mode-live`): `{"subtype":"set_permission_mode","mode":"default"}` changes the permission mode of a running CLI; it answers `{"mode":"default"}` and prints `system/status` with the new `permissionMode`. Under `acceptEdits` a Write ran without asking; after the switch the next Write was asked about.
+- [x] Phase 2 (2026-10-04, fixture `mcp-status-tool-hints`): `{"subtype":"mcp_status"}` returns each MCP server with its tools and their annotations, without the "Hint" suffix and only those that are true (`{"readOnly":true}`, `{"destructive":true}`, `{}` for none). It is answered mid-turn. `system/init` lists tool names only. The CLI asks (`can_use_tool`) about every MCP tool call, read-only ones included, and not about its own bookkeeping tools such as ToolSearch.
 - [ ] Phase 5: `claude setup-token` and `CLAUDE_CODE_OAUTH_TOKEN` behaviour inside a container. Not tested; needs a container.
 
 ### Other spike findings

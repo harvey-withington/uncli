@@ -5,7 +5,6 @@
   import NewSessionDialog from './components/NewSessionDialog.svelte'
   import SessionPane from './components/SessionPane.svelte'
   import SettingsDialog from './components/SettingsDialog.svelte'
-  import PermissionsDialog from './components/PermissionsDialog.svelte'
   import SetupScreen from './components/SetupScreen.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import Toasts from './components/Toasts.svelte'
@@ -47,7 +46,7 @@
       if (app.cliReady && !app.newSessionOpen && !app.settingsOpen) app.searchFocus++
       return
     }
-    if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || app.newSessionOpen || app.settingsOpen || app.permissionsOpen) return
+    if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || app.newSessionOpen || app.settingsOpen) return
     const n = app.currentPages.length
     if (e.key === 'ArrowLeft') {
       e.preventDefault()
@@ -106,7 +105,6 @@
 
 {#if app.newSessionOpen}{#key app.newSessionSeq}<NewSessionDialog />{/key}{/if}
 {#if app.settingsOpen}<SettingsDialog />{/if}
-{#if app.permissionsOpen && app.current}<PermissionsDialog />{/if}
 <ConfirmDialog />
 <Toasts />
 

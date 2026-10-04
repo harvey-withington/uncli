@@ -1,15 +1,18 @@
 <script lang="ts">
-  import type { Approval, ApprovalDecision, SessionView } from '../lib/api'
-  import { describeApproval, ruleLabel } from '../lib/approvals'
+  import type { Approval, ApprovalDecision, Scope, SessionView } from '../lib/api'
+  import { askingReasons, classLabel, describeApproval, fixedReason, loadScope, modeOf, saveScope } from '../lib/approvals'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
 
-  // A tool use waiting for the user's answer: what Claude wants to do, in
-  // plain words, and Allow / Always allow … / Deny. "Always" adds a rule
-  // for this project (the session's folder); the choice of rule starts at
-  // the most specific suggestion.
+  // A tool use waiting for the user's answer: why Claude is asking, what it
+  // wants to do in plain words, and Allow once / This is safe / Deny.
+  // "This is safe" remembers the class of each part that prompted (shown
+  // under the buttons) on the safe list, for this project or all projects;
+  // the scope starts where the user last left it. Under Always there is no
+  // "This is safe" (the user asked to be prompted), and a part whose risk
+  // comes from what it touches can only be allowed once, which a line says.
   interface Props {
     session: SessionView
     approval: Approval
@@ -18,16 +21,20 @@
   let { session, approval }: Props = $props()
   const app = useApp()
   const view = $derived(describeApproval(approval))
-  let choice = $state(0)
-  let scope = $state<'session' | 'always'>('session') // how long "Always allow" lasts
+  // Why it needs the user, in plain words, before the command itself.
+  const reasons = $derived(askingReasons(approval))
+  const always = $derived(modeOf(session) === 'always')
+  const learn = $derived(always ? [] : approval.learn)
+  const fixed = $derived(always || learn.length > 0 ? undefined : fixedReason(approval))
+  let scope = $state<Scope>(loadScope())
   let busy = $state(false)
 
   async function answer(decision: ApprovalDecision) {
     if (busy) return
     busy = true
     try {
-      const rule = decision === 'always' || decision === 'session' ? approval.suggestions[choice] : undefined
-      await app.backend.answerApproval(session.id, approval.requestId, decision, rule)
+      if (decision === 'safe') saveScope(scope)
+      await app.backend.answerApproval(session.id, approval.requestId, decision, decision === 'safe' ? scope : undefined)
     } catch (e) {
       showToast(String(e), 'error')
     } finally {
@@ -42,6 +49,16 @@
     <span class="title">{view.title}</span>
     <span class="hint">{t('approval.waiting')}</span>
   </div>
+  {#if reasons.length > 0}
+    <div class="asking" aria-label={t('asking.title')}>
+      <Icon name="triangle-alert" size={14} />
+      <ul>
+        {#each reasons as r, i (i)}
+          <li>{#if r.part && reasons.length > 1}<code>{r.part}</code> {/if}{r.text}</li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
   <div class="what" id="approval-{approval.requestId}">
     {#if view.target}<code class="target">{view.target}</code>{/if}
     {#if view.note}<span class="note">{view.note}</span>{/if}
@@ -51,30 +68,27 @@
     {/if}
   </div>
   <div class="actions">
-    <button class="btn primary small" onclick={() => answer('allow')} disabled={busy}>{t('approval.allow')}</button>
-    {#if approval.suggestions.length > 0}
-      <span class="always">
-        <button class="btn small" onclick={() => answer(scope)} disabled={busy}>{t('approval.always')}</button>
-        {#if approval.suggestions.length > 1}
-          <select class="scope" bind:value={choice} aria-label={t('approval.alwaysWhat')} disabled={busy}>
-            {#each approval.suggestions as s, i (i)}
-              <option value={i}>{ruleLabel(s)}</option>
-            {/each}
-          </select>
-        {:else}
-          <span class="scope-one">{ruleLabel(approval.suggestions[0] ?? { tool: approval.tool })}</span>
-        {/if}
-        <select class="scope" bind:value={scope} aria-label={t('approval.howLong')} disabled={busy}>
-          <option value="session">{t('approval.forSession')}</option>
-          <option value="always">{t('approval.forProject')}</option>
+    <button class="btn primary small" onclick={() => answer('allow')} disabled={busy}>{t('approval.allowOnce')}</button>
+    {#if learn.length > 0}
+      <span class="safe">
+        <button class="btn small" onclick={() => answer('safe')} disabled={busy}><Icon name="shield-check" size={13} />{t('approval.safe')}</button>
+        <select class="scope" bind:value={scope} aria-label={t('scope.label')} disabled={busy}>
+          <option value="project">{t('scope.project')}</option>
+          <option value="all">{t('scope.all')}</option>
         </select>
       </span>
     {/if}
-    {#if approval.suggestions.length === 0}
-      <span class="once">{t('approval.onceOnly')}</span>
-    {/if}
     <button class="btn small deny" onclick={() => answer('deny')} disabled={busy}>{t('approval.deny')}</button>
   </div>
+  {#if learn.length > 0}
+    <p class="remember">
+      {t('approval.willRemember')}
+      {#each learn as c, i (i)}{#if i > 0}, {/if}<code>{classLabel(c)}</code>{/each}
+      {#if learn.some(c => c.kind === 'command')}<span class="any">{t('approval.anyFiles')}</span>{/if}
+    </p>
+  {:else if fixed}
+    <p class="remember">{fixed}</p>
+  {/if}
 </div>
 
 <style>
@@ -101,6 +115,32 @@
   }
   .hint {
     margin-left: auto;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+  .asking {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--text-sm);
+    font-weight: 520;
+  }
+  .asking :global(svg) {
+    flex: none;
+    margin-top: 2px;
+    color: var(--warning);
+  }
+  .asking ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .asking code {
+    font-family: var(--mono);
     font-size: var(--text-xs);
     color: var(--text-muted);
   }
@@ -150,14 +190,16 @@
     align-items: center;
     gap: var(--space-2);
   }
-  .always {
+  .safe {
     display: inline-flex;
     align-items: center;
     gap: 6px;
   }
+  .safe .btn {
+    gap: 5px;
+  }
   .scope {
     height: 26px;
-    max-width: 280px;
     padding: 0 4px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
@@ -165,13 +207,14 @@
     color: var(--text);
     font-size: var(--text-xs);
   }
-  .scope-one {
+  .remember {
+    margin: var(--space-2) 0 0;
     font-size: var(--text-xs);
     color: var(--text-muted);
   }
-  .once {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
+  .remember code {
+    font-family: var(--mono);
+    color: var(--text);
   }
   .deny {
     margin-left: auto;

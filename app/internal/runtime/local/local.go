@@ -124,7 +124,13 @@ func Run(ctx context.Context, cmd core.Command) ([]byte, error) {
 
 // RunInput is Run with stdin.
 func RunInput(ctx context.Context, cmd core.Command, stdin string) ([]byte, error) {
+	return RunInputIn(ctx, "", cmd, stdin)
+}
+
+// RunInputIn is RunInput in a given working folder (empty: this process's).
+func RunInputIn(ctx context.Context, dir string, cmd core.Command, stdin string) ([]byte, error) {
 	c := exec.CommandContext(ctx, cmd.Path, cmd.Args...)
+	c.Dir = dir
 	c.Env = Env(os.Environ(), cmd)
 	configure(c)
 	c.Stdin = strings.NewReader(stdin)

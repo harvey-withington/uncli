@@ -31,6 +31,11 @@ type Deps struct {
 	Binary     BinaryFunc
 	Sink       Sink
 	ScratchDir string // chat sessions get <ScratchDir>/<session id>
+	// Judge asks the quick-task model about commands UNCLI doesn't
+	// recognise, and Unknown says what the user wants done with them
+	// (UnknownModel, UnknownInside, UnknownAsk). Either may be nil.
+	Judge   JudgeFunc
+	Unknown func() string
 }
 
 // ErrNoCLI means the CLI isn't installed yet; the UI shows the setup screen.
@@ -44,6 +49,7 @@ type Manager struct {
 	focused  string
 	models   []core.ModelInfo
 	usage    *core.UsageLimit
+	judge    judging
 
 	// InterruptGrace is how long an interrupt waits for the CLI before the
 	// process is killed instead.
@@ -53,7 +59,8 @@ type Manager struct {
 const modelsSetting = "claude.models"
 
 func NewManager(d Deps) (*Manager, error) {
-	m := &Manager{d: d, sessions: map[string]*Session{}, InterruptGrace: 5 * time.Second}
+	m := &Manager{d: d, sessions: map[string]*Session{}, InterruptGrace: 5 * time.Second,
+		judge: judging{inFlight: map[string]bool{}, failed: map[string]bool{}}}
 	if err := d.Store.MarkOpenPages("interrupted"); err != nil {
 		return nil, err
 	}
@@ -155,14 +162,14 @@ func (m *Manager) Send(ctx context.Context, id, text string, files ...core.Attac
 	return s.Send(ctx, text, files)
 }
 
-// Answer gives the user's decision (allow, always, deny) on a tool use
-// waiting for approval.
-func (m *Manager) Answer(id, requestID, decision string, rule *store.ToolRule) error {
+// Answer gives the user's decision on a waiting request: allow (once),
+// safe (and remember it, in scope "project" or "all") or deny.
+func (m *Manager) Answer(id, requestID, decision, scope string) error {
 	s, err := m.get(id)
 	if err != nil {
 		return err
 	}
-	return s.Answer(requestID, decision, rule)
+	return s.Answer(requestID, decision, scope)
 }
 
 // SetUnattended turns a session's unattended mode on or off.
@@ -172,72 +179,6 @@ func (m *Manager) SetUnattended(id string, on bool) (View, error) {
 		return View{}, err
 	}
 	return s.SetUnattended(on), nil
-}
-
-// SessionRules lists a session's own rules (kept until UNCLI quits).
-func (m *Manager) SessionRules(id string) ([]store.ToolRule, error) {
-	s, err := m.get(id)
-	if err != nil {
-		return nil, err
-	}
-	return s.SessionRules(), nil
-}
-
-// DeleteSessionRule drops one of a session's own rules.
-func (m *Manager) DeleteSessionRule(id string, r store.ToolRule) ([]store.ToolRule, error) {
-	s, err := m.get(id)
-	if err != nil {
-		return nil, err
-	}
-	return s.RemoveSessionRule(r), nil
-}
-
-// PromoteSessionRule makes a session rule permanent: it moves to the project.
-func (m *Manager) PromoteSessionRule(id string, r store.ToolRule) error {
-	s, err := m.get(id)
-	if err != nil {
-		return err
-	}
-	if err := m.d.Store.SetRule(s.View().Workdir, r); err != nil {
-		return err
-	}
-	s.RemoveSessionRule(r)
-	return nil
-}
-
-// Rules lists the tool rules of a session's project (its working folder).
-func (m *Manager) Rules(id string) ([]store.ToolRule, error) {
-	s, err := m.get(id)
-	if err != nil {
-		return nil, err
-	}
-	return m.d.Store.Rules(s.View().Workdir)
-}
-
-// SetRule adds or changes a tool rule for a session's project.
-func (m *Manager) SetRule(id string, r store.ToolRule) ([]store.ToolRule, error) {
-	s, err := m.get(id)
-	if err != nil {
-		return nil, err
-	}
-	w := s.View().Workdir
-	if err := m.d.Store.SetRule(w, r); err != nil {
-		return nil, err
-	}
-	return m.d.Store.Rules(w)
-}
-
-// DeleteRule removes a tool rule from a session's project.
-func (m *Manager) DeleteRule(id string, r store.ToolRule) ([]store.ToolRule, error) {
-	s, err := m.get(id)
-	if err != nil {
-		return nil, err
-	}
-	w := s.View().Workdir
-	if err := m.d.Store.DeleteRule(w, r.Tool, r.Prefix); err != nil {
-		return nil, err
-	}
-	return m.d.Store.Rules(w)
 }
 
 func (m *Manager) Interrupt(id string) error {

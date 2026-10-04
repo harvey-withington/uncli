@@ -2,8 +2,9 @@
 // component tests). It behaves like the real one closely enough to
 // exercise streaming, states, bookmarks and errors, with canned content.
 import type {
-  ActivityState, Backend, Bootstrap, CLIStatus, Handlers, NewSessionChoices, Page, Preferences, SearchHit, SearchQuery, SearchResult, SessionView, ToolRule, UEvent,
+  ActivityState, Approval, Backend, Bootstrap, CLIStatus, Handlers, NewSessionChoices, Page, Preferences, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
 } from './types'
+import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type MockAsk, type Outcome } from './mock-access'
 import { SECTION_KINDS } from '../sections'
 
 const profiles: Bootstrap['profiles'] = [
@@ -171,9 +172,9 @@ function session(id: string, profileId: string, title: string, state: ActivitySt
   }
 }
 
-export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; unattended?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
+export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; unattended?: boolean; mode?: SessionMode; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
-    session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended }),
+    session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode }),
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2 }),
     session('s-cowork', 'cowork', 'Summarise the Q3 planning notes', 'idle', { modifiers: ['efficiency'], sortOrder: 1 }),
   ]
@@ -183,9 +184,18 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
         model: 'opus', modifiers: ['thorough'], bookmarked: true,
         trace: [
           { id: 't1', name: 'Read', summary: 'Read parser.go', done: true, ok: true },
-          { id: 't2', name: 'Bash', summary: 'Bash go test -count=5 ./internal/adapter/...', done: true, ok: true },
+          {
+            id: 't2', name: 'PowerShell', summary: 'PowerShell git status --short; go vet ./internal/adapter/...', done: true, ok: true, approved: 'safe',
+            why: [
+              { part: 'git status --short', by: 'looks' },
+              { part: 'go vet ./internal/adapter/...', by: 'safe', class: { kind: 'command', words: 'go vet' } },
+            ],
+          },
           { id: 't3', name: 'Edit', summary: 'Edit parser.go', done: true, ok: true },
-          { id: 't4', name: 'Bash', summary: 'Bash rm -rf testdata/tmp', done: true, ok: false, denied: true, output: 'Permission for this tool use was denied.' },
+          {
+            id: 't4', name: 'Bash', summary: 'Bash rm -rf testdata/fixtures', done: true, ok: false, denied: true, output: 'Permission for this tool use was denied.',
+            why: [{ part: 'rm -rf testdata/fixtures', by: 'unsafe', risk: 'deletes', class: { kind: 'command', words: 'rm testdata/fixtures', flags: '-f -r' } }],
+          },
           {
             id: 't5', name: 'PowerShell', summary: 'PowerShell npm test 2>&1 | Select-Object -Last 40', done: true, ok: false, approved: 'you',
             output: "Exit code 1\n> grid@0.1.0 test\r\n> vitest run\r\n\r\nnode.exe : 'vitest' is not recognized as an internal or external command,\r\noperable program or batch file.",
@@ -207,11 +217,49 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
   let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }
   const timers = new Map<string, number[]>()
-  // Approvals: a question that mentions "push" asks to run git push first.
-  const rules: Record<string, ToolRule[]> = {}
-  const sessionRules: Record<string, ToolRule[]> = {} // by session id
-  const approvalWaits = new Map<string, (allowed: boolean) => void>()
+  // Approvals: a question that mentions "push" asks to run git push first,
+  // one that mentions a "note" to save it with an MCP tool (mock-access.ts).
+  const safe: SafeEntry[] = [] // the safe list, every project's
+  const judged = new Set<string>() // tools the quick-task model has looked at
+  const approvalWaits = new Map<string, (o: Outcome) => void>()
   let requestSeq = 0
+
+  const listFor = (s: SessionView) => safe.filter(e => !e.folder || e.folder === s.workdir)
+  const judgeAsk = (s: SessionView, ask: MockAsk) => mockJudge(s, ask, listFor(s), prefs.unknownCommands ?? 'model', judged.has(ask.tool))
+  const sameClass = (a: SafeEntry, b: SafeEntry) => a.kind === b.kind && a.words === b.words && (a.flags ?? '') === (b.flags ?? '')
+  // put adds or replaces an entry at a scope; all projects absorbs the
+  // project entries for the same class.
+  const put = (s: SessionView, e: SafeEntry, scope: Scope) => {
+    const folder = scope === 'all' ? undefined : s.workdir
+    for (let i = safe.length - 1; i >= 0; i--) {
+      const x = safe[i] as SafeEntry
+      if (sameClass(x, e) && (x.folder === folder || scope === 'all')) safe.splice(i, 1)
+    }
+    safe.push({ kind: e.kind, words: e.words, flags: e.flags || undefined, verdict: e.verdict, folder })
+  }
+  const drop = (e: SafeEntry) => {
+    const i = safe.findIndex(x => sameClass(x, e) && x.folder === e.folder)
+    if (i >= 0) safe.splice(i, 1)
+  }
+  // Look again at waiting cards after the mode or the safe list changed.
+  const rejudge = (s: SessionView) => {
+    const waiting = s.approvals ?? []
+    const still = waiting.filter(a => {
+      const ask = MOCK_ASKS.find(x => x.tool === a.tool)
+      if (!ask) return true
+      const v = judgeAsk(s, ask)
+      if (v.action === 'ask' || v.action === 'judge') {
+        a.why = v.why
+        return true
+      }
+      approvalWaits.get(a.requestId)?.(v.action === 'allow' ? 'allow' : 'deny')
+      return false
+    })
+    s.approvals = still
+    if (still.length === 0 && waiting.length > 0) setState(s, 'running_tools')
+    else changed(s)
+  }
+  const rejudgeAll = () => sessions.forEach(rejudge)
 
   const changed = (s: SessionView) => h?.sessionChanged({ ...s })
   const setState = (s: SessionView, state: ActivityState) => {
@@ -303,32 +351,35 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       // rest (an approval, then the streamed answer) runs on its own.
       const run = async () => {
         let answer = text.startsWith('/') ? `Ran \`${text}\`.` : STREAM
-        if (/\bpush\b/i.test(text)) {
-          const suggestions: ToolRule[] = [
-            { tool: 'Bash', prefix: 'git push', action: 'allow' },
-            { tool: 'Bash', prefix: 'git:publish', action: 'allow' },
-            { tool: 'Bash', prefix: 'git', action: 'allow' },
-          ]
-          const ruled = [...(sessionRules[s.id] ?? []), ...(rules[s.workdir] ?? [])].find(r => r.tool === 'Bash' && suggestions.some(x => x.prefix === r.prefix))
-          let allowed = ruled?.action === 'allow'
-          let away = false
-          if (!ruled || ruled.action === 'ask') {
-            if (s.unattended) {
-              away = true // declined at once, as the real backend does
-            } else {
-              const requestId = `req_${++requestSeq}`
-              s.approvals = [...(s.approvals ?? []), {
-                requestId, tool: 'Bash', input: { command: 'git push origin main', description: 'Push the branch to origin' },
-                toolUseId: `toolu_${requestSeq}`, suggestions, askedAt: Date.now(),
-              }]
-              setState(s, 'needs_approval')
-              allowed = await new Promise<boolean>(resolve => approvalWaits.set(requestId, resolve))
-              away = !allowed && !!s.unattended
-            }
+        const ask = MOCK_ASKS.find(a => a.match.test(text))
+        if (ask) {
+          let v = judgeAsk(s, ask)
+          let outcome: Outcome | undefined
+          const requestId = `req_${++requestSeq}`
+          const approval: Approval = {
+            requestId, tool: ask.tool, input: ask.input, toolUseId: `toolu_${requestSeq}`,
+            learn: [ask.learn], class: ask.class, why: v.why, askedAt: Date.now(),
           }
-          answer = allowed ? 'Pushed **main** to origin.'
-            : away ? "I didn't push: you're away, so the push was declined. The commit is still local."
-            : "I didn't push: the push was denied. The commit is still local."
+          if (v.action === 'judge') {
+            // The quick-task model checks a tool UNCLI can't place: the
+            // request waits without a card meanwhile.
+            s.approvals = [...(s.approvals ?? []), { ...approval, judging: true }]
+            changed(s)
+            await new Promise(r => setTimeout(r, 600))
+            judged.add(ask.tool)
+            s.approvals = (s.approvals ?? []).filter(a => a.requestId !== requestId)
+            v = judgeAsk(s, ask)
+            approval.why = v.why
+          }
+          if (v.action === 'allow') outcome = 'allow'
+          else if (v.action === 'deny') outcome = 'deny'
+          else if (s.unattended) outcome = 'away' // declined at once, as the real backend does
+          else {
+            s.approvals = [...(s.approvals ?? []), approval]
+            setState(s, 'needs_approval')
+            outcome = await new Promise<Outcome>(resolve => approvalWaits.set(requestId, resolve))
+          }
+          answer = ask.answers[outcome ?? 'deny']
         }
         const words = answer.split(/(?<=\s)/)
         const ts: number[] = []
@@ -383,28 +434,16 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       return { ...s }
     },
     async setSortOrder(id, o) { const s = find(id); s.sortOrder = o; changed(s); return { ...s } },
-    async answerApproval(sid, rid, decision, rule) {
+    async answerApproval(sid, rid, decision, scope) {
       const s = find(sid)
       const a = (s.approvals ?? []).find(x => x.requestId === rid)
       if (!a) throw new Error('that request is no longer waiting for an answer')
-      if (decision === 'session' && rule) {
-        const list = (sessionRules[sid] ??= [])
-        const i = list.findIndex(r => r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? ''))
-        const r = { ...rule, action: 'allow' as const }
-        if (i >= 0) list[i] = r
-        else list.push(r)
-      }
-      if (decision === 'always' && rule) {
-        const list = (rules[s.workdir] ??= [])
-        const i = list.findIndex(r => r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? ''))
-        const r = { ...rule, action: 'allow' as const }
-        if (i >= 0) list[i] = r
-        else list.push(r)
-      }
+      if (decision === 'safe') a.learn.forEach(c => put(s, { ...c, verdict: 'safe' }, scope ?? 'project'))
       s.approvals = (s.approvals ?? []).filter(x => x.requestId !== rid)
       if (s.approvals.length === 0) setState(s, 'running_tools')
       else changed(s)
-      approvalWaits.get(rid)?.(decision !== 'deny')
+      approvalWaits.get(rid)?.(decision === 'deny' ? 'deny' : 'allow')
+      if (decision === 'safe') rejudgeAll()
     },
     async setUnattended(sid, on) {
       const s = find(sid)
@@ -414,34 +453,50 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
         const waiting = s.approvals ?? []
         s.approvals = []
         if (waiting.length) setState(s, 'running_tools')
-        waiting.forEach(a => approvalWaits.get(a.requestId)?.(false))
+        waiting.forEach(a => approvalWaits.get(a.requestId)?.('away'))
       }
       changed(s)
       return { ...s }
     },
-    async toolRules(sid) { return [...(rules[find(sid).workdir] ?? [])] },
-    async sessionToolRules(sid) { return [...(sessionRules[sid] ?? [])] },
-    async deleteSessionToolRule(sid, rule) {
-      sessionRules[sid] = (sessionRules[sid] ?? []).filter(r => !(r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? '')))
-      return [...sessionRules[sid]]
+    async setMode(sid, mode) {
+      const s = find(sid)
+      s.mode = mode
+      rejudge(s)
+      return { ...s }
     },
-    async promoteSessionToolRule(sid, rule) {
-      const list = (rules[find(sid).workdir] ??= [])
-      list.push({ ...rule })
-      sessionRules[sid] = (sessionRules[sid] ?? []).filter(r => !(r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? '')))
+    async safeList(sid) { return listFor(find(sid)).map(e => ({ ...e })) },
+    async setSafeEntry(sid, entry, scope) {
+      const s = find(sid)
+      put(s, entry, scope)
+      rejudgeAll()
+      return listFor(s).map(e => ({ ...e }))
     },
-    async setToolRule(sid, rule) {
-      const list = (rules[find(sid).workdir] ??= [])
-      const i = list.findIndex(r => r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? ''))
-      if (i >= 0) list[i] = { ...rule }
-      else list.push({ ...rule })
-      return [...list]
+    async deleteSafeEntry(sid, entry) {
+      drop(entry)
+      rejudgeAll()
+      return listFor(find(sid)).map(e => ({ ...e }))
     },
-    async deleteToolRule(sid, rule) {
-      const w = find(sid).workdir
-      rules[w] = (rules[w] ?? []).filter(r => !(r.tool === rule.tool && (r.prefix ?? '') === (rule.prefix ?? '')))
-      return [...rules[w]]
+    async moveSafeEntry(sid, entry, scope) {
+      const s = find(sid)
+      drop(entry)
+      put(s, entry, scope)
+      rejudgeAll()
+      return listFor(s).map(e => ({ ...e }))
     },
+    async teach(sid, classes, verdict, scope) {
+      const s = find(sid)
+      classes.forEach(c => put(s, { ...c, verdict }, scope))
+      rejudgeAll()
+    },
+    async previewClasses(_sid, command) { return mockPreview(command) },
+    async knownTools() {
+      return ['Bash', 'Edit', 'PowerShell', 'Read', 'WebFetch', 'WebSearch', 'Write', 'mcp__notes__read_note', 'mcp__notes__touch_note']
+    },
+    async explainCommand(sid, command) {
+      const s = find(sid)
+      return mockExplain(s, command, listFor(s), MOCK_ALLOWLISTS[s.profileId] ?? [], prefs.unknownCommands ?? 'model')
+    },
+    async sessionAllowlist(sid) { return [...(MOCK_ALLOWLISTS[find(sid).profileId] ?? [])] },
     async search(q) {
       return mockSearch(q, sessions, pages)
     },

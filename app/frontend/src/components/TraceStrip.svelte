@@ -2,17 +2,27 @@
   import { slide } from 'svelte/transition'
   import type { TraceItem } from '../lib/api'
   import { t } from '../lib/i18n.svelte'
+  import { approvedLabel, promptable, reasonLabel } from '../lib/approvals'
   import { failureGist } from '../lib/trace'
   import Icon from './Icon.svelte'
+  import ShouldPrompt from './ShouldPrompt.svelte'
+
+  // Each row says who let the call run when the CLI asked first. When
+  // UNCLI answered on its own, that label (or "why" on a refused call)
+  // opens the reason for each part of the command: only looking, judged
+  // safe, the safe list, the session type's list, Never… Parts that ran
+  // because UNCLI judged them safe offer "This should prompt".
 
   interface Props {
     items: TraceItem[] | null
+    sessionId: string
   }
 
-  let { items: raw }: Props = $props()
+  let { items: raw, sessionId }: Props = $props()
   const items = $derived(raw ?? [])
   let open = $state(false)
   let shown = $state<Record<string, boolean>>({}) // rows showing their full output
+  let reasons = $state<Record<string, boolean>>({}) // rows showing why each part ran
 
   const denied = $derived(items.filter(i => i.denied).length)
   const failed = $derived(items.filter(i => i.done && !i.ok && !i.denied).length)
@@ -38,7 +48,15 @@
             </span>
             <span class="line">
               <span class="name" title={it.summary || it.name}>{it.summary || it.name}</span>
-              {#if it.approved}<span class="who">{t(it.approved === 'you' ? 'trace.allowedByYou' : it.approved === 'session' ? 'trace.allowedForSession' : 'trace.allowedByRule')}</span>{/if}
+              {#if it.approved && it.why?.length}
+                <button class="who" onclick={() => (reasons[it.id] = !reasons[it.id])} aria-expanded={!!reasons[it.id]} title={t('trace.why')}>
+                  {approvedLabel(it.approved, it.why)}<Icon name="chevron-down" size={11} />
+                </button>
+              {:else if it.approved}
+                <span class="who">{approvedLabel(it.approved)}</span>
+              {:else if it.why?.length}
+                <button class="more" onclick={() => (reasons[it.id] = !reasons[it.id])} aria-expanded={!!reasons[it.id]}>{t('trace.whyShort')}</button>
+              {/if}
               {#if it.output && !it.denied}
                 <button class="more" onclick={() => (shown[it.id] = !shown[it.id])} aria-expanded={!!shown[it.id]}>
                   {shown[it.id] ? t('trace.hideOutput') : t('trace.showOutput')}
@@ -48,6 +66,16 @@
             <span class="visually-hidden">{it.denied ? t('trace.wasDenied') : !it.done ? t('trace.isRunning') : it.ok ? t('trace.ok') : t('trace.wasFailed')}</span>
             {#if it.denied && it.output}<span class="why">{it.output}</span>{/if}
             {#if it.done && !it.ok && !it.denied && it.output && !shown[it.id]}<span class="why failed-why">{failureGist(it.output)}</span>{/if}
+            {#if reasons[it.id] && it.why}
+              <ul class="parts" aria-label={t('trace.why')}>
+                {#each it.why as r, i (i)}
+                  <li class={r.by}>{#if r.part}<code>{r.part}</code>{/if}<span>{reasonLabel(r)}</span></li>
+                {/each}
+                {#if promptable(it.why).length > 0}
+                  <li><ShouldPrompt {sessionId} classes={promptable(it.why)} /></li>
+                {/if}
+              </ul>
+            {/if}
             {#if shown[it.id] && it.output}<pre class="output">{it.output}</pre>{/if}
           </li>
         {/each}
@@ -146,12 +174,50 @@
   }
   .who {
     flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
     padding: 0 6px;
+    border: 0;
     border-radius: 999px;
     background: var(--accent-soft);
     color: var(--accent);
     font-family: var(--font);
     font-size: 11px;
+  }
+  button.who:hover {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .parts {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 2px 0 0;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    list-style: none;
+    font-family: var(--font);
+    font-size: var(--text-xs);
+  }
+  .parts li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: 0;
+    font-size: var(--text-xs);
+  }
+  .parts code {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+  }
+  .parts .deny,
+  .parts .blocked,
+  .parts .readonly {
+    color: var(--danger);
   }
   .more {
     flex: none;

@@ -10,7 +10,7 @@ For each stream `<name>.jsonl` there may be:
   and control responses), in order.
 - `<name>.args.txt`: the CLI arguments after the binary.
 
-Paths, the account email and the org id are scrubbed (`C:\uncli-spike`,
+Paths, the account email and the org id are scrubbed (newer recordings also empty the user's own slash commands and agents in the `initialize` answer) (`C:\uncli-spike`,
 `user@example.com`, a zero uuid). Signatures and ids are left as recorded.
 
 ## claude/2.1.285
@@ -32,6 +32,8 @@ Recorded with Claude Code 2.1.285 (`stable` on 2026-10-01), mostly on Haiku 4.5.
 | `perm-accept-edits-bash-allowlist` | Code profile shape: `acceptEdits` + `Bash(git status:*)`; Write allowed, other Bash denied |
 | `perm-stdio-allow` | `initialize` handshake, then `--permission-prompt-tool stdio` `can_use_tool` request answered allow |
 | `perm-stdio-deny` | Same without `initialize`, answered deny |
+| `set-permission-mode-live` | `set_permission_mode` switches `acceptEdits` to `default` on a live process: the first Write runs unasked, the second is asked; MCP tools are asked about (recorded 2026-10-04) |
+| `mcp-status-tool-hints` | `mcp_status` sent mid-turn returns each MCP tool with its annotations (`readOnly`, `destructive`, `openWorld`, true ones only); read and destructive tool calls both asked (recorded 2026-10-04) |
 | `image-input` | Base64 PNG image content block on stream-json input |
 | `append-system-prompt` | `--append-system-prompt` and `--disallowedTools Bash` |
 | `chat-profile-minimal` | Chat profile flags: `--system-prompt`, `--tools`, `--strict-mcp-config`, `--setting-sources ""`, `--disable-slash-commands` |

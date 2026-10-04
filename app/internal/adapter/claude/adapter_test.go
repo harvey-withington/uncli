@@ -112,6 +112,18 @@ func TestEncodeControl(t *testing.T) {
 	if !ok || !strings.Contains(string(b), `"behavior":"allow"`) || !strings.Contains(string(b), `"request_id":"r1"`) {
 		t.Errorf("approve -> %s", b)
 	}
+	b, ok = a.EncodeControl(core.Control{Kind: core.CtlSetPermissionMode, Mode: "default"})
+	if !ok || !strings.Contains(string(b), `"mode":"default","subtype":"set_permission_mode"`) {
+		t.Errorf("set_permission_mode -> %s", b)
+	}
+	for _, mode := range []string{"bypassPermissions", ""} {
+		if _, ok := a.EncodeControl(core.Control{Kind: core.CtlSetPermissionMode, Mode: mode}); ok {
+			t.Errorf("set_permission_mode %q should be refused", mode)
+		}
+	}
+	if b, ok := a.EncodeControl(core.Control{Kind: core.CtlToolHints}); !ok || !strings.Contains(string(b), `"subtype":"mcp_status"`) {
+		t.Errorf("tool hints -> %s", b)
+	}
 	if _, ok := a.EncodeControl(core.Control{Kind: "nope"}); ok {
 		t.Error("unknown control should be unsupported")
 	}
@@ -123,7 +135,7 @@ func TestBuildCommand(t *testing.T) {
 		ResumeID: "abc", SessionID: "ignored-when-resuming", Model: "haiku", Effort: "high",
 		SystemPrompt: "sys", Tools: []string{"WebSearch", "Write"},
 		AllowedTools:   []string{"Write(./artifacts/**)", "Bash(git status:*)"},
-		PermissionMode: "acceptEdits", Isolated: true,
+		PermissionMode: "acceptEdits", Isolated: true, MCPConfig: []string{"mcp.json"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +145,7 @@ func TestBuildCommand(t *testing.T) {
 		"-p|--input-format|stream-json|--output-format|stream-json|--verbose|--include-partial-messages",
 		"--resume|abc", "--model|haiku", "--effort|high", "--system-prompt|sys", "--tools|WebSearch,Write",
 		"--allowedTools|Write(./artifacts/**)|Bash(git status:*)|--permission-mode|acceptEdits",
-		"--permission-prompts|none", "--strict-mcp-config|--setting-sources||--disable-slash-commands",
+		"--permission-prompts|none", "--mcp-config|mcp.json|--strict-mcp-config|--setting-sources||--disable-slash-commands",
 	} {
 		if !strings.Contains(args, want) {
 			t.Errorf("args missing %q:\n%s", want, args)

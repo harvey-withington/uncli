@@ -47,7 +47,9 @@ const ssh = cmd => execFileSync('ssh', ['-o', 'BatchMode=yes', target, cmd], { e
 
 // The builds already there, oldest first.
 const pattern = /^uncli-setup-(\d{4}-\d{2}-\d{2})-(\d{3,})\.exe$/
-const listed = ssh(`if not exist ${dir} mkdir ${dir} & dir /b ${dir} 2>nul & exit 0`)
+// The brackets matter: without them cmd makes `& dir …` part of the `if`,
+// so the listing only ran when the folder was missing.
+const listed = ssh(`(if not exist ${dir} mkdir ${dir}) & dir /b ${dir} 2>nul & exit 0`)
 const builds = listed
   .split(/\r?\n/)
   .map(s => s.trim())

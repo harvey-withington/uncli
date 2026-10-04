@@ -3,6 +3,7 @@ package session
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"time"
 
 	"uncli/internal/core"
@@ -10,42 +11,53 @@ import (
 )
 
 // Approvals: with the adapter's Approvals capability, the CLI asks before
-// any tool use its allowlist doesn't cover, and waits for the answer. The
-// project's rules (rules.go) answer it when one matches (allow or deny);
-// otherwise the session keeps it until the user answers on its card
-// (Allow, Always allow…, Deny). Whatever is still waiting when the turn is
-// stopped is denied.
+// any tool use it wouldn't run on its own, and waits for the answer. The
+// session's prompt level and the safe list (modes.go) answer it when they
+// can; otherwise the session keeps it until the user answers on its card:
+// Allow once, This is safe (remembered for this project or all projects),
+// or Deny. Whatever is still waiting when the turn is stopped is denied.
 //
-// Unattended mode is for when the user walks away: rules still answer
-// first, but anything that would wait for the user is declined at once,
-// with a message telling the model why and how to carry on without it.
+// Unattended mode is for when the user walks away: anything that would
+// prompt is declined at once, with a message telling the model why and
+// how to carry on without it.
 
 // Approval is a tool use waiting for the user's answer.
 type Approval struct {
-	RequestID   string           `json:"requestId"`
-	Tool        string           `json:"tool"`
-	Input       json.RawMessage  `json:"input,omitempty"`
-	Description string           `json:"description,omitempty"`
-	ToolUseID   string           `json:"toolUseId,omitempty"`
-	Suggestions []store.ToolRule `json:"suggestions"` // what "Always allow" can add, most specific first
-	AskedAt     int64            `json:"askedAt"`
+	RequestID   string              `json:"requestId"`
+	Tool        string              `json:"tool"`
+	Input       json.RawMessage     `json:"input,omitempty"`
+	Description string              `json:"description,omitempty"`
+	ToolUseID   string              `json:"toolUseId,omitempty"`
+	Action      core.ToolAction     `json:"-"`     // what it does, in provider-neutral terms
+	Class       Class               `json:"class"` // what UNCLI takes it to do
+	Why         []store.TraceReason `json:"why"`   // what each part does, and why it prompts
+	// Learn is what "This is safe" would remember: a class for each part
+	// that prompts. Empty when it can't be learned (the card says why).
+	Learn []store.SafeClass `json:"learn"`
+	// Judging: the quick-task model is judging it; it waits without a card.
+	Judging bool  `json:"judging,omitempty"`
+	AskedAt int64 `json:"askedAt"`
 }
 
-// Decisions the user can make on an approval card.
+// Decisions the user can make on a card.
 const (
-	Allow        = "allow"   // this once
-	AllowSession = "session" // and add a rule for the rest of this session
-	Always       = "always"  // and add a rule to the project
-	Deny         = "deny"
+	Allow = "allow" // this once
+	Safe  = "safe"  // and remember it as safe (with a scope)
+	Deny  = "deny"
+)
+
+// Scopes of a safe-list entry, as the UI names them.
+const (
+	ScopeProject = "project"
+	ScopeAll     = "all"
 )
 
 const (
-	deniedByUser = "Denied by the user in UNCLI."
-	deniedByRule = "Denied by a rule for this project in UNCLI."
+	deniedOnCard = "Denied by the user in UNCLI."
 
-	unattendedDeclined = "Declined automatically: the user is away (UNCLI unattended mode) and no rule allows this. " +
-		"Don't retry it as it is. Use tools and commands that are already allowed; run chained or piped commands " +
-		"as separate commands, since each part needs a rule of its own. If the task can't be finished without " +
+	unattendedDeclined = "Declined automatically: the user is away (UNCLI unattended mode), and this would have needed " +
+		"their approval. Don't retry it as it is. Carry on with what doesn't need them; run chained or piped commands " +
+		"as separate commands, since the safe parts can then run on their own. If the task can't be finished without " +
 		"this, finish what you can and list what still needs the user at the end of your answer."
 	unattendedQuestion = "The user is away (UNCLI unattended mode) and can't answer questions. Make the most " +
 		"reasonable choice yourself, carry on, and say at the end of your answer which choices you made."
@@ -53,30 +65,32 @@ const (
 		"answer and stop there; the user will review it when they're back."
 
 	// Told to the model at the start of a turn when the mode has changed.
-	unattendedOn = "Unattended mode is on: the user is away. Any tool use or command that would need their " +
-		"approval is declined automatically, and questions to them can't be answered. Prefer tools and commands " +
-		"that are already allowed, run chained or piped commands as separate commands, make reasonable choices " +
-		"yourself, and end your answer with what you decided and anything that still needs the user."
+	unattendedOn = "Unattended mode is on: the user is away. Anything that would need their approval is declined " +
+		"automatically, and questions to them can't be answered. Prefer safe work, run chained or piped commands as " +
+		"separate commands, make reasonable choices yourself, and end your answer with what you decided and anything " +
+		"that still needs the user."
 	unattendedOff = "Unattended mode is off: the user is back and can approve tool uses and answer questions again."
+
+	// What the model is told about the prompt level when it changes (or
+	// once after a restore). Each line also retires the old read-only mode,
+	// so a session told it was read-only stops refusing to try tools.
+	levelAlways = "Prompt level: Always. Use tools as you normally would; anything except reading is put to the user " +
+		"for approval first. There is no read-only restriction: any earlier read-only instruction no longer applies."
+	levelUnsafe = "Prompt level: When unsafe. Use tools as you normally would; safe work runs, and anything unsafe is put " +
+		"to the user for approval first. There is no read-only restriction: any earlier read-only instruction no longer applies."
+	levelNever = "Prompt level: Never. Tools run without asking the user, except what the user has blocked. There is no " +
+		"read-only restriction: any earlier read-only instruction no longer applies."
 )
 
 // unattendedMessage is the reason given for a request declined in unattended mode.
-func unattendedMessage(tool string) string {
-	switch tool {
-	case "AskUserQuestion":
+func unattendedMessage(a core.ToolAction) string {
+	switch a.Kind {
+	case core.ActQuestion:
 		return unattendedQuestion
-	case "ExitPlanMode":
+	case core.ActPlan:
 		return unattendedPlan
 	}
 	return unattendedDeclined
-}
-
-func bashCommand(input json.RawMessage) string {
-	var in struct {
-		Command string `json:"command"`
-	}
-	_ = json.Unmarshal(input, &in)
-	return in.Command
 }
 
 // askLocked handles a permission request from the CLI. Caller holds s.mu.
@@ -86,37 +100,117 @@ func (s *Session) askLocked(a core.ApprovalAsked) bool {
 		_ = s.replyLocked(a.RequestID, false, nil, "There is no turn to approve this for.")
 		return false
 	}
-	rules, _ := s.m.d.Store.Rules(s.rec.Workdir)
-	action, from := decide(s.sessionRules, rules, a.Tool, a.Input)
-	switch action {
-	case store.RuleAllow:
-		_ = s.replyLocked(a.RequestID, true, a.Input, "")
-		s.markApprovedLocked(a.ToolUseID, from)
-		return false
-	case store.RuleDeny:
-		_ = s.replyLocked(a.RequestID, false, nil, deniedByRule)
-		s.markDeniedLocked(a.ToolUseID)
+	action := a.Action
+	if action.Kind == "" { // an adapter that doesn't say: nothing known about it
+		action = core.ToolAction{Kind: core.ActOther, Tool: a.Tool, Input: a.Input}
+	}
+	v := s.policyLocked().judge(action)
+	if s.settleLocked(a.RequestID, a.ToolUseID, action, a.Input, v) {
 		return false
 	}
-	if s.unattended {
-		_ = s.replyLocked(a.RequestID, false, nil, unattendedMessage(a.Tool))
-		s.markDeniedLocked(a.ToolUseID)
+	ap := Approval{RequestID: a.RequestID, Tool: a.Tool, Input: a.Input, Description: a.Description, ToolUseID: a.ToolUseID,
+		Action: action, AskedAt: time.Now().UnixMilli()}
+	ap.update(v)
+	s.pending = append(s.pending, ap)
+	if v.action == actionJudge {
+		s.m.startJudging(v.judge)
+	}
+	return s.waitingForUserLocked()
+}
+
+// update takes a fresh verdict for a waiting request.
+func (a *Approval) update(v verdict) {
+	a.Class, a.Why, a.Judging = v.class, v.why, v.action == actionJudge
+	a.Learn, _ = learnable(v.why)
+	if a.Learn == nil {
+		a.Learn = []store.SafeClass{}
+	}
+}
+
+// settleLocked answers a request without the user when the verdict (or
+// unattended mode) allows it. It reports whether it did.
+func (s *Session) settleLocked(requestID, toolUseID string, a core.ToolAction, input json.RawMessage, v verdict) bool {
+	switch {
+	case v.action == actionRun:
+		_ = s.replyLocked(requestID, true, input, "")
+		s.markApprovedLocked(toolUseID, v.by, v.why)
+		s.followShellLocked(a)
+	case v.action == actionBlock:
+		_ = s.replyLocked(requestID, false, nil, v.reason)
+		s.markDeniedLocked(toolUseID, v.why)
+	case v.action == actionJudge:
+		return false // the model's answer decides
+	case s.unattended:
+		_ = s.replyLocked(requestID, false, nil, unattendedMessage(a))
+		s.markDeniedLocked(toolUseID, v.why)
+	default:
 		return false
 	}
-	sug := suggestions(a.Tool, a.Input)
-	if sug == nil {
-		sug = []store.ToolRule{}
-	}
-	s.pending = append(s.pending, Approval{
-		RequestID: a.RequestID, Tool: a.Tool, Input: a.Input, Description: a.Description, ToolUseID: a.ToolUseID,
-		Suggestions: sug, AskedAt: time.Now().UnixMilli(),
-	})
 	return true
 }
 
-// Answer gives the user's decision on a waiting request. For Always, rule
-// is the rule to add (one of the request's suggestions, possibly edited).
-func (s *Session) Answer(requestID, decision string, rule *store.ToolRule) error {
+// followShellLocked keeps track of the shell a command ran in: its
+// dialect, and the folder a cd left it in (the CLI keeps that between
+// commands, and goes back to the session folder if it leaves it).
+func (s *Session) followShellLocked(a core.ToolAction) {
+	if a.Kind != core.ActShell {
+		return
+	}
+	s.shellDialect = a.Dialect
+	base := s.shellCwd
+	if base == "" {
+		base = s.rec.Workdir
+	}
+	if _, cwd, ok := readScript(a.Command, s.shellDialect, base); ok {
+		s.shellCwd = ""
+		if p := filepath.ToSlash(filepath.Clean(cwd)); inside(p, s.rec.Workdir) && cwd != s.rec.Workdir {
+			s.shellCwd = cwd
+		}
+	}
+}
+
+// policyLocked gathers what a decision depends on. Caller holds s.mu.
+func (s *Session) policyLocked() policy {
+	safe, _ := s.m.d.Store.SafeList(s.rec.Workdir)
+	allowlist := s.allowlist
+	if allowlist == nil { // not started yet: the list it will use
+		allowlist = parseAllowlist(s.m.Allowlist(s.rec.ProfileID), s.rec.Workdir)
+	}
+	return policy{mode: s.rec.Mode, unknown: s.m.unknownSetting(), safe: safe, profile: allowlist,
+		workdir: s.rec.Workdir, cwd: s.shellCwd, state: s.m.statePaths(), hints: s.hints, judged: s.m.d.Store.Judgement, failed: s.m.judge.isFailed}
+}
+
+// rejudgeLocked looks again at the requests waiting for the user after
+// something they depend on changed (the level, the safe list, unattended
+// mode, a model's judgement), and answers the ones that no longer need
+// the user.
+func (s *Session) rejudgeLocked() {
+	if len(s.pending) == 0 {
+		return
+	}
+	p := s.policyLocked()
+	still := s.pending[:0:0]
+	for _, a := range s.pending {
+		v := p.judge(a.Action)
+		if !s.settleLocked(a.RequestID, a.ToolUseID, a.Action, a.Input, v) {
+			a.update(v)
+			if a.Judging {
+				s.m.startJudging(v.judge)
+			}
+			still = append(still, a)
+		}
+	}
+	s.pending = still
+	s.resumeLocked()
+	if s.waitingForUserLocked() && s.page != nil {
+		s.state = NeedsApproval // a request the model was judging now needs the user
+	}
+}
+
+// Answer gives the user's decision on a waiting request. Safe remembers
+// each part that prompted as safe, in scope (ScopeProject or ScopeAll),
+// then allows it; every other waiting request is looked at again.
+func (s *Session) Answer(requestID, decision, scope string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	i := -1
@@ -129,41 +223,59 @@ func (s *Session) Answer(requestID, decision string, rule *store.ToolRule) error
 		return errors.New("that request is no longer waiting for an answer")
 	}
 	a := s.pending[i]
-	allow := decision == Allow || decision == AllowSession || decision == Always
-	if !allow && decision != Deny {
-		return errors.New("unknown decision " + decision)
-	}
-	if decision == Always || decision == AllowSession {
-		if rule == nil || rule.Tool != a.Tool {
-			return errors.New("choose what to always allow")
+	switch decision {
+	case Allow, Deny:
+	case Safe:
+		classes, ok := learnable(a.Why)
+		if !ok {
+			return errors.New("this can only be allowed once")
 		}
-		r := *rule
-		r.Action = store.RuleAllow
-		if decision == Always {
-			if err := s.m.d.Store.SetRule(s.rec.Workdir, r); err != nil {
+		folder, err := s.scopeFolder(scope)
+		if err != nil {
+			return err
+		}
+		for _, c := range classes {
+			if err := s.m.d.Store.SetSafeEntry(store.SafeEntry{Kind: c.Kind, Words: c.Words, Flags: c.Flags, Verdict: store.Safe, Folder: folder}); err != nil {
 				return err
 			}
-		} else {
-			s.sessionRules = addRule(s.sessionRules, r)
 		}
+	default:
+		return errors.New("unknown decision " + decision)
 	}
-	if err := s.replyLocked(a.RequestID, allow, a.Input, deniedByUser); err != nil {
+	allow := decision != Deny
+	if err := s.replyLocked(a.RequestID, allow, a.Input, deniedOnCard); err != nil {
 		return err
 	}
 	s.pending = append(s.pending[:i:i], s.pending[i+1:]...)
 	if allow {
-		s.markApprovedLocked(a.ToolUseID, "you")
+		s.markApprovedLocked(a.ToolUseID, "you", nil)
+		s.followShellLocked(a.Action)
 	} else {
-		s.markDeniedLocked(a.ToolUseID)
+		s.markDeniedLocked(a.ToolUseID, nil)
 	}
 	s.resumeLocked()
 	s.changed()
+	if decision == Safe {
+		go s.m.rejudgeAll() // what was just learned may cover other waiting requests, here and elsewhere
+	}
 	return nil
+}
+
+// scopeFolder is the folder a safe-list entry belongs to: this session's
+// for ScopeProject, none for ScopeAll.
+func (s *Session) scopeFolder(scope string) (string, error) {
+	switch scope {
+	case ScopeProject, "":
+		return s.rec.Workdir, nil
+	case ScopeAll:
+		return "", nil
+	}
+	return "", errors.New("unknown scope " + scope)
 }
 
 // resumeLocked goes back to work once nothing waits for the user.
 func (s *Session) resumeLocked() {
-	if len(s.pending) == 0 && s.state == NeedsApproval {
+	if !s.waitingForUserLocked() && s.state == NeedsApproval {
 		s.state = Thinking
 		if s.runningTools > 0 {
 			s.state = RunningTools
@@ -177,82 +289,128 @@ func (s *Session) SetUnattended(on bool) View {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.unattended = on
-	if on {
-		for _, a := range s.pending {
-			_ = s.replyLocked(a.RequestID, false, nil, unattendedMessage(a.Tool))
-			s.markDeniedLocked(a.ToolUseID)
-		}
-		s.pending = nil
-		s.resumeLocked()
-	}
+	s.rejudgeLocked()
 	s.changed()
 	return s.viewLocked()
 }
 
-// unattendedDirective is what the next turn tells the model about the
-// mode, when it has changed since the model was last told. Caller holds s.mu.
-func (s *Session) unattendedDirective() []string {
-	if s.unattended == s.toldUnattended {
-		return nil
+// SetMode changes when the session prompts (modes.go). It applies to the
+// next tool use the CLI asks about, and to requests already waiting.
+// "Always" also needs the CLI to ask about edits it would otherwise make
+// on its own, so the CLI's permission mode follows (cliModeLocked).
+func (s *Session) SetMode(mode string) (View, error) {
+	if !ValidMode(mode) {
+		return View{}, errors.New("unknown prompt level " + mode)
 	}
-	if s.unattended {
-		return []string{unattendedOn}
-	}
-	return []string{unattendedOff}
-}
-
-// SessionRules are the rules for this session only, kept until UNCLI quits.
-func (s *Session) SessionRules() []store.ToolRule {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return append([]store.ToolRule{}, s.sessionRules...)
+	s.rec.Mode = mode
+	if err := s.m.d.Store.UpdateSession(&s.rec); err != nil {
+		return View{}, err
+	}
+	s.applyCLIModeLocked()
+	s.rejudgeLocked()
+	s.changed()
+	return s.viewLocked(), nil
 }
 
-// RemoveSessionRule drops a session rule.
-func (s *Session) RemoveSessionRule(r store.ToolRule) []store.ToolRule {
+// Rejudge looks again at waiting requests after a change made elsewhere
+// (the safe list, a judgement).
+func (s *Session) Rejudge() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := s.sessionRules[:0:0]
-	for _, x := range s.sessionRules {
-		if x.Tool != r.Tool || x.Prefix != r.Prefix {
-			out = append(out, x)
-		}
+	if len(s.pending) > 0 {
+		s.rejudgeLocked()
+		s.changed()
 	}
-	s.sessionRules = out
-	return append([]store.ToolRule{}, out...)
 }
 
-// addRule adds a rule, replacing one for the same tool and prefix.
-func addRule(rules []store.ToolRule, r store.ToolRule) []store.ToolRule {
-	for i, x := range rules {
-		if x.Tool == r.Tool && x.Prefix == r.Prefix {
-			rules[i] = r
-			return rules
-		}
+// cliModeLocked is the permission mode the CLI should run in: the
+// profile's, except under "Always prompt me", where it must ask about the
+// edits acceptEdits would approve on its own.
+func (s *Session) cliModeLocked(profileMode string) string {
+	if modeOf(s.rec.Mode) == ModeAlways && profileMode != "" && profileMode != "default" {
+		return "default"
 	}
-	return append(rules, r)
+	return profileMode
 }
 
-// markApprovedLocked records on the trace who let a tool use run.
-func (s *Session) markApprovedLocked(toolUseID, by string) {
+// applyCLIModeLocked switches a running CLI to the mode it should be in,
+// live when the adapter can; otherwise the next turn respawns it (Send
+// compares the modes).
+func (s *Session) applyCLIModeLocked() {
+	if s.proc == nil || !s.m.d.Adapter.Capabilities().LivePermissionMode {
+		return
+	}
+	want := s.cliModeLocked(s.profileMode)
+	if want == s.cliMode {
+		return
+	}
+	if want == "" {
+		want = "default"
+	}
+	if b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlSetPermissionMode, Mode: want}); ok {
+		if _, err := s.proc.Stdin().Write(b); err == nil {
+			s.cliMode = s.cliModeLocked(s.profileMode)
+		}
+	}
+}
+
+// modeDirectives is what the next turn tells the model about the prompt
+// level and unattended mode, each when it changed since the model was last
+// told. Caller holds s.mu.
+func (s *Session) modeDirectives() []string {
+	var out []string
+	if mode := modeOf(s.rec.Mode); mode != s.toldMode {
+		switch mode {
+		case ModeAlways:
+			out = append(out, levelAlways)
+		case ModeNever:
+			out = append(out, levelNever)
+		default:
+			out = append(out, levelUnsafe)
+		}
+	}
+	if s.unattended != s.toldUnattended {
+		if s.unattended {
+			out = append(out, unattendedOn)
+		} else {
+			out = append(out, unattendedOff)
+		}
+	}
+	return out
+}
+
+// toldLocked records that the model now knows the current modes.
+func (s *Session) toldLocked() {
+	s.toldUnattended = s.unattended
+	s.toldMode = modeOf(s.rec.Mode)
+}
+
+// markApprovedLocked records on the trace who let a tool use run, and
+// why for each part.
+func (s *Session) markApprovedLocked(toolUseID, by string, why []store.TraceReason) {
 	if s.page == nil || toolUseID == "" {
 		return
 	}
 	for k := range s.page.Trace {
 		if s.page.Trace[k].ID == toolUseID {
-			s.page.Trace[k].Approved = by
+			s.page.Trace[k].Approved, s.page.Trace[k].Why = by, why
 		}
 	}
 	s.savePage()
 }
 
-func (s *Session) markDeniedLocked(toolUseID string) {
+func (s *Session) markDeniedLocked(toolUseID string, why []store.TraceReason) {
 	if s.page == nil || toolUseID == "" {
 		return
 	}
 	for k := range s.page.Trace {
 		if s.page.Trace[k].ID == toolUseID {
 			s.page.Trace[k].Denied = true
+			if why != nil {
+				s.page.Trace[k].Why = why
+			}
 		}
 	}
 	s.savePage()

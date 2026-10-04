@@ -94,7 +94,7 @@
         <p class="banner err" role="alert"><Icon name="triangle-alert" size={14} />{page.error || t('page.failed')}</p>
       {/if}
 
-      <TraceStrip items={page.trace} />
+      <TraceStrip items={page.trace} sessionId={page.sessionId} />
     </div>
   </article>
 {/key}

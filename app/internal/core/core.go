@@ -74,6 +74,7 @@ type LaunchSpec struct {
 	PermissionMode  string            // default | acceptEdits | dontAsk | plan; never bypass
 	Approvals       bool              // phase 2: route prompts to UNCLI; false = deny automatically
 	Isolated        bool              // ignore user settings, MCP servers and skills (chat)
+	MCPConfig       []string          // MCP server config files to load, besides the user's own
 	Env             map[string]string //
 }
 
@@ -100,12 +101,19 @@ const (
 	CtlInterrupt  ControlKind = "interrupt"
 	CtlSetModel   ControlKind = "set_model"
 	CtlApprove    ControlKind = "approve" // answer to EvApprovalAsked (phase 2)
+	// CtlSetPermissionMode changes the CLI's own permission mode on the
+	// running process (LivePermissionMode).
+	CtlSetPermissionMode ControlKind = "set_permission_mode"
+	// CtlToolHints asks for the MCP tools' annotations; the answer comes
+	// back as EvToolHints (ToolHints).
+	CtlToolHints ControlKind = "tool_hints"
 )
 
 type Control struct {
 	Kind         ControlKind
 	RequestID    string          // for CtlApprove: the request being answered
 	Model        string          // CtlSetModel
+	Mode         string          // CtlSetPermissionMode: default | acceptEdits | dontAsk | plan; never bypass
 	Allow        bool            // CtlApprove
 	Message      string          // CtlApprove deny reason
 	UpdatedInput json.RawMessage // CtlApprove allow
@@ -125,11 +133,23 @@ type Capabilities struct {
 	LiveModelSwitch  bool `json:"liveModelSwitch"` // control message instead of respawn
 	Interrupt        bool `json:"interrupt"`
 	Approvals        bool `json:"approvals"` // permission prompt routing
+	// LivePermissionMode: the CLI's permission mode can change without a
+	// respawn (CtlSetPermissionMode).
+	LivePermissionMode bool `json:"livePermissionMode"`
+	// ToolHints: the CLI reports its MCP tools' annotations (CtlToolHints).
+	ToolHints        bool `json:"toolHints"`
 	Images           bool `json:"images"`
 	Documents        bool `json:"documents"` // PDF and text attachments
 	UsageReporting   bool `json:"usageReporting"`
 	ThinkingEvents   bool `json:"thinkingEvents"`
 	SlashPassthrough bool `json:"slashPassthrough"`
+}
+
+// StatePather is an adapter whose CLI keeps files of its own outside the
+// session folder (plans, memory, todo lists): writing there is the CLI's
+// bookkeeping, not a change to the user's files. Optional.
+type StatePather interface {
+	StatePaths() []string // absolute folders
 }
 
 // TextTasker is an adapter that can run one-off text tasks (page summaries,

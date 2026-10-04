@@ -1,0 +1,5 @@
+{"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":null}}
+{"type":"user","message":{"role":"user","content":"Call the notes read_note tool with name x, then the notes delete_note tool with name y. Then reply DONE."},"parent_tool_use_id":null,"session_id":""}
+{"type":"control_request","request_id":"req_2","request":{"subtype":"mcp_status"}}
+{"type":"control_response","response":{"subtype":"success","request_id":"1a0f2412-34f0-4253-8663-585b8fa93ec4","response":{"behavior":"allow","updatedInput":{"name":"x"}}}}
+{"type":"control_response","response":{"subtype":"success","request_id":"3b971011-a7e1-47ad-9c43-693c93bc1a7c","response":{"behavior":"deny","message":"Denied by probe."}}}

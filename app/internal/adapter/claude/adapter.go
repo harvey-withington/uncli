@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -29,11 +31,26 @@ func (a *Adapter) ID() string { return "claude" }
 
 func (a *Adapter) Installer() core.Installer { return a.installer }
 
+// StatePaths are the folders the CLI keeps its own files in (plans,
+// per-project memory and transcripts, todo lists): writing there is its
+// bookkeeping. Its settings and credentials are not among them.
+func (a *Adapter) StatePaths() []string {
+	dir := os.Getenv("CLAUDE_CONFIG_DIR")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		dir = filepath.Join(home, ".claude")
+	}
+	return []string{filepath.Join(dir, "plans"), filepath.Join(dir, "projects"), filepath.Join(dir, "todos")}
+}
+
 func (a *Adapter) Capabilities() core.Capabilities {
 	return core.Capabilities{
 		PartialStreaming: true, Resume: true, LiveModelSwitch: true, Interrupt: true,
-		Approvals: true, Images: true, Documents: true, UsageReporting: true, ThinkingEvents: true,
-		SlashPassthrough: true,
+		Approvals: true, LivePermissionMode: true, ToolHints: true,
+		Images: true, Documents: true, UsageReporting: true, ThinkingEvents: true, SlashPassthrough: true,
 	}
 }
 
@@ -98,6 +115,9 @@ func (a *Adapter) BuildCommand(bin string, s core.LaunchSpec) (core.Command, err
 		args = append(args, "--permission-prompt-tool", "stdio")
 	} else {
 		args = append(args, "--permission-prompts", "none")
+	}
+	for _, c := range s.MCPConfig {
+		args = append(args, "--mcp-config", c)
 	}
 	if s.Isolated {
 		args = append(args, "--strict-mcp-config", "--setting-sources", "", "--disable-slash-commands")
@@ -195,6 +215,13 @@ func (a *Adapter) EncodeControl(c core.Control) ([]byte, bool) {
 		req = map[string]any{"subtype": "interrupt"}
 	case core.CtlSetModel:
 		req = map[string]any{"subtype": "set_model", "model": c.Model}
+	case core.CtlSetPermissionMode:
+		if !permissionModes[c.Mode] || c.Mode == "" {
+			return nil, false
+		}
+		req = map[string]any{"subtype": "set_permission_mode", "mode": c.Mode}
+	case core.CtlToolHints:
+		req = map[string]any{"subtype": "mcp_status"}
 	case core.CtlApprove:
 		resp := map[string]any{"behavior": "deny", "message": c.Message}
 		if c.Allow {

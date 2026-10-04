@@ -2,8 +2,10 @@ package claude
 
 import (
 	"bufio"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -229,13 +231,65 @@ func TestToolUseAndFileTouched(t *testing.T) {
 	}
 }
 
+// mcp_status, sent mid-turn, comes back with each MCP tool's
+// annotations; the CLI asks about every MCP tool call, read-only or not.
+func TestToolHints(t *testing.T) {
+	evs := parseFixture(t, "mcp-status-tool-hints")
+	hints := ofKind(evs, core.EvToolHints)
+	if len(hints) != 1 {
+		t.Fatalf("tool_hints = %d", len(hints))
+	}
+	got := decode[core.ToolHints](t, hints[0]).Tools
+	want := map[string]core.ToolHint{
+		"mcp__notes__read_note":   {ReadOnly: true},
+		"mcp__notes__delete_note": {Destructive: true},
+		"mcp__notes__lookup_web":  {ReadOnly: true, OpenWorld: true},
+		"mcp__notes__touch_note":  {},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("hints = %+v", got)
+	}
+	for name, h := range want {
+		if g, ok := got[name]; !ok || g != h {
+			t.Errorf("%s = %+v (%v), want %+v", name, g, ok, h)
+		}
+	}
+	var asked []string
+	for _, e := range ofKind(evs, core.EvApprovalAsked) {
+		asked = append(asked, decode[core.ApprovalAsked](t, e).Tool)
+	}
+	if strings.Join(asked, ",") != "mcp__notes__read_note,mcp__notes__delete_note" {
+		t.Errorf("asked about %v", asked)
+	}
+	if hints := toolHints([]mcpServer{{Name: "claude.ai Gmail"}}); hints.Tools == nil {
+		t.Error("no tools should still give a map")
+	}
+}
+
+// set_permission_mode switches acceptEdits to default on a live process:
+// the first Write runs without asking, the second is asked about.
+func TestSetPermissionModeLive(t *testing.T) {
+	evs := parseFixture(t, "set-permission-mode-live")
+	asks := ofKind(evs, core.EvApprovalAsked)
+	if len(asks) != 3 {
+		t.Fatalf("approval_asked = %d, want 3 (Write after the switch, two MCP tools)", len(asks))
+	}
+	if a := decode[core.ApprovalAsked](t, asks[0]); a.Tool != "Write" || !strings.Contains(string(a.Input), "b.txt") {
+		t.Errorf("first ask = %+v", a)
+	}
+	if len(ofKind(evs, core.EvError)) != 0 {
+		t.Error("the mode switch was answered with an error")
+	}
+}
+
 func TestApprovalAndAccount(t *testing.T) {
 	evs := parseFixture(t, "perm-stdio-allow")
 	asks := ofKind(evs, core.EvApprovalAsked)
 	if len(asks) != 1 {
 		t.Fatalf("approval_asked = %d", len(asks))
 	}
-	if a := decode[core.ApprovalAsked](t, asks[0]); a.Tool != "Write" || a.RequestID == "" || !strings.HasPrefix(a.ToolUseID, "toolu_") {
+	if a := decode[core.ApprovalAsked](t, asks[0]); a.Tool != "Write" || a.RequestID == "" || !strings.HasPrefix(a.ToolUseID, "toolu_") ||
+		a.Action.Kind != core.ActWrite || !strings.HasSuffix(a.Action.Path, "hello.txt") {
 		t.Errorf("approval = %+v", a)
 	}
 	acc := ofKind(evs, core.EvAccount)
@@ -296,6 +350,29 @@ func TestTruncateKeepsUTF8(t *testing.T) {
 	for _, r := range strings.TrimSuffix(out, "…") {
 		if r != 'é' {
 			t.Fatalf("split rune: %q", r)
+		}
+	}
+}
+
+func TestActionOf(t *testing.T) {
+	cases := []struct {
+		tool, input string
+		want        core.ToolAction
+	}{
+		{"PowerShell", `{"command":"npm test"}`, core.ToolAction{Kind: core.ActShell, Tool: "PowerShell", Dialect: "powershell", Command: "npm test"}},
+		{"Bash", `{"command":"ls"}`, core.ToolAction{Kind: core.ActShell, Tool: "Bash", Dialect: "bash", Command: "ls"}},
+		{"Edit", `{"file_path":"a.go"}`, core.ToolAction{Kind: core.ActEdit, Tool: "Edit", Path: "a.go"}},
+		{"NotebookEdit", `{"notebook_path":"n.ipynb"}`, core.ToolAction{Kind: core.ActEdit, Tool: "NotebookEdit", Path: "n.ipynb"}},
+		{"mcp__notes__read_note", `{}`, core.ToolAction{Kind: core.ActMCP, Tool: "mcp__notes__read_note"}},
+		{"AskUserQuestion", `{}`, core.ToolAction{Kind: core.ActQuestion, Tool: "AskUserQuestion"}},
+		{"SubagentHandback", `{}`, core.ToolAction{Kind: core.ActInternal, Tool: "SubagentHandback"}},
+		{"CronCreate", `{}`, core.ToolAction{Kind: core.ActOther, Tool: "CronCreate"}},
+	}
+	for _, c := range cases {
+		got := ActionOf(c.tool, json.RawMessage(c.input))
+		got.Input = nil
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s = %+v, want %+v", c.tool, got, c.want)
 		}
 	}
 }

@@ -21,6 +21,7 @@ const (
 	EvToolFinished  EventKind = "tool_finished"  // id, ok, denied, output (truncated)
 	EvFileTouched   EventKind = "file_touched"   // path, line, how (edit/write/bash-detected)
 	EvApprovalAsked EventKind = "approval_asked" // request id, tool, input (phase 2)
+	EvToolHints     EventKind = "tool_hints"     // what the MCP servers say about their tools
 	EvNotice        EventKind = "notice"         // model changed, compacted, conversation reset, command output
 	EvUsageLimit    EventKind = "usage_limit"    // subscription window utilisation and reset times
 	EvTurnResult    EventKind = "turn_result"    // usage, cost, duration, is_error, error code
@@ -118,6 +119,49 @@ type ApprovalAsked struct {
 	Input       json.RawMessage `json:"input,omitempty"`
 	Description string          `json:"description,omitempty"`
 	ToolUseID   string          `json:"toolUseId,omitempty"` // the tool call it is for, as in EvToolStarted
+	Action      ToolAction      `json:"action"`              // what it does, in provider-neutral terms
+}
+
+// ToolAction is what a tool use does, in terms that don't depend on the
+// provider: the adapter maps its CLI's tools onto these kinds, and UNCLI
+// decides when to prompt from them alone.
+type ToolAction struct {
+	Kind    string          `json:"kind"`              // one of the Act… kinds
+	Tool    string          `json:"tool"`              // the provider's own name for the tool (an identity, e.g. for the safe list)
+	Dialect string          `json:"dialect,omitempty"` // shell: bash | powershell
+	Command string          `json:"command,omitempty"` // shell: the command line
+	Path    string          `json:"path,omitempty"`    // read, write, edit: the file
+	Input   json.RawMessage `json:"input,omitempty"`   // as the provider gave it (for showing it, or for a model to read)
+}
+
+// Kinds of tool action.
+const (
+	ActShell    = "shell"    // runs a command line
+	ActRead     = "read"     // reads a file
+	ActSearch   = "search"   // searches or lists files
+	ActWrite    = "write"    // writes a file
+	ActEdit     = "edit"     // edits a file
+	ActWeb      = "web"      // searches or fetches from the web
+	ActMCP      = "mcp"      // an MCP server's tool (its annotations are in EvToolHints)
+	ActQuestion = "question" // asks the user something
+	ActPlan     = "plan"     // asks the user to approve a plan
+	ActAgent    = "agent"    // starts a sub-agent (its own tool uses are asked about one by one)
+	ActInternal = "internal" // the CLI's own bookkeeping (to-do lists, tool search, messages between agents)
+	ActOther    = "other"    // anything else
+)
+
+// ToolHint is what a tool's server says about it (the MCP tool
+// annotations). They are hints, not guarantees: the server may be wrong.
+type ToolHint struct {
+	ReadOnly    bool `json:"readOnly,omitempty"`    // doesn't change anything
+	Destructive bool `json:"destructive,omitempty"` // may delete or overwrite
+	OpenWorld   bool `json:"openWorld,omitempty"`   // reaches outside this computer (web, email, other services)
+}
+
+// ToolHints maps the CLI's tool names (as in EvApprovalAsked) to their
+// hints, for every tool of every connected MCP server.
+type ToolHints struct {
+	Tools map[string]ToolHint `json:"tools"`
 }
 
 // Notice kinds.

@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"uncli/internal/core"
 	"uncli/internal/runtime/local"
+	"uncli/internal/session"
 	"uncli/internal/store"
 )
 
@@ -26,6 +29,10 @@ type ModelRef struct {
 type Preferences struct {
 	QuickTaskModel ModelRef `json:"quickTaskModel"` // the model for every quick task
 	AutoSummary    string   `json:"autoSummary"`    // which answers summarise themselves as they finish: off, long or always
+	// UnknownCommands is what Ask mode does with a command UNCLI doesn't
+	// recognise: model (the quick-task model judges it), inside (it runs if
+	// it stays in the session folder) or ask.
+	UnknownCommands string `json:"unknownCommands"`
 }
 
 // Automatic summaries: none, answers long enough to need one (the UI
@@ -48,7 +55,7 @@ type Provider struct {
 const settingPrefs = "prefs"
 
 func defaultPreferences() Preferences {
-	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}, AutoSummary: SummaryOff}
+	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}, AutoSummary: SummaryOff, UnknownCommands: session.UnknownModel}
 }
 
 func (s *Service) Preferences() Preferences {
@@ -70,6 +77,9 @@ func (s *Service) Preferences() Preferences {
 			p.AutoSummary = SummaryLong
 		}
 	}
+	if !session.ValidUnknown(p.UnknownCommands) {
+		p.UnknownCommands = session.UnknownModel
+	}
 	return p
 }
 
@@ -82,6 +92,12 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 	}
 	if !validSummary(p.AutoSummary) {
 		return s.Preferences(), fmt.Errorf("unknown summary setting %q", p.AutoSummary)
+	}
+	if p.UnknownCommands == "" {
+		p.UnknownCommands = session.UnknownModel
+	}
+	if !session.ValidUnknown(p.UnknownCommands) {
+		return s.Preferences(), fmt.Errorf("unknown setting for unrecognised commands %q", p.UnknownCommands)
 	}
 	b, err := json.Marshal(p)
 	if err != nil {
@@ -119,7 +135,13 @@ func (s *Service) RunTextTask(ctx context.Context, t core.TextTask) (core.TextRe
 	t.Model = ref.Model
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
-	out, runErr := local.RunInput(ctx, tasker.TextTaskCommand(bin, t), t.Prompt)
+	// An empty folder of its own: from any other the CLI would read that
+	// folder's CLAUDE.md and memory into the task.
+	dir := filepath.Join(s.Paths.Cache, "quick-tasks")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return core.TextResult{}, ref, err
+	}
+	out, runErr := local.RunInputIn(ctx, dir, tasker.TextTaskCommand(bin, t), t.Prompt)
 	res, err := tasker.ParseTextTask(out)
 	if err != nil {
 		if runErr != nil && len(out) == 0 {

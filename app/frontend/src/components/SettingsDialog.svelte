@@ -4,12 +4,14 @@
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
+  import SafeSection from './SafeSection.svelte'
   import type { AutoSummary, Preferences } from '../lib/api'
   import { modelOptions } from '../lib/models'
   import { AUTO_SUMMARY_MIN_WORDS } from '../lib/outline'
 
-  // Settings: the quick-task model, and the CLI version (anything but the
-  // pinned version is at the user's own risk).
+  // Settings: the quick-task model, what counts as safe (SafeSection; the
+  // header's shield opens Settings there), and the CLI version (anything
+  // but the pinned version is at the user's own risk).
   const app = useApp()
   let version = $state(app.cli?.version ?? '')
   let channels = $state<Record<string, string>>({})
@@ -17,6 +19,13 @@
 
   $effect(() => {
     app.backend.cliChannels().then(c => (channels = c)).catch(() => {})
+  })
+
+  // Opened from the shield: start at "Safe and unsafe".
+  $effect(() => {
+    if (app.settingsAt !== 'safe') return
+    app.settingsAt = ''
+    requestAnimationFrame(() => document.getElementById('settings-safe')?.scrollIntoView?.({ block: 'start' }))
   })
 
   const pinned = $derived(app.cli?.pinned ?? '')
@@ -55,7 +64,7 @@
   }
 </script>
 
-<Modal title={t('settings.title')} width={480} onclose={() => (app.settingsOpen = false)}>
+<Modal title={t('settings.title')} width={560} onclose={() => (app.settingsOpen = false)}>
   {#if prefs}
     <section>
       <h3>{t('settings.quickTitle')}</h3>
@@ -84,6 +93,7 @@
       </div>
     </section>
   {/if}
+  <SafeSection {savePrefs} />
   <section>
     <h3>{t('settings.cliTitle')}</h3>
     <p class="muted">{t('settings.cliBody', { pinned })}</p>
@@ -128,6 +138,7 @@
     color: var(--text-muted);
     font-size: var(--text-xs);
   }
+  :global(section) + section,
   section + section {
     margin-top: var(--space-5);
     padding-top: var(--space-4);

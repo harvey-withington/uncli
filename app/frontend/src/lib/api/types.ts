@@ -33,6 +33,19 @@ export interface SessionView {
   error?: string
   approvals?: Approval[] // tool uses waiting for the user, oldest first
   unattended?: boolean // requests that would wait for the user are declined
+  mode?: SessionMode | '' // when Claude stops to prompt; empty = when unsafe
+}
+
+// When Claude stops to prompt the user: always (anything but reading),
+// unsafe (only what could do harm; the default) or never.
+export type SessionMode = 'always' | 'unsafe' | 'never'
+
+// What UNCLI takes a tool use to do, and on whose word.
+export interface ToolClassView {
+  write: boolean
+  destructive?: boolean
+  openWorld?: boolean
+  source: 'you' | 'built-in' | 'server' | 'unknown'
 }
 
 export interface TraceItem {
@@ -43,7 +56,66 @@ export interface TraceItem {
   ok: boolean
   denied?: boolean
   output?: string
-  approved?: 'you' | 'session' | 'rule' // who let it run, when the CLI asked first
+  approved?: Approver // who let it run, when the CLI asked first
+  why?: TraceReason[] // when UNCLI answered without the user: the reason for each part of the command
+}
+
+// Who let a tool use run: you (on its card), your safe list, the session
+// type's list, UNCLI judging it safe (or reading), the setting for what it
+// can't place, Run without prompting, or a mix. (Older traces also hold
+// rule, session, profile, routine, full.)
+export type Approver = 'you' | 'listed' | 'builtin' | 'safe' | 'looks' | 'inside' | 'never' | 'mixed'
+  | 'rule' | 'session' | 'profile' | 'routine' | 'full'
+
+// Why one part of a command (or a whole tool use) ran, prompted or was blocked.
+export interface TraceReason {
+  part?: string // the part of the command; absent for a whole tool use
+  by:
+    | 'looks' | 'safe' | 'listed' | 'builtin' | 'inside' | 'never' // it ran
+    | 'always' | 'unsafe' | 'unknown' | 'judging' | 'user' // it prompted (judging: the model first)
+    | 'blocked' // the user's safe list blocks it
+    | 'rule' | 'session' | 'profile' | 'routine' | 'full' | 'deny' | 'readonly' | 'outside' | 'ask' | 'risky' | 'none' | 'complex' // older traces
+  entry?: SafeEntry // the safe-list entry that decided it
+  allow?: string // the session type's entry that matched, as written
+  class?: SafeClass // what "This is safe" or "This should prompt" would remember
+  fixed?: 'inline' | 'complex' | 'context' // why nothing can be remembered for it
+  rule?: ToolRule // older traces: the rule that matched
+  risk?: Risk // how an unsafe part could do harm
+  judged?: string // the quick-task model that judged a part UNCLI didn't recognise
+  note?: string // its one-line reason
+}
+
+// The safe list: the user's corrections to what UNCLI counts as safe.
+export type Verdict = 'safe' | 'unsafe' | 'blocked'
+export interface SafeClass {
+  kind: 'command' | 'tool'
+  words: string // "npm run test", a git class "git:local", or a tool's name
+  flags?: string // risk flags that set the class apart, e.g. "--force"
+}
+export interface SafeEntry extends SafeClass {
+  verdict: Verdict
+  folder?: string // the project it belongs to; absent for all projects
+}
+// Where an entry applies: this session's project, or all projects.
+export type Scope = 'project' | 'all'
+
+// What an example command would be remembered as, part by part.
+export interface ClassPreview {
+  part: string
+  class?: SafeClass
+  fixed?: 'inline' | 'complex' | 'context'
+}
+
+// How something risky could do harm.
+export type Risk = 'deletes' | 'discards' | 'outside' | 'publishes' | 'installs' | 'system' | 'stops' | 'remote' | 'secrets' | 'runs-code' | 'cloud'
+
+// What "Prompt when unsafe" does with a command UNCLI can't place.
+export type UnknownCommands = 'model' | 'inside' | 'ask'
+
+// What a session would do with a command now, and why.
+export interface Explanation {
+  action: 'allow' | 'ask' | 'deny' // runs, prompts, or blocked (or declined while away)
+  why: TraceReason[]
 }
 
 // A table of contents written by the quick-task model, anchored to the
@@ -93,9 +165,7 @@ export interface PageAttachment {
   size: number
 }
 
-// Tool permission rules for a project (a session's folder): allow, ask or
-// deny a tool, or for Bash a command prefix ("git push") or a git class
-// ("git:local").
+// Older traces name the rule that let a tool use run.
 export type RuleAction = 'allow' | 'ask' | 'deny'
 export interface ToolRule {
   tool: string
@@ -110,13 +180,15 @@ export interface Approval {
   input?: unknown
   description?: string
   toolUseId?: string
-  suggestions: ToolRule[] // what "Always allow" can add, most specific first
+  learn: SafeClass[] // what "This is safe" would remember; empty when it can only be allowed once
+  class?: ToolClassView // what UNCLI takes it to do
+  why?: TraceReason[] // what each part does, and why it needs the user
+  judging?: boolean // the quick-task model is judging it: no card yet
   askedAt: number
 }
 
-// allow: this once; session: and a rule for the rest of this session;
-// always: and a rule for the project.
-export type ApprovalDecision = 'allow' | 'session' | 'always' | 'deny'
+// allow: this once; safe: and remember it as safe (with a scope); deny.
+export type ApprovalDecision = 'allow' | 'safe' | 'deny'
 
 // Search across sessions (the store's full-text index).
 export interface SearchQuery {
@@ -230,6 +302,7 @@ export type AutoSummary = 'off' | 'long' | 'always'
 export interface Preferences {
   quickTaskModel: ModelRef
   autoSummary: AutoSummary // which answers summarise themselves as they finish
+  unknownCommands?: UnknownCommands // Ask mode and commands UNCLI doesn't recognise (default model)
 }
 
 export interface Provider {
@@ -376,14 +449,18 @@ export interface Backend {
   describePaths(paths: string[]): Promise<DroppedPath[]>
   describeAttachments(paths: string[]): Promise<AttachmentInfo[]>
   search(q: SearchQuery): Promise<SearchResult>
-  answerApproval(sessionId: string, requestId: string, decision: ApprovalDecision, rule?: ToolRule): Promise<void>
+  answerApproval(sessionId: string, requestId: string, decision: ApprovalDecision, scope?: Scope): Promise<void>
   setUnattended(sessionId: string, on: boolean): Promise<SessionView>
-  toolRules(sessionId: string): Promise<ToolRule[]>
-  sessionToolRules(sessionId: string): Promise<ToolRule[]>
-  deleteSessionToolRule(sessionId: string, rule: ToolRule): Promise<ToolRule[]>
-  promoteSessionToolRule(sessionId: string, rule: ToolRule): Promise<void>
-  setToolRule(sessionId: string, rule: ToolRule): Promise<ToolRule[]>
-  deleteToolRule(sessionId: string, rule: ToolRule): Promise<ToolRule[]>
+  setMode(sessionId: string, mode: SessionMode): Promise<SessionView>
+  safeList(sessionId: string): Promise<SafeEntry[]>
+  setSafeEntry(sessionId: string, entry: SafeEntry, scope: Scope): Promise<SafeEntry[]>
+  deleteSafeEntry(sessionId: string, entry: SafeEntry): Promise<SafeEntry[]>
+  moveSafeEntry(sessionId: string, entry: SafeEntry, scope: Scope): Promise<SafeEntry[]>
+  teach(sessionId: string, classes: SafeClass[], verdict: Verdict, scope: Scope): Promise<void>
+  previewClasses(sessionId: string, command: string): Promise<ClassPreview[]>
+  knownTools(sessionId: string): Promise<string[]>
+  explainCommand(sessionId: string, command: string): Promise<Explanation>
+  sessionAllowlist(sessionId: string): Promise<string[]>
   remove(sessionId: string): Promise<void>
   setBookmark(sessionId: string, pageId: string, on: boolean): Promise<Page>
   focus(sessionId: string): Promise<void>

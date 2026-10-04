@@ -34,7 +34,7 @@ export class AppStore {
   newSessionFolder = $state<string | null>(null) // folder it opens with (a dropped folder)
   newSessionSeq = $state(0) // each open is a fresh dialog, even mid fade-out
   settingsOpen = $state(false)
-  permissionsOpen = $state(false) // the current project's tool rules
+  settingsAt = $state<'' | 'safe'>('') // a section to open Settings at
   outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
   sidebarWidth = $state(loadSidebarWidth())
   questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line

@@ -6,7 +6,8 @@ export type * from './types'
 
 // The app runs on Wails; anywhere else (vite dev in a browser,
 // screenshots) it runs on the mock. ?mock=setup, ?mock=signin,
-// ?mock=empty or ?mock=unattended pick a starting scenario for the mock.
+// ?mock=empty, ?mock=unattended, ?mock=always or ?mock=never pick a
+// starting scenario for the mock.
 export function createBackend(): Backend {
   if (hasWails()) return wailsBackend()
   const scenario = new URLSearchParams(location.search).get('mock')
@@ -14,5 +15,6 @@ export function createBackend(): Backend {
   if (scenario === 'signin') return mockBackend({ cli: { loggedIn: false } })
   if (scenario === 'empty') return mockBackend({ empty: true })
   if (scenario === 'unattended') return mockBackend({ unattended: true })
+  if (scenario === 'always' || scenario === 'never') return mockBackend({ mode: scenario })
   return mockBackend()
 }

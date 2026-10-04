@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,9 @@ type Session struct {
 	cancel     context.CancelFunc
 	procEffort string
 	lastCost   float64 // the CLI's running cost total on this process
+	// The profile's permission mode, and the one the running CLI is in
+	// (they differ in Read-only; approvals.go).
+	profileMode, cliMode string
 
 	page         *store.Page // the open page, nil when idle
 	evN          int         // events logged on the open page
@@ -39,19 +43,32 @@ type Session struct {
 	interrupting *time.Timer
 	lastMods     []string // modifiers sent with the previous turn
 	lastSeq      int
-	pending      []Approval       // tool uses waiting for the user's answer
-	sessionRules []store.ToolRule // "for this session" rules, in memory only
+	pending      []Approval // tool uses waiting for the user's answer
 	// Unattended: anything that would wait for the user is declined
 	// (approvals.go). In memory only, so it's off after a restart.
-	unattended     bool
-	toldUnattended bool // what the model was last told about it
+	unattended bool
+	// What the model was last told about the modes (modeDirectives); an
+	// empty toldMode restates the prompt level on the next turn.
+	toldUnattended bool
+	toldMode       string
+	// The profile's allowlist, applied by UNCLI when the CLI routes its
+	// prompts here (allowlist.go), and the MCP servers' word on their tools.
+	allowlist []allowEntry
+	// The shell's dialect and the folder it is in (Claude's cd persists
+	// between commands), as far as UNCLI can follow; empty: the session folder.
+	shellDialect, shellCwd string
+	hints                  map[string]core.ToolHint
 }
 
 func newSession(m *Manager, rec store.Session) *Session {
 	s := &Session{m: m, rec: rec, state: Idle}
+	s.toldLocked()
 	if pages, err := m.d.Store.ListPages(rec.ID); err == nil && len(pages) > 0 {
 		last := pages[len(pages)-1]
 		s.lastMods, s.lastSeq = last.Modifiers, last.Seq
+		// A restored conversation may hold notices from older versions (the
+		// read-only mode) or an earlier level: restate the level once.
+		s.toldMode = ""
 	}
 	return s
 }
@@ -123,6 +140,7 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	}
 	s.gen++
 	s.proc, s.cancel, s.procEffort, s.lastCost = proc, cancel, spec.Effort, 0
+	s.cliMode = spec.PermissionMode
 	s.rec.CLIVersion = version
 	s.state = Starting
 	gen := s.gen
@@ -176,12 +194,21 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	}
 	active := append([]string{}, s.rec.Modifiers...)
 	spec := set.Resolve(prof, s.rec.Model, active, s.rec.Workdir)
-	// Tool uses outside the allowlist come to the user as approval cards
-	// when the CLI can route them; otherwise the CLI denies them.
-	spec.Approvals = s.m.d.Adapter.Capabilities().Approvals
+	// Tool uses the CLI doesn't allow itself come to UNCLI when the CLI
+	// can route them (approvals.go); otherwise the CLI denies them. UNCLI
+	// then applies the allowlist itself, after the session mode and rules.
+	caps := s.m.d.Adapter.Capabilities()
+	spec.Approvals = caps.Approvals
+	s.profileMode = spec.PermissionMode
+	if spec.Approvals {
+		s.allowlist = parseAllowlist(spec.AllowedTools, s.rec.Workdir)
+		spec.AllowedTools = nil
+		spec.PermissionMode = s.cliModeLocked(spec.PermissionMode)
+	}
 
-	// Effort is a launch flag, so a change respawns with resume.
-	if s.proc != nil && spec.Effort != s.procEffort {
+	// Effort and the permission mode are launch flags, so a change the
+	// CLI can't take live respawns with resume.
+	if s.proc != nil && (spec.Effort != s.procEffort || spec.PermissionMode != s.cliMode) {
 		s.stopLocked()
 	}
 	if s.proc == nil {
@@ -193,8 +220,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		}
 	}
 
-	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods, s.unattendedDirective()...)
-	caps := s.m.d.Adapter.Capabilities()
+	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods, s.modeDirectives()...)
 	for _, f := range files {
 		if strings.HasPrefix(f.MediaType, "image/") && !caps.Images || !strings.HasPrefix(f.MediaType, "image/") && !caps.Documents {
 			return fmt.Errorf("this CLI can't take %s as an attachment", f.Name)
@@ -230,7 +256,15 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		s.stopLocked()
 		return err
 	}
-	s.toldUnattended = s.unattended
+	s.toldLocked()
+	// Ask again what the MCP servers say about their tools: servers
+	// connect after the CLI starts, and the answer comes before the
+	// turn's first tool use.
+	if caps.ToolHints {
+		if b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlToolHints}); ok {
+			_, _ = s.proc.Stdin().Write(b)
+		}
+	}
 	if s.state != Starting {
 		s.state = Thinking
 	}
@@ -486,6 +520,10 @@ func (s *Session) handle(gen int, ev core.Event) {
 		if len(a.Models) > 0 {
 			go s.m.setModels(a.Models)
 		}
+	case core.EvToolHints:
+		h, _ := core.Decode[core.ToolHints](ev)
+		s.hints = h.Tools
+		s.rejudgeLocked()
 	case core.EvUsageLimit:
 		u, _ := core.Decode[core.UsageLimit](ev)
 		go s.m.setUsage(u)
@@ -559,7 +597,7 @@ func (s *Session) handle(gen int, ev core.Event) {
 		s.err = e.Message
 	}
 	s.state = next(s.state, ev.Kind, s.runningTools, turnOpen)
-	if len(s.pending) > 0 && s.page != nil {
+	if s.waitingForUserLocked() && s.page != nil {
 		s.state = NeedsApproval // still waiting on the user, whatever else arrives
 	}
 	if s.state != prev {
@@ -630,4 +668,18 @@ func (t *tail) String() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return string(t.buf)
+}
+
+// dialect is the command-line dialect the session's shell commands use:
+// the last one its CLI ran, else the platform's usual one.
+func (s *Session) dialect() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.shellDialect != "" {
+		return s.shellDialect
+	}
+	if runtime.GOOS == "windows" {
+		return DialectPowerShell
+	}
+	return DialectBash
 }

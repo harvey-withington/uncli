@@ -30,6 +30,7 @@ type Profile struct {
 	AllowedTools    []string `yaml:"allowed_tools" json:"-"`
 	DisallowedTools []string `yaml:"disallowed_tools" json:"-"`
 	Isolated        bool     `yaml:"isolated" json:"-"`
+	MCPConfig       []string `yaml:"mcp_config" json:"-"` // extra MCP server configs (--mcp-config); relative paths are from the session folder
 	PermissionMode  string   `yaml:"permission_mode" json:"-"`
 	ModifiersOn     []string `yaml:"modifiers_on" json:"modifiersOn"`
 	IDELinks        bool     `yaml:"ide_links" json:"ideLinks"`
@@ -216,7 +217,7 @@ func (s *Set) Resolve(p Profile, model string, active []string, workdir string) 
 		Model: model, Workdir: workdir,
 		SystemPrompt: strings.TrimSpace(p.SystemPrompt), AppendPrompt: strings.TrimSpace(p.AppendPrompt),
 		Tools: p.Tools, AllowedTools: p.AllowedTools, DisallowedTools: p.DisallowedTools,
-		PermissionMode: p.PermissionMode, Isolated: p.Isolated,
+		PermissionMode: p.PermissionMode, Isolated: p.Isolated, MCPConfig: p.MCPConfig,
 	}
 	for _, id := range active {
 		if m, ok := s.Modifier(id); ok {

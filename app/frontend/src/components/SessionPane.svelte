@@ -7,6 +7,8 @@
   import { blockMatching } from '../lib/search'
   import ApprovalCard from './ApprovalCard.svelte'
   import ActivityBadge from './ActivityBadge.svelte'
+  import ModeSwitch from './ModeSwitch.svelte'
+  import SessionStatus from './SessionStatus.svelte'
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
   import NavBar from './NavBar.svelte'
@@ -23,6 +25,9 @@
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   const page = $derived(app.currentPage)
   let scroller: HTMLElement | undefined = $state()
+  // Requests the quick-task model is still judging wait without a card.
+  const cards = $derived((session.approvals ?? []).filter(a => !a.judging))
+  const checking = $derived((session.approvals ?? []).some(a => a.judging))
 
   // Unattended: rules still apply, but anything that would wait for the
   // user is declined, and Claude is told the user is away.
@@ -69,6 +74,8 @@
       <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <h1 title={session.title}>{session.title || t('session.untitled')}</h1>
       <ActivityBadge state={session.state} />
+      <span class="gap"></span>
+      <ModeSwitch {session} />
       <button
         class="btn ghost small away-btn"
         class:on={session.unattended}
@@ -80,9 +87,9 @@
       </button>
       <button
         class="btn ghost small icon"
-        onclick={() => (app.permissionsOpen = true)}
-        aria-label={t('rules.open')}
-        title={t('rules.open')}
+        onclick={() => { app.settingsAt = 'safe'; app.settingsOpen = true }}
+        aria-label={t('safe.open')}
+        title={t('safe.open')}
       >
         <Icon name="shield" />
       </button>
@@ -97,9 +104,7 @@
       </button>
     </div>
     <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}</span>
-    {#if session.unattended}
-      <p class="away" role="status"><Icon name="coffee" size={14} />{t('unattended.on')}</p>
-    {/if}
+    <SessionStatus {session} />
     <Toolbar {session} />
     {#if session.error && session.state === 'error'}
       <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>
@@ -124,11 +129,14 @@
           {/if}
         </div>
       </div>
-      {#if session.approvals?.length}
+      {#if cards.length || checking}
         <div class="approvals">
-          {#each session.approvals as a (a.requestId)}
+          {#each cards as a (a.requestId)}
             <ApprovalCard {session} approval={a} />
           {/each}
+          {#if checking}
+            <p class="checking" role="status"><Icon name="loader" spin size={13} />{t('asking.checking')}</p>
+          {/if}
         </div>
       {/if}
       <div class="dock"><NavBar /></div>
@@ -253,21 +261,15 @@
   .dock :global(.navbar) {
     transform: translateY(-50%);
   }
+  .gap {
+    flex: 1;
+  }
   .away-btn {
-    margin-left: auto;
     gap: 6px;
     color: var(--text-muted);
   }
   .away-btn.on {
     background: var(--warning-soft);
-    color: var(--warning);
-  }
-  .away {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0 0 0 38px;
-    font-size: var(--text-xs);
     color: var(--warning);
   }
   /* Approval cards sit just above the page controls, over the end of the
@@ -279,6 +281,15 @@
     overflow-y: auto;
     padding: var(--space-2) var(--space-6) var(--space-5);
     margin-top: calc(-1 * var(--space-4));
+  }
+  .checking {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
   .empty {
     max-width: 420px;

@@ -71,132 +71,89 @@ func lastControl(h *harness) map[string]any {
 	return nil
 }
 
-func TestApprovalsFlow(t *testing.T) {
+// A push prompts. "Allow once" lets it run and teaches nothing; "This is
+// safe" (this project) remembers the class, so the next push runs without
+// a card here, a forced push still prompts, and another project still
+// prompts.
+func TestTeachingFromACard(t *testing.T) {
 	h := newHarness(t, "perm-stdio-allow")
 	h.rt.onControl = true
-	write := map[string]string{"file_path": "hello.txt", "content": "hi"}
 	push := map[string]string{"command": "git push origin main"}
+	force := map[string]string{"command": "git push --force origin main"}
 	h.rt.turns = [][]byte{
-		// Turn 1: Claude wants to write a file, then to push.
-		seg(toolUseLine("toolu_W", "Write", write), askLine("req_W", "toolu_W", "Write", write)),
-		seg(toolResultLine("toolu_W", "ok", false), toolUseLine("toolu_P", "Bash", push), askLine("req_P", "toolu_P", "Bash", push)),
-		seg(toolResultLine("toolu_P", deniedByUser, true), scriptedResult),
-		// Turn 2: the same write (a rule allows it), then the push (a rule denies it).
-		seg(toolUseLine("toolu_W2", "Write", write), askLine("req_W2", "toolu_W2", "Write", write)),
-		seg(toolResultLine("toolu_W2", "ok", false), toolUseLine("toolu_P2", "Bash", push), askLine("req_P2", "toolu_P2", "Bash", push)),
-		seg(toolResultLine("toolu_P2", deniedByRule, true), scriptedResult),
+		// Turn 1: a push, allowed once.
+		seg(toolUseLine("toolu_1", "PowerShell", push), askLine("req_1", "toolu_1", "PowerShell", push)),
+		seg(toolResultLine("toolu_1", "ok", false), scriptedResult),
+		// Turn 2: a push again, marked safe for this project.
+		seg(toolUseLine("toolu_2", "PowerShell", push), askLine("req_2", "toolu_2", "PowerShell", push)),
+		seg(toolResultLine("toolu_2", "ok", false), scriptedResult),
+		// Turn 3: a push runs on its own; a forced push still prompts, and is denied.
+		seg(toolUseLine("toolu_3", "PowerShell", push), askLine("req_3", "toolu_3", "PowerShell", push)),
+		seg(toolResultLine("toolu_3", "ok", false), toolUseLine("toolu_4", "PowerShell", force), askLine("req_4", "toolu_4", "PowerShell", force)),
+		seg(toolResultLine("toolu_4", deniedOnCard, true), scriptedResult),
 	}
 	dir := t.TempDir()
-	v, err := h.m.Create("code", dir, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	v, _ := h.m.Create("code", dir, "")
 	s, _ := h.m.get(v.ID)
-	if err := h.m.Send(context.Background(), v.ID, "write and push"); err != nil {
-		t.Fatal(err)
+
+	h.m.Send(context.Background(), v.ID, "push")
+	waitUntil(t, "the card", func() bool { return len(s.View().Approvals) == 1 })
+	a := s.View().Approvals[0]
+	if a.Why[0].By != "unsafe" || a.Why[0].Risk != WhyPublishes || len(a.Learn) != 1 || a.Learn[0].Words != "git push" {
+		t.Fatalf("card = %+v", a)
 	}
-	waitUntil(t, "the write request", func() bool { return len(s.View().Approvals) == 1 })
-	view := s.View()
-	a := view.Approvals[0]
-	if view.State != NeedsApproval || a.Tool != "Write" || a.ToolUseID != "toolu_W" || len(a.Suggestions) != 1 || a.Suggestions[0].Tool != "Write" {
-		t.Fatalf("view = %+v", view)
-	}
-	if args := strings.Join(h.rt.starts[0].Args, " "); !strings.Contains(args, "--permission-prompt-tool stdio") {
-		t.Errorf("approvals must be routed to UNCLI: %s", args)
+	h.m.Answer(v.ID, a.RequestID, Allow, "")
+	h.waitIdle(v.ID)
+	if l, _ := h.m.SafeList(v.ID); len(l) != 0 {
+		t.Errorf("allow once teaches nothing: %+v", l)
 	}
 
-	// Always allow writes in this project.
-	if err := h.m.Answer(v.ID, a.RequestID, Always, &a.Suggestions[0]); err != nil {
-		t.Fatal(err)
-	}
-	if c := lastControl(h); c["behavior"] != "allow" || c["request_id"] != "req_W" || c["updatedInput"] == nil {
-		t.Errorf("answer sent = %v", c)
-	}
-	waitUntil(t, "the push request", func() bool { v := s.View(); return len(v.Approvals) == 1 && v.Approvals[0].Tool == "Bash" })
-	p := s.View().Approvals[0]
-	var sugg []string
-	for _, r := range p.Suggestions {
-		sugg = append(sugg, r.Prefix)
-	}
-	if strings.Join(sugg, ",") != "git push,git:publish,git" {
-		t.Errorf("push suggestions = %v", sugg)
-	}
-
-	// Deny the push: the model is told, and the trace marks it.
-	if err := h.m.Answer(v.ID, p.RequestID, Deny, nil); err != nil {
-		t.Fatal(err)
-	}
-	if c := lastControl(h); c["behavior"] != "deny" || c["message"] != deniedByUser {
-		t.Errorf("deny sent = %v", c)
-	}
-	pages := h.waitIdle(v.ID)
-	last := pages[len(pages)-1]
-	var denied []string
-	for _, it := range last.Trace {
-		if it.Denied {
-			denied = append(denied, it.ID)
-		}
-	}
-	if last.Trace[0].Approved != "you" {
-		t.Errorf("the allowed write should say who allowed it: %+v", last.Trace[0])
-	}
-	if strings.Join(denied, ",") != "toolu_P" || last.Status != "done" {
-		t.Errorf("trace = %+v, status %s", last.Trace, last.Status)
-	}
-	if err := h.m.Answer(v.ID, p.RequestID, Allow, nil); err == nil {
-		t.Error("an answered request can't be answered again")
-	}
-
-	// Rules belong to the project: another session in the same folder sees them.
-	other, _ := h.m.Create("code", dir, "")
-	rules, _ := h.m.Rules(other.ID)
-	if len(rules) != 1 || rules[0] != (store.ToolRule{Tool: "Write", Action: store.RuleAllow}) {
-		t.Errorf("project rules = %+v", rules)
-	}
-	if _, err := h.m.SetRule(v.ID, store.ToolRule{Tool: "Bash", Prefix: "git push", Action: store.RuleDeny}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Turn 2: both requests are answered by rules, without a card.
-	if err := h.m.Send(context.Background(), v.ID, "again"); err != nil {
+	h.m.Send(context.Background(), v.ID, "push again")
+	waitUntil(t, "the card", func() bool { return len(s.View().Approvals) == 1 })
+	if err := h.m.Answer(v.ID, s.View().Approvals[0].RequestID, Safe, ScopeProject); err != nil {
 		t.Fatal(err)
 	}
 	h.waitIdle(v.ID)
-	if len(s.View().Approvals) != 0 {
-		t.Errorf("rules should have answered: %+v", s.View().Approvals)
+	l, _ := h.m.SafeList(v.ID)
+	if len(l) != 1 || l[0] != (store.SafeEntry{Kind: store.KindCommand, Words: "git push", Verdict: store.Safe, Folder: dir}) {
+		t.Fatalf("safe list = %+v", l)
 	}
-	if p2, _ := h.m.Pages(v.ID); p2[len(p2)-1].Trace[0].Approved != "rule" {
-		t.Errorf("the rule-allowed write should say so: %+v", p2[len(p2)-1].Trace[0])
+
+	h.m.Send(context.Background(), v.ID, "and again")
+	waitUntil(t, "the forced push's card", func() bool { a := s.View().Approvals; return len(a) == 1 && a[0].RequestID == "req_4" })
+	if !strings.Contains(answerTo(h, "req_3"), `"behavior":"allow"`) {
+		t.Error("the learned push should run on its own")
 	}
-	answers := map[string]string{}
-	for _, l := range h.rt.lines() {
-		if strings.Contains(l, "req_W2") {
-			answers["W2"] = l
-		}
-		if strings.Contains(l, "req_P2") {
-			answers["P2"] = l
-		}
+	if f := s.View().Approvals[0]; f.Learn[0].Flags != "--force" {
+		t.Errorf("a forced push is its own class: %+v", f.Learn)
 	}
-	if !strings.Contains(answers["W2"], `"behavior":"allow"`) || !strings.Contains(answers["P2"], `"behavior":"deny"`) || !strings.Contains(answers["P2"], deniedByRule) {
-		t.Errorf("rule answers = %v", answers)
+	h.m.Answer(v.ID, "req_4", Deny, "")
+	pages := h.waitIdle(v.ID)
+	tr := pages[len(pages)-1].Trace
+	if tr[0].Approved != "listed" || tr[0].Why[0].Entry == nil || !tr[1].Denied {
+		t.Errorf("trace = %+v", tr)
 	}
-	h.sink.mu.Lock()
-	sawWaiting := false
-	for _, st := range h.sink.states {
-		if st == NeedsApproval {
-			sawWaiting = true
-		}
+
+	// Another project still prompts; promoting the entry to all projects
+	// changes that.
+	other, _ := h.m.Create("code", t.TempDir(), "")
+	if e, _ := h.m.ExplainCommand(other.ID, "git push"); e.Action != actionPrompt {
+		t.Errorf("another project: %+v", e)
 	}
-	h.sink.mu.Unlock()
-	if !sawWaiting {
-		t.Error("the sidebar should have shown Needs approval during turn 1")
+	if _, err := h.m.MoveSafeEntry(v.ID, l[0], ScopeAll); err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := h.m.ExplainCommand(other.ID, "git push"); e.Action != actionRun || e.Why[0].By != "listed" {
+		t.Errorf("after promoting: %+v", e)
+	}
+	if err := h.m.Answer(v.ID, "nope", Safe, ScopeAll); err == nil {
+		t.Error("only a waiting request can be answered")
 	}
 }
 
-// Stopping a turn that waits on a card denies the request and ends the turn.
 func TestApprovalInterrupt(t *testing.T) {
 	h := newHarness(t, "perm-stdio-allow")
-	write := map[string]string{"file_path": "x.txt", "content": "x"}
+	write := map[string]string{"file_path": "~/.ssh/uncli-test", "content": "x"} // secrets: always prompts
 	h.rt.turns = [][]byte{seg(toolUseLine("toolu_X", "Write", write), askLine("req_X", "toolu_X", "Write", write))}
 	h.m.InterruptGrace = 50 * time.Millisecond
 	v, _ := h.m.Create("code", t.TempDir(), "")
@@ -225,95 +182,29 @@ func TestApprovalInterrupt(t *testing.T) {
 	}
 }
 
-// "Allow for this session": a rule that lasts as long as this session in
-// UNCLI, never reaches the project, and wins ties against project rules.
-func TestSessionRules(t *testing.T) {
-	h := newHarness(t, "perm-stdio-allow")
-	h.rt.onControl = true
-	push := map[string]string{"command": "git push origin main"}
-	h.rt.turns = [][]byte{
-		seg(toolUseLine("toolu_1", "PowerShell", push), askLine("req_1", "toolu_1", "PowerShell", push)),
-		seg(toolResultLine("toolu_1", "ok", false), scriptedResult),
-		seg(toolUseLine("toolu_2", "PowerShell", push), askLine("req_2", "toolu_2", "PowerShell", push)),
-		seg(toolResultLine("toolu_2", "ok", false), scriptedResult),
-	}
-	dir := t.TempDir()
-	v, _ := h.m.Create("code", dir, "")
-	s, _ := h.m.get(v.ID)
-	h.m.Send(context.Background(), v.ID, "push")
-	waitUntil(t, "the request", func() bool { return len(s.View().Approvals) == 1 })
-	a := s.View().Approvals[0]
-	if err := h.m.Answer(v.ID, a.RequestID, AllowSession, &a.Suggestions[0]); err != nil {
-		t.Fatal(err)
-	}
-	h.waitIdle(v.ID)
-	if r, _ := h.m.Rules(v.ID); len(r) != 0 {
-		t.Errorf("a session rule must not reach the project: %+v", r)
-	}
-	if r, _ := h.m.SessionRules(v.ID); len(r) != 1 || r[0].Prefix != "git push" {
-		t.Errorf("session rules = %+v", r)
-	}
-	// A project rule saying ask, equally specific: the session's allow wins.
-	h.m.SetRule(v.ID, store.ToolRule{Tool: "Bash", Prefix: "git push", Action: store.RuleAsk})
-	h.m.Send(context.Background(), v.ID, "push again")
-	pages := h.waitIdle(v.ID)
-	if len(s.View().Approvals) != 0 || pages[len(pages)-1].Trace[0].Approved != "session" {
-		t.Errorf("the session rule should have answered: %+v / %+v", s.View().Approvals, pages[len(pages)-1].Trace)
-	}
-	// Another session in the same folder doesn't share it.
-	other, _ := h.m.Create("code", dir, "")
-	if r, _ := h.m.SessionRules(other.ID); len(r) != 0 {
-		t.Errorf("session rules leaked: %+v", r)
-	}
-	// Make it permanent: it moves to the project.
-	if err := h.m.PromoteSessionRule(v.ID, store.ToolRule{Tool: "PowerShell", Prefix: "git push", Action: store.RuleAllow}); err != nil {
-		t.Fatal(err)
-	}
-	sr, _ := h.m.SessionRules(v.ID)
-	pr, _ := h.m.Rules(other.ID)
-	if len(sr) != 0 || len(pr) != 2 {
-		t.Errorf("after promote: session %+v, project %+v", sr, pr)
-	}
-}
-
-func TestDecidePrecedence(t *testing.T) {
-	sess := []store.ToolRule{{Tool: "Bash", Prefix: "git", Action: store.RuleAllow}}
-	proj := []store.ToolRule{{Tool: "Bash", Prefix: "git push", Action: store.RuleDeny}}
-	if a, from := decide(sess, proj, "Bash", bash("git push")); a != store.RuleDeny || from != "rule" {
-		t.Errorf("the more specific project rule must win: %s %s", a, from)
-	}
-	if a, from := decide(sess, proj, "Bash", bash("git log")); a != store.RuleAllow || from != "session" {
-		t.Errorf("= %s %s", a, from)
-	}
-	if a, from := decide(nil, nil, "Bash", bash("git log")); a != "" || from != "" {
-		t.Errorf("no rules = %s %s", a, from)
-	}
-}
-
-// Unattended: rules still answer, but whatever would wait for the user is
-// declined with a note to the model, and the model is told when the mode
-// changes.
 func TestUnattended(t *testing.T) {
 	h := newHarness(t, "perm-stdio-allow")
 	h.rt.onControl = true
-	write := map[string]string{"file_path": "a.txt", "content": "a"}
-	chained := map[string]string{"command": "npm test && git push"}
+	push := map[string]string{"command": "git push"}
+	tests := map[string]string{"command": "npm test"}
 	question := map[string]any{"questions": []any{map[string]any{"question": "Which one?"}}}
 	h.rt.turns = [][]byte{
 		// Turn 1: a card is waiting when the user walks away.
-		seg(toolUseLine("toolu_1", "Write", write), askLine("req_1", "toolu_1", "Write", write)),
+		seg(toolUseLine("toolu_1", "Bash", push), askLine("req_1", "toolu_1", "Bash", push)),
 		seg(toolResultLine("toolu_1", unattendedDeclined, true), scriptedResult),
-		// Turn 2: a rule allows the write; the chained command and the question are declined.
-		seg(toolUseLine("toolu_2", "Write", write), askLine("req_2", "toolu_2", "Write", write)),
-		seg(toolResultLine("toolu_2", "ok", false), toolUseLine("toolu_3", "Bash", chained), askLine("req_3", "toolu_3", "Bash", chained)),
+		// Turn 2: safe work runs; the push and the question are declined.
+		seg(toolUseLine("toolu_2", "Bash", tests), askLine("req_2", "toolu_2", "Bash", tests)),
+		seg(toolResultLine("toolu_2", "ok", false), toolUseLine("toolu_3", "Bash", push), askLine("req_3", "toolu_3", "Bash", push)),
 		seg(toolResultLine("toolu_3", unattendedDeclined, true), toolUseLine("toolu_4", "AskUserQuestion", question), askLine("req_4", "toolu_4", "AskUserQuestion", question)),
 		seg(toolResultLine("toolu_4", unattendedQuestion, true), scriptedResult),
-		seg(scriptedResult), // turn 3
+		// Turn 3, under "Always prompt me": even the tests are declined.
+		seg(toolUseLine("toolu_5", "Bash", tests), askLine("req_5", "toolu_5", "Bash", tests)),
+		seg(toolResultLine("toolu_5", unattendedDeclined, true), scriptedResult),
 		seg(scriptedResult), // turn 4
 	}
 	v, _ := h.m.Create("code", t.TempDir(), "")
 	s, _ := h.m.get(v.ID)
-	h.m.Send(context.Background(), v.ID, "write")
+	h.m.Send(context.Background(), v.ID, "push")
 	waitUntil(t, "the request", func() bool { return len(s.View().Approvals) == 1 })
 
 	// Turning it on declines the waiting card.
@@ -324,39 +215,28 @@ func TestUnattended(t *testing.T) {
 	if c := lastControl(h); c["behavior"] != "deny" || c["request_id"] != "req_1" || c["message"] != unattendedDeclined {
 		t.Errorf("waiting card answer = %v", c)
 	}
-	pages := h.waitIdle(v.ID)
-	if !pages[len(pages)-1].Trace[0].Denied {
-		t.Errorf("trace = %+v", pages[len(pages)-1].Trace)
-	}
-
-	// Turn 2: told it's unattended; rules still apply; nothing waits.
-	h.m.SetRule(v.ID, store.ToolRule{Tool: "Write", Action: store.RuleAllow})
-	h.m.Send(context.Background(), v.ID, "carry on")
-	pages = h.waitIdle(v.ID)
-	answers := map[string]string{}
-	for _, l := range h.rt.lines() {
-		for _, id := range []string{"req_2", "req_3", "req_4"} {
-			if strings.Contains(l, id) {
-				answers[id] = l
-			}
-		}
-	}
-	if !strings.Contains(answers["req_2"], `"behavior":"allow"`) {
-		t.Errorf("the rule should still allow the write: %s", answers["req_2"])
-	}
-	if !strings.Contains(answers["req_3"], `"behavior":"deny"`) || !strings.Contains(answers["req_3"], "separate commands") {
-		t.Errorf("chained command answer = %s", answers["req_3"])
-	}
-	if !strings.Contains(answers["req_4"], `"behavior":"deny"`) || !strings.Contains(answers["req_4"], "can't answer questions") {
-		t.Errorf("question answer = %s", answers["req_4"])
-	}
-	if p := pages[len(pages)-1]; p.Status != "done" || p.Trace[0].Approved != "rule" || !p.Trace[1].Denied || !p.Trace[2].Denied {
-		t.Errorf("turn 2 = %s %+v", p.Status, p.Trace)
-	}
-
-	// Turn 3 says nothing new; turn 4, after switching off, says it's off.
-	h.m.Send(context.Background(), v.ID, "more")
 	h.waitIdle(v.ID)
+
+	h.m.Send(context.Background(), v.ID, "carry on")
+	pages := h.waitIdle(v.ID)
+	if !strings.Contains(answerTo(h, "req_2"), `"behavior":"allow"`) {
+		t.Errorf("safe work should run: %s", answerTo(h, "req_2"))
+	}
+	if !strings.Contains(answerTo(h, "req_3"), "separate commands") || !strings.Contains(answerTo(h, "req_4"), "can't answer questions") {
+		t.Errorf("push = %s\nquestion = %s", answerTo(h, "req_3"), answerTo(h, "req_4"))
+	}
+	if p := pages[len(pages)-1]; p.Trace[0].Approved != "builtin" || !p.Trace[1].Denied || !p.Trace[2].Denied {
+		t.Errorf("turn 2 = %+v", p.Trace)
+	}
+
+	h.m.SetMode(v.ID, ModeAlways)
+	h.m.Send(context.Background(), v.ID, "test")
+	h.waitIdle(v.ID)
+	if !strings.Contains(answerTo(h, "req_5"), `"behavior":"deny"`) {
+		t.Errorf("Always + Unattended declines anything but reading: %s", answerTo(h, "req_5"))
+	}
+
+	// Turn 4, after switching off, says it's off.
 	h.m.SetUnattended(v.ID, false)
 	h.m.Send(context.Background(), v.ID, "back")
 	h.waitIdle(v.ID)
@@ -382,4 +262,33 @@ func toldPerTurn(h *harness) string {
 		}
 	}
 	return strings.Join(told, ",")
+}
+
+// The model hears the prompt level when it changes, and once after a
+// restore, so a conversation told it was read-only (an older version's
+// mode) stops refusing to try tools.
+func TestPromptLevelDirectives(t *testing.T) {
+	dir := t.TempDir()
+	h := openHarness(t, dir, "multi-turn-partial")
+	v, _ := h.m.Create("chat", "", "")
+	h.send(v.ID, "one")
+	h.m.SetMode(v.ID, ModeAlways)
+	h.send(v.ID, "two")
+	pages, _ := h.m.Pages(v.ID)
+	if strings.Contains(pages[0].Directives, "Prompt level") || !strings.Contains(pages[1].Directives, levelAlways) {
+		t.Fatalf("directives = %q / %q", pages[0].Directives, pages[1].Directives)
+	}
+	h.m.Close()
+	h.db.Close()
+
+	h2 := openHarness(t, dir, "resume-partial")
+	s, _ := h2.m.get(v.ID)
+	s.mu.Lock()
+	told := s.modeDirectives()
+	s.toldLocked()
+	again := s.modeDirectives()
+	s.mu.Unlock()
+	if len(told) != 1 || told[0] != levelAlways || len(again) != 0 {
+		t.Errorf("after restore = %v, then %v", told, again)
+	}
 }

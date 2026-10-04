@@ -1,6 +1,6 @@
-// Approval cards and permission rules in plain words: what a tool use
-// will do, and what a rule covers.
-import type { Approval, ToolRule } from './api'
+// Approval cards and the safe list in plain words: what a tool use will
+// do, why it prompts, and what an entry covers.
+import type { Approval, Approver, Risk, SafeClass, SafeEntry, Scope, SessionMode, SessionView, ToolRule, TraceReason } from './api'
 import { t } from './i18n.svelte'
 
 export interface ApprovalView {
@@ -67,7 +67,7 @@ export function describeApproval(a: Approval): ApprovalView {
   }
 }
 
-// ruleLabel says what a rule covers, for "Always allow …" and the rules list.
+// ruleLabel says what an older trace's rule covered.
 export function ruleLabel(r: Pick<ToolRule, 'tool' | 'prefix'>): string {
   if (isShell(r.tool)) {
     if (!r.prefix) return t('rule.allCommands')
@@ -79,5 +79,144 @@ export function ruleLabel(r: Pick<ToolRule, 'tool' | 'prefix'>): string {
   return t('rule.tool', { tool: r.tool })
 }
 
-// The git classes, for the rules dialog, with what each covers.
-export const GIT_CLASSES = ['git:read', 'git:local', 'git:commit', 'git:publish', 'git:destructive'] as const
+// The prompt levels, in the order the switch shows them.
+export const MODES: { id: SessionMode; icon: string }[] = [
+  { id: 'always', icon: 'hand' },
+  { id: 'unsafe', icon: 'shield' },
+  { id: 'never', icon: 'zap' },
+]
+
+export const modeOf = (s: Pick<SessionView, 'mode'>): SessionMode => s.mode || 'unsafe'
+
+// classLabel names a safe-list class: "npm run test", "git push --force",
+// "Local git changes (…)", "touch_note (notes)".
+export function classLabel(c: SafeClass): string {
+  if (c.kind === 'tool') {
+    const mcp = mcpName(c.words)
+    return mcp ? t('rule.mcp', { name: mcp.name, server: mcp.server }) : c.words
+  }
+  if (c.words.startsWith('git:')) return t(`rule.${c.words.replace(':', '.')}`)
+  return c.flags ? `${c.words} ${c.flags}` : c.words
+}
+
+// scopeLabel: where an entry applies.
+export const scopeLabel = (e: Pick<SafeEntry, 'folder'>) => t(e.folder ? 'scope.project' : 'scope.all')
+export const scopeOf = (e: Pick<SafeEntry, 'folder'>): Scope => (e.folder ? 'project' : 'all')
+
+// allowLabel says what a session type's allowlist entry covers, from the
+// CLI's syntax: "Bash(npm test:*)" is "npm test …", "Write(./artifacts/**)"
+// is "Write in ./artifacts/**".
+export function allowLabel(entry: string): string {
+  const m = /^(\w+)(?:\((.*)\))?$/.exec(entry.trim())
+  if (!m) return entry
+  const tool = m[1] as string
+  const spec = m[2]?.trim()
+  if (!spec) return ruleLabel({ tool })
+  if (isShell(tool)) return spec.endsWith(':*') ? t('rule.command', { prefix: spec.slice(0, -2).trim() }) : spec
+  return t('allow.path', { tool, path: spec })
+}
+
+// riskLabel says how something unsafe could do harm, as the end of a
+// sentence ("deletes or overwrites things for good").
+export const riskLabel = (risk: Risk | undefined) => t(`risk.${risk ?? 'system'}`)
+
+// reasonLabel says why one part of a command (or a tool use) ran, prompted
+// or was blocked. A judgement by the quick-task model adds its reason.
+export function reasonLabel(r: TraceReason): string {
+  const rule = r.rule ? ruleLabel(r.rule) : ''
+  const scope = r.entry ? scopeLabel(r.entry) : ''
+  let text: string
+  switch (r.by) {
+    case 'listed': text = t('why.listed', { scope }); break
+    case 'blocked': text = t('why.blocked', { scope }); break
+    case 'unsafe': text = r.entry ? t('why.marked', { scope }) : t('why.unsafe', { risk: riskLabel(r.risk) }); break
+    case 'builtin':
+    case 'profile': text = t('why.profile', { entry: allowLabel(r.allow ?? '') }); break
+    case 'rule': text = t('why.rule', { rule }); break
+    case 'session': text = t('why.session', { rule }); break
+    case 'deny': text = t('why.deny', { rule }); break
+    case 'ask': text = t('why.ask', { rule }); break
+    case 'risky': text = t('why.risky', { risk: riskLabel(r.risk) }); break
+    default: text = t(`why.${r.by}`)
+  }
+  return r.judged && r.note ? t('why.judged', { text, note: r.note, model: r.judged }) : text
+}
+
+// The reasons a card is waiting for the user, in plain words: each part
+// that needs them, with what it could do. Parts that would just run aren't
+// listed; under Always one line says why everything prompts.
+export function askingReasons(a: Approval): { part?: string; text: string }[] {
+  const out: { part?: string; text: string }[] = []
+  for (const r of a.why ?? []) {
+    let text = ''
+    switch (r.by) {
+      case 'unsafe':
+        text = r.entry ? t('asking.marked', { scope: scopeLabel(r.entry) }) : r.note || capital(riskLabel(r.risk)) + '.'
+        break
+      case 'risky': text = r.note || capital(riskLabel(r.risk)) + '.'; break
+      case 'unknown': text = t('asking.unknown'); break
+      case 'always':
+        if (!out.some(o => !o.part)) out.unshift({ text: t('asking.always') })
+        continue
+      case 'ask': text = t('why.ask', { rule: r.rule ? ruleLabel(r.rule) : '' }); break
+      case 'outside': text = t('asking.outside'); break
+      default: continue
+    }
+    out.push({ part: r.part, text })
+  }
+  return out
+}
+
+// fixedReason says why a card can only be allowed once: a part whose risk
+// comes from what it touches or does there, not from the program.
+export function fixedReason(a: Approval): string | undefined {
+  const r = (a.why ?? []).find(w => w.fixed && w.by !== 'looks')
+  return r?.fixed ? t(`fixed.${r.fixed}`) : undefined
+}
+
+// promptable: the classes a trace row's "This should prompt" would mark
+// unsafe: the parts that ran because UNCLI judged them safe.
+export function promptable(why: TraceReason[] = []): SafeClass[] {
+  const out: SafeClass[] = []
+  for (const r of why) {
+    if (!r.class || !['safe', 'inside', 'builtin'].includes(r.by)) continue
+    if (!out.some(c => c.kind === r.class?.kind && c.words === r.class.words && (c.flags ?? '') === (r.class.flags ?? ''))) out.push(r.class)
+  }
+  return out
+}
+
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+// Short names of who allowed something, for a command whose parts ran for
+// different reasons.
+const SHORT: Partial<Record<TraceReason['by'], string>> = {
+  looks: 'who.looks', safe: 'who.safe', listed: 'who.listed', builtin: 'who.profile', inside: 'who.inside', never: 'who.never',
+  rule: 'who.rule', session: 'who.session', profile: 'who.profile', routine: 'who.routine', full: 'who.full',
+}
+
+// approvedLabel says who let a tool use run, on its trace row.
+export function approvedLabel(approved: Approver, why: TraceReason[] = []): string {
+  if (approved !== 'mixed') return t(`trace.allowed.${approved}`)
+  const who = [...new Set(why.map(w => SHORT[w.by]).filter((k): k is string => !!k))].map(k => t(k))
+  return t('trace.allowed.mixed', { who: who.join(', ') })
+}
+
+// The scope "This is safe" and "This should prompt" last used, so the next
+// card starts there; This project the first time.
+const SCOPE_KEY = 'uncli-scope'
+
+export function loadScope(): Scope {
+  try {
+    return localStorage.getItem(SCOPE_KEY) === 'all' ? 'all' : 'project'
+  } catch {
+    return 'project'
+  }
+}
+
+export function saveScope(scope: Scope) {
+  try {
+    localStorage.setItem(SCOPE_KEY, scope)
+  } catch {
+    // only a convenience
+  }
+}

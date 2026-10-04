@@ -145,47 +145,68 @@ func (a *App) Send(sessionID, text string, attachments []app.AttachmentRef) erro
 
 func (a *App) Interrupt(sessionID string) error { return a.svc.Sessions.Interrupt(sessionID) }
 
-// AnswerApproval gives the user's decision (allow, always, deny) on a tool
-// use waiting for approval.
-// For "always", rule is the rule to add.
-func (a *App) AnswerApproval(sessionID, requestID, decision string, rule *store.ToolRule) error {
-	return a.svc.Sessions.Answer(sessionID, requestID, decision, rule)
+// AnswerApproval gives the user's decision on a waiting tool use: allow
+// (once), safe (and remember it as safe, in scope "project" or "all") or deny.
+func (a *App) AnswerApproval(sessionID, requestID, decision, scope string) error {
+	return a.svc.Sessions.Answer(sessionID, requestID, decision, scope)
 }
 
-// SetUnattended turns a session's unattended mode on or off: requests that
-// would wait for the user are declined with a note to the model.
+// SetUnattended turns a session's unattended mode on or off: anything that
+// would prompt is declined, with a note to the model.
 func (a *App) SetUnattended(sessionID string, on bool) (session.View, error) {
 	return a.svc.Sessions.SetUnattended(sessionID, on)
 }
 
-// SessionToolRules lists a session's own rules (until UNCLI quits).
-func (a *App) SessionToolRules(sessionID string) ([]store.ToolRule, error) {
-	return a.svc.Sessions.SessionRules(sessionID)
+// SetMode sets when a session prompts: always, unsafe or never.
+func (a *App) SetMode(sessionID, mode string) (session.View, error) {
+	return a.svc.Sessions.SetMode(sessionID, mode)
 }
 
-// DeleteSessionToolRule drops one of a session's own rules.
-func (a *App) DeleteSessionToolRule(sessionID string, r store.ToolRule) ([]store.ToolRule, error) {
-	return a.svc.Sessions.DeleteSessionRule(sessionID, r)
+// SafeList lists the safe-list entries for a session's project and for all projects.
+func (a *App) SafeList(sessionID string) ([]store.SafeEntry, error) {
+	return a.svc.Sessions.SafeList(sessionID)
 }
 
-// PromoteSessionToolRule moves a session rule to the project.
-func (a *App) PromoteSessionToolRule(sessionID string, r store.ToolRule) error {
-	return a.svc.Sessions.PromoteSessionRule(sessionID, r)
+// SetSafeEntry adds or changes a safe-list entry, in scope "project" or "all".
+func (a *App) SetSafeEntry(sessionID string, e store.SafeEntry, scope string) ([]store.SafeEntry, error) {
+	return a.svc.Sessions.SetSafeEntry(sessionID, e, scope)
 }
 
-// ToolRules lists the tool rules of a session's project.
-func (a *App) ToolRules(sessionID string) ([]store.ToolRule, error) {
-	return a.svc.Sessions.Rules(sessionID)
+// DeleteSafeEntry removes a safe-list entry.
+func (a *App) DeleteSafeEntry(sessionID string, e store.SafeEntry) ([]store.SafeEntry, error) {
+	return a.svc.Sessions.DeleteSafeEntry(sessionID, e)
 }
 
-// SetToolRule adds or changes a tool rule for a session's project.
-func (a *App) SetToolRule(sessionID string, r store.ToolRule) ([]store.ToolRule, error) {
-	return a.svc.Sessions.SetRule(sessionID, r)
+// MoveSafeEntry gives a safe-list entry another scope: "project" or "all".
+func (a *App) MoveSafeEntry(sessionID string, e store.SafeEntry, scope string) ([]store.SafeEntry, error) {
+	return a.svc.Sessions.MoveSafeEntry(sessionID, e, scope)
 }
 
-// DeleteToolRule removes a tool rule from a session's project.
-func (a *App) DeleteToolRule(sessionID string, r store.ToolRule) ([]store.ToolRule, error) {
-	return a.svc.Sessions.DeleteRule(sessionID, r)
+// Teach remembers command classes or tools with a verdict, in scope
+// ("This should prompt" teaches unsafe).
+func (a *App) Teach(sessionID string, classes []store.SafeClass, verdict, scope string) error {
+	return a.svc.Sessions.Teach(sessionID, classes, verdict, scope)
+}
+
+// PreviewClasses says what each part of an example command would be remembered as.
+func (a *App) PreviewClasses(sessionID, command string) ([]session.ClassPreview, error) {
+	return a.svc.Sessions.PreviewClasses(sessionID, command)
+}
+
+// KnownTools lists a session's MCP tools, for adding to the safe list.
+func (a *App) KnownTools(sessionID string) ([]string, error) {
+	return a.svc.Sessions.KnownTools(sessionID)
+}
+
+// ExplainCommand says what a session would do with a command now (runs,
+// prompts or blocked) and why for each part, without running it.
+func (a *App) ExplainCommand(sessionID, command string) (session.Explanation, error) {
+	return a.svc.Sessions.ExplainCommand(sessionID, command)
+}
+
+// SessionAllowlist is the list of what a session's type counts as safe, as written.
+func (a *App) SessionAllowlist(sessionID string) ([]string, error) {
+	return a.svc.Sessions.SessionAllowlist(sessionID)
 }
 
 func (a *App) SetModel(sessionID, model string) error {
