@@ -4,14 +4,13 @@
   import { cost } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
   import { modelLabel } from '../lib/models'
-  import { activeEntry, autoSummaryFor, OUTLINE_MAX, OUTLINE_MIN } from '../lib/outline'
+  import { activeEntry, autoSummaryFor } from '../lib/outline'
   import { KIND_ICONS } from '../lib/sections'
   import Icon from './Icon.svelte'
-  import ResizeHandle from './ResizeHandle.svelte'
 
-  // "On this page": the answer's headings, or a summary written by the
-  // quick-task model. Clicking an entry scrolls to it; the one being read is
-  // highlighted. The left edge resizes the panel.
+  // The "On this page" tab: the answer's headings, or a summary written by
+  // the quick-task model. Clicking an entry scrolls to it; the one being
+  // read is highlighted.
   interface Props {
     page: Page
     scroller: HTMLElement | undefined
@@ -80,18 +79,9 @@
   }
 </script>
 
-<aside class="outline" style:width="{app.outline.width}px" aria-label={t('outline.title')}>
-  <ResizeHandle
-    edge="left"
-    width={app.outline.width}
-    min={OUTLINE_MIN}
-    max={OUTLINE_MAX}
-    label={t('outline.resize')}
-    onresize={w => (app.outline.width = w)}
-    oncommit={w => app.setOutlineWidth(w)}
-  />
+<div class="outline">
   <div class="head">
-    <h2>{t('outline.title')}</h2>
+    <span class="what">{#if !(outline.summary.length > 0 && outline.headings.length > 0) && entries.length > 0}{t(showingSummary ? 'outline.summary' : 'outline.headings')}{/if}</span>
     <button
       class="btn ghost small icon"
       onclick={summarise}
@@ -152,18 +142,16 @@
       {t('outline.by', { model: modelLabel(app.boot?.models ?? null, page.outline.model), cost: cost(page.outline.costUsd) })}
     </p>
   {/if}
-</aside>
+</div>
 
 <style>
   .outline {
-    position: relative;
-    flex: none;
+    position: relative; /* clips absolutely positioned descendants (as .scroll in SessionPane) */
+    flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    padding: var(--space-5) var(--space-3) var(--space-4) var(--space-4);
-    border-left: 1px solid var(--border);
-    background: var(--bg);
+    padding: var(--space-2) var(--space-3) var(--space-4) var(--space-4);
     overflow-y: auto;
   }
   .head {
@@ -172,12 +160,8 @@
     justify-content: space-between;
     margin: 0 0 var(--space-2) var(--space-2);
   }
-  h2 {
-    margin: 0;
+  .what {
     font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
     color: var(--text-faint);
   }
   .switch {

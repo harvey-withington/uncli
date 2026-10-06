@@ -2,14 +2,15 @@
 // component tests). It behaves like the real one closely enough to
 // exercise streaming, states, bookmarks and errors, with canned content.
 import type {
-  ActivityState, Approval, Backend, Bootstrap, CLIStatus, Handlers, NewSessionChoices, Page, Preferences, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
+  ActivityState, Approval, Backend, Bootstrap, CLIStatus, Editor, Handlers, NewSessionChoices, Page, Preferences, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
 } from './types'
 import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type MockAsk, type Outcome } from './mock-access'
 import { SECTION_KINDS } from '../sections'
+import { MOCK_CHAT_ARTIFACTS, mockArtifactFiles, mockReadArtifact } from './mock-artifacts'
 
 const profiles: Bootstrap['profiles'] = [
-  { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false },
-  { id: 'cowork', label: 'Co-work', icon: 'briefcase', hue: 38, folder: 'pick', model: 'sonnet', tools: null, modifiersOn: null, ideLinks: false },
+  { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false, artifacts: true },
+  { id: 'cowork', label: 'Co-work', icon: 'briefcase', hue: 38, folder: 'pick', model: 'sonnet', tools: null, modifiersOn: null, ideLinks: false, artifacts: true },
   { id: 'code', label: 'Code', icon: 'code', hue: 280, folder: 'repo', model: 'opus', tools: [], modifiersOn: null, ideLinks: true },
 ]
 
@@ -88,6 +89,13 @@ stdin.write(JSON.stringify(turn) + '\\n')
 \`\`\`
 
 That's all the adapter needs to get started.`
+
+// VS Code installed, the others not.
+const MOCK_EDITORS: Editor[] = [
+  { id: 'vscode', label: 'VS Code', command: 'code {folder} -g {file}:{line}', found: true },
+  { id: 'cursor', label: 'Cursor', command: 'cursor {folder} -g {file}:{line}', found: false },
+  { id: 'antigravity', label: 'Antigravity', command: 'antigravity {folder} -g {file}:{line}', found: false },
+]
 
 let idn = 100
 const newId = () => `mock-${++idn}`
@@ -182,6 +190,12 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     's-code': [
       page('s-code', 1, 'Why does TestMultiTurnPartial fail about one run in five?', PARSER, {
         model: 'opus', modifiers: ['thorough'], bookmarked: true,
+        touchedFiles: [
+          { path: 'C:\\Users\\you\\code\\internal\\adapter\\claude\\parser.go', how: 'edit', line: 148, added: 12, removed: 3 },
+          { path: 'C:\\Users\\you\\code\\internal\\adapter\\claude\\parser_test.go', how: 'write', added: 64 },
+          { path: 'C:\\Users\\you\\code\\coverage.out', how: 'command' },
+          { path: 'C:\\Users\\you\\code\\testdata\\old.jsonl', how: 'deleted' },
+        ],
         trace: [
           { id: 't1', name: 'Read', summary: 'Read parser.go', done: true, ok: true },
           {
@@ -205,7 +219,8 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       }),
     ],
     's-chat': [
-      page('s-chat', 1, 'Plan a relaxed weekend in Lisbon for two, mostly on foot.', LISBON),
+      page('s-chat', 1, 'Sketch our Lisbon route as a diagram and draft an itinerary page.', 'Done: **route.mmd** sketches the route and **itinerary.html** has a first draft.', MOCK_CHAT_ARTIFACTS.page1),
+      page('s-chat', 2, 'Plan a relaxed weekend in Lisbon for two, mostly on foot.', LISBON, MOCK_CHAT_ARTIFACTS.page2),
     ],
     's-cowork': [
       page('s-cowork', 1, 'What are the three decisions in these notes?', 'The notes record three decisions:\n\n1. Ship the **desktop app first**; mobile waits.\n2. Keep pricing flat for the first year.\n3. Hire a designer before the public beta.', { bookmarked: true }),
@@ -292,7 +307,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async bootstrap() {
       return {
         profiles, modifiers, toolbar, models, platform: 'windows', lastNewSession: structuredClone(lastNew),
-        preferences: structuredClone(prefs), providers: [{ id: 'claude', label: 'Claude' }],
+        preferences: structuredClone(prefs), providers: [{ id: 'claude', label: 'Claude' }], editors: structuredClone(MOCK_EDITORS),
         sessions: sessions.map(s => ({ ...s })),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
@@ -585,6 +600,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     },
     async setDecisionKey(k) { decisionKey = k.trim() },
     async hasDecisionKey() { return decisionKey !== '' },
+    async testNotification() {},
     async testDecisionModel() {
       await new Promise(r => setTimeout(r, 150))
       const d = prefs.decisionModel
@@ -612,6 +628,12 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       return { status: 'allowed', windows: { five_hour: { utilization: 0.18, resetsAt: now + 7200 }, seven_day: { utilization: 0.31, resetsAt: now + 260000 } } }
     },
     async openFolder() {},
+    async openFile() {},
+    async revealFile() {},
+    async editors() { return structuredClone(MOCK_EDITORS) },
+    async artifactFiles(id) { return mockArtifactFiles(id) },
+    async readArtifact(_id, ref) { return mockReadArtifact(ref) },
+    async artifactPath(_id, p) { return 'C:\\Users\\you\\chat\\artifacts\\' + p.replace(/\//g, '\\') },
     async openURL(url) { window.open(url, '_blank', 'noopener') },
     async copyText(text) { await navigator.clipboard?.writeText(text) },
     async clipboardFiles() { return [] },

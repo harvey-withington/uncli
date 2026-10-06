@@ -5,6 +5,8 @@
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
   import DecisionSection from './DecisionSection.svelte'
+  import EditorSection from './EditorSection.svelte'
+  import NotifySection from './NotifySection.svelte'
   import SafeSection from './SafeSection.svelte'
   import type { AutoSummary, Preferences } from '../lib/api'
   import { modelOptions } from '../lib/models'
@@ -97,6 +99,8 @@
       </div>
     </section>
   {/if}
+  {#if prefs}<NotifySection {prefs} {savePrefs} />{/if}
+  {#if prefs}<EditorSection {prefs} {savePrefs} />{/if}
   <SafeSection {savePrefs} />
   {#if prefs}<DecisionSection {prefs} {savePrefs} />{/if}
   <section>

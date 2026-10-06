@@ -231,6 +231,71 @@ func TestToolUseAndFileTouched(t *testing.T) {
 	}
 }
 
+// An Edit is a touched file once it has succeeded, at the first line it
+// changed (from its structuredPatch); the Read before it isn't.
+func TestEditTouchesFileAtChangedLine(t *testing.T) {
+	evs := parseFixture(t, "edit-tool-result")
+	ft := ofKind(evs, core.EvFileTouched)
+	if len(ft) != 1 {
+		t.Fatalf("file_touched = %d events", len(ft))
+	}
+	f := decode[core.FileTouched](t, ft[0])
+	if f.How != "edit" || f.Line != 6 || f.Added != 1 || f.Removed != 1 || !strings.HasSuffix(f.Path, "notes.txt") {
+		t.Errorf("file_touched = %+v", f)
+	}
+	// It comes after the tool's finish, not with its start.
+	var finishedAt, touchedAt int
+	for i, ev := range evs {
+		switch ev.Kind {
+		case core.EvToolFinished:
+			finishedAt = i
+		case core.EvFileTouched:
+			touchedAt = i
+		}
+	}
+	if touchedAt < finishedAt {
+		t.Error("file_touched came before the edit finished")
+	}
+}
+
+// A write that was denied touched nothing.
+func TestDeniedWriteTouchesNothing(t *testing.T) {
+	for _, name := range []string{"perm-stdio-deny", "perm-prompts-none", "perm-mode-dontask"} {
+		if ft := ofKind(parseFixture(t, name), core.EvFileTouched); len(ft) != 0 {
+			t.Errorf("%s: file_touched = %v", name, ft)
+		}
+	}
+}
+
+func TestPatchStats(t *testing.T) {
+	cases := map[string][3]int{ // line, added, removed
+		`{"structuredPatch":[{"newStart":3,"lines":[" a"," b"," c","-x","+X"]}]}`:                                          {6, 1, 1},
+		`{"structuredPatch":[{"newStart":1,"lines":["+new first line"," a"]}]}`:                                            {1, 1, 0},
+		`{"structuredPatch":[{"newStart":2,"lines":[" a","-b","-c"," d"]},{"newStart":40,"lines":[" x","+y","+z","+w"]}]}`: {3, 3, 2},
+		`{"type":"create","content":"one\ntwo\nthree\n","structuredPatch":[]}`:                                             {0, 3, 0},
+		`{"type":"create","content":"no newline"}`:                                                                         {0, 1, 0},
+		`{"structuredPatch":[]}`: {0, 0, 0},
+		`not json`:               {0, 0, 0},
+	}
+	for in, want := range cases {
+		line, added, removed := patchStats(json.RawMessage(in))
+		if got := [3]int{line, added, removed}; got != want {
+			t.Errorf("patchStats(%s) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+// A file a tool created counts every line as added (fixture: Write "hi").
+func TestCreatedFileCountsItsLines(t *testing.T) {
+	ft := ofKind(parseFixture(t, "perm-stdio-allow"), core.EvFileTouched)
+	if len(ft) != 1 {
+		t.Fatalf("file_touched = %d", len(ft))
+	}
+	if f := decode[core.FileTouched](t, ft[0]); f.How != "write" || f.Added != 1 || f.Removed != 0 {
+		t.Errorf("file_touched = %+v", f)
+	}
+}
+
 // mcp_status, sent mid-turn, comes back with each MCP tool's
 // annotations; the CLI asks about every MCP tool call, read-only or not.
 func TestToolHints(t *testing.T) {

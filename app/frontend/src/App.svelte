@@ -54,9 +54,12 @@
     } else if (e.key === 'ArrowRight') {
       e.preventDefault()
       app.goTo(forward(app.currentIndex, n))
+    } else if ((e.key === 'a' || e.key === 'A') && app.hasArtifacts(app.currentId)) {
+      e.preventDefault()
+      app.showTab('artifacts')
     } else if (e.key === 'o' || e.key === 'O') {
       e.preventDefault()
-      app.toggleOutline()
+      app.showTab('outline')
     } else if (e.key === 'b' || e.key === 'B') {
       e.preventDefault()
       app.toggleBookmark().catch(err => showToast(String(err), 'error'))

@@ -35,9 +35,16 @@ App data (sessions, pages, bookmarks) lives in your user config folder
 - The toolbar switches model mid-conversation, toggles modifiers (Use
   Agents, Efficiency Mode, Thorough), runs `/compact` and `/context`, and
   shows your subscription usage.
-
-Phase 1 has no approval prompts: each mode has a fixed list of tools it may
-use, and anything else is refused and shown in the page's tool list.
+- **Prompt me** (Always, When unsafe or Never) decides when Claude stops to
+  ask before using a tool. A card shows what it wants to do, and "This is
+  safe" teaches UNCLI for next time. The shield opens the safe list.
+- Each page lists the **files Claude changed**. In Code sessions, Open takes
+  you to the line in your editor (Settings → Editor).
+- Chat and Co-work sessions keep their **artifacts** (HTML, SVG, Mermaid,
+  Markdown, images) version by version. The side panel's Artifacts tab (or
+  A) shows them as they were at the page you're on, beside On this page (O).
+- A **desktop notification** says when a session you aren't looking at
+  finishes or needs approval (Settings → Notifications).
 
 ## Building
 

@@ -42,3 +42,32 @@ export function saveQuestionCompact(compact: boolean) {
     // not persisted; still applied for this run
   }
 }
+
+// The side panel's tabs, "On this page" and "Artifacts": which one is
+// showing. Whether the panel is open, and its width (one for both tabs),
+// are the outline layout's (lib/outline.ts).
+export type PanelTab = 'outline' | 'artifacts'
+
+const PANEL_KEY = 'uncli-panel'
+
+export interface PanelLayout {
+  tab: PanelTab
+}
+
+export function loadPanelLayout(): PanelLayout {
+  try {
+    const v = JSON.parse(localStorage.getItem(PANEL_KEY) ?? 'null') as Partial<PanelLayout> | null
+    if (v) return { tab: v.tab === 'artifacts' ? 'artifacts' : 'outline' }
+  } catch {
+    // fall through to the defaults
+  }
+  return { tab: 'outline' }
+}
+
+export function savePanelLayout(l: PanelLayout) {
+  try {
+    localStorage.setItem(PANEL_KEY, JSON.stringify(l))
+  } catch {
+    // not persisted; still applied for this run
+  }
+}

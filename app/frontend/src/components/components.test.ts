@@ -254,9 +254,12 @@ describe('Outline panel', () => {
     localStorage.clear()
     render(App, { props: { backend: mockBackend() } })
     await fireEvent.click(await screen.findByText('Plan a weekend in Lisbon'))
-    const handle = await screen.findByRole('separator', { name: 'Resize the outline' })
+    const handle = await screen.findByRole('separator', { name: 'Resize the side panel' })
     await fireEvent.keyDown(handle, { key: 'ArrowLeft' })
-    expect(handle).toHaveAttribute('aria-valuenow', '256')
+    expect(handle).toHaveAttribute('aria-valuenow', '376')
+    // Both tabs share the width.
+    await fireEvent.click(screen.getByRole('tab', { name: /^Artifacts/ }))
+    expect(screen.getByRole('separator', { name: 'Resize the side panel' })).toHaveAttribute('aria-valuenow', '376')
   })
 })
 

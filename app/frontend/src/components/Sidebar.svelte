@@ -105,6 +105,7 @@
     font-family: var(--font);
   }
   nav {
+    position: relative; /* clips absolutely positioned descendants (as .scroll in SessionPane) */
     flex: 1;
     overflow-y: auto;
     margin: 0 calc(-1 * var(--space-1));

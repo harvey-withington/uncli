@@ -48,9 +48,13 @@ export function activeEntry(tops: readonly number[], readingLine: number): numbe
   return active
 }
 
-export const OUTLINE_MIN = 180
-export const OUTLINE_MAX = 480
-export const OUTLINE_DEFAULT = 240
+// The side panel's width, one for both its tabs (On this page and
+// Artifacts), so switching tabs never moves the answer column. Wide enough
+// at its narrowest for the tab strip; the artifact viewer gets room by
+// dragging the panel wider.
+export const OUTLINE_MIN = 240
+export const OUTLINE_MAX = 960
+export const OUTLINE_DEFAULT = 360
 
 export function clampWidth(w: number): number {
   return Math.round(Math.min(OUTLINE_MAX, Math.max(OUTLINE_MIN, w)))

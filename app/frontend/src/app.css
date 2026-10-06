@@ -173,6 +173,10 @@ html, body {
   font-feature-settings: 'cv11', 'ss01';
 }
 
+/* The window never scrolls as a whole: each panel scrolls on its own, so a
+   stray overflow can't add a second scrollbar beside a panel's. */
+html { overflow: hidden; }
+
 #app { height: 100%; }
 
 button, input, select, textarea { font: inherit; color: inherit; }

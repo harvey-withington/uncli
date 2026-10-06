@@ -12,8 +12,8 @@
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
   import NavBar from './NavBar.svelte'
-  import OutlinePanel from './OutlinePanel.svelte'
   import PageView from './PageView.svelte'
+  import SidePanel from './SidePanel.svelte'
   import Toolbar from './Toolbar.svelte'
 
   interface Props {
@@ -113,10 +113,10 @@
       </button>
       <button
         class="btn ghost small icon"
-        onclick={() => app.toggleOutline()}
+        onclick={() => app.togglePanel()}
         aria-pressed={app.outline.open}
-        aria-label={t('outline.toggle')}
-        title={t('outline.toggle')}
+        aria-label={t(app.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
+        title={t(app.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
       >
         <Icon name={app.outline.open ? 'panel-right-close' : 'panel-right-open'} />
       </button>
@@ -165,7 +165,7 @@
       </footer>
     </div>
     {#if page && app.outline.open}
-      <OutlinePanel {page} {scroller} />
+      <SidePanel {page} {scroller} />
     {/if}
   </div>
 </section>
@@ -241,6 +241,9 @@
     flex-direction: column;
   }
   .scroll {
+    /* Positioned, so absolutely positioned descendants (visually-hidden
+       labels) are clipped here instead of stretching the window. */
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow-y: auto;

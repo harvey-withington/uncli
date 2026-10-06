@@ -38,6 +38,7 @@ export function wailsBackend(): Backend {
         rt.EventsOn('page:changed', d => h.pageChanged(d as never)),
         rt.EventsOn('cli:progress', d => h.cliProgress(d as never)),
         rt.EventsOn('cli:status', d => h.cliStatus(d as never)),
+        rt.EventsOn('notify:open', d => h.notifyOpen?.(String(d ?? ''))),
       ]
       return () => offs.forEach(off => off())
     },
@@ -83,9 +84,16 @@ export function wailsBackend(): Backend {
     setDecisionKey: k => call('SetDecisionKey', k),
     hasDecisionKey: () => call('HasDecisionKey'),
     testDecisionModel: () => call('TestDecisionModel'),
+    testNotification: () => call('TestNotification'),
     summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     usage: () => call('Usage'),
     openFolder: p => call('OpenFolder', p),
+    openFile: (s, p, l) => call('OpenFile', s, p, l),
+    revealFile: p => call('RevealFile', p),
+    editors: () => call('Editors'),
+    artifactFiles: s => call('ArtifactFiles', s),
+    readArtifact: (s, r) => call('ReadArtifact', s, r),
+    artifactPath: (s, p) => call('ArtifactPath', s, p),
     openURL: u => call('OpenURL', u),
     // The WebView's own clipboard first; the native one if that's refused.
     async copyText(text) {

@@ -47,16 +47,16 @@ describe('layout', () => {
   beforeEach(() => localStorage.clear())
 
   it('clamps width and survives a reload', () => {
-    expect(clampWidth(20)).toBe(180)
-    expect(clampWidth(9000)).toBe(480)
-    expect(loadLayout()).toEqual({ open: true, width: 240 })
+    expect(clampWidth(20)).toBe(240)
+    expect(clampWidth(9000)).toBe(960)
+    expect(loadLayout()).toEqual({ open: true, width: 360 })
     saveLayout({ open: false, width: 333 })
     expect(loadLayout()).toEqual({ open: false, width: 333 })
   })
 
   it('ignores junk in storage', () => {
     localStorage.setItem('uncli-outline', '{not json')
-    expect(loadLayout()).toEqual({ open: true, width: 240 })
+    expect(loadLayout()).toEqual({ open: true, width: 360 })
   })
 })
 

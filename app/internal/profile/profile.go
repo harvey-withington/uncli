@@ -34,6 +34,7 @@ type Profile struct {
 	PermissionMode  string   `yaml:"permission_mode" json:"-"`
 	ModifiersOn     []string `yaml:"modifiers_on" json:"modifiersOn"`
 	IDELinks        bool     `yaml:"ide_links" json:"ideLinks"`
+	Artifacts       bool     `yaml:"artifacts" json:"artifacts"` // versions ./artifacts/ per page and shows it in the artifact pane
 }
 
 type Modifier struct {

@@ -7,6 +7,7 @@
   import { attachmentIcon, formatSize } from '../lib/attachments'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import CopyButton from './CopyButton.svelte'
+  import FilesStrip from './FilesStrip.svelte'
   import Icon from './Icon.svelte'
   import PageChips from './PageChips.svelte'
   import TraceStrip from './TraceStrip.svelte'
@@ -94,6 +95,7 @@
         <p class="banner err" role="alert"><Icon name="triangle-alert" size={14} />{page.error || t('page.failed')}</p>
       {/if}
 
+      <FilesStrip files={page.touchedFiles} sessionId={page.sessionId} />
       <TraceStrip items={page.trace} sessionId={page.sessionId} />
     </div>
   </article>

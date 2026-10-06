@@ -1,11 +1,11 @@
 // App state: sessions, their pages, the page each session is showing, and
 // the live text of answers still streaming. All state is keyed by id.
 import type {
-  AttachmentRef, Backend, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
+  ArtifactFile, AttachmentRef, Backend, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
   ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
-import { loadQuestionCompact, loadSidebarWidth, saveQuestionCompact, saveSidebarWidth } from '../lib/panels'
+import { loadPanelLayout, loadQuestionCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
 import { toBlocks } from '../lib/render/markdown'
 import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
@@ -36,6 +36,11 @@ export class AppStore {
   settingsOpen = $state(false)
   settingsAt = $state<'' | 'safe'>('') // a section to open Settings at
   outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
+  // The side panel's tab ("On this page" or "Artifacts"; its open state and
+  // width are outline's), the artifact each session shows there, and what is in each session's artifacts folder now.
+  panel = $state(loadPanelLayout())
+  artifactSel = $state<Record<string, string>>({})
+  artifactLive = $state<Record<string, ArtifactFile[]>>({})
   sidebarWidth = $state(loadSidebarWidth())
   questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
   // Search across sessions: the box's text and filters (the sidebar shows
@@ -70,6 +75,7 @@ export class AppStore {
       pageChanged: p => this.upsertPage(p),
       cliProgress: p => { this.progress = p },
       cliStatus: s => { this.cli = s },
+      notifyOpen: id => { void this.openFromNotification(id) },
     })
     const [boot, cli] = await Promise.all([this.backend.bootstrap(), this.backend.cliStatus(false)])
     this.boot = boot
@@ -95,7 +101,17 @@ export class AppStore {
         showToast(String(e), 'error')
       }
     }
+    if (this.outline.open) void this.refreshArtifacts(id)
     await this.backend.focus(id)
+  }
+
+  // openFromNotification shows the session a notification was about, on
+  // its latest page (where the answer or the approval card is).
+  async openFromNotification(id: string) {
+    if (!id || !this.sessions.some(s => s.id === id)) return
+    await this.select(id)
+    const n = this.pages[id]?.length ?? 0
+    if (n > 0) this.index[id] = n - 1
   }
 
   // openNewSession opens the new-session dialog, on a given profile if one
@@ -112,9 +128,58 @@ export class AppStore {
     saveSidebarWidth(width)
   }
 
-  toggleOutline() {
+  // togglePanel opens or closes the side panel, on the tab it had.
+  togglePanel() {
     this.outline.open = !this.outline.open
     saveLayout(this.outline)
+    if (this.outline.open && this.currentId) void this.refreshArtifacts(this.currentId)
+  }
+
+  // showTab opens the side panel on a tab (O and A); pressed again on the
+  // tab already showing, it closes the panel.
+  showTab(tab: PanelTab) {
+    if (this.outline.open && this.tabFor(this.currentId) === tab) {
+      this.togglePanel()
+      return
+    }
+    this.setTab(tab)
+    if (!this.outline.open) this.togglePanel()
+  }
+
+  setTab(tab: PanelTab) {
+    this.panel.tab = tab
+    savePanelLayout(this.panel)
+  }
+
+  // tabFor is the tab a session shows: Artifacts only for a session type
+  // that keeps them.
+  tabFor(sessionId: string | null): PanelTab {
+    return this.panel.tab === 'artifacts' && this.hasArtifacts(sessionId) ? 'artifacts' : 'outline'
+  }
+
+  // hasArtifacts: the session's type keeps artifacts.
+  hasArtifacts(sessionId: string | null): boolean {
+    const s = this.sessions.find(x => x.id === sessionId)
+    return !!s && !!this.boot?.profiles.find(p => p.id === s.profileId)?.artifacts
+  }
+
+  // openArtifact shows an artifact (a path in the artifacts folder) on the
+  // Artifacts tab.
+  openArtifact(sessionId: string, path: string) {
+    this.artifactSel[sessionId] = path
+    this.setTab('artifacts')
+    if (!this.outline.open) this.togglePanel()
+    else void this.refreshArtifacts(sessionId)
+  }
+
+  // refreshArtifacts reads what is in a session's artifacts folder now.
+  async refreshArtifacts(sessionId: string) {
+    if (!this.hasArtifacts(sessionId)) return
+    try {
+      this.artifactLive[sessionId] = await this.backend.artifactFiles(sessionId)
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
   }
 
   toggleQuestionCompact() {
@@ -283,6 +348,7 @@ export class AppStore {
       }
       case 'turn_result':
         delete this.live[sessionId]
+        if (this.outline.open && sessionId === this.currentId) void this.refreshArtifacts(sessionId)
         break
       case 'usage_limit':
         this.usage = event.data as UsageLimit

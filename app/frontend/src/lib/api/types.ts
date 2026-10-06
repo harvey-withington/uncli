@@ -142,7 +142,8 @@ export interface Page {
   modifiers: string[]
   answerMd: string
   trace: TraceItem[]
-  touchedFiles: { path: string; line?: number; how: string }[]
+  touchedFiles: TouchedFile[]
+  artifacts?: ArtifactVersion[] // artifacts the turn added, changed or deleted
   status: PageStatus
   error?: string
   bookmarked: boolean
@@ -157,6 +158,42 @@ export interface Page {
   finishedAt: number
   outline?: PageOutline
   attachments?: PageAttachment[] // files sent with the question
+}
+
+// A file the page's turn changed: written (created or replaced) or edited
+// by a tool, changed or deleted by a command.
+export interface TouchedFile {
+  path: string // absolute
+  line?: number // the latest edit's first changed line
+  how: 'write' | 'edit' | 'command' | 'deleted'
+  added?: number // lines added and removed by the turn's tools; absent when no tool said (a command's change)
+  removed?: number
+}
+
+// An artifact as a page's turn left it: its content by hash, or deleted.
+export interface ArtifactVersion {
+  path: string // relative to the artifacts folder
+  hash?: string
+  size: number
+  deleted?: boolean
+}
+
+// An artifact in a session's artifacts folder now.
+export interface ArtifactFile {
+  path: string // relative, with slashes
+  size: number
+}
+
+// An artifact to read: a stored version by hash, or the file in the folder by path.
+export interface ArtifactRef {
+  hash?: string
+  path?: string
+}
+
+// An artifact's content, base64.
+export interface ArtifactContent {
+  data: string
+  size: number
 }
 
 // A file sent with a page's question (its content is in the CLI's transcript).
@@ -253,6 +290,7 @@ export interface Profile {
   tools: string[] | null
   modifiersOn: string[] | null
   ideLinks: boolean
+  artifacts?: boolean // ./artifacts/ is versioned per page and shown in the artifact pane
 }
 
 export interface Modifier {
@@ -308,7 +346,22 @@ export interface Preferences {
   autoSummary: AutoSummary // which answers summarise themselves as they finish
   unknownCommands?: UnknownCommands // Ask mode and commands UNCLI doesn't recognise (default model)
   decisionModel?: DecisionModel // answers "is this safe?"; the quick-task model unless set
+  notifications?: NotifySetting // desktop notifications (default all)
+  editor?: string // opens files in sessions that link to an IDE: a preset id, auto or custom
+  editorCommand?: string // custom: a template with {file}, {line}, {folder}
 }
+
+// An editor UNCLI knows, and whether it is installed.
+export interface Editor {
+  id: string
+  label: string
+  command: string // template: {file}, {line}, {folder}
+  found: boolean
+}
+
+// Which desktop notifications to show: a background session finishing or
+// needing approval (all), only approvals, or none.
+export type NotifySetting = 'all' | 'approvals' | 'off'
 
 // The app-level decision model (decision record 0006): the quick-task
 // model, or a System One server (Kev, Jev) with its address, model and
@@ -351,6 +404,7 @@ export interface Bootstrap {
   lastNewSession: NewSessionChoices
   preferences: Preferences
   providers: Provider[]
+  editors?: Editor[]
 }
 
 export interface CLIStatus {
@@ -439,6 +493,7 @@ export interface Handlers {
   pageChanged(p: Page): void
   cliProgress(p: Progress): void
   cliStatus(s: CLIStatus): void
+  notifyOpen?(sessionId: string): void // the user clicked a notification ("" for the tray icon)
 }
 
 // Backend is everything the UI can ask of UNCLI. The Wails bridge
@@ -487,9 +542,16 @@ export interface Backend {
   setDecisionKey(key: string): Promise<void> // the decision model's API key; never read back
   hasDecisionKey(): Promise<boolean>
   testDecisionModel(): Promise<DecisionTest> // a sample question to the decision model
+  testNotification(): Promise<void> // shows a sample desktop notification
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   openFolder(path: string): Promise<void>
+  openFile(sessionId: string, path: string, line: number): Promise<void> // editor at line (IDE-linked sessions) or default app (documents)
+  revealFile(path: string): Promise<void> // shows it in its folder
+  editors(): Promise<Editor[]>
+  artifactFiles(sessionId: string): Promise<ArtifactFile[]> // what is in the artifacts folder now
+  readArtifact(sessionId: string, ref: ArtifactRef): Promise<ArtifactContent>
+  artifactPath(sessionId: string, path: string): Promise<string> // where it is on disk now
   openURL(url: string): Promise<void>
   copyText(text: string): Promise<void>
   clipboardFiles(): Promise<string[]> // full paths of files copied in the file manager; [] if none

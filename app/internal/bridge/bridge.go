@@ -17,9 +17,11 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"uncli/internal/app"
+	"uncli/internal/artifacts"
 	"uncli/internal/attach"
 	"uncli/internal/clipfiles"
 	"uncli/internal/core"
+	"uncli/internal/ide"
 	"uncli/internal/session"
 	"uncli/internal/store"
 )
@@ -45,6 +47,13 @@ func (a *App) Emit(name string, data any) {
 	wruntime.EventsEmit(ctx, name, data)
 }
 
+// context is the Wails context, nil until the window exists.
+func (a *App) context() context.Context {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ctx
+}
+
 // Run starts the desktop app with the embedded frontend.
 func Run(assets fs.FS) error {
 	paths, err := app.DefaultPaths()
@@ -57,6 +66,12 @@ func Run(assets fs.FS) error {
 		return err
 	}
 	a.svc = svc
+	svc.ShowWindow = func() {
+		if ctx := a.context(); ctx != nil {
+			wruntime.WindowUnminimise(ctx)
+			wruntime.Show(ctx)
+		}
+	}
 	defer svc.Close()
 
 	return wails.Run(&options.App{
@@ -277,9 +292,40 @@ func (a *App) SummarisePage(sessionID, pageID string, blocks []string) (store.Pa
 
 func (a *App) Focus(sessionID string) { a.svc.Sessions.Focus(sessionID) }
 
+// TestNotification shows a sample desktop notification.
+func (a *App) TestNotification() error { return a.svc.TestNotification() }
+
 func (a *App) Usage() *core.UsageLimit { return a.svc.Sessions.Usage() }
 
 func (a *App) OpenFolder(path string) error { return app.OpenFolder(path) }
+
+// OpenFile opens a file from a page: in the editor at line (sessions that
+// link to an IDE) or with the default app (documents only).
+func (a *App) OpenFile(sessionID, path string, line int) error {
+	return a.svc.OpenFile(sessionID, path, line)
+}
+
+// RevealFile shows a file in its folder.
+func (a *App) RevealFile(path string) error { return a.svc.RevealFile(path) }
+
+// ArtifactFiles lists what is in a session's artifacts folder now.
+func (a *App) ArtifactFiles(sessionID string) ([]artifacts.File, error) {
+	return a.svc.ArtifactFiles(sessionID)
+}
+
+// ReadArtifact returns an artifact's content (a version by hash, or the
+// file in the folder by path), base64.
+func (a *App) ReadArtifact(sessionID string, ref app.ArtifactRef) (app.ArtifactContent, error) {
+	return a.svc.ReadArtifact(sessionID, ref)
+}
+
+// ArtifactPath is where an artifact is on disk now.
+func (a *App) ArtifactPath(sessionID, path string) (string, error) {
+	return a.svc.ArtifactPath(sessionID, path)
+}
+
+// Editors lists the editors UNCLI knows and which are installed.
+func (a *App) Editors() []ide.Editor { return a.svc.Editors() }
 
 func (a *App) CopyText(text string) error { return wruntime.ClipboardSetText(a.ctx, text) }
 

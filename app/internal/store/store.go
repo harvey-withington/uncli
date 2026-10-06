@@ -327,37 +327,52 @@ type TraceReason struct {
 	Note   string `json:"note,omitempty"`
 }
 
+// TouchedFile is a file Claude changed during a page's turn.
 type TouchedFile struct {
-	Path string `json:"path"`
-	Line int    `json:"line,omitempty"`
-	How  string `json:"how"`
+	Path string `json:"path"`           // absolute
+	Line int    `json:"line,omitempty"` // the latest edit's first changed line
+	How  string `json:"how"`            // write (created or replaced) | edit | command (a command changed it) | deleted (a command deleted it)
+	// Lines added and removed, summed over the turn's tool writes; zero
+	// for both when no tool said (a command's change).
+	Added   int `json:"added,omitempty"`
+	Removed int `json:"removed,omitempty"`
+}
+
+// ArtifactVersion is an artifact as a page's turn left it: its content
+// by hash in the artifact store, or deleted.
+type ArtifactVersion struct {
+	Path    string `json:"path"` // relative to the artifacts folder, with slashes
+	Hash    string `json:"hash,omitempty"`
+	Size    int64  `json:"size"`
+	Deleted bool   `json:"deleted,omitempty"`
 }
 
 type Page struct {
-	ID           string           `json:"id"`
-	SessionID    string           `json:"sessionId"`
-	Seq          int              `json:"seq"`
-	Question     string           `json:"question"`
-	Directives   string           `json:"directives,omitempty"`
-	Model        string           `json:"model"`
-	Modifiers    []string         `json:"modifiers"`
-	AnswerMD     string           `json:"answerMd"`
-	Trace        []TraceItem      `json:"trace"`
-	TouchedFiles []TouchedFile    `json:"touchedFiles"`
-	Status       string           `json:"status"` // open | done | error | interrupted
-	Error        string           `json:"error,omitempty"`
-	Bookmarked   bool             `json:"bookmarked"`
-	Pinned       bool             `json:"pinned"`
-	InputTokens  int              `json:"inputTokens"`
-	OutputTokens int              `json:"outputTokens"`
-	CacheRead    int              `json:"cacheRead"`
-	CacheWrite   int              `json:"cacheWrite"`
-	CostUSD      float64          `json:"costUsd"`
-	DurationMS   int              `json:"durationMs"`
-	StartedAt    int64            `json:"startedAt"`
-	FinishedAt   int64            `json:"finishedAt"`
-	Outline      *PageOutline     `json:"outline,omitempty"` // a summary table of contents, if one was made
-	Attachments  []PageAttachment `json:"attachments"`       // files sent with the question (their content is in the CLI's transcript)
+	ID           string            `json:"id"`
+	SessionID    string            `json:"sessionId"`
+	Seq          int               `json:"seq"`
+	Question     string            `json:"question"`
+	Directives   string            `json:"directives,omitempty"`
+	Model        string            `json:"model"`
+	Modifiers    []string          `json:"modifiers"`
+	AnswerMD     string            `json:"answerMd"`
+	Trace        []TraceItem       `json:"trace"`
+	TouchedFiles []TouchedFile     `json:"touchedFiles"`
+	Artifacts    []ArtifactVersion `json:"artifacts"` // artifacts the turn added, changed or deleted
+	Status       string            `json:"status"`    // open | done | error | interrupted
+	Error        string            `json:"error,omitempty"`
+	Bookmarked   bool              `json:"bookmarked"`
+	Pinned       bool              `json:"pinned"`
+	InputTokens  int               `json:"inputTokens"`
+	OutputTokens int               `json:"outputTokens"`
+	CacheRead    int               `json:"cacheRead"`
+	CacheWrite   int               `json:"cacheWrite"`
+	CostUSD      float64           `json:"costUsd"`
+	DurationMS   int               `json:"durationMs"`
+	StartedAt    int64             `json:"startedAt"`
+	FinishedAt   int64             `json:"finishedAt"`
+	Outline      *PageOutline      `json:"outline,omitempty"` // a summary table of contents, if one was made
+	Attachments  []PageAttachment  `json:"attachments"`       // files sent with the question (their content is in the CLI's transcript)
 }
 
 // PageAttachment records a file sent with a page's question.
@@ -446,13 +461,51 @@ func nonNil[T any](v []T) []T {
 	return v
 }
 
-func (s *Store) ListPages(sessionID string) ([]Page, error) {
-	rows, err := s.db.Query(`SELECT id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
+// SetPageFiles stores what a page's turn changed, found after it closed:
+// its touched files and artifact versions. Only those columns change, so
+// a bookmark set meanwhile is kept.
+func (s *Store) SetPageFiles(pageID string, touched []TouchedFile, artifacts []ArtifactVersion) error {
+	t, _ := json.Marshal(nonNil(touched))
+	a, _ := json.Marshal(nonNil(artifacts))
+	res, err := s.db.Exec(`UPDATE pages SET touched_files=?, artifacts=? WHERE id=?`, string(t), string(a), pageID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("page not found")
+	}
+	return nil
+}
+
+const pageColumns = `id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
 		touched_files, status, bookmarked, pinned, input_tokens, output_tokens, cache_read, cache_write, cost_usd,
-		duration_ms, started_at, finished_at, outline, attachments FROM pages WHERE session_id=? ORDER BY seq`, sessionID)
+		duration_ms, started_at, finished_at, outline, attachments, artifacts`
+
+// Page reads one page.
+func (s *Store) Page(pageID string) (Page, error) {
+	rows, err := s.db.Query(`SELECT `+pageColumns+` FROM pages WHERE id=?`, pageID)
+	if err != nil {
+		return Page{}, err
+	}
+	pages, err := scanPages(rows)
+	if err != nil {
+		return Page{}, err
+	}
+	if len(pages) == 0 {
+		return Page{}, errors.New("page not found")
+	}
+	return pages[0], nil
+}
+
+func (s *Store) ListPages(sessionID string) ([]Page, error) {
+	rows, err := s.db.Query(`SELECT `+pageColumns+` FROM pages WHERE session_id=? ORDER BY seq`, sessionID)
 	if err != nil {
 		return nil, err
 	}
+	return scanPages(rows)
+}
+
+func scanPages(rows *sql.Rows) ([]Page, error) {
 	defer rows.Close()
 	out := []Page{}
 	for rows.Next() {
@@ -461,11 +514,13 @@ func (s *Store) ListPages(sessionID string) ([]Page, error) {
 		var bm, pin sql.NullBool
 		var in, outT, cr, cw, dur, st, fin sql.NullInt64
 		var cost sql.NullFloat64
-		var outline, attached sql.NullString
+		var outline, attached, artifacts sql.NullString
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Seq, &p.Question, &directives, &p.Model, &mods, &answer, &trace,
-			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached); err != nil {
+			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached, &artifacts); err != nil {
 			return nil, err
 		}
+		_ = json.Unmarshal([]byte(artifacts.String), &p.Artifacts)
+		p.Artifacts = nonNil(p.Artifacts)
 		_ = json.Unmarshal([]byte(attached.String), &p.Attachments)
 		p.Attachments = nonNil(p.Attachments)
 		if outline.Valid && outline.String != "" {

@@ -1,0 +1,2 @@
+{"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":null}}
+{"type":"user","message":{"role":"user","content":"In notes.txt, use the Edit tool to change the line six to SIX. Don't read it first. Then reply DONE."},"parent_tool_use_id":null,"session_id":""}

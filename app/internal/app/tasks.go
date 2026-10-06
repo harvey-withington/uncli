@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"uncli/internal/core"
+	"uncli/internal/ide"
 	"uncli/internal/runtime/local"
 	"uncli/internal/session"
 	"uncli/internal/store"
@@ -36,6 +37,13 @@ type Preferences struct {
 	// DecisionModel answers fixed-answer questions such as "is this safe?"
 	// (decide.go); the quick-task model unless set.
 	DecisionModel DecisionModel `json:"decisionModel"`
+	// Notifications says which desktop notifications to show (notify.go):
+	// all, approvals or off.
+	Notifications string `json:"notifications"`
+	// Editor opens files from sessions that link to an IDE (files.go): a
+	// preset id, auto (the first installed) or custom (EditorCommand).
+	Editor        string `json:"editor"`
+	EditorCommand string `json:"editorCommand,omitempty"`
 }
 
 // Automatic summaries: none, answers long enough to need one (the UI
@@ -59,7 +67,7 @@ const settingPrefs = "prefs"
 
 func defaultPreferences() Preferences {
 	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}, AutoSummary: SummaryOff, UnknownCommands: session.UnknownModel,
-		DecisionModel: DecisionModel{Provider: DeciderQuickTask}}
+		DecisionModel: DecisionModel{Provider: DeciderQuickTask}, Notifications: NotifyAll, Editor: ide.Auto}
 }
 
 func (s *Service) Preferences() Preferences {
@@ -87,6 +95,12 @@ func (s *Service) Preferences() Preferences {
 	if p.DecisionModel.Provider == "" || validDecisionModel(p.DecisionModel) != nil {
 		p.DecisionModel = defaultPreferences().DecisionModel
 	}
+	if !validNotify(p.Notifications) {
+		p.Notifications = NotifyAll
+	}
+	if validEditor(p.Editor, p.EditorCommand) != nil {
+		p.Editor, p.EditorCommand = ide.Auto, ""
+	}
 	return p
 }
 
@@ -110,6 +124,18 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 		p.DecisionModel.Provider = DeciderQuickTask
 	}
 	if err := validDecisionModel(p.DecisionModel); err != nil {
+		return s.Preferences(), err
+	}
+	if p.Notifications == "" {
+		p.Notifications = NotifyAll
+	}
+	if !validNotify(p.Notifications) {
+		return s.Preferences(), fmt.Errorf("unknown notification setting %q", p.Notifications)
+	}
+	if p.Editor == "" {
+		p.Editor = ide.Auto
+	}
+	if err := validEditor(p.Editor, p.EditorCommand); err != nil {
 		return s.Preferences(), err
 	}
 	b, err := json.Marshal(p)

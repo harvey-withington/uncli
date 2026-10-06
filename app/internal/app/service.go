@@ -20,8 +20,11 @@ import (
 
 	"uncli/config"
 	"uncli/internal/adapter/claude"
+	"uncli/internal/artifacts"
 	"uncli/internal/attach"
 	"uncli/internal/core"
+	"uncli/internal/ide"
+	"uncli/internal/notify"
 	"uncli/internal/profile"
 	"uncli/internal/runtime/local"
 	"uncli/internal/session"
@@ -67,7 +70,13 @@ type Service struct {
 	Installer *claude.Installer
 	Sessions  *session.Manager
 
-	emit Emitter
+	// ShowWindow brings UNCLI's window to the front (set by the bridge);
+	// clicking a notification uses it.
+	ShowWindow func()
+
+	emit          Emitter
+	notifier      notify.Notifier
+	artifactStore *artifacts.Store
 
 	authMu   sync.Mutex
 	auth     *core.AuthInfo
@@ -95,9 +104,15 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	}
 	inst := claude.NewInstaller(filepath.Join(paths.Cache, "cli", "claude"))
 	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst), emit: emit}
+	s.notifier = newNotifier(s.notifyClicked)
+	s.artifactStore = artifacts.NewStore(filepath.Join(paths.Config, "artifact-store"))
+	sink := newAttention(newCoalescer(emit, 50*time.Millisecond),
+		func(id string) bool { return s.Sessions != nil && s.Sessions.Focused(id) },
+		func() string { return s.Preferences().Notifications },
+		func(n notify.Note) { go s.showNote(n) })
 	s.Sessions, err = session.NewManager(session.Deps{
 		Store: db, Adapter: s.Adapter, Runtime: local.New(), Profiles: set,
-		Binary: s.binary, Sink: newCoalescer(emit, 50*time.Millisecond), ScratchDir: paths.Scratch,
+		Binary: s.binary, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
 		Judge: s.judgeCommand, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
 	})
 	if err != nil {
@@ -110,6 +125,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 func (s *Service) Close() {
 	s.CancelSignIn()
 	s.Sessions.Close()
+	s.notifier.Close()
 	s.Store.Close()
 }
 
@@ -454,6 +470,7 @@ type Bootstrap struct {
 	LastNew      NewSessionChoices     `json:"lastNewSession"`
 	Preferences  Preferences           `json:"preferences"`
 	Providers    []Provider            `json:"providers"`
+	Editors      []ide.Editor          `json:"editors"`
 }
 
 // NewSessionChoices is what the user picked last time in the new-session
@@ -510,7 +527,7 @@ func (s *Service) Bootstrap() Bootstrap {
 		Profiles: s.Profiles.Profiles, Modifiers: s.Profiles.Modifiers, Toolbar: s.Profiles.Toolbar,
 		Sessions: s.Sessions.List(), Models: s.Sessions.Models(), Capabilities: s.Adapter.Capabilities(),
 		Platform: runtime.GOOS, LastNew: s.lastNewSession(),
-		Preferences: s.Preferences(), Providers: s.Providers(),
+		Preferences: s.Preferences(), Providers: s.Providers(), Editors: s.Editors(),
 	}
 }
 

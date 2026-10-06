@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
+	"uncli/internal/artifacts"
 	"uncli/internal/core"
 	"uncli/internal/store"
 )
@@ -44,6 +46,7 @@ type Session struct {
 	lastMods     []string // modifiers sent with the previous turn
 	lastSeq      int
 	pending      []Approval // tool uses waiting for the user's answer
+	files        *turnFiles // what the open page's turn needs to find the files it changed (files.go)
 	// Unattended: anything that would wait for the user is declined
 	// (approvals.go). In memory only, so it's off after a restart.
 	unattended bool
@@ -109,6 +112,9 @@ func (s *Session) savePage() {
 	}
 	if s.page.Attachments == nil {
 		s.page.Attachments = []store.PageAttachment{}
+	}
+	if s.page.Artifacts == nil {
+		s.page.Artifacts = []store.ArtifactVersion{}
 	}
 	if err := s.m.d.Store.SavePage(s.page); err != nil {
 		s.err = "Could not save the page: " + err.Error()
@@ -241,6 +247,11 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	s.page = &store.Page{ID: NewID(), SessionID: s.rec.ID, Seq: seq, Question: text, Directives: directives,
 		Model: s.rec.Model, Modifiers: active, Status: "open", StartedAt: time.Now().UnixMilli(), Attachments: attached}
 	s.evN, s.runningTools, s.notice, s.err = 0, 0, "", ""
+	artifactsRoot := ""
+	if prof.Artifacts {
+		artifactsRoot = filepath.Join(s.rec.Workdir, artifacts.Folder)
+	}
+	s.files = startTurnFiles(s.rec.Workdir, artifactsRoot)
 	s.lastMods, s.lastSeq = active, seq
 	if s.rec.Title == "" {
 		if text != "" {
@@ -410,7 +421,10 @@ func (s *Session) closePage(status, errText string) {
 		}
 	}
 	s.savePage()
-	s.page, s.runningTools = nil, 0
+	if t := s.files; t != nil && t.tools {
+		go s.finishFiles(t, p)
+	}
+	s.page, s.runningTools, s.files = nil, 0, nil
 	switch {
 	case status == "error":
 		s.err = errText
@@ -554,6 +568,9 @@ func (s *Session) handle(gen int, ev core.Event) {
 			t, _ := core.Decode[core.ToolStarted](ev)
 			s.page.Trace = append(s.page.Trace, store.TraceItem{ID: t.ID, Name: t.Name, Summary: t.Summary})
 			s.runningTools++
+			if s.files != nil {
+				s.files.tools = true
+			}
 			s.savePage()
 		}
 	case core.EvToolFinished:
@@ -576,7 +593,8 @@ func (s *Session) handle(gen int, ev core.Event) {
 	case core.EvFileTouched:
 		if turnOpen {
 			f, _ := core.Decode[core.FileTouched](ev)
-			s.page.TouchedFiles = append(s.page.TouchedFiles, store.TouchedFile{Path: f.Path, Line: f.Line, How: f.How})
+			s.page.TouchedFiles = mergeTouched(s.page.TouchedFiles, store.TouchedFile{Path: f.Path, Line: f.Line, How: f.How, Added: f.Added, Removed: f.Removed})
+			s.savePage()
 		}
 	case core.EvApprovalAsked:
 		// The user answers it on an approval card, unless a session rule

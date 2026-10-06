@@ -19,7 +19,7 @@ const (
 	EvTextBlock     EventKind = "text_block"     // a completed assistant text block
 	EvToolStarted   EventKind = "tool_started"   // id, name, input
 	EvToolFinished  EventKind = "tool_finished"  // id, ok, denied, output (truncated)
-	EvFileTouched   EventKind = "file_touched"   // path, line, how (edit/write/bash-detected)
+	EvFileTouched   EventKind = "file_touched"   // path, line, how (edit/write), once the tool has succeeded
 	EvApprovalAsked EventKind = "approval_asked" // request id, tool, input (phase 2)
 	EvToolHints     EventKind = "tool_hints"     // what the MCP servers say about their tools
 	EvNotice        EventKind = "notice"         // model changed, compacted, conversation reset, command output
@@ -110,7 +110,11 @@ type ToolFinished struct {
 type FileTouched struct {
 	Path string `json:"path"`
 	Line int    `json:"line,omitempty"`
-	How  string `json:"how"` // edit | write | bash-detected
+	How  string `json:"how"` // write | edit (UNCLI adds command and deleted for changes it finds itself)
+	// Lines the tool added and removed, when it says (its patch, or a new
+	// file's content); zero for both when it doesn't.
+	Added   int `json:"added,omitempty"`
+	Removed int `json:"removed,omitempty"`
 }
 
 type ApprovalAsked struct {

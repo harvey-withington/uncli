@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"uncli/internal/artifacts"
 	"uncli/internal/core"
 	"uncli/internal/profile"
 	"uncli/internal/store"
@@ -31,6 +32,9 @@ type Deps struct {
 	Binary     BinaryFunc
 	Sink       Sink
 	ScratchDir string // chat sessions get <ScratchDir>/<session id>
+	// Artifacts keeps the versions of what session types with artifacts
+	// put in their artifacts folder; nil keeps none.
+	Artifacts *artifacts.Store
 	// Judge asks the app's decision model about commands UNCLI doesn't
 	// recognise, and Unknown says what the user wants done with them
 	// (UnknownModel, UnknownInside, UnknownAsk). DeciderKey names the
@@ -139,7 +143,7 @@ func (m *Manager) Create(profileID, workdir, model string) (View, error) {
 		return View{}, err
 	}
 	if p.Folder == "scratch" {
-		_ = os.MkdirAll(filepath.Join(workdir, "artifacts"), 0o755)
+		_ = os.MkdirAll(filepath.Join(workdir, artifacts.Folder), 0o755)
 	}
 	rec := store.Session{ID: id, Adapter: m.d.Adapter.ID(), Runtime: m.d.Runtime.ID(), ProfileID: p.ID,
 		Workdir: workdir, Model: model, Modifiers: append([]string{}, p.ModifiersOn...)}
@@ -153,6 +157,15 @@ func (m *Manager) Create(profileID, workdir, model string) (View, error) {
 	v := s.View()
 	m.d.Sink.SessionChanged(v)
 	return v, nil
+}
+
+// View is one session as the UI sees it.
+func (m *Manager) View(id string) (View, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return View{}, err
+	}
+	return s.View(), nil
 }
 
 func (m *Manager) Pages(id string) ([]store.Page, error) { return m.d.Store.ListPages(id) }
@@ -268,6 +281,10 @@ func (m *Manager) Focus(id string) {
 		s.markRead()
 	}
 }
+
+// Focused says whether the user is looking at a session: it is the one
+// shown and UNCLI's window has focus.
+func (m *Manager) Focused(id string) bool { return m.isFocused(id) }
 
 func (m *Manager) isFocused(id string) bool {
 	m.mu.Lock()

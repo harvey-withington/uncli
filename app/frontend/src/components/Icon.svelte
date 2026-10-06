@@ -60,6 +60,16 @@
   import Users from 'lucide-svelte/icons/users'
   import Wrench from 'lucide-svelte/icons/wrench'
   import X from 'lucide-svelte/icons/x'
+  import Bell from 'lucide-svelte/icons/bell'
+  import FilePen from 'lucide-svelte/icons/file-pen'
+  import FilePlus from 'lucide-svelte/icons/file-plus'
+  import Terminal from 'lucide-svelte/icons/terminal'
+  import ExternalLink from 'lucide-svelte/icons/external-link'
+  import FolderSearch from 'lucide-svelte/icons/folder-search'
+  import Layers from 'lucide-svelte/icons/layers'
+  import FileX from 'lucide-svelte/icons/file-x'
+  import FileCode from 'lucide-svelte/icons/file-code'
+  import History from 'lucide-svelte/icons/history'
 
   // Icon names as used in YAML config (Lucide's kebab-case), plus a few
   // the app uses itself. Unknown names fall back to a neutral glyph.
@@ -73,6 +83,7 @@
     sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
     eye: Eye, 'globe-lock': GlobeLock, hand: Hand, zap: Zap,
+    bell: Bell, 'file-pen': FilePen, 'file-plus': FilePlus, terminal: Terminal, 'external-link': ExternalLink, 'folder-search': FolderSearch, layers: Layers, 'file-x': FileX, 'file-code': FileCode, history: History,
   } as const
 
   export type IconName = keyof typeof ICONS

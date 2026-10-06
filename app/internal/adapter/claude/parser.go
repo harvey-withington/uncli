@@ -17,14 +17,19 @@ const maxToolOutput = 2000
 // parser turns Claude Code stream-json lines into normalized events. It is
 // stateful: system/init repeats every turn and is reported only on change,
 // and a permission denial and the tool result that follows it are reported once.
+// A file a tool writes is reported once the tool has succeeded, not when
+// it is asked for, so a denied or failed write isn't a touched file.
 type parser struct {
 	sid, model  string
 	denied      map[string]bool
-	errorCode   string // from a synthetic assistant message, folded into the result
+	touching    map[string]core.FileTouched // tool use id -> the file it will write
+	errorCode   string                      // from a synthetic assistant message, folded into the result
 	interrupted bool
 }
 
-func newParser() *parser { return &parser{denied: map[string]bool{}} }
+func newParser() *parser {
+	return &parser{denied: map[string]bool{}, touching: map[string]core.FileTouched{}}
+}
 
 type line struct {
 	Type            string  `json:"type"`
@@ -83,6 +88,9 @@ type line struct {
 	Response  json.RawMessage `json:"response"`
 
 	IsSynthetic bool `json:"isSynthetic"`
+
+	// user: what a tool reported beyond its text (an edit's patch)
+	ToolUseResult json.RawMessage `json:"tool_use_result"`
 }
 
 type resultUsage struct {
@@ -158,6 +166,7 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 			return []core.Event{ev(core.EvNotice, core.Notice{Kind: core.NoticeCompacted})}, nil
 		case "permission_denied":
 			p.denied[l.ToolUseID] = true
+			delete(p.touching, l.ToolUseID)
 			return []core.Event{ev(core.EvToolFinished, core.ToolFinished{
 				ID: l.ToolUseID, Denied: true, Output: truncate(rawString(l.Message)),
 			})}, nil
@@ -187,7 +196,7 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 					ID: b.ID, Name: b.Name, Input: b.Input, Summary: toolSummary(b.Name, b.Input),
 				}))
 				if ft, ok := fileTouched(b.Name, b.Input); ok {
-					out = append(out, ev(core.EvFileTouched, ft))
+					p.touching[b.ID] = ft
 				}
 			}
 		}
@@ -204,9 +213,12 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 			return p.userText(s, ev), nil
 		}
 		var out []core.Event
-		for _, b := range blocks(m.Content) {
+		bs := blocks(m.Content)
+		for _, b := range bs {
 			switch b.Type {
 			case "tool_result":
+				ft, touches := p.touching[b.ToolUseID]
+				delete(p.touching, b.ToolUseID)
 				if p.denied[b.ToolUseID] {
 					delete(p.denied, b.ToolUseID)
 					continue
@@ -214,6 +226,12 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 				out = append(out, ev(core.EvToolFinished, core.ToolFinished{
 					ID: b.ToolUseID, OK: !b.IsError, Output: truncate(resultText(b.Content)),
 				}))
+				if touches && !b.IsError {
+					if len(bs) == 1 { // the line's tool_use_result is this tool's
+						ft.Line, ft.Added, ft.Removed = patchStats(l.ToolUseResult)
+					}
+					out = append(out, ev(core.EvFileTouched, ft))
+				}
 			case "text":
 				out = append(out, p.userText(b.Text, ev)...)
 			}
@@ -448,6 +466,64 @@ func toolSummary(name string, input json.RawMessage) string {
 		return name
 	}
 	return name + " " + arg
+}
+
+// patchStats reads what a tool that wrote a file reports: the first
+// changed line in the new file, and the lines added and removed, from its
+// structuredPatch (a hunk starts at newStart and leads with context lines,
+// " ", then the change, "-" / "+"). A file the tool created has no patch:
+// every line of its content is added. Zeros when it says neither.
+func patchStats(result json.RawMessage) (line, added, removed int) {
+	var r struct {
+		Type            string `json:"type"`
+		Content         string `json:"content"`
+		StructuredPatch []struct {
+			NewStart int      `json:"newStart"`
+			Lines    []string `json:"lines"`
+		} `json:"structuredPatch"`
+	}
+	if json.Unmarshal(result, &r) != nil {
+		return 0, 0, 0
+	}
+	if len(r.StructuredPatch) == 0 {
+		if r.Type == "create" {
+			return 0, lineCount(r.Content), 0
+		}
+		return 0, 0, 0
+	}
+	for i, h := range r.StructuredPatch {
+		at := h.NewStart
+		for _, l := range h.Lines {
+			switch {
+			case strings.HasPrefix(l, "+"):
+				added++
+			case strings.HasPrefix(l, "-"):
+				removed++
+			default:
+				at++
+				continue
+			}
+			if i == 0 && line == 0 {
+				line = at
+			}
+		}
+	}
+	if line == 0 {
+		line = r.StructuredPatch[0].NewStart
+	}
+	return line, added, removed
+}
+
+// lineCount counts the lines in a file's content.
+func lineCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	n := strings.Count(s, "\n")
+	if !strings.HasSuffix(s, "\n") {
+		n++
+	}
+	return n
 }
 
 func fileTouched(name string, input json.RawMessage) (core.FileTouched, bool) {

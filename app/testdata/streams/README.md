@@ -34,6 +34,7 @@ Recorded with Claude Code 2.1.285 (`stable` on 2026-10-01), mostly on Haiku 4.5.
 | `perm-stdio-deny` | Same without `initialize`, answered deny |
 | `set-permission-mode-live` | `set_permission_mode` switches `acceptEdits` to `default` on a live process: the first Write runs unasked, the second is asked; MCP tools are asked about (recorded 2026-10-04) |
 | `mcp-status-tool-hints` | `mcp_status` sent mid-turn returns each MCP tool with its annotations (`readOnly`, `destructive`, `openWorld`, true ones only); read and destructive tool calls both asked (recorded 2026-10-04) |
+| `edit-tool-result` | `acceptEdits` with Read and Edit allowed: an Edit's `tool_use_result` carries `structuredPatch` hunks (`newStart` plus context lines), from which the changed line is found; a Read's carries the file (recorded 2026-10-06) |
 | `image-input` | Base64 PNG image content block on stream-json input |
 | `append-system-prompt` | `--append-system-prompt` and `--disallowedTools Bash` |
 | `chat-profile-minimal` | Chat profile flags: `--system-prompt`, `--tools`, `--strict-mcp-config`, `--setting-sources ""`, `--disable-slash-commands` |

@@ -14,6 +14,7 @@ profiles:
     tools: [WebSearch, WebFetch, Write]
     allowed_tools: [WebSearch, WebFetch, "Write(./artifacts/**)"]
     isolated: true           # no user settings, MCP servers or skills: ~2.4k tokens a turn instead of ~26k
+    artifacts: true          # ./artifacts/ is versioned per page and shown in the artifact pane
     permission_mode: default
     modifiers_on: []
   - id: cowork
@@ -26,6 +27,7 @@ profiles:
       You are helping with documents and knowledge work in this folder.
       Put generated deliverables under ./artifacts/.
     allowed_tools: [Read, Write, Edit, Glob, Grep, WebSearch, WebFetch]
+    artifacts: true
     permission_mode: default
   - id: code
     label: Code
