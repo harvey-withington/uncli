@@ -115,6 +115,11 @@
   </div>
 
   {#snippet footer()}
+    {#if app.boot?.capabilities.import}
+      <button class="btn ghost small import-link" onclick={() => { app.newSessionOpen = false; app.importOpen = true }}>
+        <Icon name="download" size={13} />{t('import.fromNew')}
+      </button>
+    {/if}
     <button class="btn" onclick={() => (app.newSessionOpen = false)}>{t('common.cancel')}</button>
     <button class="btn primary" bind:this={startButton} onclick={create} disabled={creating || (needsFolder && !folder)}>
       {#if creating}<Icon name="loader" spin size={14} />{/if}
@@ -202,6 +207,10 @@
   .hint {
     margin: 0 0 var(--space-4);
     font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+  .import-link {
+    margin-right: auto;
     color: var(--text-muted);
   }
 </style>

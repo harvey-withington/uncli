@@ -1,0 +1,2 @@
+{"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":null}}
+{"type":"user","message":{"role":"user","content":"Use the Agent tool once, in the foreground (do not run it in the background), with this task: reply with exactly the word PONG. Then tell me what it replied."},"parent_tool_use_id":null,"session_id":""}

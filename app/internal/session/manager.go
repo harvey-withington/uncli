@@ -40,7 +40,10 @@ type Deps struct {
 	// (UnknownModel, UnknownInside, UnknownAsk). DeciderKey names the
 	// current decision model (core.DeciderInfo.Key), so answers cached from
 	// another one are asked again. Any may be nil.
-	Judge      JudgeFunc
+	Judge JudgeFunc
+	// JudgeTools asks about several tools of one MCP server at once
+	// (judging.go); nil judges each tool on its own as it is used.
+	JudgeTools JudgeToolsFunc
 	Unknown    func() string
 	DeciderKey func() string
 }
@@ -258,17 +261,47 @@ func (m *Manager) SetBookmark(sessionID, pageID string, on bool) (store.Page, er
 	if err := m.d.Store.SetBookmark(pageID, on); err != nil {
 		return store.Page{}, err
 	}
-	pages, err := m.d.Store.ListPages(sessionID)
+	return m.marked(sessionID, pageID, func(p *store.Page) { p.Bookmarked = on })
+}
+
+// SetPinned pins or unpins a page (Pinned lists them across sessions).
+func (m *Manager) SetPinned(sessionID, pageID string, on bool) (store.Page, error) {
+	if err := m.d.Store.SetPinned(pageID, on); err != nil {
+		return store.Page{}, err
+	}
+	return m.marked(sessionID, pageID, func(p *store.Page) { p.Pinned = on })
+}
+
+// Pinned lists the pinned pages of every session, newest first.
+func (m *Manager) Pinned() ([]store.PinnedPage, error) { return m.d.Store.Pinned() }
+
+// marked applies a bookmark or pin to the session's open page too, when
+// it is that page (the session saves and sends its own copy as the answer
+// streams), and returns the page as stored.
+func (m *Manager) marked(sessionID, pageID string, set func(*store.Page)) (store.Page, error) {
+	if s, err := m.get(sessionID); err == nil {
+		s.mu.Lock()
+		if s.page != nil && s.page.ID == pageID {
+			set(s.page)
+		}
+		s.mu.Unlock()
+	}
+	p, err := m.d.Store.Page(pageID)
 	if err != nil {
 		return store.Page{}, err
 	}
-	for _, p := range pages {
-		if p.ID == pageID {
-			m.d.Sink.PageChanged(p)
-			return p, nil
-		}
+	m.d.Sink.PageChanged(p)
+	return p, nil
+}
+
+// Archive archives a session (on) or restores it. Archiving stops its CLI;
+// it isn't deleted, and can be read and restored.
+func (m *Manager) Archive(id string, on bool) (View, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return View{}, err
 	}
-	return store.Page{}, errors.New("page not found")
+	return s.Archive(on)
 }
 
 // Focus marks the session the user is looking at; its Unread clears.

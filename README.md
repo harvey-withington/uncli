@@ -45,6 +45,12 @@ App data (sessions, pages, bookmarks) lives in your user config folder
   A) shows them as they were at the page you're on, beside On this page (O).
 - A **desktop notification** says when a session you aren't looking at
   finishes or needs approval (Settings → Notifications).
+- **Import** a conversation the Claude CLI saved (New session → Continue a
+  conversation from the terminal…) to read it in UNCLI and carry on. A
+  deleted UNCLI chat can be brought back the same way.
+- **Pin** pages you want at hand (P), **archive** finished sessions, see
+  **usage** over time, and find any action in the **command palette**
+  (Ctrl+Shift+P); ? lists every shortcut.
 
 ## Building
 

@@ -2,10 +2,12 @@ package session
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"uncli/internal/core"
 	"uncli/internal/store"
 )
 
@@ -114,4 +116,72 @@ func (s *Session) waitingForUserLocked() bool {
 		}
 	}
 	return false
+}
+
+// JudgeToolsFunc asks the decision model about several tools of one MCP
+// server at once, returning a judgement for each tool it could judge.
+type JudgeToolsFunc func(ctx context.Context, q ToolsQuery) (map[string]store.Judgement, error)
+
+// ToolsQuery is a server's tools that gave no hints, to judge together.
+type ToolsQuery struct {
+	Server  string   `json:"server"`
+	Version string   `json:"version,omitempty"`
+	Tools   []string `json:"tools"` // the CLI's names (mcp__server__tool)
+	Workdir string   `json:"workdir"`
+}
+
+// prejudge judges each MCP server's tools that gave no hints as soon as
+// the CLI reports them, one decision per server, rather than one per tool
+// as each is first used. Tools already judged (for this server version),
+// or being judged, are left out. If a batch fails, each tool is still
+// judged on its own when it is used.
+func (m *Manager) prejudge(hints map[string]core.ToolHint, workdir string) {
+	if m.d.JudgeTools == nil || m.unknownSetting() != UnknownModel {
+		return
+	}
+	byServer := map[string]*ToolsQuery{}
+	for tool, h := range hints {
+		if h.ReadOnly || h.Destructive || h.OpenWorld || h.Server == "" {
+			continue // the server said what it does
+		}
+		key := mcpJudgeKey(tool, h)
+		if _, ok := m.judged(key); ok {
+			continue
+		}
+		m.judge.mu.Lock()
+		skip := m.judge.inFlight[key] || m.judge.failed[key]
+		if !skip {
+			m.judge.inFlight[key] = true
+		}
+		m.judge.mu.Unlock()
+		if skip {
+			continue
+		}
+		q := byServer[h.Server]
+		if q == nil {
+			q = &ToolsQuery{Server: h.Server, Version: h.ServerVersion, Workdir: workdir}
+			byServer[h.Server] = q
+		}
+		q.Tools = append(q.Tools, tool)
+	}
+	for _, q := range byServer {
+		sort.Strings(q.Tools)
+		go m.judgeServer(*q)
+	}
+}
+
+func (m *Manager) judgeServer(q ToolsQuery) {
+	ctx, cancel := context.WithTimeout(context.Background(), judgeTimeout)
+	got, err := m.d.JudgeTools(ctx, q)
+	cancel()
+	for _, tool := range q.Tools {
+		key := mcpJudgeKey(tool, core.ToolHint{Server: q.Server, ServerVersion: q.Version})
+		if j, ok := got[tool]; err == nil && ok && (j.Level == RiskLooks || j.Level == RiskRoutine || j.Level == RiskRisky) {
+			_ = m.d.Store.SetJudgement(key, j)
+		}
+		m.judge.mu.Lock()
+		delete(m.judge.inFlight, key)
+		m.judge.mu.Unlock()
+	}
+	m.rejudgeAll()
 }

@@ -55,6 +55,9 @@
   --cmd-unsafe: var(--warning);
   --cmd-blocked: var(--danger);
   --cmd-rest: var(--text-faint);
+  /* Charts (usage dashboard): one series hue, checked with the dataviz
+     validator against each theme's surface (lightness band, 3:1 contrast). */
+  --chart-bar: #4f46e5;
 
   --font: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Consolas, monospace;
@@ -92,6 +95,7 @@
     --border: #29292e;
     --border-strong: #3a3a40;
     --accent: #8b8cf8;
+    --chart-bar: #7f80f4;
     --accent-hover: #a5a6fa;
     --accent-soft: rgba(139, 140, 248, 0.13);
     --accent-text: #111113;
@@ -132,6 +136,7 @@
   --border: #29292e;
   --border-strong: #3a3a40;
   --accent: #8b8cf8;
+  --chart-bar: #7f80f4;
   --accent-hover: #a5a6fa;
   --accent-soft: rgba(139, 140, 248, 0.13);
   --accent-text: #111113;

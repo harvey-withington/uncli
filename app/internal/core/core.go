@@ -143,6 +143,8 @@ type Capabilities struct {
 	UsageReporting   bool `json:"usageReporting"`
 	ThinkingEvents   bool `json:"thinkingEvents"`
 	SlashPassthrough bool `json:"slashPassthrough"`
+	// Import: the adapter is a TranscriptReader (saved conversations can be imported).
+	Import bool `json:"import"`
 }
 
 // StatePather is an adapter whose CLI keeps files of its own outside the
@@ -172,4 +174,65 @@ type TextResult struct {
 	Structured json.RawMessage `json:"structured,omitempty"`
 	Usage      Usage           `json:"usage"`
 	CostUSD    float64         `json:"costUsd"`
+}
+
+// TranscriptReader is an adapter that can list the conversations its CLI
+// has saved and turn one into UNCLI's terms, so a conversation from the
+// terminal (or a deleted UNCLI session) can be opened and continued.
+// Optional; adapters that have it set the Import capability. The format is
+// the CLI's own and undocumented, so a reader skips what it doesn't know.
+type TranscriptReader interface {
+	ListTranscripts(loc TranscriptLocation) ([]TranscriptInfo, error)
+	ReadTranscript(loc TranscriptLocation, id string) (Transcript, error)
+}
+
+// TranscriptLocation says where to look: the runtime knows (the user's
+// home locally, a volume in a container), so the reader never assumes.
+type TranscriptLocation struct {
+	Home      string // the home folder the CLI keeps its state under
+	ConfigDir string // the CLI's own state folder, when set apart from Home (Claude: CLAUDE_CONFIG_DIR)
+}
+
+// TranscriptInfo describes a saved conversation without reading it all.
+type TranscriptInfo struct {
+	ID            string `json:"id"`      // the provider's session id: what --resume takes
+	Workdir       string `json:"workdir"` // the folder it ran in
+	Started       int64  `json:"started"` // ms
+	Updated       int64  `json:"updated"` // ms
+	FirstQuestion string `json:"firstQuestion"`
+	Turns         int    `json:"turns"`
+	CLIVersion    string `json:"cliVersion,omitempty"`
+}
+
+// Transcript is a saved conversation as UNCLI pages it.
+type Transcript struct {
+	Info  TranscriptInfo   `json:"info"`
+	Turns []TranscriptTurn `json:"turns"`
+}
+
+// TranscriptTurn is one question and what came of it.
+type TranscriptTurn struct {
+	Question   string           `json:"question"`
+	Answer     string           `json:"answer"`
+	Model      string           `json:"model,omitempty"` // as the provider names it (a full model id)
+	Usage      Usage            `json:"usage"`
+	StartedAt  int64            `json:"startedAt"`
+	FinishedAt int64            `json:"finishedAt"`
+	Tools      []TranscriptTool `json:"tools"`
+	Files      []FileTouched    `json:"files"`
+	Command    bool             `json:"command,omitempty"` // a slash command (/compact), not a question
+	// Origin "cli": the CLI started the turn by itself (a background task
+	// finished), so it has no question.
+	Origin string `json:"origin,omitempty"`
+	Error  bool   `json:"error,omitempty"` // the turn ended in an error
+}
+
+// TranscriptTool is a tool use in a turn.
+type TranscriptTool struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Summary string `json:"summary"`
+	Done    bool   `json:"done"`
+	OK      bool   `json:"ok"`
+	Output  string `json:"output,omitempty"`
 }

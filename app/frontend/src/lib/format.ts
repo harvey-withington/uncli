@@ -17,7 +17,8 @@ export function duration(ms: number): string {
   if (ms < 1000) return `${ms} ms`
   const s = ms / 1000
   if (s < 60) return `${s.toFixed(1)} s`
-  return `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`
+  if (s < 3600) return `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`
+  return `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`
 }
 
 export function bytes(n: number): string {

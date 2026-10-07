@@ -77,6 +77,7 @@ type Service struct {
 	emit          Emitter
 	notifier      notify.Notifier
 	artifactStore *artifacts.Store
+	transcripts   *core.TranscriptLocation // where saved conversations are read from; nil: the CLI's own (tests set it)
 
 	authMu   sync.Mutex
 	auth     *core.AuthInfo
@@ -113,7 +114,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	s.Sessions, err = session.NewManager(session.Deps{
 		Store: db, Adapter: s.Adapter, Runtime: local.New(), Profiles: set,
 		Binary: s.binary, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
-		Judge: s.judgeCommand, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
+		Judge: s.judgeCommand, JudgeTools: s.judgeTools, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
 	})
 	if err != nil {
 		db.Close()

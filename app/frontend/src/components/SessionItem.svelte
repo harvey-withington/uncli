@@ -40,10 +40,20 @@
   function moveWithKeys(e: KeyboardEvent) {
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
     e.preventDefault()
-    const from = app.sessions.findIndex(s => s.id === session.id)
+    const from = app.activeSessions.findIndex(s => s.id === session.id)
     app.moveSession(session.id, e.key === 'ArrowUp' ? from - 1 : from + 2).then(() => {
       document.querySelector<HTMLElement>(`[data-id="${session.id}"] .main`)?.focus()
     })
+  }
+
+  async function archive(e: MouseEvent, on: boolean) {
+    e.stopPropagation()
+    try {
+      await app.archive(session.id, on)
+      showToast(t(on ? 'archive.done' : 'archive.restored', { title: session.title || t('session.untitled') }), 'success')
+    } catch (err) {
+      showToast(String(err), 'error')
+    }
   }
 
   async function remove(e: MouseEvent) {
@@ -95,12 +105,20 @@
         <span class="title" class:untitled={!session.title}>{session.title || t('session.untitled')}</span>
         <span class="meta">
           <ActivityBadge state={session.state} />
+          {#if !session.busy && (session.background?.length ?? 0) > 0}
+            <span class="bg" title={t('background.hint')}><Icon name="loader" spin size={11} />{t('background.short')}</span>
+          {/if}
           {#if session.state === 'idle'}<span class="model">{session.model}</span>{/if}
         </span>
       </span>
     </button>
     <span class="actions" data-no-drag>
       <button class="btn ghost small icon" onclick={startRename} aria-label={t('session.rename')} title={t('session.rename')}><Icon name="pencil" size={13} /></button>
+      {#if session.archived}
+        <button class="btn ghost small icon" onclick={e => archive(e, false)} aria-label={t('archive.restore')} title={t('archive.restore')}><Icon name="archive-restore" size={13} /></button>
+      {:else}
+        <button class="btn ghost small icon" onclick={e => archive(e, true)} aria-label={t('archive.archive')} title={t('archive.archive')}><Icon name="archive" size={13} /></button>
+      {/if}
       <button class="btn ghost small icon" onclick={remove} aria-label={t('session.delete')} title={t('session.delete')}><Icon name="trash" size={13} /></button>
     </span>
   {/if}
@@ -186,6 +204,13 @@
   .item:hover .actions,
   .item:focus-within .actions {
     opacity: 1;
+  }
+  .bg {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--text-xs);
+    color: var(--accent);
   }
   .rename {
     flex: 1;

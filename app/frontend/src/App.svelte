@@ -1,10 +1,14 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte'
+  import CommandPalette from './components/CommandPalette.svelte'
   import ConfirmDialog from './components/ConfirmDialog.svelte'
+  import ImportDialog from './components/ImportDialog.svelte'
+  import KeyboardMap from './components/KeyboardMap.svelte'
   import Icon from './components/Icon.svelte'
   import NewSessionDialog from './components/NewSessionDialog.svelte'
   import SessionPane from './components/SessionPane.svelte'
   import SettingsDialog from './components/SettingsDialog.svelte'
+  import UsageDashboard from './components/UsageDashboard.svelte'
   import SetupScreen from './components/SetupScreen.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import Toasts from './components/Toasts.svelte'
@@ -13,8 +17,8 @@
   import { listenForDrops } from './lib/drops'
   import { tintStyle } from './lib/tint'
   import { t } from './lib/i18n.svelte'
-  import { back, forward, isTyping } from './lib/nav'
-  import { showToast } from './lib/toasts.svelte'
+  import { commands, matches } from './lib/commands'
+  import { isTyping } from './lib/nav'
   import { AppStore } from './stores/app.svelte'
 
   interface Props {
@@ -35,34 +39,23 @@
   })
   onDestroy(() => app.destroy())
 
+  // Shortcuts come from the command registry (lib/commands.ts), the same
+  // list the palette and the keyboard map show. A key a control already
+  // handled (arrows on a radio group or tab strip) is left alone; plain keys
+  // never fire while typing (function keys do: they type nothing); while a dialog is open it owns the keyboard,
+  // except for the palette's own shortcut.
   function onkeydown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
-      e.preventDefault()
-      if (app.cliReady) app.openNewSession()
-      return
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault()
-      if (app.cliReady && !app.newSessionOpen && !app.settingsOpen) app.searchFocus++
-      return
-    }
-    if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target) || app.newSessionOpen || app.settingsOpen) return
-    const n = app.currentPages.length
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault()
-      app.goTo(back(app.currentIndex))
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault()
-      app.goTo(forward(app.currentIndex, n))
-    } else if ((e.key === 'a' || e.key === 'A') && app.hasArtifacts(app.currentId)) {
-      e.preventDefault()
-      app.showTab('artifacts')
-    } else if (e.key === 'o' || e.key === 'O') {
-      e.preventDefault()
-      app.showTab('outline')
-    } else if (e.key === 'b' || e.key === 'B') {
-      e.preventDefault()
-      app.toggleBookmark().catch(err => showToast(String(err), 'error'))
+    if (e.defaultPrevented || e.repeat && !e.key.startsWith('Arrow')) return
+    const dialog = app.newSessionOpen || app.settingsOpen || app.usageOpen || app.paletteOpen || app.keysOpen || app.importOpen
+    for (const c of commands(app)) {
+      for (const k of c.keys ?? []) {
+        if (!matches(k, e)) continue
+        if (dialog && c.id !== 'palette') return
+        if (!k.ctrl && !/^F\d+$/.test(k.key) && isTyping(e.target)) return
+        e.preventDefault()
+        c.run()
+        return
+      }
     }
   }
 
@@ -108,6 +101,10 @@
 
 {#if app.newSessionOpen}{#key app.newSessionSeq}<NewSessionDialog />{/key}{/if}
 {#if app.settingsOpen}<SettingsDialog />{/if}
+{#if app.usageOpen}<UsageDashboard />{/if}
+{#if app.paletteOpen}<CommandPalette />{/if}
+{#if app.keysOpen}<KeyboardMap />{/if}
+{#if app.importOpen}<ImportDialog />{/if}
 <ConfirmDialog />
 <Toasts />
 

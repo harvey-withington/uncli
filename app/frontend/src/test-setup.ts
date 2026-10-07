@@ -28,3 +28,14 @@ if (typeof window !== 'undefined' && !('PointerEvent' in window)) {
   }
   ;(window as unknown as { PointerEvent: typeof MouseEvent }).PointerEvent = PointerEventPolyfill
 }
+
+// jsdom has no ResizeObserver; Svelte's bind:clientWidth uses it. Nothing
+// is ever resized in a test, so it never calls back.
+if (typeof window !== 'undefined' && !('ResizeObserver' in window)) {
+  class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  ;(window as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver = ResizeObserverStub
+}

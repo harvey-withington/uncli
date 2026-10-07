@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -601,8 +602,14 @@ func TestSessionModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const q = "Call these notes tools one after another, each with name x: read_note, then touch_note, then delete_note. " +
-		"Call all three even if one is refused. Then reply with one word per tool: OK or REFUSED."
+	// Each turn names a note of its own: once a turn has really deleted a
+	// note, the model would see no point deleting it again in the next.
+	turn := 0
+	q := func() string {
+		turn++
+		return fmt.Sprintf("Call these notes tools one after another, each with name note%d: read_note, then touch_note, then delete_note. "+
+			"Call all three even if one is refused. Then reply with one word per tool: OK or REFUSED.", turn)
+	}
 
 	// run sends q in a mode and answers cards (touch allowed, delete denied);
 	// it returns the tools that came to the user, and the page.
@@ -611,7 +618,7 @@ func TestSessionModes(t *testing.T) {
 		if _, err := svc.Sessions.SetMode(v.ID, mode); err != nil {
 			t.Fatal(err)
 		}
-		if err := svc.Sessions.Send(ctx, v.ID, q); err != nil {
+		if err := svc.Sessions.Send(ctx, v.ID, q()); err != nil {
 			t.Fatal(err)
 		}
 		var asked []string
@@ -717,4 +724,88 @@ func TestModelJudgesCommands(t *testing.T) {
 		}
 		t.Logf("%s -> %s %+v", c, e.Action, e.Why)
 	}
+}
+
+// A deleted chat is restored from the CLI's saved transcript, and the
+// restored session continues the same conversation: it remembers what it
+// was told before it was deleted.
+func TestImportRestoresAndContinues(t *testing.T) {
+	config := t.TempDir()
+	svc, _ := open(t, config)
+	defer svc.Close()
+	if st := svc.CLIStatus(context.Background(), true); !st.Installed || !st.LoggedIn {
+		t.Skip("the CLI isn't installed and signed in")
+	}
+	v, _, err := svc.CreateSession("chat", "", "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	send(t, svc, v.ID, "Remember the code word PELICAN for later. Reply with just OK.")
+	sid := view(svc, v.ID).ProviderSID
+	if sid == "" {
+		t.Fatal("no provider session id")
+	}
+	if err := svc.Sessions.Delete(v.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := svc.Transcripts()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found *app.TranscriptEntry
+	for i := range list {
+		if list[i].ID == sid {
+			found = &list[i]
+		}
+	}
+	if found == nil || !found.FromChat || found.SessionID != "" || found.Turns != 1 {
+		t.Fatalf("transcript entry = %+v", found)
+	}
+	got, err := svc.ImportTranscript(sid, "")
+	if err != nil || got.View.ProfileID != "chat" || got.PagesLoaded != 1 || got.FolderGone {
+		t.Fatalf("import = %+v, %v", got, err)
+	}
+	p := send(t, svc, got.View.ID, "What was the code word? Reply with just the word.")
+	if !strings.Contains(strings.ToUpper(p.AnswerMD), "PELICAN") || p.Seq != 2 {
+		t.Errorf("answer after import = %q (page %d)", p.AnswerMD, p.Seq)
+	}
+}
+
+// A background sub-agent finishes after the turn that started it; the CLI
+// carries on by itself and its answer lands on a page of its own.
+func TestBackgroundAgentCarriesOn(t *testing.T) {
+	config := t.TempDir()
+	svc, _ := open(t, config)
+	defer svc.Close()
+	if st := svc.CLIStatus(context.Background(), true); !st.Installed || !st.LoggedIn {
+		t.Skip("the CLI isn't installed and signed in")
+	}
+	v, _, err := svc.CreateSession("code", t.TempDir(), "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	send(t, svc, v.ID, "Use the Agent tool to start ONE subagent in the background (set run_in_background to true). "+
+		"Its task: reply with exactly the word PING. Then wait for the subagent to finish and tell me what it replied.")
+	deadline := time.Now().Add(3 * time.Minute)
+	for time.Now().Before(deadline) {
+		pages, _ := svc.Sessions.Pages(v.ID)
+		for _, p := range pages {
+			if p.Origin == session.OriginCLI && p.Status == "done" {
+				if !strings.Contains(strings.ToUpper(p.AnswerMD), "PING") || p.Question != "" {
+					t.Errorf("CLI page = %+v", p)
+				}
+				if bg := view(svc, v.ID).Background; len(bg) != 0 {
+					t.Errorf("still running in the background: %+v", bg)
+				}
+				return
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	pages, _ := svc.Sessions.Pages(v.ID)
+	for _, p := range pages {
+		t.Logf("page %d (%s, origin %q): %.200s", p.Seq, p.Status, p.Origin, p.AnswerMD)
+	}
+	t.Fatal("the CLI never carried on on a page of its own")
 }

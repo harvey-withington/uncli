@@ -260,6 +260,19 @@ func (a *App) SetBookmark(sessionID, pageID string, on bool) (store.Page, error)
 	return a.svc.Sessions.SetBookmark(sessionID, pageID, on)
 }
 
+// SetPinned pins or unpins a page.
+func (a *App) SetPinned(sessionID, pageID string, on bool) (store.Page, error) {
+	return a.svc.Sessions.SetPinned(sessionID, pageID, on)
+}
+
+// Pinned lists the pinned pages of every session.
+func (a *App) Pinned() ([]store.PinnedPage, error) { return a.svc.Sessions.Pinned() }
+
+// Archive archives a session (on) or restores it.
+func (a *App) Archive(sessionID string, on bool) (session.View, error) {
+	return a.svc.Sessions.Archive(sessionID, on)
+}
+
 func (a *App) SetPreferences(p app.Preferences) (app.Preferences, error) {
 	return a.svc.SetPreferences(p)
 }
@@ -297,6 +310,9 @@ func (a *App) TestNotification() error { return a.svc.TestNotification() }
 
 func (a *App) Usage() *core.UsageLimit { return a.svc.Sessions.Usage() }
 
+// UsageReport sums the pages' tokens and cost for the usage dashboard.
+func (a *App) UsageReport(q store.UsageQuery) (store.UsageReport, error) { return a.svc.Store.Usage(q) }
+
 func (a *App) OpenFolder(path string) error { return app.OpenFolder(path) }
 
 // OpenFile opens a file from a page: in the editor at line (sessions that
@@ -322,6 +338,14 @@ func (a *App) ReadArtifact(sessionID string, ref app.ArtifactRef) (app.ArtifactC
 // ArtifactPath is where an artifact is on disk now.
 func (a *App) ArtifactPath(sessionID, path string) (string, error) {
 	return a.svc.ArtifactPath(sessionID, path)
+}
+
+// Transcripts lists the conversations the CLI has saved, for importing.
+func (a *App) Transcripts() ([]app.TranscriptEntry, error) { return a.svc.Transcripts() }
+
+// ImportTranscript imports a saved conversation as a session of a type (empty: guessed).
+func (a *App) ImportTranscript(id, profileID string) (session.ImportedSession, error) {
+	return a.svc.ImportTranscript(id, profileID)
 }
 
 // Editors lists the editors UNCLI knows and which are installed.

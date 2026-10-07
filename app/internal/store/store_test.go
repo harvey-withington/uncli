@@ -164,3 +164,27 @@ func TestMigrationAddsOutline(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A bookmark or pin set while the answer streams survives the page's next
+// saves, which carry the session's own (older) copy.
+func TestSavePageKeepsMarks(t *testing.T) {
+	s, _ := open(t)
+	_ = s.CreateSession(&Session{ID: "s1", Adapter: "claude", Runtime: "local", ProfileID: "chat", Workdir: "/w", Model: "m"})
+	p := &Page{ID: "p1", SessionID: "s1", Seq: 1, Question: "q", Model: "m", Status: "open"}
+	if err := s.SavePage(p); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.SetBookmark("p1", true)
+	_ = s.SetPinned("p1", true)
+	p.AnswerMD, p.Status = "a", "done" // Bookmarked and Pinned still false here
+	if err := s.SavePage(p); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.Page("p1")
+	if !got.Bookmarked || !got.Pinned || got.AnswerMD != "a" {
+		t.Errorf("page = %+v", got)
+	}
+	if err := s.SetPinned("missing", true); err == nil {
+		t.Error("pinned a missing page")
+	}
+}

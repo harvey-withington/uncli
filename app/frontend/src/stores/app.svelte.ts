@@ -1,7 +1,7 @@
 // App state: sessions, their pages, the page each session is showing, and
 // the live text of answers still streaming. All state is keyed by id.
 import type {
-  ArtifactFile, AttachmentRef, Backend, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
+  ArtifactFile, AttachmentRef, Backend, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
   ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
@@ -9,6 +9,7 @@ import { loadPanelLayout, loadQuestionCompact, loadSidebarWidth, savePanelLayout
 import { toBlocks } from '../lib/render/markdown'
 import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
+import { t } from '../lib/i18n.svelte'
 import { showToast } from '../lib/toasts.svelte'
 
 export interface Live {
@@ -34,7 +35,11 @@ export class AppStore {
   newSessionFolder = $state<string | null>(null) // folder it opens with (a dropped folder)
   newSessionSeq = $state(0) // each open is a fresh dialog, even mid fade-out
   settingsOpen = $state(false)
-  settingsAt = $state<'' | 'safe'>('') // a section to open Settings at
+  usageOpen = $state(false) // the usage dashboard
+  settingsAt = $state('') // a section to open Settings at ('safe', 'notify'…: #settings-<section>)
+  paletteOpen = $state(false) // the command palette
+  keysOpen = $state(false) // the keyboard map
+  importOpen = $state(false) // the import picker (saved CLI conversations)
   outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
   // The side panel's tab ("On this page" or "Artifacts"; its open state and
   // width are outline's), the artifact each session shows there, and what is in each session's artifacts folder now.
@@ -53,6 +58,10 @@ export class AppStore {
   searchFocus = $state(0)
   search = $state<{ result: SearchResult | null; active: number }>({ result: null, active: 0 })
   reveal = $state<{ pageId: string; terms: string[] } | null>(null)
+  // Pinned pages across sessions (the sidebar's Pinned group), and whether
+  // the sidebar shows the archived sessions.
+  pins = $state<PinnedPage[]>([])
+  showArchived = $state(false)
   summarising = $state<Record<string, boolean>>({}) // page id → a summary is being made
   preferHeadings = $state<Record<string, boolean>>({}) // page id → show its headings, not its summary
   private autoSummarised = new Set<string>() // tried once, so a failure isn't retried in a loop
@@ -62,6 +71,9 @@ export class AppStore {
     this.backend = backend
   }
 
+  // The session list shows active sessions; archived ones are listed apart.
+  activeSessions = $derived.by(() => this.sessions.filter(s => !s.archived))
+  archivedSessions = $derived.by(() => this.sessions.filter(s => s.archived))
   current = $derived.by(() => this.sessions.find(s => s.id === this.currentId) ?? null)
   currentPages = $derived.by(() => (this.currentId ? this.pages[this.currentId] ?? [] : []))
   currentIndex = $derived.by(() => (this.currentId ? this.index[this.currentId] ?? 0 : 0))
@@ -81,8 +93,9 @@ export class AppStore {
     this.boot = boot
     this.cli = cli
     this.sessions = sortSessions(boot.sessions)
+    void this.refreshPins()
     this.ready = true
-    const first = this.sessions[0]
+    const first = this.activeSessions[0]
     if (first) await this.select(first.id)
   }
 
@@ -112,6 +125,12 @@ export class AppStore {
     await this.select(id)
     const n = this.pages[id]?.length ?? 0
     if (n > 0) this.index[id] = n - 1
+  }
+
+  // openSettings opens Settings, at a section if one is given.
+  openSettings(section = '') {
+    this.settingsAt = section
+    this.settingsOpen = true
   }
 
   // openNewSession opens the new-session dialog, on a given profile if one
@@ -195,7 +214,7 @@ export class AppStore {
   // moveSession puts a session at a position in the list as shown (drag
   // and drop, or Alt+arrows), saving only its new sortOrder.
   async moveSession(id: string, to: number) {
-    const order = orderAt(this.sessions, id, to)
+    const order = orderAt(this.activeSessions, id, to)
     if (order === null) return
     const before = this.sessions
     this.sessions = sortSessions(this.sessions.map(s => (s.id === id ? { ...s, sortOrder: order } : s)))
@@ -247,15 +266,63 @@ export class AppStore {
     this.upsertPage(updated)
   }
 
+  // togglePin pins or unpins the page shown (P).
+  async togglePin() {
+    const p = this.currentPage
+    if (!p) return
+    await this.setPinned(p.sessionId, p.id, !p.pinned)
+  }
+
+  async setPinned(sessionId: string, pageId: string, on: boolean) {
+    this.upsertPage(await this.backend.setPinned(sessionId, pageId, on))
+    await this.refreshPins()
+  }
+
+  async refreshPins() {
+    try {
+      this.pins = await this.backend.pinned()
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
+  }
+
+  // openPin shows a pinned page in its session.
+  async openPin(pin: PinnedPage) {
+    if (this.currentId !== pin.sessionId || !this.pages[pin.sessionId]) await this.select(pin.sessionId)
+    let list = this.pages[pin.sessionId] ?? []
+    if (!list.some(p => p.id === pin.pageId)) list = this.pages[pin.sessionId] = await this.backend.pages(pin.sessionId)
+    const i = list.findIndex(p => p.id === pin.pageId)
+    if (i >= 0) this.index[pin.sessionId] = i
+  }
+
+  // importTranscript imports a saved CLI conversation and opens it on its
+  // latest page.
+  async importTranscript(id: string, profileId: string) {
+    const r = await this.backend.importTranscript(id, profileId)
+    this.upsertSession(r.session)
+    delete this.pages[r.session.id] // load them fresh
+    await this.select(r.session.id)
+    this.index[r.session.id] = Math.max(0, (this.pages[r.session.id]?.length ?? 1) - 1)
+    showToast(t(r.folderGone ? 'import.doneGone' : 'import.done', { n: r.pagesLoaded }), r.folderGone ? 'info' : 'success')
+    return r
+  }
+
+  // archive archives a session (stopping its CLI) or restores it.
+  async archive(id: string, on: boolean) {
+    this.upsertSession(await this.backend.archive(id, on))
+    void this.refreshPins()
+  }
+
   async remove(id: string) {
     await this.backend.remove(id)
     this.sessions = this.sessions.filter(s => s.id !== id)
+    this.pins = this.pins.filter(p => p.sessionId !== id)
     delete this.pages[id]
     delete this.index[id]
     delete this.live[id]
     if (this.currentId === id) {
       this.currentId = null
-      const next = this.sessions[0]
+      const next = this.activeSessions[0]
       if (next) await this.select(next.id)
     }
   }

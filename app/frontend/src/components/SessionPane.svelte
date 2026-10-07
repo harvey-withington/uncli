@@ -57,6 +57,14 @@
     }
   }
 
+  async function restore() {
+    try {
+      await app.archive(session.id, false)
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
+  }
+
   // A different page starts at the top.
   $effect(() => {
     if (page?.id && scroller) scroller.scrollTop = 0
@@ -105,7 +113,7 @@
       </button>
       <button
         class="btn ghost small icon"
-        onclick={() => { app.settingsAt = 'safe'; app.settingsOpen = true }}
+        onclick={() => app.openSettings('safe')}
         aria-label={t('safe.open')}
         title={t('safe.open')}
       >
@@ -160,7 +168,16 @@
       <div class="dock"><NavBar /></div>
       <footer class="bottom">
         <div class="inner">
-          <Composer {session} />
+          {#if session.archived}
+            <!-- An archived session reads like any other, but can't take a turn. -->
+            <div class="restore" role="status">
+              <Icon name="archive" size={15} />
+              <span>{t('archive.readOnly')}</span>
+              <button class="btn primary small" onclick={restore}><Icon name="archive-restore" size={14} />{t('archive.restore')}</button>
+            </div>
+          {:else}
+            <Composer {session} />
+          {/if}
         </div>
       </footer>
     </div>
@@ -358,6 +375,19 @@
     padding: calc(18px + var(--space-2)) var(--space-6) var(--space-4);
     border-top: 1px solid var(--border);
     background: var(--bg);
+  }
+  .restore {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+  .restore span {
+    flex: 1;
   }
   .inner {
     max-width: calc(var(--reading-width) + 2 * var(--space-6));

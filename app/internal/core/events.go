@@ -22,12 +22,16 @@ const (
 	EvFileTouched   EventKind = "file_touched"   // path, line, how (edit/write), once the tool has succeeded
 	EvApprovalAsked EventKind = "approval_asked" // request id, tool, input (phase 2)
 	EvToolHints     EventKind = "tool_hints"     // what the MCP servers say about their tools
-	EvNotice        EventKind = "notice"         // model changed, compacted, conversation reset, command output
-	EvUsageLimit    EventKind = "usage_limit"    // subscription window utilisation and reset times
-	EvTurnResult    EventKind = "turn_result"    // usage, cost, duration, is_error, error code
-	EvError         EventKind = "error"          //
-	EvExited        EventKind = "exited"         // exit code
-	EvUnknown       EventKind = "unknown"        // raw line kept, never dropped
+	// EvBackground: the tasks running in the background now (sub-agents,
+	// shells), all of them each time. When one finishes the CLI may start a
+	// turn of its own to carry on, with no user message.
+	EvBackground EventKind = "background_tasks"
+	EvNotice     EventKind = "notice"      // model changed, compacted, conversation reset, command output
+	EvUsageLimit EventKind = "usage_limit" // subscription window utilisation and reset times
+	EvTurnResult EventKind = "turn_result" // usage, cost, duration, is_error, error code
+	EvError      EventKind = "error"       //
+	EvExited     EventKind = "exited"      // exit code
+	EvUnknown    EventKind = "unknown"     // raw line kept, never dropped
 )
 
 type Event struct {
@@ -160,12 +164,27 @@ type ToolHint struct {
 	ReadOnly    bool `json:"readOnly,omitempty"`    // doesn't change anything
 	Destructive bool `json:"destructive,omitempty"` // may delete or overwrite
 	OpenWorld   bool `json:"openWorld,omitempty"`   // reaches outside this computer (web, email, other services)
+	// The server that has the tool, and its version as it reports it: a
+	// judgement of the tool holds for that version only.
+	Server        string `json:"server,omitempty"`
+	ServerVersion string `json:"serverVersion,omitempty"`
 }
 
 // ToolHints maps the CLI's tool names (as in EvApprovalAsked) to their
 // hints, for every tool of every connected MCP server.
 type ToolHints struct {
 	Tools map[string]ToolHint `json:"tools"`
+}
+
+// BackgroundTasks lists what runs in the background now.
+type BackgroundTasks struct {
+	Tasks []BackgroundTask `json:"tasks"`
+}
+
+type BackgroundTask struct {
+	ID          string `json:"id"`
+	Kind        string `json:"kind,omitempty"` // the provider's (local_agent, local_bash…)
+	Description string `json:"description"`
 }
 
 // Notice kinds.

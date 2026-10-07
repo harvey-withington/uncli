@@ -162,6 +162,25 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 			return nil, nil
 		case "thinking_tokens":
 			return []core.Event{ev(core.EvThinking, core.Thinking{EstimatedTokens: l.EstimatedTokens})}, nil
+		case "background_tasks_changed":
+			var b struct {
+				Tasks []struct {
+					ID          string `json:"task_id"`
+					Kind        string `json:"task_type"`
+					Description string `json:"description"`
+				} `json:"tasks"`
+			}
+			_ = json.Unmarshal(raw, &b)
+			out := core.BackgroundTasks{Tasks: []core.BackgroundTask{}}
+			for _, t := range b.Tasks {
+				out.Tasks = append(out.Tasks, core.BackgroundTask{ID: t.ID, Kind: t.Kind, Description: t.Description})
+			}
+			return []core.Event{ev(core.EvBackground, out)}, nil
+		case "task_started", "task_updated", "task_notification":
+			// Known; background_tasks_changed says what runs, and a finished
+			// task's result reaches the answer through the turn the CLI then
+			// starts on its own (or the tool result, in the foreground).
+			return nil, nil
 		case "compact_boundary":
 			return []core.Event{ev(core.EvNotice, core.Notice{Kind: core.NoticeCompacted})}, nil
 		case "permission_denied":
@@ -333,7 +352,10 @@ type initModel struct {
 // each tool's annotations without the "Hint" suffix and leaves out the
 // false ones.
 type mcpServer struct {
-	Name  string `json:"name"`
+	Name       string `json:"name"`
+	ServerInfo struct {
+		Version string `json:"version"`
+	} `json:"serverInfo"`
 	Tools []struct {
 		Name        string `json:"name"`
 		Annotations struct {
@@ -354,7 +376,8 @@ func toolHints(servers []mcpServer) core.ToolHints {
 		for _, t := range s.Tools {
 			name := "mcp__" + mcpUnsafe.ReplaceAllString(s.Name, "_") + "__" + mcpUnsafe.ReplaceAllString(t.Name, "_")
 			a := t.Annotations
-			out.Tools[name] = core.ToolHint{ReadOnly: a.ReadOnly, Destructive: a.Destructive, OpenWorld: a.OpenWorld}
+			out.Tools[name] = core.ToolHint{ReadOnly: a.ReadOnly, Destructive: a.Destructive, OpenWorld: a.OpenWorld,
+				Server: s.Name, ServerVersion: s.ServerInfo.Version}
 		}
 	}
 	return out

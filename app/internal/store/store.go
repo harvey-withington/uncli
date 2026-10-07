@@ -108,7 +108,7 @@ func migrate(db *sql.DB) error {
 		return false
 	}
 	for _, c := range []struct{ table, col, def string }{
-		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"},
+		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"}, {"pages", "origin", "TEXT"},
 		{"sessions", "mode", "TEXT"},
 		{"risk_judgements", "decider", "TEXT"}, {"risk_judgements", "confidence", "REAL"},
 		{"safe_list", "label", "TEXT NOT NULL DEFAULT ''"},
@@ -245,8 +245,9 @@ func (s *Store) GetSession(id string) (Session, error) {
 	return scanSession(s.db.QueryRow(`SELECT `+sessionCols+` FROM sessions WHERE id=?`, id))
 }
 
+// ListSessions lists every session, archived ones included (Archived says).
 func (s *Store) ListSessions() ([]Session, error) {
-	rows, err := s.db.Query(`SELECT ` + sessionCols + ` FROM sessions WHERE archived=0 ORDER BY sort_order DESC, created_at DESC`)
+	rows, err := s.db.Query(`SELECT ` + sessionCols + ` FROM sessions ORDER BY sort_order DESC, created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -373,6 +374,9 @@ type Page struct {
 	FinishedAt   int64             `json:"finishedAt"`
 	Outline      *PageOutline      `json:"outline,omitempty"` // a summary table of contents, if one was made
 	Attachments  []PageAttachment  `json:"attachments"`       // files sent with the question (their content is in the CLI's transcript)
+	// Origin is who started the turn: empty for the user; "cli" when the CLI
+	// carried on by itself (a background task finished), with no question.
+	Origin string `json:"origin,omitempty"`
 }
 
 // PageAttachment records a file sent with a page's question.
@@ -433,21 +437,24 @@ func (s *Store) NextSeq(sessionID string) (int, error) {
 	return int(max.Int64) + 1, err
 }
 
+// SavePage writes a page as its turn goes. Bookmarked and pinned are set
+// only on insert: afterwards SetBookmark and SetPinned own them, so a
+// bookmark or pin set while the answer streams isn't lost.
 func (s *Store) SavePage(p *Page) error {
 	trace, _ := json.Marshal(traceDoc{Items: nonNil(p.Trace), Error: p.Error})
 	touched, _ := json.Marshal(nonNil(p.TouchedFiles))
 	attached, _ := json.Marshal(nonNil(p.Attachments))
 	_, err := s.db.Exec(`INSERT INTO pages (id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
 		touched_files, artifacts, status, bookmarked, pinned, input_tokens, output_tokens, cache_read, cache_write,
-		cost_usd, duration_ms, started_at, finished_at, attachments) VALUES (?,?,?,?,?,?,?,?,?,?,'[]',?,?,?,?,?,?,?,?,?,?,?,?)
+		cost_usd, duration_ms, started_at, finished_at, attachments, origin) VALUES (?,?,?,?,?,?,?,?,?,?,'[]',?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET answer_md=excluded.answer_md, trace=excluded.trace, touched_files=excluded.touched_files,
-		status=excluded.status, bookmarked=excluded.bookmarked, pinned=excluded.pinned, model=excluded.model,
+		status=excluded.status, model=excluded.model,
 		input_tokens=excluded.input_tokens, output_tokens=excluded.output_tokens, cache_read=excluded.cache_read,
 		cache_write=excluded.cache_write, cost_usd=excluded.cost_usd, duration_ms=excluded.duration_ms,
 		finished_at=excluded.finished_at`,
 		p.ID, p.SessionID, p.Seq, p.Question, p.Directives, p.Model, jsonList(p.Modifiers), p.AnswerMD, string(trace),
 		string(touched), p.Status, p.Bookmarked, p.Pinned, p.InputTokens, p.OutputTokens, p.CacheRead, p.CacheWrite,
-		p.CostUSD, p.DurationMS, p.StartedAt, p.FinishedAt, string(attached))
+		p.CostUSD, p.DurationMS, p.StartedAt, p.FinishedAt, string(attached), nullStr(p.Origin))
 	if err != nil {
 		return err
 	}
@@ -479,7 +486,7 @@ func (s *Store) SetPageFiles(pageID string, touched []TouchedFile, artifacts []A
 
 const pageColumns = `id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
 		touched_files, status, bookmarked, pinned, input_tokens, output_tokens, cache_read, cache_write, cost_usd,
-		duration_ms, started_at, finished_at, outline, attachments, artifacts`
+		duration_ms, started_at, finished_at, outline, attachments, artifacts, origin`
 
 // Page reads one page.
 func (s *Store) Page(pageID string) (Page, error) {
@@ -514,11 +521,12 @@ func scanPages(rows *sql.Rows) ([]Page, error) {
 		var bm, pin sql.NullBool
 		var in, outT, cr, cw, dur, st, fin sql.NullInt64
 		var cost sql.NullFloat64
-		var outline, attached, artifacts sql.NullString
+		var outline, attached, artifacts, origin sql.NullString
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Seq, &p.Question, &directives, &p.Model, &mods, &answer, &trace,
-			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached, &artifacts); err != nil {
+			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached, &artifacts, &origin); err != nil {
 			return nil, err
 		}
+		p.Origin = origin.String
 		_ = json.Unmarshal([]byte(artifacts.String), &p.Artifacts)
 		p.Artifacts = nonNil(p.Artifacts)
 		_ = json.Unmarshal([]byte(attached.String), &p.Attachments)
@@ -553,6 +561,49 @@ func (s *Store) SetBookmark(pageID string, on bool) error {
 		return errors.New("page not found")
 	}
 	return nil
+}
+
+// SetPinned pins or unpins a page.
+func (s *Store) SetPinned(pageID string, on bool) error {
+	res, err := s.db.Exec(`UPDATE pages SET pinned=? WHERE id=?`, on, pageID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("page not found")
+	}
+	return nil
+}
+
+// PinnedPage is a pinned page as the sidebar lists it.
+type PinnedPage struct {
+	PageID       string `json:"pageId"`
+	SessionID    string `json:"sessionId"`
+	Seq          int    `json:"seq"`
+	Question     string `json:"question"`
+	SessionTitle string `json:"sessionTitle"`
+	ProfileID    string `json:"profileId"`
+	Archived     bool   `json:"archived"`
+	StartedAt    int64  `json:"startedAt"`
+}
+
+// Pinned lists the pinned pages of every session, newest first.
+func (s *Store) Pinned() ([]PinnedPage, error) {
+	rows, err := s.db.Query(`SELECT p.id, p.session_id, p.seq, p.question, COALESCE(s.title, ''), s.profile_id, COALESCE(s.archived, 0), COALESCE(p.started_at, 0)
+		FROM pages p JOIN sessions s ON s.id = p.session_id WHERE p.pinned = 1 ORDER BY p.started_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []PinnedPage{}
+	for rows.Next() {
+		var x PinnedPage
+		if err := rows.Scan(&x.PageID, &x.SessionID, &x.Seq, &x.Question, &x.SessionTitle, &x.ProfileID, &x.Archived, &x.StartedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
 }
 
 // MarkOpenPages closes pages left open by a crash or quit mid-turn.

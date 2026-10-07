@@ -105,3 +105,72 @@ func judgementFrom(info core.DeciderInfo, dec core.Decided, threshold float64) (
 	}
 	return j, nil
 }
+
+// maxToolsPerDecision keeps one batch's prompt (and its schema) small; a
+// server with more tools is judged in several rounds.
+const maxToolsPerDecision = 20
+
+// judgeTools judges an MCP server's tools that gave no hints, together:
+// a "what does it do" and a "how could it harm" question for each. The
+// CLI reports no tool descriptions, so the names (and seeing them side by
+// side) are all the decider has; it writes no reasons, so cards say the
+// risk in plain words.
+func (s *Service) judgeTools(ctx context.Context, q session.ToolsQuery) (map[string]store.Judgement, error) {
+	d, err := s.decider()
+	if err != nil {
+		return nil, err
+	}
+	return judgeToolsWith(ctx, d, s.Preferences().DecisionModel.threshold(), q)
+}
+
+func judgeToolsWith(ctx context.Context, d core.Decider, threshold float64, q session.ToolsQuery) (map[string]store.Judgement, error) {
+	out := map[string]store.Judgement{}
+	for start := 0; start < len(q.Tools); start += maxToolsPerDecision {
+		batch := q.Tools[start:min(start+maxToolsPerDecision, len(q.Tools))]
+		var qs []core.Question
+		for i, tool := range batch {
+			name := shortTool(tool, q.Server)
+			qs = append(qs,
+				core.Question{ID: fmt.Sprintf("level.%d", i), Text: fmt.Sprintf("What does the tool %q do?", name), Choices: judgeQuestions[0].Choices},
+				core.Question{ID: fmt.Sprintf("risk.%d", i), Text: fmt.Sprintf("If %q is risky, the main way it could do harm; otherwise none.", name), Choices: judgeQuestions[1].Choices})
+		}
+		dec, err := d.Decide(ctx, core.Decision{Instructions: judgeSystem, State: toolsState(q, batch), Questions: qs})
+		if err != nil {
+			return out, err
+		}
+		for i, tool := range batch {
+			one := core.Decided{Answers: map[string]core.Answer{
+				"level": dec.Answers[fmt.Sprintf("level.%d", i)],
+				"risk":  dec.Answers[fmt.Sprintf("risk.%d", i)],
+			}}
+			if j, err := judgementFrom(d.Info(), one, threshold); err == nil {
+				out[tool] = j
+			}
+		}
+	}
+	return out, nil
+}
+
+// shortTool is a tool's own name, without the CLI's mcp__server__ prefix.
+func shortTool(tool, server string) string {
+	if rest, ok := strings.CutPrefix(tool, "mcp__"); ok {
+		if _, name, ok := strings.Cut(rest, "__"); ok {
+			return name
+		}
+	}
+	return tool
+}
+
+func toolsState(q session.ToolsQuery, tools []string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "The assistant, working in the folder %s, has these tools from the MCP server %q", q.Workdir, q.Server)
+	if q.Version != "" {
+		fmt.Fprintf(&b, " (version %s)", q.Version)
+	}
+	b.WriteString(". The server doesn't say what they do, so judge each from its name and the others beside it, " +
+		"as it would usually be used:\n\n")
+	for _, t := range tools {
+		fmt.Fprintf(&b, "- %s\n", shortTool(t, q.Server))
+	}
+	return b.String()
+}

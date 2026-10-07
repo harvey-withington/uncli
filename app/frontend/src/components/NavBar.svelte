@@ -20,6 +20,14 @@
       showToast(String(e), 'error')
     }
   }
+
+  async function pin() {
+    try {
+      await app.togglePin()
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
+  }
 </script>
 
 <nav class="navbar" aria-label={t('nav.label')}>
@@ -54,6 +62,17 @@
     title={t('nav.toggleBookmark')}
   >
     <Icon name="bookmark" fill={page?.bookmarked ?? false} size={15} />
+  </button>
+  <button
+    class="bm"
+    class:on={page?.pinned}
+    onclick={pin}
+    disabled={!page}
+    aria-pressed={page?.pinned ?? false}
+    aria-label={t('nav.togglePin')}
+    title={t('nav.togglePin')}
+  >
+    <Icon name="pin" fill={page?.pinned ?? false} size={15} />
   </button>
 </nav>
 

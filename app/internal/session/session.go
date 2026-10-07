@@ -47,6 +47,9 @@ type Session struct {
 	lastSeq      int
 	pending      []Approval // tool uses waiting for the user's answer
 	files        *turnFiles // what the open page's turn needs to find the files it changed (files.go)
+	// background is what runs in the background now (sub-agents, shells).
+	// When one finishes the CLI may carry on by itself, in a turn of its own.
+	background []core.BackgroundTask
 	// Unattended: anything that would wait for the user is declined
 	// (approvals.go). In memory only, so it's off after a restart.
 	unattended bool
@@ -84,7 +87,7 @@ func (s *Session) View() View {
 
 func (s *Session) viewLocked() View {
 	return View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err,
-		Approvals: append([]Approval{}, s.pending...), Unattended: s.unattended}
+		Approvals: append([]Approval{}, s.pending...), Unattended: s.unattended, Background: append([]core.BackgroundTask{}, s.background...)}
 }
 
 func (s *Session) changed() { s.m.d.Sink.SessionChanged(s.viewLocked()) }
@@ -171,6 +174,7 @@ func (s *Session) stopLocked() {
 	s.cancel()
 	s.proc, s.cancel = nil, nil
 	s.pending = nil
+	s.background = nil // they ran in the process
 }
 
 func (s *Session) stop() {
@@ -192,6 +196,9 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	defer s.mu.Unlock()
 	if s.page != nil {
 		return errors.New("this session is still answering; wait or stop it first")
+	}
+	if s.rec.Archived {
+		return errors.New("this session is archived; restore it to continue")
 	}
 	set := s.m.d.Profiles
 	prof, ok := set.Profile(s.rec.ProfileID)
@@ -247,11 +254,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	s.page = &store.Page{ID: NewID(), SessionID: s.rec.ID, Seq: seq, Question: text, Directives: directives,
 		Model: s.rec.Model, Modifiers: active, Status: "open", StartedAt: time.Now().UnixMilli(), Attachments: attached}
 	s.evN, s.runningTools, s.notice, s.err = 0, 0, "", ""
-	artifactsRoot := ""
-	if prof.Artifacts {
-		artifactsRoot = filepath.Join(s.rec.Workdir, artifacts.Folder)
-	}
-	s.files = startTurnFiles(s.rec.Workdir, artifactsRoot)
+	s.files = s.startFilesLocked()
 	s.lastMods, s.lastSeq = active, seq
 	if s.rec.Title == "" {
 		if text != "" {
@@ -282,6 +285,37 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	s.changed()
 	return nil
 }
+
+// startFilesLocked starts looking for the files a turn changes: the
+// session folder, and the artifacts folder for a type that keeps them.
+func (s *Session) startFilesLocked() *turnFiles {
+	root := ""
+	if prof, ok := s.m.d.Profiles.Profile(s.rec.ProfileID); ok && prof.Artifacts {
+		root = filepath.Join(s.rec.Workdir, artifacts.Folder)
+	}
+	return startTurnFiles(s.rec.Workdir, root)
+}
+
+// continueLocked opens a page for a turn the CLI started by itself: when a
+// background task (a sub-agent, a shell) finishes after the turn that
+// started it, the CLI carries on with no user message, and its answer
+// would otherwise have nowhere to go. The page has no question; Origin
+// says the CLI started it. Caller holds s.mu.
+func (s *Session) continueLocked() {
+	seq, err := s.m.d.Store.NextSeq(s.rec.ID)
+	if err != nil {
+		return
+	}
+	s.page = &store.Page{ID: NewID(), SessionID: s.rec.ID, Seq: seq, Origin: OriginCLI, Model: s.rec.Model,
+		Modifiers: append([]string{}, s.rec.Modifiers...), Status: "open", StartedAt: time.Now().UnixMilli()}
+	s.evN, s.runningTools, s.notice, s.err = 0, 0, "", ""
+	s.lastSeq = seq
+	s.files = s.startFilesLocked()
+	s.savePage()
+}
+
+// OriginCLI marks a page whose turn the CLI started by itself.
+const OriginCLI = "cli"
 
 func titleFrom(text string) string {
 	t := strings.Join(strings.Fields(text), " ")
@@ -374,6 +408,28 @@ func (s *Session) SetSortOrder(order float64) (View, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.rec.SortOrder = order
+	if err := s.m.d.Store.UpdateSession(&s.rec); err != nil {
+		return View{}, err
+	}
+	s.changed()
+	return s.viewLocked(), nil
+}
+
+// Archive archives the session or restores it. A session can't be
+// archived while it is answering; archiving stops its CLI.
+func (s *Session) Archive(on bool) (View, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if on && s.page != nil {
+		return View{}, errors.New("this session is still answering; wait or stop it first")
+	}
+	if on {
+		s.stopLocked()
+		if s.state != Errored {
+			s.state = Idle
+		}
+	}
+	s.rec.Archived = on
 	if err := s.m.d.Store.UpdateSession(&s.rec); err != nil {
 		return View{}, err
 	}
@@ -475,7 +531,7 @@ func (s *Session) exited(gen, code int, stderr string) {
 	if gen != s.gen { // killed on purpose
 		return
 	}
-	s.proc = nil
+	s.proc, s.background = nil, nil
 	if s.cancel != nil {
 		s.cancel()
 		s.cancel = nil
@@ -510,6 +566,10 @@ func (s *Session) handle(gen int, ev core.Event) {
 	if gen != s.gen {
 		return
 	}
+	// A turn starting with no page open is the CLI carrying on by itself.
+	if ev.Kind == core.EvTurnStarted && s.page == nil && s.proc != nil {
+		s.continueLocked()
+	}
 	turnOpen := s.page != nil
 	ev.TurnSeq = s.lastSeq
 	if turnOpen {
@@ -537,7 +597,12 @@ func (s *Session) handle(gen int, ev core.Event) {
 	case core.EvToolHints:
 		h, _ := core.Decode[core.ToolHints](ev)
 		s.hints = h.Tools
+		s.m.prejudge(h.Tools, s.rec.Workdir)
 		s.rejudgeLocked()
+	case core.EvBackground:
+		b, _ := core.Decode[core.BackgroundTasks](ev)
+		s.background = b.Tasks
+		s.changed()
 	case core.EvUsageLimit:
 		u, _ := core.Decode[core.UsageLimit](ev)
 		go s.m.setUsage(u)

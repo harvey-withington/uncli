@@ -34,6 +34,15 @@ export interface SessionView {
   approvals?: Approval[] // tool uses waiting for the user, oldest first
   unattended?: boolean // requests that would wait for the user are declined
   mode?: SessionMode | '' // when Claude stops to prompt; empty = when unsafe
+  background?: BackgroundTask[] // what runs in the background now (sub-agents, shells)
+}
+
+// A task running in the background. When it finishes, the CLI may carry on
+// by itself in a turn of its own (a page with origin 'cli').
+export interface BackgroundTask {
+  id: string
+  kind?: string // the provider's: local_agent, local_bash…
+  description: string
 }
 
 // When Claude stops to prompt the user: always (anything but reading),
@@ -158,6 +167,41 @@ export interface Page {
   finishedAt: number
   outline?: PageOutline
   attachments?: PageAttachment[] // files sent with the question
+  origin?: 'cli' // the CLI started this turn by itself (a background task finished): no question
+}
+
+// A conversation the CLI saved, as the import picker lists it.
+export interface TranscriptEntry {
+  id: string // the provider's session id
+  workdir: string
+  started: number
+  updated: number
+  firstQuestion: string
+  turns: number
+  cliVersion?: string
+  sessionId?: string // already in UNCLI as this session
+  folderGone: boolean // its folder no longer exists
+  fromChat: boolean // it ran in a UNCLI chat folder: a deleted UNCLI chat
+  profile: string // the session type it would be imported as
+}
+
+// What an import made.
+export interface ImportedSession {
+  session: SessionView
+  folderGone: boolean // imported archived: its folder no longer exists
+  pagesLoaded: number
+}
+
+// A pinned page as the sidebar lists it, across sessions.
+export interface PinnedPage {
+  pageId: string
+  sessionId: string
+  seq: number
+  question: string
+  sessionTitle: string
+  profileId: string
+  archived: boolean
+  startedAt: number
 }
 
 // A file the page's turn changed: written (created or replaced) or edited
@@ -329,6 +373,7 @@ export interface Capabilities {
   usageReporting: boolean
   thinkingEvents: boolean
   slashPassthrough: boolean
+  import?: boolean // saved CLI conversations can be imported
 }
 
 // One model, chosen by the user, for every quick task (summaries now,
@@ -443,6 +488,37 @@ export interface UsageWindow {
   resetsAt: number
 }
 
+// The usage dashboard: what pages recorded, summed over a period.
+export interface UsageQuery {
+  since?: number // ms; absent = from the start
+  until?: number
+}
+export interface UsageTotals {
+  turns: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  costUsd: number
+  durationMs: number
+}
+// One group: a day ("2026-10-06", local), a model, a session type or a session (label: its title).
+export interface UsageRow extends UsageTotals {
+  key: string
+  label?: string
+}
+export interface UsageReport {
+  totals: UsageTotals
+  byDay: UsageRow[] // oldest first; days without turns left out
+  byModel: UsageRow[]
+  byProfile: UsageRow[]
+  bySession: UsageRow[] // costliest first, at most 10
+  sessions: number
+  quickTasks: number
+  quickTaskCostUsd: number
+  first?: number
+}
+
 export interface UsageLimit {
   status: string
   windows: Record<string, UsageWindow>
@@ -459,6 +535,7 @@ export type EventKind =
   | 'tool_finished'
   | 'file_touched'
   | 'approval_asked'
+  | 'background_tasks'
   | 'notice'
   | 'usage_limit'
   | 'turn_result'
@@ -537,6 +614,9 @@ export interface Backend {
   sessionAllowlist(sessionId: string): Promise<string[]>
   remove(sessionId: string): Promise<void>
   setBookmark(sessionId: string, pageId: string, on: boolean): Promise<Page>
+  setPinned(sessionId: string, pageId: string, on: boolean): Promise<Page>
+  pinned(): Promise<PinnedPage[]> // pinned pages of every session, newest first
+  archive(sessionId: string, on: boolean): Promise<SessionView> // archive (stops its CLI) or restore
   focus(sessionId: string): Promise<void>
   setPreferences(p: Preferences): Promise<Preferences>
   setDecisionKey(key: string): Promise<void> // the decision model's API key; never read back
@@ -545,10 +625,13 @@ export interface Backend {
   testNotification(): Promise<void> // shows a sample desktop notification
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
+  usageReport(q: UsageQuery): Promise<UsageReport>
   openFolder(path: string): Promise<void>
   openFile(sessionId: string, path: string, line: number): Promise<void> // editor at line (IDE-linked sessions) or default app (documents)
   revealFile(path: string): Promise<void> // shows it in its folder
   editors(): Promise<Editor[]>
+  transcripts(): Promise<TranscriptEntry[]> // conversations the CLI saved, newest first
+  importTranscript(id: string, profileId: string): Promise<ImportedSession> // empty profile: guessed
   artifactFiles(sessionId: string): Promise<ArtifactFile[]> // what is in the artifacts folder now
   readArtifact(sessionId: string, ref: ArtifactRef): Promise<ArtifactContent>
   artifactPath(sessionId: string, path: string): Promise<string> // where it is on disk now

@@ -3,6 +3,7 @@
   import { t } from '../lib/i18n.svelte'
   import { theme, cycleTheme } from '../lib/theme.svelte'
   import Icon from './Icon.svelte'
+  import PinnedList from './PinnedList.svelte'
   import ResizeHandle from './ResizeHandle.svelte'
   import SearchPanel from './SearchPanel.svelte'
   import SessionItem from './SessionItem.svelte'
@@ -40,14 +41,31 @@
   <nav aria-label={t('session.list')}>
     {#if app.searchText.trim()}
       <SearchPanel results />
-    {:else if app.sessions.length === 0}
-      <p class="empty">{t('session.none')}</p>
     {:else}
-      <ul use:dragSort={{ item: 'li[data-id]', onmove: (id, to) => app.moveSession(id, to) }}>
-        {#each app.sessions as session (session.id)}
-          <SessionItem {session} active={session.id === app.currentId} />
-        {/each}
-      </ul>
+      <PinnedList />
+      {#if app.activeSessions.length === 0}
+        <p class="empty">{t('session.none')}</p>
+      {:else}
+        <ul use:dragSort={{ item: 'li[data-id]', onmove: (id, to) => app.moveSession(id, to) }}>
+          {#each app.activeSessions as session (session.id)}
+            <SessionItem {session} active={session.id === app.currentId} />
+          {/each}
+        </ul>
+      {/if}
+      {#if app.archivedSessions.length > 0}
+        <button class="archived-toggle" onclick={() => (app.showArchived = !app.showArchived)} aria-expanded={app.showArchived}>
+          <Icon name="archive" size={13} />
+          <span>{t('archive.list', { n: app.archivedSessions.length })}</span>
+          <span class="chev" class:open={app.showArchived}><Icon name="chevron-right" size={12} /></span>
+        </button>
+        {#if app.showArchived}
+          <ul class="archived" aria-label={t('archive.title')}>
+            {#each app.archivedSessions as session (session.id)}
+              <SessionItem {session} active={session.id === app.currentId} />
+            {/each}
+          </ul>
+        {/if}
+      {/if}
     {/if}
   </nav>
 
@@ -142,6 +160,34 @@
     color: var(--text-faint);
     font-size: var(--text-sm);
     padding: var(--space-2) var(--space-3);
+  }
+  .archived-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: var(--space-3);
+    padding: var(--space-1) var(--space-2);
+    border: 0;
+    background: none;
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-align: left;
+  }
+  .archived-toggle:hover {
+    color: var(--text);
+  }
+  .archived-toggle .chev {
+    margin-left: auto;
+    display: inline-flex;
+    transition: transform var(--normal) var(--ease);
+  }
+  .archived-toggle .chev.open {
+    transform: rotate(90deg);
+  }
+  .archived {
+    opacity: 0.75;
   }
   footer {
     display: flex;

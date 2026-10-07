@@ -306,10 +306,10 @@ func TestToolHints(t *testing.T) {
 	}
 	got := decode[core.ToolHints](t, hints[0]).Tools
 	want := map[string]core.ToolHint{
-		"mcp__notes__read_note":   {ReadOnly: true},
-		"mcp__notes__delete_note": {Destructive: true},
-		"mcp__notes__lookup_web":  {ReadOnly: true, OpenWorld: true},
-		"mcp__notes__touch_note":  {},
+		"mcp__notes__read_note":   {ReadOnly: true, Server: "notes", ServerVersion: "1.0.0"},
+		"mcp__notes__delete_note": {Destructive: true, Server: "notes", ServerVersion: "1.0.0"},
+		"mcp__notes__lookup_web":  {ReadOnly: true, OpenWorld: true, Server: "notes", ServerVersion: "1.0.0"},
+		"mcp__notes__touch_note":  {Server: "notes", ServerVersion: "1.0.0"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("hints = %+v", got)
@@ -439,5 +439,29 @@ func TestActionOf(t *testing.T) {
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s = %+v, want %+v", c.tool, got, c.want)
 		}
+	}
+}
+
+// A background sub-agent shows as a background task until it finishes;
+// the task lines themselves aren't unknown (fixture subagent-background).
+func TestBackgroundTasks(t *testing.T) {
+	evs := parseFixture(t, "subagent-background")
+	bg := ofKind(evs, core.EvBackground)
+	if len(bg) != 2 {
+		t.Fatalf("background events = %d", len(bg))
+	}
+	if first := decode[core.BackgroundTasks](t, bg[0]); len(first.Tasks) != 1 || first.Tasks[0].Description != "Simple ping response" || first.Tasks[0].Kind != "local_agent" {
+		t.Errorf("first = %+v", first)
+	}
+	if last := decode[core.BackgroundTasks](t, bg[1]); len(last.Tasks) != 0 {
+		t.Errorf("after it finished = %+v", last)
+	}
+	for _, ev := range ofKind(evs, core.EvUnknown) {
+		if u := decode[core.Unknown](t, ev); strings.HasPrefix(u.Type, "system/task_") {
+			t.Errorf("%s reported as unknown", u.Type)
+		}
+	}
+	if n := len(results(t, evs)); n != 2 {
+		t.Errorf("results = %d, want the user's turn and the one the CLI started", n)
 	}
 }

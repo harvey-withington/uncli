@@ -60,6 +60,10 @@
   import Users from 'lucide-svelte/icons/users'
   import Wrench from 'lucide-svelte/icons/wrench'
   import X from 'lucide-svelte/icons/x'
+  import Pin from 'lucide-svelte/icons/pin'
+  import PinOff from 'lucide-svelte/icons/pin-off'
+  import Archive from 'lucide-svelte/icons/archive'
+  import ArchiveRestore from 'lucide-svelte/icons/archive-restore'
   import Bell from 'lucide-svelte/icons/bell'
   import FilePen from 'lucide-svelte/icons/file-pen'
   import FilePlus from 'lucide-svelte/icons/file-plus'
@@ -84,6 +88,7 @@
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
     eye: Eye, 'globe-lock': GlobeLock, hand: Hand, zap: Zap,
     bell: Bell, 'file-pen': FilePen, 'file-plus': FilePlus, terminal: Terminal, 'external-link': ExternalLink, 'folder-search': FolderSearch, layers: Layers, 'file-x': FileX, 'file-code': FileCode, history: History,
+    pin: Pin, 'pin-off': PinOff, archive: Archive, 'archive-restore': ArchiveRestore,
   } as const
 
   export type IconName = keyof typeof ICONS

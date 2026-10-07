@@ -24,7 +24,10 @@
   const thinking = $derived(open && !answer)
   const compact = $derived(app.questionCompact)
   // A question sent with files only reads as their names.
-  const questionLine = $derived(page.question || (page.attachments ?? []).map(f => f.name).join(', '))
+  // A turn the CLI started by itself (a background task finished) has no
+  // question: the header says so instead.
+  const byCli = $derived(page.origin === 'cli')
+  const questionLine = $derived(byCli ? t('page.byCli') : page.question || (page.attachments ?? []).map(f => f.name).join(', '))
   // The outline's entries, marked beside their blocks in the left margin.
   const markers = $derived(new Map(app.outlineFor(page).entries.map(e => [e.block, e])))
 </script>
@@ -49,17 +52,19 @@
         <div class="q-head">
           <p class="q-line" title={questionLine}>{questionLine}</p>
           <span class="seq">{t('page.number', { n: page.seq })}</span>
-          <span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>
+          {#if page.question}<span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>{/if}
           {@render toggle()}
         </div>
       {:else}
         <div class="q-head">
           <span class="seq">{t('page.number', { n: page.seq })}</span>
           {#if page.bookmarked}<span class="marked"><Icon name="bookmark-check" size={13} />{t('nav.bookmarked')}</span>{/if}
-          <span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>
+          {#if page.question}<span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>{/if}
           {@render toggle()}
         </div>
-        {#if page.question}<p class="q-text">{page.question}</p>{/if}
+        {#if byCli}
+          <p class="q-text by-cli"><Icon name="history" size={15} />{t('page.byCli')}</p>
+        {:else if page.question}<p class="q-text">{page.question}</p>{/if}
         {#if page.attachments?.length}
           <ul class="q-files" aria-label={t('page.attachments')}>
             {#each page.attachments as f, i (i)}
@@ -173,6 +178,15 @@
   .q-copy:focus-within,
   .q-copy:has(:global(.copied)) {
     opacity: 1;
+  }
+  .q-text.by-cli {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+    font-size: var(--text-md);
+    font-weight: 500;
+    font-style: italic;
   }
   .q-text {
     margin: var(--space-1) 0 var(--space-3);

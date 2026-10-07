@@ -7,6 +7,8 @@ import type {
 import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type MockAsk, type Outcome } from './mock-access'
 import { SECTION_KINDS } from '../sections'
 import { MOCK_CHAT_ARTIFACTS, mockArtifactFiles, mockReadArtifact } from './mock-artifacts'
+import { mockUsageReport } from './mock-usage'
+import { mockTranscriptPages, mockTranscripts } from './mock-import'
 
 const profiles: Bootstrap['profiles'] = [
   { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false, artifacts: true },
@@ -185,6 +187,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode }),
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2 }),
     session('s-cowork', 'cowork', 'Summarise the Q3 planning notes', 'idle', { modifiers: ['efficiency'], sortOrder: 1 }),
+    session('s-old', 'chat', 'Compare three standing desks', 'idle', { sortOrder: 0, archived: true }),
   ]
   const pages: Record<string, Page[]> = opts.empty ? {} : {
     's-code': [
@@ -222,8 +225,11 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       page('s-chat', 1, 'Sketch our Lisbon route as a diagram and draft an itinerary page.', 'Done: **route.mmd** sketches the route and **itinerary.html** has a first draft.', MOCK_CHAT_ARTIFACTS.page1),
       page('s-chat', 2, 'Plan a relaxed weekend in Lisbon for two, mostly on foot.', LISBON, MOCK_CHAT_ARTIFACTS.page2),
     ],
+    's-old': [
+      page('s-old', 1, 'Compare these three standing desks for a small flat.', 'The **Flexi Pro** is the best fit: it is the narrowest and the quietest of the three.', { pinned: true, startedAt: Date.now() - 9 * 86400000 }),
+    ],
     's-cowork': [
-      page('s-cowork', 1, 'What are the three decisions in these notes?', 'The notes record three decisions:\n\n1. Ship the **desktop app first**; mobile waits.\n2. Keep pricing flat for the first year.\n3. Hire a designer before the public beta.', { bookmarked: true }),
+      page('s-cowork', 1, 'What are the three decisions in these notes?', 'The notes record three decisions:\n\n1. Ship the **desktop app first**; mobile waits.\n2. Keep pricing flat for the first year.\n3. Hire a designer before the public beta.', { bookmarked: true, pinned: true }),
       page('s-cowork', 2, 'Who owns each one?', '- Desktop first: **Priya**\n- Pricing: **Tom**\n- Designer hire: still open', { modifiers: ['efficiency'] }),
       page('s-cowork', 3, 'Draft a two-line update for the team.', 'We\'re shipping desktop first, keeping pricing flat for a year, and hiring a designer before the beta. Owners are in the planning doc.', { modifiers: ['efficiency'] }),
     ],
@@ -292,6 +298,27 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
   }
   const emit = (sessionId: string, kind: UEvent['kind'], turnSeq: number, data?: unknown) =>
     h?.sessionEvent({ sessionId, event: { kind, turnSeq, at: new Date().toISOString(), data } })
+  // A background task finished: like the CLI, the mock carries on by
+  // itself in a turn of its own, on a page with no question.
+  const carryOn = (s: SessionView) => {
+    s.background = []
+    const list = (pages[s.id] ??= [])
+    // Opened first (so the app shows it, as for a turn the user sent), then done.
+    const p = page(s.id, list.length + 1, '', '', { origin: 'cli', model: s.model, status: 'open' })
+    list.push(p)
+    s.busy = true
+    h?.pageChanged({ ...p })
+    setState(s, 'thinking')
+    window.setTimeout(() => {
+      p.answerMd = 'The background agent finished: the other three test files pass, so only the parser test was flaky.'
+      p.status = 'done'
+      p.finishedAt = Date.now()
+      h?.pageChanged({ ...p })
+      emit(s.id, 'turn_result', p.seq, {})
+      s.busy = false
+      setState(s, 'idle')
+    }, 300)
+  }
   const find = (id: string) => {
     const s = sessions.find(x => x.id === id)
     if (!s) throw new Error(`no session ${id}`)
@@ -311,7 +338,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
         sessions: sessions.map(s => ({ ...s })),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
-          images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true,
+          images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true,
         },
       }
     },
@@ -356,6 +383,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async pages(id) { return (pages[id] ?? []).map(p => ({ ...p })) },
     async send(id, text, attachments = []) {
       const s = find(id)
+      if (s.archived) throw new Error('this session is archived; restore it to continue')
       if (s.busy) throw new Error('this session is still answering; wait or stop it first')
       const list = (pages[id] ??= [])
       const attached = attachments.map(a => {
@@ -375,6 +403,8 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       // rest (an approval, then the streamed answer) runs on its own.
       const run = async () => {
         let answer = text.startsWith('/') ? `Ran \`${text}\`.` : STREAM
+        const background = /background/i.test(text)
+        if (background) answer = "I've started a background agent to check the other three test files. I'll report back when it finishes."
         const ask = MOCK_ASKS.find(a => a.match.test(text))
         if (ask) {
           let v = judgeAsk(s, ask)
@@ -426,7 +456,9 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
           emit(id, 'text_block', p.seq, { text: answer })
           emit(id, 'turn_result', p.seq, {})
           s.busy = false
+          if (background) s.background = [{ id: 'task-1', kind: 'local_agent', description: 'Check the other test files' }]
           setState(s, 'idle')
+          if (background) ts.push(window.setTimeout(() => carryOn(s), 1500))
         }, at + 50))
         timers.set(id, ts)
       }
@@ -585,6 +617,27 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       h?.pageChanged({ ...p })
       return { ...p }
     },
+    async setPinned(sid, pid, on) {
+      const p = pages[sid]?.find(x => x.id === pid)
+      if (!p) throw new Error('page not found')
+      p.pinned = on
+      h?.pageChanged({ ...p })
+      return { ...p }
+    },
+    async pinned() {
+      return sessions.flatMap(s => (pages[s.id] ?? []).filter(p => p.pinned).map(p => ({
+        pageId: p.id, sessionId: s.id, seq: p.seq, question: p.question, sessionTitle: s.title, profileId: s.profileId,
+        archived: s.archived, startedAt: p.startedAt,
+      }))).sort((a, b) => b.startedAt - a.startedAt)
+    },
+    async archive(id, on) {
+      const s = find(id)
+      if (on && s.busy) throw new Error('this session is still answering; wait or stop it first')
+      s.archived = on
+      s.running = false
+      changed(s)
+      return { ...s }
+    },
     async focus(id) {
       const s = sessions.find(x => x.id === id)
       if (s && s.state === 'unread') setState(s, 'idle')
@@ -630,6 +683,20 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async openFolder() {},
     async openFile() {},
     async revealFile() {},
+    async usageReport(q) { return mockUsageReport(q) },
+    async transcripts() {
+      return mockTranscripts().map(e => ({ ...e, sessionId: sessions.find(s => s.providerSid === e.id)?.id ?? e.sessionId }))
+    },
+    async importTranscript(id, profileId) {
+      const e = mockTranscripts().find(x => x.id === id)
+      if (!e) throw new Error('that conversation is no longer saved by the CLI')
+      if (sessions.some(s => s.providerSid === id) || e.sessionId) throw new Error('that conversation is already in UNCLI')
+      const s = session(newId(), profileId || e.profile, e.firstQuestion.slice(0, 60), 'idle', { providerSid: id, workdir: e.workdir, archived: e.folderGone, sortOrder: Date.now() })
+      sessions.unshift(s)
+      pages[s.id] = mockTranscriptPages(e, s.id)
+      changed(s)
+      return { session: { ...s }, folderGone: e.folderGone, pagesLoaded: e.turns }
+    },
     async editors() { return structuredClone(MOCK_EDITORS) },
     async artifactFiles(id) { return mockArtifactFiles(id) },
     async readArtifact(_id, ref) { return mockReadArtifact(ref) },

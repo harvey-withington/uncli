@@ -51,6 +51,7 @@ func (a *Adapter) Capabilities() core.Capabilities {
 		PartialStreaming: true, Resume: true, LiveModelSwitch: true, Interrupt: true,
 		Approvals: true, LivePermissionMode: true, ToolHints: true,
 		Images: true, Documents: true, UsageReporting: true, ThinkingEvents: true, SlashPassthrough: true,
+		Import: true,
 	}
 }
 

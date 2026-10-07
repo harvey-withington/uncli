@@ -31,6 +31,8 @@ type View struct {
 	Approvals []Approval `json:"approvals"`
 	// Unattended: requests that would wait for the user are declined.
 	Unattended bool `json:"unattended"`
+	// Background is what runs in the background now (sub-agents, shells).
+	Background []core.BackgroundTask `json:"background"`
 }
 
 // Sink receives everything the UI needs. Implementations must not call

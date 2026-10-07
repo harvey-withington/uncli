@@ -27,9 +27,10 @@
 
   // Opened from the shield: start at "Safe and unsafe".
   $effect(() => {
-    if (app.settingsAt !== 'safe') return
+    const at = app.settingsAt
+    if (!at) return
     app.settingsAt = ''
-    requestAnimationFrame(() => document.getElementById('settings-safe')?.scrollIntoView?.({ block: 'start' }))
+    requestAnimationFrame(() => document.getElementById(`settings-${at}`)?.scrollIntoView?.({ block: 'start' }))
   })
 
   const pinned = $derived(app.cli?.pinned ?? '')

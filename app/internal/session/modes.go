@@ -111,6 +111,21 @@ type JudgeQuery struct {
 	Workdir     string          `json:"workdir"`
 }
 
+// keyFor is the cache key for judging one check. An MCP tool's judgement
+// holds for the server version that reported it, so a server update judges
+// its tools again (the CLI gives no tool descriptions or schemas to
+// compare; BRUV card "Judge MCP tools per server").
+func (p policy) keyFor(a core.ToolAction, text string, class *store.SafeClass) string {
+	if a.Kind == core.ActMCP {
+		return mcpJudgeKey(a.Tool, p.hints[a.Tool])
+	}
+	return judgeKey(a, text, class)
+}
+
+func mcpJudgeKey(tool string, h core.ToolHint) string {
+	return "mcp:" + tool + "@" + h.Server + "/" + h.ServerVersion
+}
+
 // judgeKey is the cache key for a judgement: the class when one can be
 // learned (so every run of it is judged once), else the part as written.
 func judgeKey(a core.ToolAction, text string, class *store.SafeClass) string {
@@ -172,7 +187,7 @@ func (p policy) judge(a core.ToolAction) verdict {
 	for _, c := range checks {
 		r := p.reason(a, c)
 		if r.By == "judging" {
-			q := JudgeQuery{Key: judgeKey(a, c.text+c.code, r.Class), Tool: a.Tool, Part: c.text, Command: cmd, Code: c.code, Workdir: p.workdir}
+			q := JudgeQuery{Key: p.keyFor(a, c.text+c.code, r.Class), Tool: a.Tool, Part: c.text, Command: cmd, Code: c.code, Workdir: p.workdir}
 			if a.Kind == core.ActShell {
 				q.Dialect = a.Dialect
 			} else {
@@ -248,7 +263,7 @@ func (p policy) reason(a core.ToolAction, c check) store.TraceReason {
 	case UnknownInside:
 		return by("inside")
 	case UnknownModel:
-		key := judgeKey(a, c.text+c.code, at.Class)
+		key := p.keyFor(a, c.text+c.code, at.Class)
 		if p.judged != nil {
 			if j, ok := p.judged(key); ok {
 				at.Judged, at.Note = j.Model, j.Note
