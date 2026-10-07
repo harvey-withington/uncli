@@ -67,23 +67,23 @@ func (s *Service) decider() (core.Decider, error) {
 		return nil, err
 	}
 	if m.Provider == DeciderSystemOne {
-		key, _ := s.Store.Setting(settingDecisionKey)
+		key := s.decisionKey()
 		return systemOneDecider{endpoint: m.Endpoint, model: m.Model, version: m.Version, key: key}, nil
 	}
 	return quickDecider{run: s.RunTextTask, model: p.QuickTaskModel}, nil
 }
 
-// SetDecisionKey saves the decision model's API key (empty removes it).
-// It is kept apart from the preferences and never sent back to the UI.
+// SetDecisionKey saves the decision model's API key (empty removes it) in
+// the OS credential store, apart from the preferences; it is never sent
+// back to the UI.
 func (s *Service) SetDecisionKey(key string) error {
-	return s.Store.SetSetting(settingDecisionKey, strings.TrimSpace(key))
+	return s.setSecret(secretDecisionKey, settingDecisionKey, strings.TrimSpace(key))
 }
 
 // HasDecisionKey reports whether a decision model API key is saved.
-func (s *Service) HasDecisionKey() bool {
-	k, _ := s.Store.Setting(settingDecisionKey)
-	return k != ""
-}
+func (s *Service) HasDecisionKey() bool { return s.decisionKey() != "" }
+
+func (s *Service) decisionKey() string { return s.secret(secretDecisionKey, settingDecisionKey) }
 
 // DecisionTest is the outcome of asking the decision model a sample question.
 type DecisionTest struct {

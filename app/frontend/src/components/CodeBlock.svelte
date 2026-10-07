@@ -85,11 +85,11 @@
   .shiki-wrap :global(span) {
     color: var(--shiki-light);
   }
-  :global(:root[data-theme='dark']) .shiki-wrap :global(span) {
+  :global(:root[data-uncli-scheme='dark']) .shiki-wrap :global(span) {
     color: var(--shiki-dark);
   }
   @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme='light'])) .shiki-wrap :global(span) {
+    :global(:root:not([data-uncli-scheme='light'])) .shiki-wrap :global(span) {
       color: var(--shiki-dark);
     }
   }

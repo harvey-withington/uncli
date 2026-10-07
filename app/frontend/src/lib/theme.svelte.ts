@@ -1,5 +1,8 @@
 // Theme: follow the system by default; the user can pin light or dark.
+// Whatever the choice, the scheme it resolves to is set on <html> as
+// data-uncli-scheme, which app.css and theme files key on.
 export type Theme = 'system' | 'light' | 'dark'
+export type Scheme = 'light' | 'dark'
 
 const KEY = 'uncli-theme'
 
@@ -17,11 +20,21 @@ function load(): Theme {
 
 export const theme = $state<{ value: Theme }>({ value: load() })
 
-export function applyTheme() {
-  const root = document.documentElement
-  if (theme.value === 'system') root.removeAttribute('data-theme')
-  else root.setAttribute('data-theme', theme.value)
+const dark = typeof window !== 'undefined' ? window.matchMedia?.('(prefers-color-scheme: dark)') : undefined
+
+export function scheme(): Scheme {
+  if (theme.value !== 'system') return theme.value
+  return dark?.matches ? 'dark' : 'light'
 }
+
+export function applyTheme() {
+  document.documentElement.setAttribute('data-uncli-scheme', scheme())
+}
+
+// The system's scheme can change while UNCLI runs.
+dark?.addEventListener?.('change', () => {
+  if (theme.value === 'system') applyTheme()
+})
 
 export function cycleTheme() {
   theme.value = theme.value === 'system' ? 'light' : theme.value === 'light' ? 'dark' : 'system'

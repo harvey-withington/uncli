@@ -95,12 +95,17 @@
 </script>
 
 <section class="pane">
-  <header class="top">
+  <header class="top" class:compact={app.headerCompact}>
     <div class="title-row">
       <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <h1 title={session.title}>{session.title || t('session.untitled')}</h1>
       <ActivityBadge state={session.state} />
-      <span class="gap"></span>
+      {#if app.headerCompact}
+        <!-- Compact: the folder follows the title on its line. -->
+        <span class="path" title={session.workdir}>{profile?.label} · {session.workdir}</span>
+      {:else}
+        <span class="gap"></span>
+      {/if}
       <ModeSwitch {session} />
       <button
         class="btn ghost small away-btn"
@@ -128,9 +133,21 @@
       >
         <Icon name={app.outline.open ? 'panel-right-close' : 'panel-right-open'} />
       </button>
+      <!-- Always last on the line, expanded or compact. -->
+      <button
+        class="btn ghost small icon h-toggle"
+        onclick={() => app.toggleHeaderCompact()}
+        aria-expanded={!app.headerCompact}
+        aria-label={t(app.headerCompact ? 'header.expand' : 'header.collapse')}
+        title={t(app.headerCompact ? 'header.expand' : 'header.collapse')}
+      >
+        <Icon name={app.headerCompact ? 'chevron-down' : 'chevron-up'} size={14} />
+      </button>
     </div>
-    <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}</span>
-    <SessionStatus {session} />
+    {#if !app.headerCompact}
+      <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}</span>
+      <SessionStatus {session} />
+    {/if}
     <Toolbar {session} />
     {#if session.error && session.state === 'error'}
       <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>
@@ -228,6 +245,29 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  /* Compact: the folder takes the room between the title and the controls,
+     cut short (from the end) before anything else gives way. */
+  .path {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compact {
+    padding-top: var(--space-3);
+  }
+  .compact h1 {
+    flex: 0 1 auto;
+    max-width: 45%;
+  }
+  .h-toggle {
+    flex: none;
+    margin-left: calc(-1 * var(--space-2));
+    color: var(--text-faint);
   }
   .workdir {
     display: block;

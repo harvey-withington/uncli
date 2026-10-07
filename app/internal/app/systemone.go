@@ -27,9 +27,13 @@ import (
 // DeciderSystemOne is a decider on the System One wire.
 const DeciderSystemOne = "systemone"
 
-// settingDecisionKey holds the decider's API key, apart from the
-// preferences so it never travels to the UI.
-const settingDecisionKey = "decisionModel.apiKey"
+// secretDecisionKey names the decider's API key in the credential store
+// (keyring.go), apart from the preferences so it never travels to the UI.
+// settingDecisionKey is where earlier versions kept it in the database.
+const (
+	secretDecisionKey  = "decision-model-key"
+	settingDecisionKey = "decisionModel.apiKey"
+)
 
 type systemOneDecider struct {
 	endpoint string // the server's base URL, or the full /v1/systemone URL

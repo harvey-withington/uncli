@@ -5,12 +5,13 @@ import type {
   ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
-import { loadPanelLayout, loadQuestionCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
+import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
 import { toBlocks } from '../lib/render/markdown'
 import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
 import { t } from '../lib/i18n.svelte'
 import { showToast } from '../lib/toasts.svelte'
+import { applyThemeFile } from '../lib/hosttheme'
 
 export interface Live {
   seq: number
@@ -48,6 +49,7 @@ export class AppStore {
   artifactLive = $state<Record<string, ArtifactFile[]>>({})
   sidebarWidth = $state(loadSidebarWidth())
   questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
+  headerCompact = $state(loadHeaderCompact()) // the session header collapsed to two lines
   // Search across sessions: the box's text and filters (the sidebar shows
   // results instead of the session list while there is text), a counter
   // that focuses the box (Ctrl+K), and a page to scroll to a match on.
@@ -80,6 +82,20 @@ export class AppStore {
   currentPage = $derived.by(() => this.currentPages[this.currentIndex] ?? null)
   cliReady = $derived.by(() => !!this.cli?.installed && !!this.cli?.loggedIn)
 
+  // loadThemeFile applies the user's theme.yaml (decision 0010); announce
+  // says what happened, for the palette's Reload theme file.
+  async loadThemeFile(announce: boolean) {
+    try {
+      const file = await this.backend.theme()
+      const warnings = applyThemeFile(file.found ? { light: file.light ?? undefined, dark: file.dark ?? undefined } : null)
+      if (warnings.length) showToast(t('theme.file.warnings', { n: warnings.length, first: warnings[0] ?? '' }), 'error')
+      else if (announce) showToast(file.found ? t('theme.file.loaded') : t('theme.file.none', { path: file.path }))
+    } catch (e) {
+      applyThemeFile(null)
+      showToast(String(e), 'error')
+    }
+  }
+
   async init() {
     this.off = this.backend.subscribe({
       sessionEvent: m => this.onEvent(m),
@@ -94,6 +110,7 @@ export class AppStore {
     this.cli = cli
     this.sessions = sortSessions(boot.sessions)
     void this.refreshPins()
+    void this.loadThemeFile(false)
     this.ready = true
     const first = this.activeSessions[0]
     if (first) await this.select(first.id)
@@ -199,6 +216,11 @@ export class AppStore {
     } catch (e) {
       showToast(String(e), 'error')
     }
+  }
+
+  toggleHeaderCompact() {
+    this.headerCompact = !this.headerCompact
+    saveHeaderCompact(this.headerCompact)
   }
 
   toggleQuestionCompact() {

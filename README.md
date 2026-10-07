@@ -24,6 +24,11 @@ App data (sessions, pages, bookmarks) lives in your user config folder
 (`%LocalAppData%\uncli\cli`). Chat sessions get their own folder under
 `%AppData%\uncli\scratch`.
 
+To restyle UNCLI, put a `theme.yaml` in that folder: colours, fonts and
+radii for light and dark, by the token names in the "Theme override" section
+of `docs/UI-CONVENTIONS.md`. Run **Reload theme file** from the palette to
+apply changes.
+
 ## Use
 
 - **New session** (Ctrl+N): pick Chat, Co-work (a folder) or Code (a

@@ -162,6 +162,7 @@ type Session struct {
 	Title       string   `json:"title"`
 	Adapter     string   `json:"adapter"`
 	Runtime     string   `json:"runtime"`
+	RuntimeRef  string   `json:"runtimeRef,omitempty"` // which place of that runtime: a container profile id
 	ProfileID   string   `json:"profileId"`
 	Workdir     string   `json:"workdir"`
 	ProviderSID string   `json:"providerSid"`
@@ -203,9 +204,9 @@ func (s *Store) CreateSession(x *Session) error {
 		_ = s.db.QueryRow(`SELECT MAX(sort_order) FROM sessions`).Scan(&max)
 		x.SortOrder = max.Float64 + 1
 	}
-	_, err := s.db.Exec(`INSERT INTO sessions (id, title, adapter, runtime, profile_id, workdir, provider_sid, cli_version,
-		model, modifiers, sort_order, archived, mode, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		x.ID, x.Title, x.Adapter, x.Runtime, x.ProfileID, x.Workdir, nullStr(x.ProviderSID), nullStr(x.CLIVersion),
+	_, err := s.db.Exec(`INSERT INTO sessions (id, title, adapter, runtime, runtime_ref, profile_id, workdir, provider_sid, cli_version,
+		model, modifiers, sort_order, archived, mode, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		x.ID, x.Title, x.Adapter, x.Runtime, nullStr(x.RuntimeRef), x.ProfileID, x.Workdir, nullStr(x.ProviderSID), nullStr(x.CLIVersion),
 		x.Model, jsonList(x.Modifiers), x.SortOrder, x.Archived, nullStr(x.Mode), x.CreatedAt, x.UpdatedAt)
 	return err
 }
@@ -224,18 +225,18 @@ func (s *Store) UpdateSession(x *Session) error {
 	return err
 }
 
-const sessionCols = `id, title, adapter, runtime, profile_id, workdir, provider_sid, cli_version, model, modifiers,
+const sessionCols = `id, title, adapter, runtime, runtime_ref, profile_id, workdir, provider_sid, cli_version, model, modifiers,
 	sort_order, archived, mode, created_at, updated_at`
 
 func scanSession(r interface{ Scan(...any) error }) (Session, error) {
 	var x Session
-	var title, sid, ver, mods, mode sql.NullString
+	var title, ref, sid, ver, mods, mode sql.NullString
 	var order sql.NullFloat64
 	var archived sql.NullBool
 	var created, updated sql.NullInt64
-	err := r.Scan(&x.ID, &title, &x.Adapter, &x.Runtime, &x.ProfileID, &x.Workdir, &sid, &ver, &x.Model, &mods,
+	err := r.Scan(&x.ID, &title, &x.Adapter, &x.Runtime, &ref, &x.ProfileID, &x.Workdir, &sid, &ver, &x.Model, &mods,
 		&order, &archived, &mode, &created, &updated)
-	x.Title, x.ProviderSID, x.CLIVersion, x.Mode = title.String, sid.String, ver.String, mode.String
+	x.Title, x.RuntimeRef, x.ProviderSID, x.CLIVersion, x.Mode = title.String, ref.String, sid.String, ver.String, mode.String
 	x.Modifiers = parseList(mods)
 	x.SortOrder, x.Archived, x.CreatedAt, x.UpdatedAt = order.Float64, archived.Bool, created.Int64, updated.Int64
 	return x, err

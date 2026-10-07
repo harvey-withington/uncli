@@ -310,6 +310,9 @@ func (a *App) TestNotification() error { return a.svc.TestNotification() }
 
 func (a *App) Usage() *core.UsageLimit { return a.svc.Sessions.Usage() }
 
+// Theme reads the user's theme.yaml (decision 0010).
+func (a *App) Theme() (app.ThemeFile, error) { return a.svc.Theme() }
+
 // UsageReport sums the pages' tokens and cost for the usage dashboard.
 func (a *App) UsageReport(q store.UsageQuery) (store.UsageReport, error) { return a.svc.Store.Usage(q) }
 

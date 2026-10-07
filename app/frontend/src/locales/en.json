@@ -500,6 +500,10 @@
   "cmd.settings.decider": "Settings: decision model",
   "cmd.usage": "Usage over time",
   "cmd.theme": "Switch theme (system, light, dark)",
+  "cmd.themeFile": "Reload theme file",
+  "theme.file.loaded": "Theme file applied",
+  "theme.file.none": "No theme file: UNCLI looks for {path}",
+  "theme.file.warnings": "Parts of the theme file were skipped ({n}), first: {first}",
   "cmd.new": "New session",
   "cmd.search": "Search all sessions",
   "cmd.go": "Go to {title}",
@@ -576,5 +580,9 @@
   "background.many": "{n} tasks working in the background. Claude will carry on as they finish.",
   "background.task": "a task",
   "background.short": "in the background",
-  "background.hint": "A task Claude started is still running; Claude will carry on when it finishes."
+  "background.hint": "A task Claude started is still running; Claude will carry on when it finishes.",
+  "header.collapse": "Compact header: two lines",
+  "header.expand": "Show the whole header",
+  "cmd.compactHeader": "Compact the session header",
+  "cmd.expandHeader": "Show the whole session header"
 }

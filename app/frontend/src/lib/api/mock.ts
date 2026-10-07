@@ -8,6 +8,7 @@ import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type M
 import { SECTION_KINDS } from '../sections'
 import { MOCK_CHAT_ARTIFACTS, mockArtifactFiles, mockReadArtifact } from './mock-artifacts'
 import { mockUsageReport } from './mock-usage'
+import { mockTheme } from './mock-theme'
 import { mockTranscriptPages, mockTranscripts } from './mock-import'
 
 const profiles: Bootstrap['profiles'] = [
@@ -684,6 +685,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async openFile() {},
     async revealFile() {},
     async usageReport(q) { return mockUsageReport(q) },
+    async theme() { return mockTheme() },
     async transcripts() {
       return mockTranscripts().map(e => ({ ...e, sessionId: sessions.find(s => s.providerSid === e.id)?.id ?? e.sessionId }))
     },

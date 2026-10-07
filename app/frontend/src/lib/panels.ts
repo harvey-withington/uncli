@@ -24,6 +24,26 @@ export function saveSidebarWidth(width: number) {
   }
 }
 
+// Whether the session header is collapsed to two lines (compact mode): the
+// title with the folder after it, and the toolbar.
+const HEADER_KEY = 'uncli-header'
+
+export function loadHeaderCompact(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(HEADER_KEY) ?? 'null')?.compact === true
+  } catch {
+    return false
+  }
+}
+
+export function saveHeaderCompact(compact: boolean) {
+  try {
+    localStorage.setItem(HEADER_KEY, JSON.stringify({ compact }))
+  } catch {
+    // not persisted; still applied for this run
+  }
+}
+
 // Whether the question header is collapsed to one line (compact mode).
 const QUESTION_KEY = 'uncli-question'
 

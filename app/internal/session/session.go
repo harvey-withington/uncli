@@ -141,8 +141,12 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	if err != nil {
 		return err
 	}
+	rt, err := s.m.runtime(s.rec)
+	if err != nil {
+		return err
+	}
 	pctx, cancel := context.WithCancel(context.Background())
-	proc, err := s.m.d.Runtime.Start(pctx, cmd, s.rec.Workdir)
+	proc, err := rt.Start(pctx, cmd, s.rec.Workdir)
 	if err != nil {
 		cancel()
 		return fmt.Errorf("could not start the CLI: %w", err)

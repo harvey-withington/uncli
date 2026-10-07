@@ -91,6 +91,7 @@ export function wailsBackend(): Backend {
     summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     usage: () => call('Usage'),
     usageReport: q => call('UsageReport', q),
+    theme: () => call('Theme'),
     openFolder: p => call('OpenFolder', p),
     openFile: (s, p, l) => call('OpenFile', s, p, l),
     revealFile: p => call('RevealFile', p),

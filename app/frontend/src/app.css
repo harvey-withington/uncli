@@ -3,31 +3,33 @@
 
 /* Design tokens. Components never hardcode a colour or size; see
    docs/UI-CONVENTIONS.md. Light is the default; dark follows the system
-   unless the user picks a theme (data-theme on <html>). */
+   unless the user picks a theme. UNCLI always sets the scheme it resolved as
+   data-uncli-scheme on <html>. Hosts and theme files override the public
+   --uncli-* tokens (docs/decisions/0010); the rest are UNCLI's own. */
 :root {
   color-scheme: light;
-  --bg: #f7f6f3;
-  --surface: #ffffff;
-  --surface-2: #f1efea;
-  --surface-3: #e8e5df;
-  --text: #1d1b18;
-  --text-muted: #6d6962;
-  --text-faint: #9c978e;
-  --border: #e4e0d8;
-  --border-strong: #d3cec4;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: rgba(79, 70, 229, 0.09);
-  --accent-text: #ffffff;
-  --danger: #c2410c;
-  --danger-soft: rgba(194, 65, 12, 0.09);
-  --warning: #a16207;
-  --warning-soft: rgba(161, 98, 7, 0.1);
-  --success: #15803d;
-  --shadow-sm: 0 1px 2px rgba(29, 27, 24, 0.06);
-  --shadow-md: 0 4px 16px rgba(29, 27, 24, 0.08), 0 1px 3px rgba(29, 27, 24, 0.06);
-  --shadow-lg: 0 18px 50px rgba(29, 27, 24, 0.18);
-  --scrim: rgba(29, 27, 24, 0.32);
+  --bg: var(--uncli-bg, #f7f6f3);
+  --surface: var(--uncli-surface, #ffffff);
+  --surface-2: var(--uncli-surface-2, #f1efea);
+  --surface-3: var(--uncli-surface-3, #e8e5df);
+  --text: var(--uncli-text, #1d1b18);
+  --text-muted: var(--uncli-text-muted, #6d6962);
+  --text-faint: var(--uncli-text-faint, #9c978e);
+  --border: var(--uncli-border, #e4e0d8);
+  --border-strong: var(--uncli-border-strong, #d3cec4);
+  --accent: var(--uncli-accent, #4f46e5);
+  --accent-hover: var(--uncli-accent-hover, #4338ca);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, transparent);
+  --accent-text: var(--uncli-accent-text, #ffffff);
+  --danger: var(--uncli-danger, #c2410c);
+  --danger-soft: color-mix(in srgb, var(--danger) 9%, transparent);
+  --warning: var(--uncli-warning, #a16207);
+  --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+  --success: var(--uncli-success, #15803d);
+  --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(29, 27, 24, 0.06));
+  --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(29, 27, 24, 0.08), 0 1px 3px rgba(29, 27, 24, 0.06));
+  --shadow-lg: var(--uncli-shadow-lg, 0 18px 50px rgba(29, 27, 24, 0.18));
+  --scrim: var(--uncli-scrim, rgba(29, 27, 24, 0.32));
 
   /* Section kinds in the outline: full saturation (HSL 100%), off-primary
      hues, mid-dark lightness, nudged per hue so they read evenly bright.
@@ -57,18 +59,18 @@
   --cmd-rest: var(--text-faint);
   /* Charts (usage dashboard): one series hue, checked with the dataviz
      validator against each theme's surface (lightness band, 3:1 contrast). */
-  --chart-bar: #4f46e5;
+  --chart-bar: var(--uncli-chart-bar, #4f46e5);
 
-  --font: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Consolas, monospace;
+  --font: var(--uncli-font, 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif);
+  --mono: var(--uncli-mono, 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Consolas, monospace);
   --text-xs: 11.5px;
   --text-sm: 12.5px;
   --text-md: 14px;
   --text-lg: 15.5px;
   --text-xl: 20px;
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  --radius-sm: var(--uncli-radius-sm, 6px);
+  --radius: var(--uncli-radius, 10px);
+  --radius-lg: var(--uncli-radius-lg, 14px);
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -83,31 +85,31 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-uncli-scheme='light']) {
     color-scheme: dark;
-    --bg: #111113;
-    --surface: #18181b;
-    --surface-2: #202024;
-    --surface-3: #2a2a2f;
-    --text: #ececef;
-    --text-muted: #a1a1aa;
-    --text-faint: #71717a;
-    --border: #29292e;
-    --border-strong: #3a3a40;
-    --accent: #8b8cf8;
-    --chart-bar: #7f80f4;
-    --accent-hover: #a5a6fa;
-    --accent-soft: rgba(139, 140, 248, 0.13);
-    --accent-text: #111113;
-    --danger: #fb923c;
-    --danger-soft: rgba(251, 146, 60, 0.12);
-    --warning: #facc15;
-    --warning-soft: rgba(250, 204, 21, 0.1);
-    --success: #4ade80;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.55);
-    --scrim: rgba(0, 0, 0, 0.55);
+    --bg: var(--uncli-bg, #111113);
+    --surface: var(--uncli-surface, #18181b);
+    --surface-2: var(--uncli-surface-2, #202024);
+    --surface-3: var(--uncli-surface-3, #2a2a2f);
+    --text: var(--uncli-text, #ececef);
+    --text-muted: var(--uncli-text-muted, #a1a1aa);
+    --text-faint: var(--uncli-text-faint, #71717a);
+    --border: var(--uncli-border, #29292e);
+    --border-strong: var(--uncli-border-strong, #3a3a40);
+    --accent: var(--uncli-accent, #8b8cf8);
+    --chart-bar: var(--uncli-chart-bar, #7f80f4);
+    --accent-hover: var(--uncli-accent-hover, #a5a6fa);
+    --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+    --accent-text: var(--uncli-accent-text, #111113);
+    --danger: var(--uncli-danger, #fb923c);
+    --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+    --warning: var(--uncli-warning, #facc15);
+    --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+    --success: var(--uncli-success, #4ade80);
+    --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.4));
+    --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.35));
+    --shadow-lg: var(--uncli-shadow-lg, 0 18px 50px rgba(0, 0, 0, 0.55));
+    --scrim: var(--uncli-scrim, rgba(0, 0, 0, 0.55));
 
     --tint-l: 62%;
 
@@ -124,31 +126,31 @@
   }
 }
 
-:root[data-theme='dark'] {
+:root[data-uncli-scheme='dark'] {
   color-scheme: dark;
-  --bg: #111113;
-  --surface: #18181b;
-  --surface-2: #202024;
-  --surface-3: #2a2a2f;
-  --text: #ececef;
-  --text-muted: #a1a1aa;
-  --text-faint: #71717a;
-  --border: #29292e;
-  --border-strong: #3a3a40;
-  --accent: #8b8cf8;
-  --chart-bar: #7f80f4;
-  --accent-hover: #a5a6fa;
-  --accent-soft: rgba(139, 140, 248, 0.13);
-  --accent-text: #111113;
-  --danger: #fb923c;
-  --danger-soft: rgba(251, 146, 60, 0.12);
-  --warning: #facc15;
-  --warning-soft: rgba(250, 204, 21, 0.1);
-  --success: #4ade80;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.55);
-  --scrim: rgba(0, 0, 0, 0.55);
+  --bg: var(--uncli-bg, #111113);
+  --surface: var(--uncli-surface, #18181b);
+  --surface-2: var(--uncli-surface-2, #202024);
+  --surface-3: var(--uncli-surface-3, #2a2a2f);
+  --text: var(--uncli-text, #ececef);
+  --text-muted: var(--uncli-text-muted, #a1a1aa);
+  --text-faint: var(--uncli-text-faint, #71717a);
+  --border: var(--uncli-border, #29292e);
+  --border-strong: var(--uncli-border-strong, #3a3a40);
+  --accent: var(--uncli-accent, #8b8cf8);
+  --chart-bar: var(--uncli-chart-bar, #7f80f4);
+  --accent-hover: var(--uncli-accent-hover, #a5a6fa);
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --accent-text: var(--uncli-accent-text, #111113);
+  --danger: var(--uncli-danger, #fb923c);
+  --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+  --warning: var(--uncli-warning, #facc15);
+  --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+  --success: var(--uncli-success, #4ade80);
+  --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.4));
+  --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.35));
+  --shadow-lg: var(--uncli-shadow-lg, 0 18px 50px rgba(0, 0, 0, 0.55));
+  --scrim: var(--uncli-scrim, rgba(0, 0, 0, 0.55));
 
   --tint-l: 62%;
 

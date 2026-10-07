@@ -71,6 +71,7 @@ export function commands(app: AppStore): Command[] {
   }
   add({ id: 'usage', group: 'app', label: t('cmd.usage'), run: () => (app.usageOpen = true) })
   add({ id: 'theme', group: 'app', label: t('cmd.theme'), run: () => cycleTheme() })
+  add({ id: 'theme.file', group: 'app', label: t('cmd.themeFile'), run: () => run(app.loadThemeFile(true)) })
   if (ready) {
     add({ id: 'new', group: 'session', label: t('cmd.new'), keys: keysOf('new'), run: () => app.openNewSession() })
     add({ id: 'search', group: 'session', label: t('cmd.search'), keys: keysOf('search'), run: () => app.searchFocus++ })
@@ -105,6 +106,7 @@ export function commands(app: AppStore): Command[] {
   add({ id: 'outline', group: 'panel', label: t('cmd.outline'), keys: keysOf('outline'), run: () => app.showTab('outline') })
   if (app.hasArtifacts(session.id)) add({ id: 'artifacts', group: 'panel', label: t('cmd.artifacts'), keys: keysOf('artifacts'), run: () => app.showTab('artifacts') })
   add({ id: 'panel', group: 'panel', label: t('cmd.panel'), run: () => app.togglePanel() })
+  add({ id: 'compactHeader', group: 'panel', label: t(app.headerCompact ? 'cmd.expandHeader' : 'cmd.compactHeader'), run: () => app.toggleHeaderCompact() })
   add({ id: 'compact', group: 'panel', label: t(app.questionCompact ? 'cmd.expandQuestion' : 'cmd.compactQuestion'), run: () => app.toggleQuestionCompact() })
 
   // When to prompt.

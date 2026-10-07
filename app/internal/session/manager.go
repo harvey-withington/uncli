@@ -28,6 +28,9 @@ type Deps struct {
 	Store      *store.Store
 	Adapter    core.Adapter
 	Runtime    core.Runtime
+	// Runtimes finds the runtime of a session that doesn't run locally, by
+	// its runtime id and ref (a container profile); nil: local only.
+	Runtimes func(id, ref string) (core.Runtime, error)
 	Profiles   *profile.Set
 	Binary     BinaryFunc
 	Sink       Sink
@@ -46,6 +49,17 @@ type Deps struct {
 	JudgeTools JudgeToolsFunc
 	Unknown    func() string
 	DeciderKey func() string
+}
+
+// runtime is where a session's CLI runs.
+func (m *Manager) runtime(rec store.Session) (core.Runtime, error) {
+	if rec.Runtime == "" || rec.Runtime == m.d.Runtime.ID() {
+		return m.d.Runtime, nil
+	}
+	if m.d.Runtimes == nil {
+		return nil, fmt.Errorf("this session runs in %s, which this UNCLI can't start", rec.Runtime)
+	}
+	return m.d.Runtimes(rec.Runtime, rec.RuntimeRef)
 }
 
 // ErrNoCLI means the CLI isn't installed yet; the UI shows the setup screen.

@@ -626,6 +626,7 @@ export interface Backend {
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   usageReport(q: UsageQuery): Promise<UsageReport>
+  theme(): Promise<ThemeFileInfo> // the user's theme.yaml, if there is one (decision 0010)
   openFolder(path: string): Promise<void>
   openFile(sessionId: string, path: string, line: number): Promise<void> // editor at line (IDE-linked sessions) or default app (documents)
   revealFile(path: string): Promise<void> // shows it in its folder
@@ -651,4 +652,12 @@ export interface DecisionTest {
   verdict: 'looks' | 'routine' | 'risky' // what UNCLI makes of it (risky when not sure enough)
   reason?: string
   millis: number
+}
+
+// The user's theme.yaml: values for the public --uncli-* tokens by scheme.
+export interface ThemeFileInfo {
+  path: string
+  found: boolean
+  light?: Record<string, string> | null
+  dark?: Record<string, string> | null
 }

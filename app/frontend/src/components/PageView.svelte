@@ -59,6 +59,7 @@
         <div class="q-head">
           <span class="seq">{t('page.number', { n: page.seq })}</span>
           {#if page.bookmarked}<span class="marked"><Icon name="bookmark-check" size={13} />{t('nav.bookmarked')}</span>{/if}
+          <span class="q-gap"></span>
           {#if page.question}<span class="q-copy"><CopyButton text={page.question} label={t('copy.question')} /></span>{/if}
           {@render toggle()}
         </div>
@@ -169,8 +170,11 @@
     font-size: var(--text-xs);
     color: var(--accent);
   }
+  /* Pushes copy and the chevron to the right edge, with or without copy. */
+  .q-gap {
+    flex: 1;
+  }
   .q-copy {
-    margin-left: auto;
     opacity: 0;
     transition: opacity var(--fast) var(--ease);
   }

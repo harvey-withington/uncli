@@ -81,6 +81,47 @@ with the code.
 Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 `danger`, `icon`, `small`; `.input`; `.select`; `.visually-hidden`.
 
+## Theme override
+
+UNCLI keeps its own look, and a host can supply its own through public
+tokens (decision 0010). Components use the tokens above, never these. Each
+public token overrides the internal token of the same name, so
+`--uncli-accent` sets `--accent`. The soft fills (`--accent-soft`,
+`--danger-soft`, `--warning-soft`) are mixed from their base colour, so
+they follow it.
+
+| Public token | Overrides |
+|---|---|
+| `--uncli-bg`, `--uncli-surface`, `--uncli-surface-2`, `--uncli-surface-3` | Backgrounds |
+| `--uncli-text`, `--uncli-text-muted`, `--uncli-text-faint` | Text |
+| `--uncli-border`, `--uncli-border-strong` | Outlines |
+| `--uncli-accent`, `--uncli-accent-hover`, `--uncli-accent-text` | The accent and the text on it |
+| `--uncli-danger`, `--uncli-warning`, `--uncli-success` | Status colours |
+| `--uncli-shadow-sm`, `--uncli-shadow-md`, `--uncli-shadow-lg`, `--uncli-scrim` | Elevation |
+| `--uncli-chart-bar` | The chart hue |
+| `--uncli-font`, `--uncli-mono` | Fonts |
+| `--uncli-radius-sm`, `--uncli-radius`, `--uncli-radius-lg` | Corner radii |
+
+Section-kind colours, type tints, the command colours and code highlighting
+stay UNCLI's own. UNCLI sets the scheme it resolved on `<html>` as
+`data-uncli-scheme="light|dark"`, and theme values key on it. The desktop
+app reads `theme.yaml` from its config folder at start and again on
+**Reload theme file** in the palette:
+
+```yaml
+light:
+  bg: "#f0f2f5"
+  accent: "#5e60ce"
+dark:
+  bg: "#18181b"
+  accent: "#6366f1"
+```
+
+Names are the public tokens without `--uncli-`. Unknown names are skipped.
+A value is refused if it holds `;`, braces, angle brackets, `@`, a
+backslash, a comment, `url(` or an unclosed quote, so a theme can only hold
+values. Skipped entries show in a toast.
+
 ## Components
 
 | Component | Props | Notes |
@@ -96,7 +137,7 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `SessionTypeAllowlist` | `sessionId`, `typeLabel` | "Safe in {type} sessions (built in)": the profile's allowlist as read-only pills (`allowLabel`: "npm test …", "Write in ./artifacts/**"; the raw entry in the tooltip), with a note that the user's Unsafe or Blocked entries still win |
 | `CommandCheck` | `sessionId` | "Check a command": type a command, Enter or Check; shows Runs without asking / Claude prompts you first / Blocked (success, warning, danger) and the reason for each part. Runs nothing |
 | `SafeList` | `sessionId`, `filter` | The safe list for the session's project and all projects: each entry's label if it has one (the user's own name for it, with the class faint beside it) or else its class in mono (a wrench for tools), a pencil to add or change the label in place (Enter saves, Escape cancels, empty clears), a verdict select (Safe / Unsafe in warning / Blocked in danger) and a scope select (moving to All projects promotes and merges), and remove. Below, Add: an example command or a tool name (a datalist of the session's known tools; the input has its own row), verdict, scope, Add; a preview list shows the class each part becomes, or why it can't be learned. Reloads in place, never blanking the list |
-| `DecisionSection` | `prefs`, `savePrefs` | Settings → "Decision model" (`#settings-decider`): the quick-task model (saved on choosing) or a System One server, whose address, model, version, threshold and local-only are edited together and saved with Save (disabled until something changed); the API key in a password field with Save key / Remove key, never read back (the placeholder says whether one is saved); Test asks about a sample command and shows the verdict, how sure (calibrated deciders only), the time and the decider, as a `status` |
+| `DecisionSection` | `prefs`, `savePrefs` | Settings → "Decision model" (`#settings-decider`): the quick-task model (saved on choosing) or a System One server, whose address, model, version, threshold and local-only are edited together and saved with Save (disabled until something changed); the API key in a password field with Save key / Remove key, kept in the OS credential store (Windows Credential Manager, `uncli:decision-model-key`) and never read back (the placeholder says whether one is saved); Test asks about a sample command and shows the verdict, how sure (calibrated deciders only), the time and the decider, as a `status` |
 | `SafeSection` | `savePrefs` | Settings → "Safe and unsafe" (`#settings-safe`): what the list is, filter chips (Everything / This project / All projects / Built in, a radio group), `SafeList`, `SessionTypeAllowlist`, `CommandCheck`, then "When UNCLI can't tell" (the model decides / safe if it stays in this folder / prompt me). Takes plain values from the current session so its updates don't reload the list |
 | `ReasonList` | `reasons`, `label`, `sessionId?` | The reason for each part of a command (or a tool use), as a list: the part in mono, then its reason, coloured by `reasonTone`: only read (faint), ran as safe (muted), judged by the decision model (accent, with a left bar, whichever way it went), prompted (warning, left bar), blocked (danger, left bar). With `sessionId`, each part UNCLI judged safe (`promptable`) has its own `ShouldPrompt` at the end of its line. Used by `TraceStrip` and `CommandCheck` |
 | `ShouldPrompt` | `sessionId`, `classes` | At the end of one part's line in `ReasonList`: "This should prompt" (hand) with the Scope select; teaches that part's class Unsafe, then says "Claude will prompt before {class} from now on" |
@@ -106,13 +147,13 @@ Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
 | `Sidebar` / `SessionItem` | — / `session`, `active` | `PinnedList` at the top, then the active sessions, then "Archived (N)", which shows the archived sessions (dimmed) when opened. Drag to reorder active sessions (or Alt+↑ / Alt+↓); type icon and active stripe in the type's colour; "in the background" (spinning, accent) beside the activity while a background task runs and no turn is open; double-click or pencil renames; Archive (or Restore on an archived session) with a toast saying where it went; trash confirms then deletes |
 | `PinnedList` | none | "Pinned (N)", collapsible: pages pinned in any session, newest first; each shows its question on one line and its session's title ("· archived" when it is), in the session type's colour; click opens the page in its session; the pin-off button (on hover or focus) unpins. Hidden when nothing is pinned |
 | `NewSessionDialog` | none | Profile cards, folder picker for co-work and code, model select; "Continue a conversation from the terminal…" (left of the buttons, when the adapter can import) opens `ImportDialog`. Opens on the welcome card clicked, else the last type used; each type starts from its last model and folder (remembered in the app database) |
-| `SessionPane` | `session` | Header, toolbar, current page, nav bar, composer (an archived session shows "This session is archived…" with Restore in the composer's place). The header's right side: `ModeSwitch`, then the Unattended toggle (coffee icon, `aria-pressed`, warning tint when on), which declines whatever would prompt the user, then the shield ("Safe and unsafe", opens Settings there), and the side panel toggle (`SidePanel`). `SessionStatus` lines sit under the folder. Requests the quick-task model is still judging (`judging`) get no card; a quiet "Checking whether a command is safe to run…" line shows in their place |
+| `SessionPane` | `session` | Header, toolbar, current page, nav bar, composer (an archived session shows "This session is archived…" with Restore in the composer's place). The header's right side: `ModeSwitch`, then the Unattended toggle (coffee icon, `aria-pressed`, warning tint when on), which declines whatever would prompt the user, then the shield ("Safe and unsafe", opens Settings there), and the side panel toggle (`SidePanel`), then the header's chevron, always last on the line. `SessionStatus` lines sit under the folder. The chevron (or the palette) collapses the header to two lines: the title with "type · folder" after it in faint text (cut short first), then the toolbar; the folder line and status lines are hidden (an error still shows); kept in localStorage. Requests the quick-task model is still judging (`judging`) get no card; a quiet "Checking whether a command is safe to run…" line shows in their place |
 | `Toolbar` | `session` | Rendered from `toolbar.yaml`: model picker, modifier toggles (groups exclusive), slash and native items |
 | `UsagePopover` | `usage`, `onclose` | Subscription windows from `EvUsageLimit`; "Usage over time" opens `UsageDashboard` |
 | `UsageDashboard` | none | Modal (`app.usageOpen`): period (7 days / 30 days / All time) and measure (Cost / Tokens) as radio groups, Chart/Table toggle; Cost as the one hero number (48 px), then Turns, Tokens (with written and read-from-cache), Time answering, Sessions; `DayChart` or a table by day; `UsageBreakdown` by model, session type and top sessions (a session opens it); a footnote with quick-task costs and that costs are at API prices. Data from `usageReport` (store sums of pages; open pages not counted) |
 | `DayChart` | `rows`, `measure` | One column per day, zero days included (`fillDays`): `--chart-bar`, at most 24 px, 4 px rounded top, square at the baseline, 2 px of surface between; hairline gridlines on clean ticks (`niceMax`); dates at the ends and on Mondays when there's room; each day's full-height band is a hover target with a tooltip (date, value, turns) and dims the others. Single series: no legend |
 | `UsageBreakdown` | `title`, `rows`, `measure`, `name`, `icon?`, `onpick?`, `empty` | A ranked list: name (with a type icon in its colour), value in text, and a 6 px magnitude bar relative to the largest row; rows with `onpick` are buttons |
-| `PageView` | `page` | Sticky question with copy (a page the CLI started by itself, `origin: cli`, has no question: the header says "Claude carried on by itself after a background task finished", italic and muted, with a history icon, and no copy button), the files sent with it (`q-files`), streamed answer, banners, the files the turn changed (`FilesStrip`), trace, chips. A chevron collapses the question to compact mode: one line, the question left (ellipsis when short of room) and the page number right, never cut, then copy and the chevron; kept in localStorage |
+| `PageView` | `page` | Sticky question with copy (a page the CLI started by itself, `origin: cli`, has no question: the header says "Claude carried on by itself after a background task finished", italic and muted, with a history icon, and no copy button), the files sent with it (`q-files`), streamed answer, banners, the files the turn changed (`FilesStrip`), trace, chips. A chevron collapses the question to compact mode: one line, the question left (ellipsis when short of room) and the page number right, never cut, then copy and the chevron; kept in localStorage. In both modes the chevron is the last thing on the line, at its right edge, with or without a copy button |
 | `AnswerBlocks` | `markdown`, `streaming?`, `markers?` | One block per top-level markdown element; each copies its source markdown. `markers` (block index → outline entry, from `app.outlineFor(page)`) puts the entry's section-kind icon in the page's left margin beside the block, 16 px in the kind colour (a step up from the outline's 13 px), so the margin always matches what the outline shows, Summary/Headings switch included |
 | `CodeBlock` | `code`, `lang`, `streaming?` | Shiki highlighting once complete; copies code only |
 | `SidePanel` | `page`, `scroller` | The panel beside the answer, as tabs (`role=tablist`, one tab stop, ← / → / Home / End move): "On this page" and, for session types with `artifacts`, "Artifacts", each with a count badge (the sections the outline shows, the artifacts as of the page; the badge's label reads "2 sections"). The aside is named after the tab showing. One width for both tabs (240–960 px, 360 to start), so switching tabs never moves the answer column; resized by the left edge (`ResizeHandle`, "Resize the side panel"); open state, tab and width kept in localStorage. The header's panel button opens or closes it on the tab it had; O and A open it on their tab, or close it when that tab is showing; View on a changed file opens the Artifacts tab on it |
@@ -164,4 +205,4 @@ the UI on the mock backend. `?mock=setup`, `?mock=signin`, `?mock=empty`,
 `?mock=unattended`, `?mock=readonly` and `?mock=full` pick a starting
 scenario (in the mock, a message mentioning "push" asks to run git push, and
 one mentioning a "note" asks to use an MCP tool with no annotations; the Chat session has two pages of artifacts: HTML, SVG, Mermaid and a Markdown file only in the folder); `?theme=light` or `?theme=dark` forces a theme
-for screenshots.
+for screenshots, and `?themefile=sample` applies a sample theme file.
