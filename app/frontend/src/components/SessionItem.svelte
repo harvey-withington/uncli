@@ -15,6 +15,7 @@
 
   let { session, active }: Props = $props()
   const app = useApp()
+  const names = $derived(app.namesFor(session.adapter))
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   let editing = $state(false)
   let draft = $state('')
@@ -106,7 +107,7 @@
         <span class="meta">
           <ActivityBadge state={session.state} />
           {#if !session.busy && (session.background?.length ?? 0) > 0}
-            <span class="bg" title={t('background.hint')}><Icon name="loader" spin size={11} />{t('background.short')}</span>
+            <span class="bg" title={t('background.hint', names)}><Icon name="loader" spin size={11} />{t('background.short')}</span>
           {/if}
           {#if session.state === 'idle'}<span class="model">{session.model}</span>{/if}
         </span>

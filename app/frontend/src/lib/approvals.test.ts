@@ -105,7 +105,7 @@ describe('why a tool use ran', () => {
     expect(reasonLabel({ part: 'git push', by: 'listed', entry: { kind: 'command', words: 'git push', verdict: 'safe' } })).toBe('on your safe list (All projects)')
     expect(reasonLabel({ part: 'rm -r x', by: 'blocked', entry: { kind: 'command', words: 'rm', flags: '-r', verdict: 'blocked', folder: 'p' } })).toBe('blocked by you (This project)')
     expect(reasonLabel({ part: 'npm publish', by: 'unsafe', risk: 'publishes' })).toBe('unsafe: it sends or publishes something beyond this computer')
-    expect(reasonLabel({ part: 'npm publish', by: 'none' })).toBe('nothing allows it, so Claude asks')
+    expect(reasonLabel({ part: 'npm publish', by: 'none' })).toBe('nothing allows it, so the assistant asks')
     expect(reasonLabel({ part: 'rm x', by: 'readonly' })).toBe('changes things: refused in Read-only')
   })
 

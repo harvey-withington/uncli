@@ -62,6 +62,9 @@ type fakeRuntime struct {
 	procs     []*fakeProc
 	hangLast  bool // keep the process alive after the last turn without replying
 	onControl bool // an approval answer (control_response) also releases the next turn
+	// fail: the next process prints this on stderr and exits 1 after its
+	// first turn's output (a CLI that can't carry on).
+	fail string
 }
 
 func (r *fakeRuntime) ID() string { return "local" }
@@ -71,7 +74,8 @@ func (r *fakeRuntime) Start(ctx context.Context, cmd core.Command, workdir strin
 	defer r.mu.Unlock()
 	r.starts = append(r.starts, cmd)
 	outR, outW := io.Pipe()
-	p := &fakeProc{r: r, out: outR, outW: outW, done: make(chan struct{})}
+	p := &fakeProc{r: r, out: outR, outW: outW, done: make(chan struct{}), stderr: r.fail}
+	r.fail = ""
 	r.procs = append(r.procs, p)
 	return p, nil
 }
@@ -83,12 +87,13 @@ func (r *fakeRuntime) lines() []string {
 }
 
 type fakeProc struct {
-	r    *fakeRuntime
-	out  *io.PipeReader
-	outW *io.PipeWriter
-	once sync.Once
-	done chan struct{}
-	code int
+	r      *fakeRuntime
+	out    *io.PipeReader
+	outW   *io.PipeWriter
+	once   sync.Once
+	done   chan struct{}
+	code   int
+	stderr string
 }
 
 func (p *fakeProc) Write(b []byte) (int, error) {
@@ -107,14 +112,19 @@ func (p *fakeProc) Write(b []byte) (int, error) {
 	}
 	p.r.mu.Unlock()
 	if seg != nil {
-		go func() { _, _ = p.outW.Write(seg) }()
+		go func() {
+			_, _ = p.outW.Write(seg)
+			if p.stderr != "" {
+				p.exit(1)
+			}
+		}()
 	}
 	return len(b), nil
 }
 
 func (p *fakeProc) Stdin() io.Writer  { return p }
 func (p *fakeProc) Stdout() io.Reader { return p.out }
-func (p *fakeProc) Stderr() io.Reader { return strings.NewReader("") }
+func (p *fakeProc) Stderr() io.Reader { return strings.NewReader(p.stderr) }
 func (p *fakeProc) Wait() error {
 	<-p.done
 	if p.code != 0 {

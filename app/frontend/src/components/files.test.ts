@@ -44,8 +44,9 @@ describe('Changed files', () => {
     const backend = mockBackend()
     const save = vi.spyOn(backend, 'setPreferences')
     render(App, { props: { backend } })
-    await fireEvent.click(await screen.findByRole('button', { name: /Claude CLI/ }))
+    await fireEvent.click(await screen.findByRole('button', { name: /Claude Code 2./ }))
     const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+    await fireEvent.click(within(dialog).getByRole('tab', { name: 'General' }))
     const select = within(dialog).getByRole('combobox', { name: 'Editor' })
     expect(within(select).getAllByRole('option').map(o => o.textContent)).toEqual([
       'Automatic: VS Code', 'VS Code', 'Cursor (not installed)', 'Antigravity (not installed)', 'My own command…',

@@ -9,6 +9,7 @@ import { SECTION_KINDS } from '../sections'
 import { MOCK_CHAT_ARTIFACTS, mockArtifactFiles, mockReadArtifact } from './mock-artifacts'
 import { mockUsageReport } from './mock-usage'
 import { mockTheme } from './mock-theme'
+import { mockContainers } from './mock-containers'
 import { mockTranscriptPages, mockTranscripts } from './mock-import'
 
 const profiles: Bootstrap['profiles'] = [
@@ -237,6 +238,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
   }
   let cli: CLIStatus = { installed: true, version: '2.1.285', pinned: '2.1.285', custom: false, loggedIn: true, email: 'you@example.com', subscription: 'max', ...opts.cli }
   let h: Handlers | null = null
+  const containers = mockContainers(c => h?.containersChanged?.(c))
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
   let decisionKey = ''
   let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }
@@ -335,7 +337,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async bootstrap() {
       return {
         profiles, modifiers, toolbar, models, platform: 'windows', lastNewSession: structuredClone(lastNew),
-        preferences: structuredClone(prefs), providers: [{ id: 'claude', label: 'Claude' }], editors: structuredClone(MOCK_EDITORS),
+        preferences: structuredClone(prefs), providers: [{ id: 'claude', label: 'Claude Code', name: 'Claude Code', agent: 'Claude', account: 'Claude' }], editors: structuredClone(MOCK_EDITORS),
         sessions: sessions.map(s => ({ ...s })),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
@@ -368,10 +370,11 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async setCLIVersion(v) { cli = { ...cli, version: v || cli.pinned }; return cli },
     async cliChannels() { return { stable: '2.1.285', latest: '2.1.286' } },
     async pickFolder() { return 'C:\\Users\\you\\projects\\demo' },
-    async createSession(profileId, workdir, model) {
+    async createSession(profileId, workdir, model, container) {
       const p = profiles.find(x => x.id === profileId)
       const s = session(newId(), profileId, '', 'idle', {
         model: model || p?.model || 'sonnet', workdir: workdir || `C:\\scratch\\${idn}`, sortOrder: sessions.length + 10,
+        ...(container ? { runtime: 'wsl', runtimeRef: container } : {}),
       })
       sessions.unshift(s)
       pages[s.id] = []
@@ -379,6 +382,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       lastNew.profileId = profileId
       lastNew.models[profileId] = s.model
       if (p?.folder !== 'scratch') lastNew.folders[profileId] = s.workdir
+      ;(lastNew.containers ??= {})[profileId] = container
       return { session: { ...s }, lastNewSession: structuredClone(lastNew) }
     },
     async pages(id) { return (pages[id] ?? []).map(p => ({ ...p })) },
@@ -686,6 +690,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async revealFile() {},
     async usageReport(q) { return mockUsageReport(q) },
     async theme() { return mockTheme() },
+    ...containers,
     async transcripts() {
       return mockTranscripts().map(e => ({ ...e, sessionId: sessions.find(s => s.providerSid === e.id)?.id ?? e.sessionId }))
     },

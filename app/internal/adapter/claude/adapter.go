@@ -262,3 +262,11 @@ func newRequestID() string {
 	_, _ = rand.Read(b[:])
 	return "uncli_" + hex.EncodeToString(b[:])
 }
+
+// LostConversation reports whether the CLI, asked to resume a conversation,
+// said it no longer has it (CLI 2.1.285: "No conversation found with session
+// ID: <id>" on stderr, an error result with no turns, exit 1). Its files
+// were removed: deleted, or with a container that was rebuilt.
+func (a *Adapter) LostConversation(stderr string) bool {
+	return strings.Contains(stderr, "No conversation found with session ID")
+}

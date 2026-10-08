@@ -147,8 +147,8 @@ func (a *App) PickFolder(title string) (string, error) {
 
 // CreateSession creates a session; the choices made are remembered for the
 // next new-session dialog and returned with it.
-func (a *App) CreateSession(profileID, workdir, model string) (app.CreatedSession, error) {
-	v, last, err := a.svc.CreateSession(profileID, workdir, model)
+func (a *App) CreateSession(profileID, workdir, model, container string) (app.CreatedSession, error) {
+	v, last, err := a.svc.CreateSessionIn(profileID, workdir, model, container)
 	return app.CreatedSession{Session: v, LastNew: last}, err
 }
 
@@ -307,6 +307,42 @@ func (a *App) Focus(sessionID string) { a.svc.Sessions.Focus(sessionID) }
 
 // TestNotification shows a sample desktop notification.
 func (a *App) TestNotification() error { return a.svc.TestNotification() }
+
+// Containers reports WSL, the containers' sign-in and each container
+// profile (decision 0011); changes arrive as containers:changed.
+func (a *App) Containers() app.ContainersInfo { return a.svc.Containers(a.ctx) }
+
+// InstallWSL turns WSL on; Windows asks for administrator rights once and
+// needs a restart afterwards.
+func (a *App) InstallWSL() error { return a.svc.InstallWSL(a.ctx) }
+
+// StopContainers stops UNCLI's own containers (never all of WSL).
+func (a *App) StopContainers() error { return a.svc.StopContainers(a.ctx) }
+
+// BuildContainer builds or rebuilds a container profile's distro.
+func (a *App) BuildContainer(id string) error { return a.svc.BuildContainer(id) }
+
+// RemoveContainer deletes a container profile's distro.
+func (a *App) RemoveContainer(id string) error { return a.svc.RemoveContainer(a.ctx, id) }
+
+// StartContainerSignIn returns the link to approve; FinishContainerSignIn
+// takes the code the page shows and keeps the token in the credential store.
+func (a *App) StartContainerSignIn() (string, error) { return a.svc.StartContainerSignIn(a.ctx) }
+func (a *App) FinishContainerSignIn(code string) error {
+	return a.svc.FinishContainerSignIn(code)
+}
+func (a *App) CancelContainerSignIn()   { a.svc.CancelContainerSignIn() }
+func (a *App) SignOutContainers() error { return a.svc.SignOutContainers() }
+
+// The full account sign-in for containers that share connectors.
+func (a *App) StartContainerAccountSignIn() (string, error) {
+	return a.svc.StartContainerAccountSignIn(a.ctx)
+}
+func (a *App) FinishContainerAccountSignIn(code string) error {
+	return a.svc.FinishContainerAccountSignIn(code)
+}
+func (a *App) CancelContainerAccountSignIn()  { a.svc.CancelContainerAccountSignIn() }
+func (a *App) SignOutContainerAccount() error { return a.svc.SignOutContainerAccount() }
 
 func (a *App) Usage() *core.UsageLimit { return a.svc.Sessions.Usage() }
 

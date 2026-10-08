@@ -58,11 +58,6 @@ func validSummary(v string) bool {
 	return v == SummaryOff || v == SummaryLong || v == SummaryAlways
 }
 
-type Provider struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
-}
-
 const settingPrefs = "prefs"
 
 func defaultPreferences() Preferences {
@@ -146,11 +141,6 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 		return s.Preferences(), err
 	}
 	return s.Preferences(), nil
-}
-
-// Providers lists the providers that can run quick tasks.
-func (s *Service) Providers() []Provider {
-	return []Provider{{ID: s.Adapter.ID(), Label: "Claude"}}
 }
 
 func (s *Service) textTasker(provider string) (core.TextTasker, error) {

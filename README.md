@@ -56,6 +56,17 @@ apply changes.
 - **Pin** pages you want at hand (P), **archive** finished sessions, see
   **usage** over time, and find any action in the **command palette**
   (Ctrl+Shift+P); ? lists every shortcut.
+- **Containers** (Windows): run a session in a Linux that UNCLI builds with
+  WSL, where Claude sees only the session's folder and can't start Windows
+  programs. Settings → Containers turns WSL on (one administrator prompt and
+  a restart), builds containers and signs them in. Then pick the container
+  under Run in when you start a session. The built-in Sandbox shares your
+  memories, skills, MCP servers and, once you sign in with your whole
+  account (Settings → AI Providers), your claude.ai connectors; Isolated
+  shares nothing. Containers are defined in `containers.yaml`: packages,
+  `brain: shared` or `sandboxed`, `mcp` and `connectors: shared` or `none` (add your own
+  in the config folder by `id`). Settings says when a container no longer
+  matches its config and needs a Rebuild; conversations survive rebuilds.
 
 ## Building
 

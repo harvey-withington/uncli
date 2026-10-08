@@ -45,7 +45,9 @@ for i in $(seq 1 30); do curl -sf http://localhost:5181/ >/dev/null && break; sl
 
 ```bash
 S="$SCRATCHPAD"    # any writable dir; use the session scratchpad
-"/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" \
+# The versioned binary: the top-level msedge.exe is a launcher (see below).
+EDGE=$(ls -d "/c/Program Files (x86)/Microsoft/Edge/Application/"[0-9]*/msedge.exe | sort -V | tail -1)
+"$EDGE" \
   --headless=new --disable-gpu --no-first-run --no-default-browser-check \
   --user-data-dir="$S\\edge-profile-$RANDOM" \
   --window-size=1440,900 --hide-scrollbars --virtual-time-budget=5000 \
@@ -59,6 +61,13 @@ Gotchas:
   a `/c/...` path exits 0 and writes nothing.
 - Use a fresh `--user-data-dir` every run. A lingering headless instance on a
   reused profile absorbs the launch: exit 0, no file.
+- Since Edge 154, `msedge.exe` (even the versioned one) hands off to another
+  process and exits at once. A one-shot `--screenshot` still works, but
+  `puppeteer.launch` takes the exit for a failed start and leaves a headless
+  Edge behind each time. To drive Edge, start it yourself with
+  `--remote-debugging-port=<port>` and a fresh `--user-data-dir`, then
+  `puppeteer.connect({ browserURL: 'http://127.0.0.1:<port>' })`, as
+  `scripts/e2e.mjs` does (`startEdge`).
 - `--virtual-time-budget` lets fonts, fetches and sockets settle first.
 - The capture follows the system theme; tokens must cover light and dark.
 - Headless Edge will not go narrower than about 500 CSS px. For a phone

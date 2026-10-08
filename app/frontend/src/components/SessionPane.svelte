@@ -22,7 +22,10 @@
 
   let { session }: Props = $props()
   const app = useApp()
+  const names = $derived(app.namesFor(session.adapter))
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
+  // A session in a container says which (decision 0011).
+  const place = $derived(session.runtimeRef ? ` · ${t('session.inContainer', { label: app.containers?.containers.find(c => c.id === session.runtimeRef)?.label ?? session.runtimeRef })}` : '')
   const page = $derived(app.currentPage)
   let scroller: HTMLElement | undefined = $state()
   // The approval cards fade out under the page controls only while there is
@@ -102,7 +105,7 @@
       <ActivityBadge state={session.state} />
       {#if app.headerCompact}
         <!-- Compact: the folder follows the title on its line. -->
-        <span class="path" title={session.workdir}>{profile?.label} · {session.workdir}</span>
+        <span class="path" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
       {:else}
         <span class="gap"></span>
       {/if}
@@ -112,7 +115,7 @@
         class:on={session.unattended}
         onclick={toggleUnattended}
         aria-pressed={!!session.unattended}
-        title={t('unattended.hint')}
+        title={t('unattended.hint', names)}
       >
         <Icon name="coffee" size={15} />{t('unattended.label')}
       </button>
@@ -145,7 +148,7 @@
       </button>
     </div>
     {#if !app.headerCompact}
-      <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}</span>
+      <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
       <SessionStatus {session} />
     {/if}
     <Toolbar {session} />

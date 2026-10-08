@@ -9,6 +9,7 @@ For each stream `<name>.jsonl` there may be:
 - `<name>.in.jsonl`: the lines UNCLI wrote to stdin (turns, control requests
   and control responses), in order.
 - `<name>.args.txt`: the CLI arguments after the binary.
+- `<name>.stderr.txt`: what it printed on stderr, where that matters.
 
 Paths, the account email and the org id are scrubbed (newer recordings also empty the user's own slash commands and agents in the `initialize` answer) (`C:\uncli-spike`,
 `user@example.com`, a zero uuid). Signatures and ids are left as recorded.
@@ -39,6 +40,7 @@ Recorded with Claude Code 2.1.285 (`stable` on 2026-10-01), mostly on Haiku 4.5.
 | `edit-tool-result` | `acceptEdits` with Read and Edit allowed: an Edit's `tool_use_result` carries `structuredPatch` hunks (`newStart` plus context lines), from which the changed line is found; a Read's carries the file (recorded 2026-10-06) |
 | `wsl-perm-stdio-allow` | The `linux-x64-musl` build in an UNCLI WSL distro (Alpine 3.24.2, user `uncli`), run through `wsl.exe -d <distro> --cd <dir> -- claude …` and signed in with `CLAUDE_CODE_OAUTH_TOKEN` passed through `WSLENV`: the same `initialize` handshake and `can_use_tool` request as `perm-stdio-allow`, with Linux paths; `initialize` reports the account only as `{"tokenSource":"CLAUDE_CODE_OAUTH_TOKEN"}` (recorded 2026-10-07, decision 0011) |
 | `wsl-perm-stdio-deny` | Same, answered deny: nothing written, the answer is DENIED (recorded 2026-10-07) |
+| `resume-lost` | `--resume` of a conversation the CLI no longer has (its files removed, as when a container is rebuilt): `No conversation found with session ID: <id>` on stderr, one `result` with `error_during_execution`, `num_turns: 0`, then exit 1 (recorded 2026-10-08 in a WSL container) |
 | `image-input` | Base64 PNG image content block on stream-json input |
 | `append-system-prompt` | `--append-system-prompt` and `--disallowedTools Bash` |
 | `chat-profile-minimal` | Chat profile flags: `--system-prompt`, `--tools`, `--strict-mcp-config`, `--setting-sources ""`, `--disable-slash-commands` |

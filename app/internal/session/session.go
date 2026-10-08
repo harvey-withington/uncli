@@ -38,6 +38,7 @@ type Session struct {
 	profileMode, cliMode string
 
 	page         *store.Page // the open page, nil when idle
+	closed       *store.Page // the page closed last
 	evN          int         // events logged on the open page
 	runningTools int
 	notice       string // last notice on the open page, used if the answer is empty
@@ -158,8 +159,8 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	s.state = Starting
 	gen := s.gen
 	parser := s.m.d.Adapter.NewParser()
-	stderr := &tail{max: 4096}
-	go func() { _, _ = io.Copy(stderr, proc.Stderr()) }()
+	stderr := &tail{max: 4096, done: make(chan struct{})}
+	go func() { _, _ = io.Copy(stderr, proc.Stderr()); close(stderr.done) }()
 	go s.read(gen, proc, parser, stderr)
 	if b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlInitialize}); ok {
 		_, _ = proc.Stdin().Write(b)
@@ -485,6 +486,7 @@ func (s *Session) closePage(status, errText string) {
 		go s.finishFiles(t, p)
 	}
 	s.page, s.runningTools, s.files = nil, 0, nil
+	s.closed = p
 	switch {
 	case status == "error":
 		s.err = errText
@@ -520,6 +522,11 @@ func (s *Session) read(gen int, proc core.Proc, parser core.Parser, stderr *tail
 		s.handle(gen, core.NewEvent(core.EvError, core.ErrorInfo{Message: "Could not read the CLI's output: " + err.Error()}, nil))
 		_ = proc.Kill()
 	}
+	// What the CLI said on stderr explains how it ended: read all of it.
+	select {
+	case <-stderr.done:
+	case <-time.After(2 * time.Second):
+	}
 	err := proc.Wait()
 	code := 0
 	var ec interface{ ExitCode() int }
@@ -543,6 +550,9 @@ func (s *Session) exited(gen, code int, stderr string) {
 	ev := core.NewEvent(core.EvExited, core.Exited{Code: code, Stderr: stderr}, nil)
 	ev.TurnSeq = s.lastSeq
 	s.m.d.Sink.SessionEvent(s.rec.ID, ev)
+	if code != 0 && s.lostConversationLocked(stderr) {
+		return
+	}
 	if s.page != nil {
 		msg := "The CLI stopped unexpectedly"
 		if t := strings.TrimSpace(stderr); t != "" {
@@ -662,6 +672,10 @@ func (s *Session) handle(gen int, ev core.Event) {
 	case core.EvFileTouched:
 		if turnOpen {
 			f, _ := core.Decode[core.FileTouched](ev)
+			var ok bool
+			if f.Path, ok = s.hostPath(f.Path); !ok {
+				return // a file only the CLI's own system has
+			}
 			s.page.TouchedFiles = mergeTouched(s.page.TouchedFiles, store.TouchedFile{Path: f.Path, Line: f.Line, How: f.How, Added: f.Added, Removed: f.Removed})
 			s.savePage()
 		}
@@ -736,9 +750,10 @@ func (s *Session) finishTurn(r core.TurnResult) {
 
 // tail keeps the last max bytes written to it.
 type tail struct {
-	mu  sync.Mutex
-	max int
-	buf []byte
+	mu   sync.Mutex
+	max  int
+	buf  []byte
+	done chan struct{} // closed once the stream ends
 }
 
 func (t *tail) Write(p []byte) (int, error) {

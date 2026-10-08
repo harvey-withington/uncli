@@ -11,8 +11,9 @@ describe('Notifications', () => {
     const save = vi.spyOn(backend, 'setPreferences')
     const test = vi.spyOn(backend, 'testNotification')
     render(App, { props: { backend } })
-    await fireEvent.click(await screen.findByRole('button', { name: /Claude CLI/ }))
+    await fireEvent.click(await screen.findByRole('button', { name: /Claude Code 2./ }))
     const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+    await fireEvent.click(within(dialog).getByRole('tab', { name: 'General' }))
     const select = within(dialog).getByRole('combobox', { name: 'Notifications' })
     expect(select).toHaveValue('all')
     expect(within(select).getAllByRole('option').map(o => o.textContent)).toEqual([

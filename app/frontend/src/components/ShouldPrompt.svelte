@@ -17,6 +17,7 @@
 
   let { sessionId, classes }: Props = $props()
   const app = useApp()
+  const names = $derived(app.namesFor(app.sessions.find(s => s.id === sessionId)?.adapter))
   let scope = $state<Scope>(loadScope())
   let busy = $state(false)
   let done = $state(false)
@@ -38,9 +39,9 @@
 
 <div class="teach">
   {#if done}
-    <span class="done"><Icon name="check" size={12} />{t('teach.done', { what: classes.map(classLabel).join(', ') })}</span>
+    <span class="done"><Icon name="check" size={12} />{t('teach.done', { ...names, what: classes.map(classLabel).join(', ') })}</span>
   {:else}
-    <button class="btn ghost small" onclick={teach} disabled={busy} title={t('teach.hint', { what: classes.map(classLabel).join(', ') })}>
+    <button class="btn ghost small" onclick={teach} disabled={busy} title={t('teach.hint', { ...names, what: classes.map(classLabel).join(', ') })}>
       <Icon name="hand" size={12} />{t('teach.prompt')}
     </button>
     <select class="scope" bind:value={scope} aria-label={t('scope.label')} disabled={busy}>

@@ -37,7 +37,11 @@ dark?.addEventListener?.('change', () => {
 })
 
 export function cycleTheme() {
-  theme.value = theme.value === 'system' ? 'light' : theme.value === 'light' ? 'dark' : 'system'
+  setTheme(theme.value === 'system' ? 'light' : theme.value === 'light' ? 'dark' : 'system')
+}
+
+export function setTheme(v: Theme) {
+  theme.value = v
   try {
     localStorage.setItem(KEY, theme.value)
   } catch {

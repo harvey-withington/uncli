@@ -24,6 +24,7 @@
 
   let { session, approval }: Props = $props()
   const app = useApp()
+  const names = $derived(app.namesFor(session.adapter))
   const view = $derived(describeApproval(approval))
   const notes = $derived(cardNotes(approval))
   const always = $derived(modeOf(session) === 'always')
@@ -55,10 +56,10 @@
   <div class="head">
     <span class="icon"><Icon name="shield" size={16} /></span>
     <span class="title">{view.title}</span>
-    <span class="hint">{t('approval.waiting')}</span>
+    <span class="hint">{t('approval.waiting', names)}</span>
   </div>
   {#if notes.length > 0}
-    <p class="asking" aria-label={t('asking.title')}><Icon name="triangle-alert" size={13} /><span>{notes.join(' ')}</span></p>
+    <p class="asking" aria-label={t('asking.title', names)}><Icon name="triangle-alert" size={13} /><span>{notes.join(' ')}</span></p>
   {/if}
   <div class="what" id="approval-{approval.requestId}">
     {#if view.target}

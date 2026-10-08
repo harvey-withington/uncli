@@ -115,3 +115,102 @@ needs `libgcc` and `libstdc++`):
   errors on stdout, so UNCLI sets `WSL_UTF8=1` and treats a first line that
   isn't JSON as a runtime error. With a token, the CLI doesn't report the
   account's email or plan.
+
+## Built (2026-10-08)
+
+- **bash is in every container.** The CLI's shell tool refuses to run
+  without it ("No suitable shell found"), so in a container with only
+  BusyBox's shell every command failed, and Claude reported git as missing.
+- **Shared brain** (`brain: shared`) mounts, for each session, the project's
+  memory folder from Windows at the name the container's path gives it
+  (`~/.claude/projects/<project dir>/memory`), so what Claude remembers there
+  is kept on Windows. It also mounts the user's skills, agents and commands,
+  copies in their CLAUDE.md, and writes their git name and email to the
+  container's `.gitconfig`. Their settings and credentials stay out.
+- **Shared MCP servers** (`mcp: shared`) copy into the container's
+  `~/.claude.json` the user's MCP servers (user scope, and the project's)
+  that can run on Linux: URL-based ones, and `npx`, `node`, `uvx`…
+  commands (a Windows `cmd /c npx …` is unwrapped) whose arguments name no
+  Windows path. An HTTP server reached over Tailscale connected from WSL.
+- The built-in **Sandbox** shares both, with the usual tools (GNU coreutils,
+  curl, jq, ripgrep, make, Node and Python). **Isolated** shares nothing.
+- **The CLI waits for shared MCP servers.** By default it connects MCP
+  servers in the background, so a server still connecting when the first
+  message goes (a few seconds from a container) has no tools in that
+  message: the model answers that it has none. Containers that share MCP
+  servers set `MCP_CONNECTION_NONBLOCKING=0` and `MCP_CONNECT_TIMEOUT_MS=15000`,
+  so the first message has them; a server that never answers delays the
+  start by 15 s at most.
+- **Conversations outlive a rebuild.** The CLI keeps its conversations in
+  `~/.claude/projects`, which was inside the distro, so rebuilding a
+  container lost them and its sessions couldn't resume. That folder is now
+  UNCLI's on Windows (`<config>/wsl-data/<container>/projects`), mounted on
+  each start, with a shared brain's memory folder mounted inside it.
+- **A lost conversation doesn't strand a session.** A CLI asked to resume a
+  conversation it no longer has fails at once (fixture `resume-lost`), and
+  would on every message after. The adapter recognises it, the session
+  forgets the conversation, the page says so, and the next message starts a
+  new one; this covers a conversation deleted on Windows too.
+- **A container says when it's out of date.** A record of what it was built
+  from (UNCLI's setup fingerprint, the base and its checksum, the CLI
+  version, the packages) is kept with its conversations
+  (`wsl-data/<container>/build.json`). Settings compares it with how the
+  container would be built now and says what changed; containers.yaml is
+  re-read each time, and what a container shares applies from its sessions'
+  next start, so only what's baked in needs a rebuild.
+- **claude.ai skills reach containers as ordinary skills.** The CLI keeps
+  them in `skills/synced/<org>_<account>/` and loads only the folder of the
+  account it's signed in to; signed in with a token it doesn't know the
+  account, so it loaded none. A shared brain now mounts each skill (the
+  user's own, then the synced ones) one by one into the container's own
+  skills folder. claude.ai connectors (MCP servers that come with the
+  account) still need the account sign-in and aren't available in
+  containers.
+- **claude.ai connectors with the whole-account sign-in** (Harvey: Jira,
+  Office). The models-only token can't fetch them; `claude auth login
+  --claudeai` can. A container profile says `connectors: shared` (Sandbox)
+  or `none` (the default, Isolated). Each provider has one whole-account
+  sign-in for containers, kept in `<config>/wsl-data/accounts/<provider>`
+  and mounted as the container's whole `~/.claude`: the CLI saves its
+  credentials by writing a new file and renaming it, so a link to a file
+  doesn't keep them but a mounted folder does. Containers sharing
+  connectors get it and no token (the token would win); others never get
+  it, and it's unmounted if a profile stops sharing them. Anything running
+  in such a container can use the sign-in, which Settings says before
+  signing in; signing out deletes it.
+
+## Coexisting with other WSL users (2026-10-08)
+
+All WSL2 distros on a Windows account share one VM, one kernel and one
+connection to the Windows drives, and other tools (Docker Desktop, Podman,
+dev containers) live there too. A container's S:\ mounts were seen to die
+("No such device") right after one of UNCLI's teardowns. UNCLI follows these
+rules (Harvey's):
+
+1. **Only its own distros.** It only ever terminates or unregisters `uncli-*`
+   distros of its own container profiles, and **never runs `wsl --shutdown`**.
+   The "Restart WSL" button is gone; a stuck WSL gets **Stop UNCLI's
+   containers**, and Settings says that restarting Windows is the fix.
+2. **By PID, never by name.** It stops only the `wsl.exe` processes it
+   started, by their own PIDs.
+3. **Gently.** It asks each process to end first: a CLI's input closes, and
+   the process holding a container up is a shell waiting on its input. Only
+   after a grace period (5 s) is it killed, by PID. A container's sessions
+   stop before it's terminated, and it's terminated (`wsl --terminate`, of
+   that distro) before it's unregistered. At exit UNCLI waits for its CLIs to
+   end.
+4. **Less churn.** Containers are long-lived. The lockdown (`/etc/wsl.conf`)
+   goes into the image before import, so a build no longer stops and starts
+   the distro to apply it.
+5. **No global state.** It never edits `.wslconfig`, restarts WSL's services
+   or mounts shared disks. The one global thing it does is put the user's
+   default distro back after an import, because WSL makes the first imported
+   distro the default.
+6. **Mounts only inside its own distros**, at its own paths; `/mnt` is never
+   touched.
+
+`TestRealCoexist` checks it: another distro mounts a folder on S: and lists
+it every half second while UNCLI builds, uses, rebuilds (with a session
+running), stops and removes a container three times. No listing failed, and
+the mount still worked afterwards. Docker and Podman weren't installed for
+the test; the other distro's drvfs mount is the same mechanism theirs use.

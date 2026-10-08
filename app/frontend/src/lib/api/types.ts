@@ -17,6 +17,7 @@ export interface SessionView {
   title: string
   adapter: string
   runtime: string
+  runtimeRef?: string // the container profile a wsl session runs in
   profileId: string
   workdir: string
   providerSid: string
@@ -420,9 +421,14 @@ export interface DecisionModel {
   threshold?: number // 0.5 to 1; default 0.9
 }
 
+// An AI provider: a CLI sessions run on, with the names the interface uses
+// for it (providers.yaml), since UNCLI's own text names no CLI.
 export interface Provider {
   id: string
   label: string
+  name: string // the CLI: in setup and settings
+  agent: string // who acts in a session
+  account: string // the account it signs in with
 }
 
 // What the user picked last time in the new-session dialog: the type, and
@@ -431,6 +437,7 @@ export interface NewSessionChoices {
   profileId?: string
   models: Record<string, string>
   folders: Record<string, string>
+  containers?: Record<string, string> // where each profile last ran: a container id, or "" for this machine
 }
 
 export interface CreatedSession {
@@ -570,6 +577,7 @@ export interface Handlers {
   pageChanged(p: Page): void
   cliProgress(p: Progress): void
   cliStatus(s: CLIStatus): void
+  containersChanged?(c: ContainersInfo): void
   notifyOpen?(sessionId: string): void // the user clicked a notification ("" for the tray icon)
 }
 
@@ -587,7 +595,7 @@ export interface Backend {
   setCLIVersion(version: string): Promise<CLIStatus>
   cliChannels(): Promise<Record<string, string>>
   pickFolder(title: string): Promise<string>
-  createSession(profileId: string, workdir: string, model: string): Promise<CreatedSession>
+  createSession(profileId: string, workdir: string, model: string, container: string): Promise<CreatedSession> // container: a container profile id, "" for this machine
   pages(sessionId: string): Promise<Page[]>
   send(sessionId: string, text: string, attachments?: AttachmentRef[]): Promise<void>
   interrupt(sessionId: string): Promise<void>
@@ -626,6 +634,19 @@ export interface Backend {
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   usageReport(q: UsageQuery): Promise<UsageReport>
+  containers(): Promise<ContainersInfo> // WSL, the sign-in and each container profile (decision 0011)
+  installWSL(): Promise<void> // one administrator prompt; Windows restarts before WSL works
+  stopContainers(): Promise<void> // stops UNCLI's own containers only (never wsl --shutdown: WSL is shared)
+  buildContainer(id: string): Promise<void> // progress arrives as containersChanged
+  removeContainer(id: string): Promise<void>
+  startContainerSignIn(): Promise<string> // the link to approve
+  finishContainerSignIn(code: string): Promise<void>
+  cancelContainerSignIn(): Promise<void>
+  signOutContainers(): Promise<void>
+  startContainerAccountSignIn(): Promise<string> // the full account sign-in: the link to approve
+  finishContainerAccountSignIn(code: string): Promise<void>
+  cancelContainerAccountSignIn(): Promise<void>
+  signOutContainerAccount(): Promise<void>
   theme(): Promise<ThemeFileInfo> // the user's theme.yaml, if there is one (decision 0010)
   openFolder(path: string): Promise<void>
   openFile(sessionId: string, path: string, line: number): Promise<void> // editor at line (IDE-linked sessions) or default app (documents)
@@ -660,4 +681,41 @@ export interface ThemeFileInfo {
   found: boolean
   light?: Record<string, string> | null
   dark?: Record<string, string> | null
+}
+
+// Containers: WSL distros UNCLI builds from container profiles (decision 0011).
+export interface WSLStatus {
+  installed: boolean
+  version?: string
+  kernel?: string
+  distros: string[] // UNCLI's own (uncli-*)
+  unresponsive?: boolean // wsl.exe didn't answer in time: WSL's service is stuck
+}
+
+export type ContainerStep = 'download' | 'remove' | 'import' | 'packages' | 'cli' | 'lockdown' | 'check'
+
+export interface ContainerInfo {
+  id: string
+  label: string
+  description?: string
+  base: string
+  baseLabel: string
+  packages: string[]
+  brain?: 'shared' | 'sandboxed' | '' // shared: the user's memories, skills, agents, commands, CLAUDE.md, git name
+  mcp?: 'shared' | 'none' | '' // shared: the user's MCP servers that can run on Linux
+  connectors?: 'shared' | 'none' | '' // shared: the user's claude.ai connectors, with the full account sign-in
+  built: boolean
+  step?: ContainerStep // being built
+  percent?: number // download: how much is done
+  error?: string // the last build failed
+  // What differs from how a built container was built; a rebuild updates it.
+  changes?: Array<'packages' | 'base' | 'cli' | 'setup' | 'unknown'>
+}
+
+export interface ContainersInfo {
+  wsl: WSLStatus
+  signedIn: boolean
+  accountSignedIn?: boolean // the full account sign-in, for containers that share connectors
+  containers: ContainerInfo[]
+  error?: string // containers.yaml couldn't be read
 }

@@ -1,0 +1,1 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --resume 0b0e8d7e-1111-4222-8333-944455556666

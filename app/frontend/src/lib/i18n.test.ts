@@ -9,6 +9,20 @@ const sources = import.meta.glob('../**/*.{svelte,ts}', { query: '?raw', import:
 describe('i18n', () => {
   const dict = en as Record<string, string>
 
+  // UNCLI is a harness for any AI CLI: its text takes the provider's names
+  // ({agent}, {cli}, {account}) from providers.yaml and never names one.
+  it('names no CLI, AI provider or maker', () => {
+    const names = /\b(Claude|Anthropic|Gemini|Google|Codex|OpenAI|ChatGPT|Copilot|Cursor|Aider)\b/
+    const named = Object.entries(dict).filter(([, v]) => names.test(v)).map(([k, v]) => `${k}: ${v}`)
+    expect(named).toEqual([])
+  })
+
+  it('fills provider names, a session\'s own over the defaults', () => {
+    expect(t('approval.waiting')).not.toContain('{agent}')
+    expect(t('approval.waiting', { agent: 'Gemini', cli: 'Gemini CLI', account: 'Google' })).toBe('Gemini is waiting for you')
+    expect(t('setup.download.title', { agent: 'Codex', cli: 'Codex CLI', account: 'ChatGPT' })).toBe('Download Codex CLI')
+  })
+
   it('has every static key used in the source', () => {
     const missing = new Set<string>()
     for (const [file, src] of Object.entries(sources)) {

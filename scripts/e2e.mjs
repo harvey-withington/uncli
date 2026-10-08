@@ -47,7 +47,31 @@ function visibleConsoles() {
 }
 
 const APPDIR = path.join(ROOT, 'app')
-const EDGE = process.env.EDGE_PATH ?? 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
+const EDGE = process.env.EDGE_PATH ?? newestEdge()
+
+// The newest versioned msedge.exe; the top-level one is a launcher.
+function newestEdge() {
+  const root = 'C:/Program Files (x86)/Microsoft/Edge/Application'
+  const v = fs.readdirSync(root).filter(d => /^\d+\./.test(d) && fs.existsSync(path.join(root, d, 'msedge.exe')))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0]
+  return v ? path.join(root, v, 'msedge.exe') : path.join(root, 'msedge.exe')
+}
+
+// startEdge runs headless Edge on a debugging port and connects to it.
+// Since Edge 154, msedge.exe hands off to another process and exits, so
+// puppeteer.launch takes it for a failed start (and leaves Edge running).
+async function startEdge(profile) {
+  const port = 9300 + Math.floor(Math.random() * 600)
+  spawn(EDGE, ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--no-first-run', '--window-size=1280,820', 'about:blank'], { stdio: 'ignore', detached: true }).unref()
+  for (let i = 0; i < 100; i++) {
+    try {
+      return await puppeteer.connect({ browserURL: `http://127.0.0.1:${port}` })
+    } catch {
+      await sleep(150)
+    }
+  }
+  throw new Error('headless Edge did not start')
+}
 const WAILS = process.env.WAILS_PATH ?? path.join(os.homedir(), 'go', 'bin', 'wails.exe')
 const DEV = 'http://localhost:34115'
 
@@ -63,7 +87,7 @@ async function launch() {
     await sleep(500)
   }
   await sleep(1500)
-  const browser = await puppeteer.launch({ executablePath: EDGE, headless: true, args: [`--user-data-dir=${path.join(HERE, 'edge-' + Date.now())}`, '--window-size=1280,820'] })
+  const browser = await startEdge(path.join(HERE, 'edge-' + Date.now()))
   const page = await browser.newPage()
   await page.setViewport({ width: 1280, height: 820 })
   page.on('pageerror', e => console.log('PAGEERROR', String(e?.stack ?? e).slice(0, 900)))

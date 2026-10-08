@@ -1,0 +1,12 @@
+# AI providers: the CLIs sessions run on, one per adapter. UNCLI is a
+# harness for any AI CLI, so the interface never names one in its own text:
+# it takes these names instead (docs/UI-CONVENTIONS.md).
+#
+#   name:  the CLI, in setup and settings ("Download {cli}")
+#   agent: who acts in a session ("{agent} prompts you before…")
+#   account: the account it signs in with ("Sign in to {account}")
+providers:
+  - id: claude
+    name: Claude Code
+    agent: Claude
+    account: Claude

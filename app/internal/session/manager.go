@@ -25,12 +25,12 @@ import (
 type BinaryFunc func(ctx context.Context) (path, version string, err error)
 
 type Deps struct {
-	Store      *store.Store
-	Adapter    core.Adapter
-	Runtime    core.Runtime
+	Store   *store.Store
+	Adapter core.Adapter
+	Runtime core.Runtime
 	// Runtimes finds the runtime of a session that doesn't run locally, by
 	// its runtime id and ref (a container profile); nil: local only.
-	Runtimes func(id, ref string) (core.Runtime, error)
+	Runtimes   func(id, ref string) (core.Runtime, error)
 	Profiles   *profile.Set
 	Binary     BinaryFunc
 	Sink       Sink
@@ -51,6 +51,9 @@ type Deps struct {
 	DeciderKey func() string
 }
 
+// RuntimeWSL is the runtime of sessions in a container (a WSL distro).
+const RuntimeWSL = "wsl"
+
 // runtime is where a session's CLI runs.
 func (m *Manager) runtime(rec store.Session) (core.Runtime, error) {
 	if rec.Runtime == "" || rec.Runtime == m.d.Runtime.ID() {
@@ -63,7 +66,7 @@ func (m *Manager) runtime(rec store.Session) (core.Runtime, error) {
 }
 
 // ErrNoCLI means the CLI isn't installed yet; the UI shows the setup screen.
-var ErrNoCLI = errors.New("the Claude CLI is not installed yet")
+var ErrNoCLI = errors.New("the CLI is not installed yet")
 
 type Manager struct {
 	d Deps
@@ -142,6 +145,12 @@ func NewID() string {
 
 // Create makes a new session. The process starts with the first turn.
 func (m *Manager) Create(profileID, workdir, model string) (View, error) {
+	return m.CreateIn(profileID, workdir, model, "")
+}
+
+// CreateIn creates a session whose CLI runs in a container profile's WSL
+// distro (decision 0011); an empty container runs it on this machine.
+func (m *Manager) CreateIn(profileID, workdir, model, container string) (View, error) {
 	p, ok := m.d.Profiles.Profile(profileID)
 	if !ok {
 		return View{}, fmt.Errorf("unknown profile %q", profileID)
@@ -164,6 +173,15 @@ func (m *Manager) Create(profileID, workdir, model string) (View, error) {
 	}
 	rec := store.Session{ID: id, Adapter: m.d.Adapter.ID(), Runtime: m.d.Runtime.ID(), ProfileID: p.ID,
 		Workdir: workdir, Model: model, Modifiers: append([]string{}, p.ModifiersOn...)}
+	if container != "" {
+		if m.d.Runtimes == nil {
+			return View{}, errors.New("containers aren't available here")
+		}
+		if _, err := m.d.Runtimes(RuntimeWSL, container); err != nil {
+			return View{}, err
+		}
+		rec.Runtime, rec.RuntimeRef = RuntimeWSL, container
+	}
 	if err := m.d.Store.CreateSession(&rec); err != nil {
 		return View{}, err
 	}

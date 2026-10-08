@@ -1,7 +1,7 @@
 // App state: sessions, their pages, the page each session is showing, and
 // the live text of answers still streaming. All state is keyed by id.
 import type {
-  ArtifactFile, AttachmentRef, Backend, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
+  ArtifactFile, AttachmentRef, Backend, ContainersInfo, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
   ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
@@ -9,9 +9,11 @@ import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderComp
 import { toBlocks } from '../lib/render/markdown'
 import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
-import { t } from '../lib/i18n.svelte'
+import { setNames, t } from '../lib/i18n.svelte'
+import { namesOf, providerOf, type ProviderNames } from '../lib/providers'
 import { showToast } from '../lib/toasts.svelte'
 import { applyThemeFile } from '../lib/hosttheme'
+import { settingsAttention } from '../lib/attention'
 
 export interface Live {
   seq: number
@@ -25,6 +27,10 @@ export class AppStore {
   boot = $state<Bootstrap | null>(null)
   cli = $state<CLIStatus | null>(null)
   progress = $state<Progress | null>(null)
+  // WSL and the container profiles (decision 0011); loaded on demand.
+  containers = $state<ContainersInfo | null>(null)
+  // What in Settings needs the user, per tab (lib/attention.ts).
+  attention = $derived(settingsAttention(this.containers))
   sessions = $state<SessionView[]>([])
   currentId = $state<string | null>(null)
   pages = $state<Record<string, Page[]>>({})
@@ -103,14 +109,18 @@ export class AppStore {
       pageChanged: p => this.upsertPage(p),
       cliProgress: p => { this.progress = p },
       cliStatus: s => { this.cli = s },
+      containersChanged: c => { this.containers = c },
       notifyOpen: id => { void this.openFromNotification(id) },
     })
     const [boot, cli] = await Promise.all([this.backend.bootstrap(), this.backend.cliStatus(false)])
     this.boot = boot
+    setNames(namesOf(providerOf(boot)))
     this.cli = cli
     this.sessions = sortSessions(boot.sessions)
     void this.refreshPins()
     void this.loadThemeFile(false)
+    // Containers' labels, and whether one needs the user (the Settings dot).
+    if (boot.platform === 'windows') void this.loadContainers()
     this.ready = true
     const first = this.activeSessions[0]
     if (first) await this.select(first.id)
@@ -265,8 +275,23 @@ export class AppStore {
     if (this.currentId) this.index[this.currentId] = i
   }
 
-  async createSession(profileId: string, workdir: string, model: string) {
-    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model)
+  // namesFor is what text about a session calls its AI provider (t()'s
+  // {agent}, {cli}, {account}); no adapter: the first provider.
+  namesFor(adapter?: string): ProviderNames {
+    return namesOf(providerOf(this.boot, adapter))
+  }
+
+  async loadContainers() {
+    try {
+      this.containers = await this.backend.containers()
+    } catch {
+      // not available here: nothing to offer
+    }
+  }
+
+  // container: a container profile to run in, '' for this machine.
+  async createSession(profileId: string, workdir: string, model: string, container = '') {
+    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model, container)
     if (this.boot) this.boot.lastNewSession = lastNewSession
     this.upsertSession(v)
     this.pages[v.id] = []

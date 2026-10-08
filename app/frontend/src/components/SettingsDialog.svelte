@@ -1,43 +1,57 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
-  import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
+  import AppearanceSection from './AppearanceSection.svelte'
+  import ContainersSection from './ContainersSection.svelte'
   import DecisionSection from './DecisionSection.svelte'
   import EditorSection from './EditorSection.svelte'
   import NotifySection from './NotifySection.svelte'
+  import ProviderSection from './ProviderSection.svelte'
+  import QuickSection from './QuickSection.svelte'
   import SafeSection from './SafeSection.svelte'
-  import type { AutoSummary, Preferences } from '../lib/api'
-  import { modelOptions } from '../lib/models'
-  import { AUTO_SUMMARY_MIN_WORDS } from '../lib/outline'
+  import type { Preferences } from '../lib/api'
+  import { loadSettingsTab, nextTab, saveSettingsTab, tabOf, tabsFor, type SettingsTab } from '../lib/settings'
 
-  // Settings: the quick-task model, what counts as safe (SafeSection; the
-  // header's shield opens Settings there), the decision model
-  // (DecisionSection), and the CLI version (anything
-  // but the pinned version is at the user's own risk).
+  // Settings, in tabs down the left (lib/settings.ts): General (appearance,
+  // notifications, editor, quick tasks), Approvals (safe and unsafe, the
+  // decision model), AI Providers (each CLI's version, account and
+  // container sign-in) and, on Windows, Containers. It opens on the last
+  // tab, or on a section's tab when opened at one (the header's shield,
+  // palette commands).
   const app = useApp()
-  let version = $state(app.cli?.version ?? '')
-  let channels = $state<Record<string, string>>({})
-  let busy = $state(false)
+  const tabs = $derived(tabsFor(app.boot?.platform))
+  let tab = $state<SettingsTab>(loadSettingsTab(tabsFor(app.boot?.platform)))
+  let panel: HTMLElement | undefined = $state()
 
-  $effect(() => {
-    app.backend.cliChannels().then(c => (channels = c)).catch(() => {})
-  })
+  function choose(next: SettingsTab) {
+    tab = next
+    saveSettingsTab(next)
+    panel?.scrollTo?.({ top: 0 })
+  }
 
-  // Opened from the shield: start at "Safe and unsafe".
+  // Opened at a section: its tab, scrolled to it.
   $effect(() => {
     const at = app.settingsAt
     if (!at) return
     app.settingsAt = ''
-    requestAnimationFrame(() => document.getElementById(`settings-${at}`)?.scrollIntoView?.({ block: 'start' }))
+    const to = tabOf(at)
+    if (to && tabs.includes(to)) choose(to)
+    void tick().then(() => document.getElementById(`settings-${at}`)?.scrollIntoView?.({ block: 'start' }))
   })
 
-  const pinned = $derived(app.cli?.pinned ?? '')
+  // ↑ / ↓ / Home / End move between the tabs (one tab stop).
+  function onkeydown(e: KeyboardEvent) {
+    const next = nextTab(tabs, tab, e.key)
+    if (!next) return
+    e.preventDefault()
+    choose(next)
+    ;(e.currentTarget as HTMLElement).querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus()
+  }
 
-  // Quick tasks: one provider and model for small jobs outside sessions.
   const prefs = $derived(app.boot?.preferences)
-  const quickModels = $derived(modelOptions(app.boot?.models ?? null, prefs?.quickTaskModel.model))
 
   async function savePrefs(next: Preferences): Promise<boolean> {
     try {
@@ -49,145 +63,115 @@
       return false
     }
   }
-
-  function setQuick(field: 'provider' | 'model', value: string) {
-    if (!prefs) return
-    savePrefs({ ...prefs, quickTaskModel: { ...prefs.quickTaskModel, [field]: value } })
-  }
-  const summaryModes: AutoSummary[] = ['off', 'long', 'always']
-  const isPinned = $derived(!version || version === pinned)
-
-  async function apply(v: string) {
-    busy = true
-    try {
-      app.cli = await app.backend.setCLIVersion(v)
-      version = app.cli.version
-      showToast(t('settings.switched', { version: app.cli.version }), 'success')
-    } catch (e) {
-      showToast(String(e), 'error')
-    } finally {
-      busy = false
-    }
-  }
 </script>
 
-<Modal title={t('settings.title')} width={560} onclose={() => (app.settingsOpen = false)}>
-  {#if prefs}
-    <section>
-      <h3>{t('settings.quickTitle')}</h3>
-      <p class="muted">{t('settings.quickBody')}</p>
-      <div class="grid">
-        <label for="quick-provider">{t('settings.quickProvider')}</label>
-        <select id="quick-provider" class="select" value={prefs.quickTaskModel.provider} onchange={e => setQuick('provider', e.currentTarget.value)}>
-          {#each app.boot?.providers ?? [] as p (p.id)}
-            <option value={p.id}>{p.label}</option>
-          {/each}
-        </select>
-        <label for="quick-model">{t('settings.quickModel')}</label>
-        <select id="quick-model" class="select" value={prefs.quickTaskModel.model} onchange={e => setQuick('model', e.currentTarget.value)}>
-          {#each quickModels as m (m.value)}
-            <option value={m.value}>{m.label}</option>
-          {/each}
-        </select>
-        <label for="auto-summary">{t('settings.autoSummary')}</label>
-        <select id="auto-summary" class="select" value={prefs.autoSummary} onchange={e => savePrefs({ ...prefs, autoSummary: e.currentTarget.value as AutoSummary })}>
-          {#each summaryModes as m (m)}
-            <option value={m}>{t(`settings.autoSummary.${m}`)}</option>
-          {/each}
-        </select>
-        <span></span>
-        <span class="hint">{t(`settings.autoSummaryHint.${prefs.autoSummary}`, { n: AUTO_SUMMARY_MIN_WORDS })}</span>
-      </div>
-    </section>
-  {/if}
-  {#if prefs}<NotifySection {prefs} {savePrefs} />{/if}
-  {#if prefs}<EditorSection {prefs} {savePrefs} />{/if}
-  <SafeSection {savePrefs} />
-  {#if prefs}<DecisionSection {prefs} {savePrefs} />{/if}
-  <section>
-    <h3>{t('settings.cliTitle')}</h3>
-    <p class="muted">{t('settings.cliBody', { pinned })}</p>
-    {#if app.cli?.custom}
-      <p class="note">{t('settings.custom')}</p>
-    {/if}
-    <div class="row">
-      <input class="input" bind:value={version} aria-label={t('settings.version')} placeholder={pinned} />
-      <button class="btn" onclick={() => apply(version)} disabled={busy || !version.trim()}>
-        {#if busy}<Icon name="loader" spin size={14} />{/if}{t('settings.use')}
-      </button>
-    </div>
-    <div class="channels">
-      {#each Object.entries(channels) as [name, v] (name)}
-        <button class="btn small ghost" onclick={() => (version = v)}>{t('settings.channel', { name, version: v })}</button>
+<Modal title={t('settings.title')} width={820} onclose={() => (app.settingsOpen = false)}>
+  <div class="settings">
+    <div class="tabs" role="tablist" aria-orientation="vertical" aria-label={t('settings.tabs')} tabindex="-1" {onkeydown}>
+      {#each tabs as k (k)}
+        <button
+          role="tab"
+          data-tab={k}
+          id="settings-tab-{k}"
+          aria-selected={tab === k}
+          aria-controls="settings-panel"
+          tabindex={tab === k ? 0 : -1}
+          class:on={tab === k}
+          onclick={() => choose(k)}
+          aria-describedby={app.attention[k]?.length ? `settings-attention-${k}` : undefined}
+          title={app.attention[k]?.length ? (app.attention[k] ?? []).map(x => t(x)).join('\n') : undefined}
+        >{t(`settings.tab.${k}`)}{#if app.attention[k]?.length}<span class="dot" aria-hidden="true"></span>{/if}</button>
       {/each}
     </div>
-    {#if !isPinned}
-      <p class="warn" role="note"><Icon name="triangle-alert" size={14} />{t('settings.risk')}</p>
-    {/if}
-    <button class="btn" onclick={() => apply('')} disabled={busy || app.cli?.version === pinned}>{t('settings.backToPinned', { pinned })}</button>
-  </section>
-  {#if app.cli?.email}
-    <section>
-      <h3>{t('settings.account')}</h3>
-      <p class="muted">{t('settings.signedIn', { email: app.cli.email, plan: app.cli.subscription ?? '' })}</p>
-    </section>
-  {/if}
+    <!-- What a tab's dot means, read out with the tab (aria-describedby). -->
+    {#each tabs as k (k)}
+      {#if app.attention[k]?.length}
+        <span id="settings-attention-{k}" class="visually-hidden">{[t('attention.label'), ...(app.attention[k] ?? []).map(x => t(x))].join('. ')}</span>
+      {/if}
+    {/each}
+    <div class="panel" id="settings-panel" role="tabpanel" aria-labelledby="settings-tab-{tab}" tabindex="-1" bind:this={panel}>
+      {#if tab === 'general'}
+        <AppearanceSection />
+        {#if prefs}
+          <NotifySection {prefs} {savePrefs} />
+          <EditorSection {prefs} {savePrefs} />
+          <QuickSection {prefs} {savePrefs} />
+        {/if}
+      {:else if tab === 'approvals'}
+        <SafeSection {savePrefs} />
+        {#if prefs}<DecisionSection {prefs} {savePrefs} />{/if}
+      {:else if tab === 'providers'}
+        {#each app.boot?.providers ?? [] as p (p.id)}
+          <ProviderSection provider={p} />
+        {/each}
+      {:else if tab === 'containers'}
+        <ContainersSection />
+      {/if}
+    </div>
+  </div>
 </Modal>
 
 <style>
-  .grid {
+  .settings {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-2) var(--space-3);
-    align-items: center;
-    margin-bottom: var(--space-3);
-    font-size: var(--text-sm);
+    grid-template-columns: 168px 1fr;
+    gap: var(--space-5);
+    /* One size for every tab, so switching doesn't make the dialog jump. */
+    height: min(620px, calc(100vh - 160px));
   }
-  .hint {
-    margin-top: -2px;
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-  }
-  :global(section) + section,
-  section + section {
-    margin-top: var(--space-5);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--border);
-  }
-  h3 {
-    margin: 0 0 var(--space-1);
-    font-size: var(--text-md);
-  }
-  .muted {
-    margin: 0 0 var(--space-3);
-    font-size: var(--text-sm);
-    color: var(--text-muted);
-  }
-  .note {
-    font-size: var(--text-sm);
-    color: var(--warning);
-  }
-  .row {
+  .tabs {
     display: flex;
-    gap: var(--space-2);
+    flex-direction: column;
+    gap: 2px;
+    padding-top: var(--space-3);
   }
-  .row .input {
-    flex: 1;
-    font-family: var(--mono);
-  }
-  .channels {
-    display: flex;
-    gap: var(--space-1);
-    margin: var(--space-2) 0 var(--space-3);
-  }
-  .warn {
-    display: flex;
-    gap: var(--space-2);
-    align-items: flex-start;
+  .tabs button {
+    text-align: left;
     padding: var(--space-2) var(--space-3);
+    border: none;
     border-radius: var(--radius-sm);
-    background: var(--warning-soft);
-    color: var(--warning);
+    background: none;
+    color: var(--text-muted);
     font-size: var(--text-sm);
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+  }
+  .tabs button:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .tabs button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--warning);
+    flex: none;
+  }
+  .tabs button.on {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .panel {
+    min-width: 0;
+    overflow: auto;
+    padding-right: var(--space-2);
+    outline: none;
+  }
+  /* The first section of a tab needs no divider above it. */
+  .panel > :global(section:first-child) {
+    margin-top: 0;
+    padding-top: var(--space-3);
+    border-top: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tabs button {
+      transition: none;
+    }
   }
 </style>

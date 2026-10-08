@@ -27,6 +27,7 @@ import (
 	"uncli/internal/notify"
 	"uncli/internal/profile"
 	"uncli/internal/runtime/local"
+	"uncli/internal/runtime/wsl"
 	"uncli/internal/session"
 	"uncli/internal/store"
 )
@@ -77,11 +78,17 @@ type Service struct {
 	emit          Emitter
 	notifier      notify.Notifier
 	artifactStore *artifacts.Store
+	containers    containers
+	providers     []Provider               // names for the interface (providers.yaml)
 	transcripts   *core.TranscriptLocation // where saved conversations are read from; nil: the CLI's own (tests set it)
 
 	authMu   sync.Mutex
 	auth     *core.AuthInfo
 	authTime time.Time
+
+	signInMu        sync.Mutex
+	containerSignIn *containerSignIn // setup-token waiting for its code
+	accountLogin    *accountSignIn   // the full account sign-in waiting for its code
 
 	loginMu sync.Mutex
 	login   *local.Interactive
@@ -106,13 +113,20 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	inst := claude.NewInstaller(filepath.Join(paths.Cache, "cli", "claude"))
 	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst), emit: emit}
 	s.notifier = newNotifier(s.notifyClicked)
+	s.containers.cfg, s.containers.err = loadContainers(defaults, paths.Config)
+	if s.providers, err = loadProviders(defaults); err != nil {
+		db.Close()
+		return nil, err
+	}
+	s.containers.building, s.containers.failed, s.containers.runtimes = map[string]string{}, map[string]string{}, map[string]*wsl.Runtime{}
+	s.containers.percent = map[string]int{}
 	s.artifactStore = artifacts.NewStore(filepath.Join(paths.Config, "artifact-store"))
 	sink := newAttention(newCoalescer(emit, 50*time.Millisecond),
 		func(id string) bool { return s.Sessions != nil && s.Sessions.Focused(id) },
 		func() string { return s.Preferences().Notifications },
 		func(n notify.Note) { go s.showNote(n) })
 	s.Sessions, err = session.NewManager(session.Deps{
-		Store: db, Adapter: s.Adapter, Runtime: local.New(), Profiles: set,
+		Store: db, Adapter: s.Adapter, Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,
 		Binary: s.binary, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
 		Judge: s.judgeCommand, JudgeTools: s.judgeTools, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
 	})
@@ -126,6 +140,9 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 func (s *Service) Close() {
 	s.CancelSignIn()
 	s.Sessions.Close()
+	s.CancelContainerSignIn()
+	s.CancelContainerAccountSignIn()
+	s.closeContainers()
 	s.notifier.Close()
 	s.Store.Close()
 }
@@ -227,7 +244,7 @@ func (s *Service) authStatus(ctx context.Context, bin string) (core.AuthInfo, er
 			break
 		}
 	}
-	return core.AuthInfo{}, fmt.Errorf("couldn't check whether Claude is signed in (%v)", lastErr)
+	return core.AuthInfo{}, fmt.Errorf("couldn't check whether the CLI is signed in (%v)", lastErr)
 }
 
 func truncate(s string, n int) string {
@@ -295,7 +312,7 @@ func (s *Service) SignIn(ctx context.Context) (SignInStart, error) {
 			if st.LoggedIn {
 				return SignInStart{SignedIn: true, Status: st}, nil
 			}
-			return SignInStart{}, fmt.Errorf("the Claude CLI's sign-in stopped without showing a link (%s). Details are in %s",
+			return SignInStart{}, fmt.Errorf("the CLI's sign-in stopped without showing a link (%s). Details are in %s",
 				describeExit(p), s.signInLogPath())
 		case <-deadline:
 			s.logSignIn("no link after 60 s; output: %q", p.Output())
@@ -481,6 +498,9 @@ type NewSessionChoices struct {
 	ProfileID string            `json:"profileId,omitempty"`
 	Models    map[string]string `json:"models"`
 	Folders   map[string]string `json:"folders"`
+	// Containers is where each profile last ran: a container profile id, or
+	// none for this machine.
+	Containers map[string]string `json:"containers"`
 }
 
 const settingLastNew = "ui.newSession.last"
@@ -502,18 +522,28 @@ func (s *Service) lastNewSession() NewSessionChoices {
 	if c.Folders == nil {
 		c.Folders = map[string]string{}
 	}
+	if c.Containers == nil {
+		c.Containers = map[string]string{}
+	}
 	return c
 }
 
 // CreateSession creates a session and remembers the choices for next time.
 func (s *Service) CreateSession(profileID, workdir, model string) (session.View, NewSessionChoices, error) {
-	v, err := s.Sessions.Create(profileID, workdir, model)
+	return s.CreateSessionIn(profileID, workdir, model, "")
+}
+
+// CreateSessionIn creates a session that runs in a container profile (empty:
+// on this machine) and remembers the choices for next time.
+func (s *Service) CreateSessionIn(profileID, workdir, model, container string) (session.View, NewSessionChoices, error) {
+	v, err := s.Sessions.CreateIn(profileID, workdir, model, container)
 	if err != nil {
 		return v, s.lastNewSession(), err
 	}
 	c := s.lastNewSession()
 	c.ProfileID = v.ProfileID
 	c.Models[v.ProfileID] = v.Model
+	c.Containers[v.ProfileID] = v.RuntimeRef
 	if p, ok := s.Profiles.Profile(v.ProfileID); ok && p.Folder != "scratch" {
 		c.Folders[v.ProfileID] = v.Workdir
 	}

@@ -66,7 +66,7 @@ export function commands(app: AppStore): Command[] {
   add({ id: 'palette', group: 'app', label: t('cmd.palette'), keys: keysOf('palette'), run: () => (app.paletteOpen = !app.paletteOpen) })
   add({ id: 'keys', group: 'app', label: t('cmd.keys'), keys: keysOf('keys'), run: () => (app.keysOpen = true) })
   add({ id: 'settings', group: 'app', label: t('cmd.settings'), run: () => app.openSettings() })
-  for (const s of ['notify', 'editor', 'safe', 'decider'] as const) {
+  for (const s of ['appearance', 'notify', 'editor', 'safe', 'decider', 'provider', ...(app.boot?.platform === 'windows' ? ['containers'] as const : [])] as const) {
     add({ id: `settings.${s}`, group: 'app', label: t(`cmd.settings.${s}`), run: () => app.openSettings(s) })
   }
   add({ id: 'usage', group: 'app', label: t('cmd.usage'), run: () => (app.usageOpen = true) })

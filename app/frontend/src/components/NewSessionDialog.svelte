@@ -21,6 +21,11 @@
   const dropped = app.newSessionFolder
   let folder = $state('')
   let model = $state('')
+  // Where the CLI runs: '' for this computer, else a built container
+  // profile (decision 0011). Offered once one is built.
+  let container = $state('')
+  const built = $derived((app.containers?.containers ?? []).filter(c => c.built))
+  if (app.boot?.platform === 'windows' && !app.containers) void app.loadContainers()
   let creating = $state(false)
 
   const profile = $derived<Profile | undefined>(profiles.find(p => p.id === profileId))
@@ -33,6 +38,8 @@
     const id = profileId
     model = last?.models?.[id] ?? profile?.model ?? 'sonnet'
     folder = (id === firstProfile && dropped) || last?.folders?.[id] || ''
+    const was = last?.containers?.[id] ?? ''
+    container = built.some(c => c.id === was) ? was : ''
   })
 
   let startButton: HTMLButtonElement | undefined = $state()
@@ -67,7 +74,7 @@
     if (!profile || (needsFolder && !folder)) return
     creating = true
     try {
-      await app.createSession(profile.id, needsFolder ? folder : '', model)
+      await app.createSession(profile.id, needsFolder ? folder : '', model, container)
       app.newSessionOpen = false
     } catch (e) {
       showToast(String(e), 'error')
@@ -102,6 +109,21 @@
       </div>
     {:else}
       <p class="hint">{t('newSession.scratchHint')}</p>
+    {/if}
+
+    {#if built.length}
+      <label class="field">
+        <span class="flabel">{t('newSession.runIn')}</span>
+        <select class="select" bind:value={container}>
+          <option value="">{t('newSession.thisComputer')}</option>
+          {#each built as c (c.id)}
+            <option value={c.id}>{c.label}</option>
+          {/each}
+        </select>
+      </label>
+      {#if container && !app.containers?.signedIn}
+        <p class="hint">{t('newSession.containerSignIn')}</p>
+      {/if}
     {/if}
 
     <label class="field">

@@ -17,6 +17,7 @@
 
   let { page }: Props = $props()
   const app = useApp()
+  const names = $derived(app.namesFor(app.sessions.find(s => s.id === page.sessionId)?.adapter))
   const sessionId = $derived(page.sessionId)
   const pages = $derived(app.pages[sessionId] ?? [])
   const index = $derived(Math.max(0, pages.findIndex(p => p.id === page.id)))
@@ -35,7 +36,7 @@
 <div class="artifacts">
   <p class="asof">{t('artifacts.asOf', { n: page.seq })}</p>
   {#if entries.length === 0}
-    <p class="empty">{t('artifacts.empty')}</p>
+    <p class="empty">{t('artifacts.empty', names)}</p>
   {:else}
     <ul class="list" aria-label={t('artifacts.list')}>
       {#each entries as e (e.path)}

@@ -11,6 +11,11 @@
   import { dragSort } from '../lib/actions'
 
   const app = useApp()
+  // The tab that needs the user, if any: the dot opens Settings there.
+  const attentionAt = $derived((['containers', 'providers'] as const).find(k => (app.attention[k]?.length ?? 0) > 0) ?? '')
+  const attentionTitle = $derived(
+    attentionAt ? [t('attention.label'), ...Object.values(app.attention).flat().map(k => t(k as string))].join('\n') : t('settings.title'),
+  )
   const themeIcon = $derived(theme.value === 'light' ? 'sun' : theme.value === 'dark' ? 'moon' : 'monitor')
 </script>
 
@@ -70,8 +75,9 @@
   </nav>
 
   <footer>
-    <button class="btn ghost small" onclick={() => (app.settingsOpen = true)} title={t('settings.title')}>
-      <Icon name="settings" size={14} />
+    <button class="btn ghost small settings" onclick={() => app.openSettings(attentionAt)} title={attentionTitle}>
+      <span class="gear"><Icon name="settings" size={14} />{#if attentionAt}<span class="dot" aria-hidden="true"></span>{/if}</span>
+      {#if attentionAt}<span class="visually-hidden">{t('attention.label')}</span>{/if}
       {t('settings.cli', { version: app.cli?.version ?? '…' })}
     </button>
     <button class="btn ghost small icon" onclick={cycleTheme} aria-label={t(`theme.${theme.value}`)} title={t(`theme.${theme.value}`)}>
@@ -188,6 +194,21 @@
   }
   .archived {
     opacity: 0.75;
+  }
+  .gear {
+    position: relative;
+    display: inline-flex;
+  }
+  /* Something in Settings needs the user (lib/attention.ts). */
+  .dot {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--warning);
+    box-shadow: 0 0 0 2px var(--bg);
   }
   footer {
     display: flex;

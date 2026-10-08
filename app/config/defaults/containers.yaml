@@ -1,0 +1,50 @@
+# Containers: WSL distros UNCLI builds and owns, one per container profile
+# (docs/decisions/0011). A session started in a container runs the CLI's
+# Linux build there, locked down: no Windows drives but its own folder, no
+# Windows programs, an unprivileged user. Every container gets bash, git and
+# what the CLI needs; packages adds more (Alpine package names, see
+# pkgs.alpinelinux.org).
+#
+#   brain: shared     your memories, skills, agents and commands are mounted,
+#                     your CLAUDE.md and git name and email are copied in
+#                     (never your credentials)
+#   brain: sandboxed  the container keeps its own (the default)
+#   mcp: shared       your MCP servers that can run on Linux (URL-based ones,
+#                     and npx, node, uvx… commands) are given to it
+#   mcp: none         no MCP servers (the default)
+#   connectors: shared  your claude.ai connectors (Jira, Office…): the
+#                     container signs in to your whole account (Settings →
+#                     AI Providers), which anything running in it can use
+#   connectors: none  the models-only sign-in (the default)
+#
+# A user's containers.yaml in UNCLI's config folder adds profiles or
+# replaces these by id. Change a profile's packages, then Rebuild it.
+
+# Bases are pinned root filesystems, checked against their SHA-256. cli is
+# the build of the CLI that runs on them (from the same release manifest as
+# the Windows build).
+bases:
+  - id: alpine-3.24
+    label: Alpine Linux 3.24
+    url: https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-minirootfs-3.24.2-x86_64.tar.gz
+    sha256: c5ca053cfe1d85c5b96dff8b9bc57045f7f184a30ffb6b65776409ca90388677
+    cli: linux-x64-musl
+
+containers:
+  - id: sandbox
+    label: Sandbox
+    description: Linux with the usual tools, your memories, MCP servers and connectors. A session there sees only its own folder.
+    base: alpine-3.24
+    brain: shared
+    mcp: shared
+    connectors: shared
+    packages: [coreutils, findutils, grep, sed, less, curl, jq, ripgrep, make, nodejs, npm, python3, py3-pip]
+
+  - id: isolated
+    label: Isolated
+    description: "A clean Linux that knows nothing of you: no memories, MCP servers or connectors."
+    base: alpine-3.24
+    brain: sandboxed
+    mcp: none
+    connectors: none
+    packages: [coreutils, findutils, grep, sed, less, curl, jq, ripgrep]

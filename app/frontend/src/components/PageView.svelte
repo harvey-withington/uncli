@@ -18,6 +18,7 @@
 
   let { page }: Props = $props()
   const app = useApp()
+  const names = $derived(app.namesFor(app.sessions.find(s => s.id === page.sessionId)?.adapter))
   const live = $derived(app.live[page.sessionId])
   const answer = $derived(displayAnswer(page, live))
   const open = $derived(page.status === 'open')
@@ -27,7 +28,7 @@
   // A turn the CLI started by itself (a background task finished) has no
   // question: the header says so instead.
   const byCli = $derived(page.origin === 'cli')
-  const questionLine = $derived(byCli ? t('page.byCli') : page.question || (page.attachments ?? []).map(f => f.name).join(', '))
+  const questionLine = $derived(byCli ? t('page.byCli', names) : page.question || (page.attachments ?? []).map(f => f.name).join(', '))
   // The outline's entries, marked beside their blocks in the left margin.
   const markers = $derived(new Map(app.outlineFor(page).entries.map(e => [e.block, e])))
 </script>
@@ -64,7 +65,7 @@
           {@render toggle()}
         </div>
         {#if byCli}
-          <p class="q-text by-cli"><Icon name="history" size={15} />{t('page.byCli')}</p>
+          <p class="q-text by-cli"><Icon name="history" size={15} />{t('page.byCli', names)}</p>
         {:else if page.question}<p class="q-text">{page.question}</p>{/if}
         {#if page.attachments?.length}
           <ul class="q-files" aria-label={t('page.attachments')}>

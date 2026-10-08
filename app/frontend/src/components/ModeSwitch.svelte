@@ -14,6 +14,7 @@
 
   let { session }: Props = $props()
   const app = useApp()
+  const names = $derived(app.namesFor(session.adapter))
   const mode = $derived(modeOf(session))
   let group: HTMLElement | undefined = $state()
 
@@ -49,7 +50,7 @@
       aria-checked={mode === m.id}
       tabindex={mode === m.id ? 0 : -1}
       data-mode={m.id}
-      title={t(`mode.${m.id}.hint`)}
+      title={t(`mode.${m.id}.hint`, names)}
       onclick={() => choose(m.id)}
     >
       <Icon name={m.icon} size={14} />{t(`mode.${m.id}`)}
