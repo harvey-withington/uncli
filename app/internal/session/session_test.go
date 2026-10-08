@@ -46,9 +46,9 @@ func segments(t *testing.T, name string) [][]byte {
 }
 
 func isResult(l []byte) bool {
-	var v struct{ Type string }
+	var v struct{ Type, Event string }
 	_ = json.Unmarshal(l, &v)
-	return v.Type == "result"
+	return v.Type == "result" || v.Event == "result"
 }
 
 // fakeRuntime replays recorded turns: each user line written to stdin
@@ -105,7 +105,7 @@ func (p *fakeProc) Write(b []byte) (int, error) {
 	p.r.mu.Lock()
 	p.r.stdin = append(p.r.stdin, strings.TrimSpace(string(b)))
 	var seg []byte
-	release := bytes.Contains(b, []byte(`"type":"user"`)) || p.r.onControl && bytes.Contains(b, []byte(`"type":"control_response"`))
+	release := bytes.Contains(b, []byte(`"type":"user"`)) || bytes.Contains(b, []byte(`"event":"user"`)) || p.r.onControl && bytes.Contains(b, []byte(`"type":"control_response"`))
 	if release && p.r.next < len(p.r.turns) {
 		seg = p.r.turns[p.r.next]
 		p.r.next++
@@ -196,7 +196,7 @@ func openHarness(t *testing.T, dir, fixture string) *harness {
 	m, err := NewManager(Deps{
 		Store: db, Adapter: claude.New(nil), Runtime: rt, Profiles: set, Sink: sink,
 		ScratchDir: filepath.Join(dir, "scratch"),
-		Binary:     func(context.Context) (string, string, error) { return "claude", claude.PinnedVersion, nil },
+		Binary:     func(context.Context, string) (string, string, error) { return "claude", claude.PinnedVersion, nil },
 	})
 	if err != nil {
 		t.Fatal(err)

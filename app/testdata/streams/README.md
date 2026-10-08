@@ -47,3 +47,20 @@ Recorded with Claude Code 2.1.285 (`stable` on 2026-10-01), mostly on Haiku 4.5.
 | `system-prompt-snapshot-resume` | Resume with a different `--append-system-prompt`: the original prompt still applies |
 | `error-bad-model` | Unknown model: `result` with `is_error`, assistant `error: model_not_found` |
 | `error-not-logged-in` | No credentials: `result` with `is_error`, assistant `error: authentication_failed` |
+
+## antigravity/1.3.1
+
+Recorded with the Antigravity CLI (`agy`) 1.3.1 on Windows on 2026-10-09,
+on Gemini 3.8 Flash (Low), with `--gemini_dir=C:\uncli-agy` (decision 0012).
+Turns are `{"event":"user","message":{"content":"…"}}` lines; each is sent
+after the previous turn's `result`. `<name>.hook.jsonl` holds what the
+`PreToolUse` hook was sent for each tool call, one JSON object a line.
+
+| Fixture | What it shows |
+| --- | --- |
+| `multi-turn` | Two turns on one process: `init` once (with the model when `--model` is given), `step_update` per step (`user_input`, `agent_response` with `text_delta`), each answer step's own `usage` when it's `DONE`, and `result` per turn with cumulative `usage` and `num_turns` |
+| `resume` | `--conversation <id>` of `multi-turn`: remembers the number |
+| `error-bad-model` | An unknown `--model`: one `result` with `status: ERROR` and the available models in `error`, the same on stderr, exit 1 |
+| `tools-hook-allow` | `--dangerously-skip-permissions` with UNCLI's hook allowing: `view_file`, `write_to_file` and `run_command` (PowerShell) as `tool` steps (`ACTIVE`, then `DONE` with `output`); the hook gets each call's full arguments and a `stepIdx` equal to the step's `step_index` |
+| `tools-hook-deny` | The hook denying a `run_command`: the step ends `ERROR` with `tool call denied by pre-tool hook: <reason>`, and the agent says so |
+| `subagent` | `invoke_subagent`: a `subagent` step with `subagent_info`, the main agent's reply, a `system_message` step when the sub-agent's report comes back, and the final answer, all in one turn; the sub-agent's own tool calls reach the hook under its conversation id |

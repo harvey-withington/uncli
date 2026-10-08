@@ -1,0 +1,1 @@
+--gemini_dir=C:\uncli-agy --input-format stream-json --output-format stream-json --model no-such-model

@@ -14,12 +14,16 @@ const FALLBACK: ModelOption[] = [
 ]
 
 // modelOptions lists the models the CLI reported, dropping its "default"
-// entry (UNCLI always names the model) and keeping aliases first.
-export function modelOptions(models: ModelInfo[] | null, current?: string): ModelOption[] {
-  const list: ModelOption[] = models?.length
-    ? models.filter(m => m.value !== 'default').map(m => ({ value: m.value, label: m.displayName || m.value, description: m.description }))
-    : [...FALLBACK]
+// entry and keeping aliases first. null (nothing reported yet) offers the
+// first provider's stable aliases; another provider's empty list offers
+// nothing but its CLI's own default (defaultLabel), which an empty current
+// model also shows.
+export function modelOptions(models: ModelInfo[] | null, current?: string, defaultLabel?: string): ModelOption[] {
+  const list: ModelOption[] = models === null
+    ? [...FALLBACK]
+    : models.filter(m => m.value !== 'default').map(m => ({ value: m.value, label: m.displayName || m.value, description: m.description }))
   if (current && !list.some(o => o.value === current)) list.unshift({ value: current, label: current, description: '' })
+  if (defaultLabel && (current === '' || !list.length)) list.unshift({ value: '', label: defaultLabel, description: '' })
   return list
 }
 

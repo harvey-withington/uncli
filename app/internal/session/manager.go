@@ -21,12 +21,25 @@ import (
 	"uncli/internal/store"
 )
 
-// BinaryFunc resolves the CLI binary to run and its version.
-type BinaryFunc func(ctx context.Context) (path, version string, err error)
+// BinaryFunc resolves a provider's CLI binary to run and its version.
+type BinaryFunc func(ctx context.Context, provider string) (path, version string, err error)
+
+// HookServer gives a CLI process a way to ask UNCLI about tool calls
+// (internal/hook): a handler for its calls, and the environment that leads
+// its hooks to it.
+type HookServer interface {
+	Register(h func(ctx context.Context, event string, payload []byte) ([]byte, error)) (env map[string]string, unregister func())
+}
 
 type Deps struct {
-	Store   *store.Store
+	Store *store.Store
+	// Adapter is the first provider, for sessions that don't name one;
+	// Others are the rest. A session uses the one its record names.
 	Adapter core.Adapter
+	Others  []core.Adapter
+	// Hooks carries hook calls for adapters that ask through one
+	// (HookApprovals); nil: such sessions can't approve tool calls.
+	Hooks   HookServer
 	Runtime core.Runtime
 	// Runtimes finds the runtime of a session that doesn't run locally, by
 	// its runtime id and ref (a container profile); nil: local only.
@@ -63,6 +76,28 @@ func (m *Manager) runtime(rec store.Session) (core.Runtime, error) {
 		return nil, fmt.Errorf("this session runs in %s, which this UNCLI can't start", rec.Runtime)
 	}
 	return m.d.Runtimes(rec.Runtime, rec.RuntimeRef)
+}
+
+// adapterNamed is a provider's adapter; empty is the first provider.
+func (m *Manager) adapterNamed(id string) (core.Adapter, error) {
+	if id == "" || id == m.d.Adapter.ID() {
+		return m.d.Adapter, nil
+	}
+	for _, a := range m.d.Others {
+		if a.ID() == id {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("no AI provider %q", id)
+}
+
+// adapterOf is the adapter a session runs on. One whose provider this UNCLI
+// no longer has keeps the first, and fails to start with a clear error.
+func (m *Manager) adapterOf(rec store.Session) core.Adapter {
+	if a, err := m.adapterNamed(rec.Adapter); err == nil {
+		return a
+	}
+	return missingAdapter{m.d.Adapter, rec.Adapter}
 }
 
 // ErrNoCLI means the CLI isn't installed yet; the UI shows the setup screen.
@@ -151,12 +186,33 @@ func (m *Manager) Create(profileID, workdir, model string) (View, error) {
 // CreateIn creates a session whose CLI runs in a container profile's WSL
 // distro (decision 0011); an empty container runs it on this machine.
 func (m *Manager) CreateIn(profileID, workdir, model, container string) (View, error) {
+	return m.CreateWith(NewSession{Profile: profileID, Workdir: workdir, Model: model, Container: container})
+}
+
+// NewSession is what a new session starts from.
+type NewSession struct {
+	Profile, Workdir, Model string
+	Container               string // a container profile; empty: this machine
+	Provider                string // the AI provider (an adapter's id); empty: the first
+}
+
+// CreateWith makes a new session on a provider. A profile's model is the
+// first provider's; another starts on its CLI's own default unless given one.
+func (m *Manager) CreateWith(n NewSession) (View, error) {
+	profileID, workdir, model, container := n.Profile, n.Workdir, n.Model, n.Container
 	p, ok := m.d.Profiles.Profile(profileID)
 	if !ok {
 		return View{}, fmt.Errorf("unknown profile %q", profileID)
 	}
-	if model == "" {
+	ad, err := m.adapterNamed(n.Provider)
+	if err != nil {
+		return View{}, err
+	}
+	if model == "" && ad == m.d.Adapter {
 		model = p.Model
+	}
+	if container != "" && ad != m.d.Adapter {
+		return View{}, errors.New("containers can only run " + m.d.Adapter.ID() + " sessions for now")
 	}
 	id := NewID()
 	if p.Folder == "scratch" || workdir == "" {
@@ -171,7 +227,7 @@ func (m *Manager) CreateIn(profileID, workdir, model, container string) (View, e
 	if p.Folder == "scratch" {
 		_ = os.MkdirAll(filepath.Join(workdir, artifacts.Folder), 0o755)
 	}
-	rec := store.Session{ID: id, Adapter: m.d.Adapter.ID(), Runtime: m.d.Runtime.ID(), ProfileID: p.ID,
+	rec := store.Session{ID: id, Adapter: ad.ID(), Runtime: m.d.Runtime.ID(), ProfileID: p.ID,
 		Workdir: workdir, Model: model, Modifiers: append([]string{}, p.ModifiersOn...)}
 	if container != "" {
 		if m.d.Runtimes == nil {

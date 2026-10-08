@@ -21,7 +21,9 @@ const SECTION_TAB: Record<string, SettingsTab> = {
   containers: 'containers',
 }
 
+// A provider's own section (provider-<id>) is on AI Providers too.
 export function tabOf(section: string): SettingsTab | null {
+  if (section.startsWith('provider-')) return 'providers'
   return SECTION_TAB[section] ?? null
 }
 

@@ -11,8 +11,14 @@ const md = new MarkdownIt({
   breaks: false,
 })
 
-// Links never navigate the app window; the click handler opens them in the
-// user's browser.
+// Links to files (file:///…, as the Antigravity CLI writes them) are links
+// too: markdown-it refuses them by default, which left their markdown
+// showing. Scripts and inline data never are.
+const unsafeLink = /^\s*(javascript|vbscript|data):/i
+md.validateLink = url => !unsafeLink.test(url)
+
+// Links never navigate the app window; the click handler opens web links
+// in the user's browser and files in their editor (lib/links.ts).
 const defaultLink = md.renderer.rules.link_open ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
 md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   tokens[idx]?.attrSet('rel', 'noopener noreferrer')

@@ -1,0 +1,1 @@
+{"event":"user","message":{"content":"Read note.txt, then create a file colour.txt containing just the colour from note.txt, then run the shell command: Get-Content colour.txt . Reply with the command output."}}

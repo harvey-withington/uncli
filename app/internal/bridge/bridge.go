@@ -141,14 +141,32 @@ func (a *App) SetCLIVersion(version string) (app.CLIStatus, error) {
 
 func (a *App) CLIChannels() (map[string]string, error) { return a.svc.CLIChannels(a.ctx) }
 
+// Any provider's CLI: status (with the models its account can use, for
+// CLIs that list them), install, version and channels.
+func (a *App) ProviderStatus(id string, fresh bool) app.CLIStatus {
+	return a.svc.ProviderStatus(a.ctx, id, fresh)
+}
+
+func (a *App) InstallProvider(id string) (app.CLIStatus, error) {
+	return a.svc.InstallProvider(a.ctx, id)
+}
+
+func (a *App) SetProviderVersion(id, version string) (app.CLIStatus, error) {
+	return a.svc.SetProviderVersion(a.ctx, id, version)
+}
+
+func (a *App) ProviderChannels(id string) (map[string]string, error) {
+	return a.svc.ProviderChannels(a.ctx, id)
+}
+
 func (a *App) PickFolder(title string) (string, error) {
 	return wruntime.OpenDirectoryDialog(a.ctx, wruntime.OpenDialogOptions{Title: title})
 }
 
 // CreateSession creates a session; the choices made are remembered for the
 // next new-session dialog and returned with it.
-func (a *App) CreateSession(profileID, workdir, model, container string) (app.CreatedSession, error) {
-	v, last, err := a.svc.CreateSessionIn(profileID, workdir, model, container)
+func (a *App) CreateSession(profileID, workdir, model, container, provider string) (app.CreatedSession, error) {
+	v, last, err := a.svc.CreateSessionWith(session.NewSession{Profile: profileID, Workdir: workdir, Model: model, Container: container, Provider: provider})
 	return app.CreatedSession{Session: v, LastNew: last}, err
 }
 
@@ -322,6 +340,14 @@ func (a *App) StopContainers() error { return a.svc.StopContainers(a.ctx) }
 // BuildContainer builds or rebuilds a container profile's distro.
 func (a *App) BuildContainer(id string) error { return a.svc.BuildContainer(id) }
 
+// SaveContainer adds or replaces a container in the user's containers.yaml;
+// RemoveContainerConfig takes the user's version out (a built-in one goes
+// back to how it ships; one of their own is deleted with its container).
+func (a *App) SaveContainer(p app.ContainerProfile) error { return a.svc.SaveContainer(p) }
+func (a *App) RemoveContainerConfig(id string) error {
+	return a.svc.RemoveContainerConfig(a.ctx, id)
+}
+
 // RemoveContainer deletes a container profile's distro.
 func (a *App) RemoveContainer(id string) error { return a.svc.RemoveContainer(a.ctx, id) }
 
@@ -358,6 +384,12 @@ func (a *App) OpenFolder(path string) error { return app.OpenFolder(path) }
 // link to an IDE) or with the default app (documents only).
 func (a *App) OpenFile(sessionID, path string, line int) error {
 	return a.svc.OpenFile(sessionID, path, line)
+}
+
+// OpenPath follows a link in an answer to a file (opened as OpenFile does)
+// or a folder (shown).
+func (a *App) OpenPath(sessionID, path string, line int) error {
+	return a.svc.OpenPath(sessionID, path, line)
 }
 
 // RevealFile shows a file in its folder.

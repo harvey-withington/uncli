@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import type { Profile } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
@@ -27,19 +27,45 @@
   const built = $derived((app.containers?.containers ?? []).filter(c => c.built))
   if (app.boot?.platform === 'windows' && !app.containers) void app.loadContainers()
   let creating = $state(false)
+  // The AI provider (its CLI) the session runs on, when there's a choice.
+  const providers = $derived(app.boot?.providers ?? [])
+  let provider = $state('')
+  const isFirst = $derived(!provider || provider === providers[0]?.id)
+  const status = $derived(app.statusOf(provider))
+  const ready = $derived(!!status?.installed && !!status?.loggedIn)
+  const names = $derived(app.namesFor(provider))
 
   const profile = $derived<Profile | undefined>(profiles.find(p => p.id === profileId))
   const needsFolder = $derived(profile?.folder !== 'scratch')
-  const options = $derived(modelOptions(app.boot?.models ?? null, model || undefined))
+  const options = $derived(modelOptions(app.modelsFor(provider), model, t('model.cliDefault', names)))
+
+  // The model a provider starts on: the last one used with this profile on
+  // it, else the profile's (the first provider's) or the CLI's first.
+  function modelFor(id: string, p: string): string {
+    const lastModel = last?.models?.[id]
+    if ((last?.providers?.[id] ?? providers[0]?.id) === p && lastModel !== undefined) return lastModel
+    if (!p || p === providers[0]?.id) return profile?.model ?? 'sonnet'
+    return app.modelsFor(p)?.[0]?.value ?? ''
+  }
+
+  function chooseProvider(p: string) {
+    provider = p
+    model = modelFor(profileId, p)
+    if (!isFirst) container = '' // containers run the first provider only
+  }
 
   $effect(() => {
-    // On each profile, start from the model and folder used with it last
-    // time, else the profile's default model and no folder.
+    // On each profile, start from the provider, model and folder used with
+    // it last time, else the first provider, the profile's model and no folder.
     const id = profileId
-    model = last?.models?.[id] ?? profile?.model ?? 'sonnet'
-    folder = (id === firstProfile && dropped) || last?.folders?.[id] || ''
-    const was = last?.containers?.[id] ?? ''
-    container = built.some(c => c.id === was) ? was : ''
+    untrack(() => {
+      const was = last?.providers?.[id]
+      provider = was && providers.some(p => p.id === was) ? was : (providers[0]?.id ?? '')
+      model = modelFor(id, provider)
+      folder = (id === firstProfile && dropped) || last?.folders?.[id] || ''
+      const wasIn = last?.containers?.[id] ?? ''
+      container = isFirst && built.some(c => c.id === wasIn) ? wasIn : ''
+    })
   })
 
   let startButton: HTMLButtonElement | undefined = $state()
@@ -71,10 +97,10 @@
   }
 
   async function create() {
-    if (!profile || (needsFolder && !folder)) return
+    if (!profile || (needsFolder && !folder) || !ready) return
     creating = true
     try {
-      await app.createSession(profile.id, needsFolder ? folder : '', model, container)
+      await app.createSession(profile.id, needsFolder ? folder : '', model, container, isFirst ? '' : provider)
       app.newSessionOpen = false
     } catch (e) {
       showToast(String(e), 'error')
@@ -111,7 +137,25 @@
       <p class="hint">{t('newSession.scratchHint')}</p>
     {/if}
 
-    {#if built.length}
+    {#if providers.length > 1}
+      <label class="field">
+        <span class="flabel">{t('newSession.provider')}</span>
+        <select class="select" value={provider} onchange={e => chooseProvider(e.currentTarget.value)}>
+          {#each providers as p (p.id)}
+            {@const st = app.statusOf(p.id)}
+            <option value={p.id}>{st?.installed && st.loggedIn ? p.name : t('newSession.notSetUp', { cli: p.name })}</option>
+          {/each}
+        </select>
+      </label>
+      {#if !ready}
+        <p class="hint setup">
+          {t(status?.installed ? 'newSession.providerSignIn' : 'newSession.providerInstall', names)}
+          <button class="btn small" onclick={() => { app.newSessionOpen = false; app.openSettings(`provider-${provider}`) }}>{t('newSession.setUp')}</button>
+        </p>
+      {/if}
+    {/if}
+
+    {#if built.length && isFirst}
       <label class="field">
         <span class="flabel">{t('newSession.runIn')}</span>
         <select class="select" bind:value={container}>
@@ -143,7 +187,7 @@
       </button>
     {/if}
     <button class="btn" onclick={() => (app.newSessionOpen = false)}>{t('common.cancel')}</button>
-    <button class="btn primary" bind:this={startButton} onclick={create} disabled={creating || (needsFolder && !folder)}>
+    <button class="btn primary" bind:this={startButton} onclick={create} disabled={creating || (needsFolder && !folder) || !ready}>
       {#if creating}<Icon name="loader" spin size={14} />{/if}
       {t('newSession.create')}
     </button>
@@ -230,6 +274,16 @@
     margin: 0 0 var(--space-4);
     font-size: var(--text-sm);
     color: var(--text-muted);
+  }
+  .hint.setup {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: calc(-1 * var(--space-2));
+    color: var(--warning);
+  }
+  .hint.setup .btn {
+    flex: none;
   }
   .import-link {
     margin-right: auto;

@@ -19,10 +19,12 @@ import (
 	"time"
 
 	"uncli/config"
+	"uncli/internal/adapter/antigravity"
 	"uncli/internal/adapter/claude"
 	"uncli/internal/artifacts"
 	"uncli/internal/attach"
 	"uncli/internal/core"
+	"uncli/internal/hook"
 	"uncli/internal/ide"
 	"uncli/internal/notify"
 	"uncli/internal/profile"
@@ -34,9 +36,25 @@ import (
 
 // Settings keys.
 const (
-	SettingCLIVersion = "cli.claude.version" // empty = the pinned version
+	SettingCLIVersion = "cli.claude.version" // empty = the pinned version (cliVersionKey)
 	SettingCLIPath    = "cli.claude.path"    // a binary to use instead of a managed one (development)
 )
+
+// HookCommandEnv runs a different command as the CLIs' hook (tests);
+// otherwise it is UNCLI itself in hook mode (main.go).
+const HookCommandEnv = "UNCLI_HOOK_COMMAND"
+
+// hookCommand is the command line that runs UNCLI's hook (decision 0012).
+func hookCommand() string {
+	if c := os.Getenv(HookCommandEnv); c != "" {
+		return c
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return `"` + exe + `" hook`
+}
 
 type Paths struct {
 	Config  string // db and user YAML
@@ -67,9 +85,12 @@ type Service struct {
 	Paths     Paths
 	Store     *store.Store
 	Profiles  *profile.Set
-	Adapter   *claude.Adapter
+	Adapter   *claude.Adapter // the first provider
 	Installer *claude.Installer
 	Sessions  *session.Manager
+
+	clis  []*cliProvider // every provider's CLI, the first first (clis.go)
+	hooks *hook.Server   // where CLIs' hooks ask about tool calls
 
 	// ShowWindow brings UNCLI's window to the front (set by the bridge);
 	// clicking a notification uses it.
@@ -81,10 +102,6 @@ type Service struct {
 	containers    containers
 	providers     []Provider               // names for the interface (providers.yaml)
 	transcripts   *core.TranscriptLocation // where saved conversations are read from; nil: the CLI's own (tests set it)
-
-	authMu   sync.Mutex
-	auth     *core.AuthInfo
-	authTime time.Time
 
 	signInMu        sync.Mutex
 	containerSignIn *containerSignIn // setup-token waiting for its code
@@ -112,6 +129,16 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	}
 	inst := claude.NewInstaller(filepath.Join(paths.Cache, "cli", "claude"))
 	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst), emit: emit}
+	agyInst := antigravity.NewInstaller(filepath.Join(paths.Cache, "cli", "antigravity"))
+	agy := antigravity.New(agyInst, filepath.Join(paths.Config, "agy"), hookCommand())
+	s.clis = []*cliProvider{
+		{adapter: s.Adapter, installer: inst, binEnv: "UNCLI_CLAUDE_BIN"},
+		{adapter: agy, installer: agyInst, binEnv: "UNCLI_AGY_BIN"},
+	}
+	if s.hooks, err = hook.Listen(); err != nil {
+		db.Close()
+		return nil, err
+	}
 	s.notifier = newNotifier(s.notifyClicked)
 	s.containers.cfg, s.containers.err = loadContainers(defaults, paths.Config)
 	if s.providers, err = loadProviders(defaults); err != nil {
@@ -126,8 +153,9 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		func() string { return s.Preferences().Notifications },
 		func(n notify.Note) { go s.showNote(n) })
 	s.Sessions, err = session.NewManager(session.Deps{
-		Store: db, Adapter: s.Adapter, Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,
-		Binary: s.binary, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
+		Store: db, Adapter: s.Adapter, Others: []core.Adapter{agy}, Hooks: s.hooks,
+		Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,
+		Binary: s.binaryOf, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
 		Judge: s.judgeCommand, JudgeTools: s.judgeTools, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
 	})
 	if err != nil {
@@ -144,38 +172,21 @@ func (s *Service) Close() {
 	s.CancelContainerAccountSignIn()
 	s.closeContainers()
 	s.notifier.Close()
+	_ = s.hooks.Close()
 	s.Store.Close()
 }
 
 // cliVersion is the version the user runs: the pinned one unless they
 // chose another at their own risk.
-func (s *Service) cliVersion() string {
-	if v, _ := s.Store.Setting(SettingCLIVersion); v != "" {
-		return v
-	}
-	return s.Installer.Pinned()
-}
+func (s *Service) cliVersion() string { return s.versionOf(s.clis[0]) }
 
+// binary is the first provider's CLI binary and its version.
 func (s *Service) binary(ctx context.Context) (string, string, error) {
-	if p := s.overridePath(); p != "" {
-		return p, "custom", nil
-	}
-	v := s.cliVersion()
-	if p, ok := s.Installer.Path(v); ok {
-		return p, v, nil
-	}
-	return "", "", session.ErrNoCLI
-}
-
-func (s *Service) overridePath() string {
-	if p := os.Getenv("UNCLI_CLAUDE_BIN"); p != "" {
-		return p
-	}
-	p, _ := s.Store.Setting(SettingCLIPath)
-	return p
+	return s.binaryOf(ctx, s.Adapter.ID())
 }
 
 type CLIStatus struct {
+	Provider     string `json:"provider"` // the provider's id
 	Installed    bool   `json:"installed"`
 	Version      string `json:"version"`
 	Pinned       string `json:"pinned"`
@@ -184,67 +195,14 @@ type CLIStatus struct {
 	Email        string `json:"email,omitempty"`
 	Subscription string `json:"subscription,omitempty"`
 	Error        string `json:"error,omitempty"`
+	// Models the account can use, for CLIs whose sign-in check lists them.
+	Models []core.ModelInfo `json:"models,omitempty"`
 }
 
-// CLIStatus reports whether the CLI is installed and signed in. The auth
-// check runs the CLI, so its result is cached briefly.
+// CLIStatus reports whether the first provider's CLI is installed and
+// signed in (the setup screen's question).
 func (s *Service) CLIStatus(ctx context.Context, fresh bool) CLIStatus {
-	st := CLIStatus{Version: s.cliVersion(), Pinned: s.Installer.Pinned(), Custom: s.overridePath() != ""}
-	bin, _, err := s.binary(ctx)
-	if err != nil {
-		return st
-	}
-	st.Installed = true
-	if st.Custom {
-		st.Version = "custom"
-	}
-	s.authMu.Lock()
-	cached := s.auth
-	if fresh || cached == nil || time.Since(s.authTime) > 30*time.Second {
-		cached = nil
-	}
-	s.authMu.Unlock()
-	if cached == nil {
-		info, err := s.authStatus(ctx, bin)
-		if err != nil {
-			st.Error = err.Error()
-			return st
-		}
-		s.authMu.Lock()
-		s.auth, s.authTime = &info, time.Now()
-		s.authMu.Unlock()
-		cached = &info
-	}
-	st.LoggedIn, st.Email, st.Subscription = cached.LoggedIn, cached.Email, cached.Subscription
-	return st
-}
-
-// authStatus asks the CLI whether it is signed in. "auth status" exits 1
-// when signed out but still prints its JSON, so the JSON decides. The first
-// run of a freshly downloaded binary can be slow (antivirus scans), so it
-// gets a generous timeout and one retry.
-func (s *Service) authStatus(ctx context.Context, bin string) (core.AuthInfo, error) {
-	var lastErr error
-	for attempt := 0; attempt < 2; attempt++ {
-		actx, cancel := context.WithTimeout(ctx, 60*time.Second)
-		out, err := local.Run(actx, s.Adapter.AuthStatusCommand(bin))
-		cancel()
-		if info, perr := s.Adapter.ParseAuthStatus(out); perr == nil {
-			return info, nil
-		}
-		switch {
-		case err != nil:
-			lastErr = err
-		case len(strings.TrimSpace(string(out))) == 0:
-			lastErr = errors.New("it printed nothing")
-		default:
-			lastErr = fmt.Errorf("unexpected output %q", truncate(string(out), 120))
-		}
-		if ctx.Err() != nil {
-			break
-		}
-	}
-	return core.AuthInfo{}, fmt.Errorf("couldn't check whether the CLI is signed in (%v)", lastErr)
+	return s.ProviderStatus(ctx, s.Adapter.ID(), fresh)
 }
 
 func truncate(s string, n int) string {
@@ -254,17 +212,9 @@ func truncate(s string, n int) string {
 	return s
 }
 
-// InstallCLI downloads the selected CLI version, reporting progress.
+// InstallCLI downloads the first provider's selected CLI version.
 func (s *Service) InstallCLI(ctx context.Context) (CLIStatus, error) {
-	_, err := s.Installer.Ensure(ctx, s.cliVersion(), func(done, total int64) {
-		s.emit.Emit(EvtCLIProgress, Progress{Done: done, Total: total})
-	})
-	if err != nil {
-		return s.CLIStatus(ctx, true), err
-	}
-	st := s.CLIStatus(ctx, true)
-	s.emit.Emit(EvtCLIStatus, st)
-	return st, nil
+	return s.InstallProvider(ctx, s.Adapter.ID())
 }
 
 // SignInStart is the result of starting sign-in: either a link for the
@@ -308,7 +258,7 @@ func (s *Service) SignIn(ctx context.Context) (SignInStart, error) {
 		case <-p.Done():
 			s.logSignIn("exited before a link: %v\noutput: %q", p.Err(), p.Output())
 			st := s.CLIStatus(ctx, true)
-			s.emit.Emit(EvtCLIStatus, st)
+			s.emitStatus(st)
 			if st.LoggedIn {
 				return SignInStart{SignedIn: true, Status: st}, nil
 			}
@@ -338,7 +288,7 @@ func (s *Service) watchSignIn(p *local.Interactive) {
 	}
 	s.logSignIn("exited on its own: %v\noutput: %q", p.Err(), p.Output())
 	st := s.CLIStatus(context.Background(), true)
-	s.emit.Emit(EvtCLIStatus, st)
+	s.emitStatus(st)
 }
 
 func describeExit(p *local.Interactive) string {
@@ -392,7 +342,7 @@ func (s *Service) SubmitLoginCode(ctx context.Context, code string) (CLIStatus, 
 	if finished {
 		// The CLI already stopped (it may have signed in on its own).
 		st := s.CLIStatus(ctx, true)
-		s.emit.Emit(EvtCLIStatus, st)
+		s.emitStatus(st)
 		if st.LoggedIn {
 			return st, nil
 		}
@@ -418,7 +368,7 @@ func (s *Service) SubmitLoginCode(ctx context.Context, code string) (CLIStatus, 
 	}
 	s.loginMu.Unlock()
 	st := s.CLIStatus(ctx, true)
-	s.emit.Emit(EvtCLIStatus, st)
+	s.emitStatus(st)
 	s.logSignIn("after the code: exit %v, signed in %v; output: %q", p.Err(), st.LoggedIn, p.Output()[before:])
 	if !st.LoggedIn {
 		msg := "the code wasn't accepted"
@@ -461,20 +411,14 @@ func lastLine(s string) string {
 	return strings.TrimSpace(lines[len(lines)-1])
 }
 
-// SetCLIVersion selects a CLI version; empty returns to the pinned one.
+// SetCLIVersion selects the first provider's CLI version; empty returns to
+// the pinned one.
 func (s *Service) SetCLIVersion(ctx context.Context, version string) (CLIStatus, error) {
-	version = strings.TrimSpace(version)
-	if version == s.Installer.Pinned() {
-		version = ""
-	}
-	if err := s.Store.SetSetting(SettingCLIVersion, version); err != nil {
-		return CLIStatus{}, err
-	}
-	return s.InstallCLI(ctx)
+	return s.SetProviderVersion(ctx, s.Adapter.ID(), version)
 }
 
 func (s *Service) CLIChannels(ctx context.Context) (map[string]string, error) {
-	return s.Installer.Channels(ctx)
+	return s.ProviderChannels(ctx, s.Adapter.ID())
 }
 
 type Bootstrap struct {
@@ -501,6 +445,7 @@ type NewSessionChoices struct {
 	// Containers is where each profile last ran: a container profile id, or
 	// none for this machine.
 	Containers map[string]string `json:"containers"`
+	Providers  map[string]string `json:"providers"` // the AI provider each profile last ran on
 }
 
 const settingLastNew = "ui.newSession.last"
@@ -525,6 +470,9 @@ func (s *Service) lastNewSession() NewSessionChoices {
 	if c.Containers == nil {
 		c.Containers = map[string]string{}
 	}
+	if c.Providers == nil {
+		c.Providers = map[string]string{}
+	}
 	return c
 }
 
@@ -536,7 +484,13 @@ func (s *Service) CreateSession(profileID, workdir, model string) (session.View,
 // CreateSessionIn creates a session that runs in a container profile (empty:
 // on this machine) and remembers the choices for next time.
 func (s *Service) CreateSessionIn(profileID, workdir, model, container string) (session.View, NewSessionChoices, error) {
-	v, err := s.Sessions.CreateIn(profileID, workdir, model, container)
+	return s.CreateSessionWith(session.NewSession{Profile: profileID, Workdir: workdir, Model: model, Container: container})
+}
+
+// CreateSessionWith creates a session on a provider (empty: the first) and
+// remembers the choices for next time.
+func (s *Service) CreateSessionWith(n session.NewSession) (session.View, NewSessionChoices, error) {
+	v, err := s.Sessions.CreateWith(n)
 	if err != nil {
 		return v, s.lastNewSession(), err
 	}
@@ -544,6 +498,7 @@ func (s *Service) CreateSessionIn(profileID, workdir, model, container string) (
 	c.ProfileID = v.ProfileID
 	c.Models[v.ProfileID] = v.Model
 	c.Containers[v.ProfileID] = v.RuntimeRef
+	c.Providers[v.ProfileID] = v.Adapter
 	if p, ok := s.Profiles.Profile(v.ProfileID); ok && p.Folder != "scratch" {
 		c.Folders[v.ProfileID] = v.Workdir
 	}

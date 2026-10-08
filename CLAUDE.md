@@ -28,4 +28,8 @@ checks to run and the commit message format.
 - If the CLI behaves differently from what the brief assumes, record it on the
   relevant BRUV card (and in a decision record if it changes the design)
   before changing the code.
-- Never use `--dangerously-skip-permissions` or bypass mode in any profile default.
+- Profiles never bypass approvals: no bypass mode or `--dangerously-skip-permissions`
+  in any profile default. An adapter may switch off its CLI's own permission
+  checks only when UNCLI gates every tool call itself and fails closed (a hook
+  that crashes, times out or answers nonsense blocks the call), with a test
+  for each of those; see decision 0012 (Antigravity).

@@ -70,6 +70,29 @@ func setupScript(packages []string) (string, error) {
 	return b.String(), nil
 }
 
+// relock runs after a container's own setup steps, which run as root and
+// could change the lockdown: wsl.conf is written again (WSL applies it at
+// the next start, so the running distro's check wouldn't notice) and its
+// checksum printed for the build to compare.
+var relock = `set -e
+rm -f /etc/wsl.conf
+cat > /etc/wsl.conf <<'UNCLI_EOF'
+` + wslConf + `UNCLI_EOF
+chown root:root /etc/wsl.conf
+chmod 0644 /etc/wsl.conf
+sha256sum /etc/wsl.conf
+`
+
+// becomesRoot prints "root" when the CLI's user can make itself root
+// without a password, which would let a session undo the lockdown.
+const becomesRoot = `if sudo -n true >/dev/null 2>&1 || doas -n true >/dev/null 2>&1; then echo root; else echo user; fi
+`
+
+func wslConfSum() string {
+	sum := sha256.Sum256([]byte(wslConf))
+	return hex.EncodeToString(sum[:])
+}
+
 // installCLI streams the binary from stdin into place.
 const installCLI = `set -e
 cat > ` + CLIPath + `.new
@@ -161,3 +184,6 @@ func withWSLConf(src, dst string) error {
 	}
 	return err
 }
+
+// ValidPackage reports whether a name can be an Alpine package.
+func ValidPackage(name string) bool { return packageRE.MatchString(name) }

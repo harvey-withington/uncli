@@ -4,15 +4,20 @@
   import { useApp } from '../lib/context'
   import { i18n, t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
+  import { blank, idFor, profileOf } from '../lib/containers'
+  import ContainerEditor from './ContainerEditor.svelte'
   import Icon from './Icon.svelte'
 
   // Settings → Containers (decision 0011): sessions can run in a WSL
   // distro UNCLI builds and locks down. This tab turns WSL on and builds or
-  // removes each container profile. Each AI provider signs in for
+  // removes each container profile, and edits them (ContainerEditor). Each AI provider signs in for
   // containers on its own (AI Providers); this says which have.
   const app = useApp()
   const info = $derived(app.containers)
   let installing = $state(false)
+  // The container being edited, or 'new'; one at a time.
+  let editing = $state('')
+  const ids = $derived(info?.containers.map(c => c.id) ?? [])
   // Containers whose Build was just clicked: they show "Starting…" at once,
   // until the first progress arrives, so a second click can't happen.
   let starting = $state<Record<string, boolean>>({})
@@ -32,7 +37,8 @@
       starting[c.id] = false
     }
   }
-  const providers = $derived(app.boot?.providers ?? [])
+  // Containers run the first provider only (for now).
+  const providers = $derived((app.boot?.providers ?? []).slice(0, 1))
 
   $effect(() => {
     void app.loadContainers()
@@ -154,14 +160,30 @@
           <button class="btn small" class:primary={changed(c)} onclick={() => build(c)} disabled={busy(c)} aria-busy={busy(c)}>
             {c.built ? t('containers.rebuild') : t('containers.build')}
           </button>
+          <button class="btn small ghost icon" onclick={() => (editing = editing === c.id ? '' : c.id)} aria-label={t('containerEdit.title', { label: c.label })} aria-expanded={editing === c.id} title={t('containerEdit.edit')}>
+            <Icon name="pencil" size={14} />
+          </button>
           {#if c.built && !busy(c)}
             <button class="btn small ghost icon" onclick={() => remove(c)} aria-label={t('containers.removeTitle', { label: c.label })} title={t('containers.remove')}>
               <Icon name="trash" size={14} />
             </button>
           {/if}
         </li>
+        {#if editing === c.id}
+          <li class="editing">
+            <ContainerEditor start={profileOf(c)} container={c} bases={info.bases ?? []} taken={ids.filter(x => x !== c.id)} onclose={() => (editing = '')} />
+          </li>
+        {/if}
       {/each}
+      {#if editing === 'new'}
+        <li class="editing">
+          <ContainerEditor start={blank(idFor('', ids), info.bases?.[0]?.id ?? '')} bases={info.bases ?? []} taken={ids} onclose={() => (editing = '')} />
+        </li>
+      {/if}
     </ul>
+    {#if editing !== 'new'}
+      <button class="btn small new" onclick={() => (editing = 'new')}><Icon name="plus" size={13} />{t('containerEdit.new')}</button>
+    {/if}
     <div class="signin">
       {#each providers as p (p.id)}
         <p class="muted">
@@ -223,6 +245,14 @@
   }
   .list li + li {
     border-top: 1px solid var(--border);
+  }
+  .list li.editing {
+    display: block;
+    padding: 0;
+    border-top: 0;
+  }
+  .new {
+    margin: calc(-1 * var(--space-2)) 0 var(--space-4);
   }
   .what {
     flex: 1;

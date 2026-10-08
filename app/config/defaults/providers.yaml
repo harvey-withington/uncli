@@ -5,8 +5,17 @@
 #   name:  the CLI, in setup and settings ("Download {cli}")
 #   agent: who acts in a session ("{agent} prompts you before…")
 #   account: the account it signs in with ("Sign in to {account}")
+#   signin:  link (UNCLI opens the CLI's sign-in link and takes the code
+#            back) or elsewhere (the provider's own app or terminal, whose
+#            sign-in the CLI shares)
 providers:
   - id: claude
     name: Claude Code
     agent: Claude
     account: Claude
+    signin: link
+  - id: antigravity
+    name: Antigravity CLI
+    agent: Antigravity
+    account: Google
+    signin: elsewhere

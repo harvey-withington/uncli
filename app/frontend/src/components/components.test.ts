@@ -387,7 +387,7 @@ describe('New session from the keyboard', () => {
     const chat = within(dialog).getByRole('radio', { name: /Chat/ })
     await waitFor(() => expect(chat).toBeChecked())
     await fireEvent.keyDown(chat, { key: 'Enter' })
-    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', 'sonnet', ''))
+    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', 'sonnet', '', ''))
   })
 
   it('Code without a folder: Enter picks one, the next Enter starts', async () => {
@@ -405,7 +405,7 @@ describe('New session from the keyboard', () => {
     await waitFor(() => expect(start).toHaveFocus())
     expect(create).not.toHaveBeenCalled()
     await fireEvent.keyDown(code, { key: 'Enter' }) // Enter from anywhere in the body also starts now
-    await waitFor(() => expect(create).toHaveBeenCalledWith('code', expect.stringMatching(/projects.demo$/), 'opus', ''))
+    await waitFor(() => expect(create).toHaveBeenCalledWith('code', expect.stringMatching(/projects.demo$/), 'opus', '', ''))
   })
 
   it('a remembered folder means Ctrl+N, Enter', async () => {
@@ -418,7 +418,7 @@ describe('New session from the keyboard', () => {
     const code = within(await lastDialog()).getByRole('radio', { name: /Code/ })
     await waitFor(() => expect(code).toBeChecked())
     await fireEvent.keyDown(code, { key: 'Enter' })
-    await waitFor(() => expect(create).toHaveBeenCalledWith('code', expect.stringMatching(/repo$/), 'haiku', ''))
+    await waitFor(() => expect(create).toHaveBeenCalledWith('code', expect.stringMatching(/repo$/), 'haiku', '', ''))
     expect(pick).not.toHaveBeenCalled()
   })
 })

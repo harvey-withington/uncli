@@ -12,11 +12,12 @@ import (
 
 // Event names the frontend subscribes to.
 const (
-	EvtSession     = "session:event"   // SessionEventMsg
-	EvtSessionView = "session:changed" // session.View
-	EvtPage        = "page:changed"    // store.Page
-	EvtCLIProgress = "cli:progress"    // Progress
-	EvtCLIStatus   = "cli:status"      // CLIStatus
+	EvtSession        = "session:event"   // SessionEventMsg
+	EvtSessionView    = "session:changed" // session.View
+	EvtPage           = "page:changed"    // store.Page
+	EvtCLIProgress    = "cli:progress"    // Progress
+	EvtCLIStatus      = "cli:status"      // CLIStatus
+	EvtProviderStatus = "provider:status" // CLIStatus of any provider (its Provider says which)
 )
 
 // Emitter delivers named events to the UI. The bridge implements it with
@@ -31,8 +32,9 @@ type SessionEventMsg struct {
 }
 
 type Progress struct {
-	Done  int64 `json:"done"`
-	Total int64 `json:"total"`
+	Provider string `json:"provider"` // whose CLI is downloading
+	Done     int64  `json:"done"`
+	Total    int64  `json:"total"`
 }
 
 // coalescer is the session Sink: it forwards events to the UI, merging

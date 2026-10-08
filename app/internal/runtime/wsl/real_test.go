@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -39,8 +40,25 @@ func TestRealDistro(t *testing.T) {
 		_ = os.RemoveAll(disk)
 	})
 	before := defaultDistro()
-	if err := Build(ctx, Spec{Name: name, Dir: disk, RootFS: rootfs, CLI: cli}, func(s string) { t.Log("step", s) }); err != nil {
+	// A package, and setup steps that use it and run as root.
+	spec := Spec{Name: name, Dir: disk, RootFS: rootfs, CLI: cli, Packages: []string{"jq"},
+		Setup: []string{"jq -n '{step: 1}' > /etc/uncli-step", "id -un >> /etc/uncli-step"}}
+	if err := Build(ctx, spec, func(s string) { t.Log("step", s) }); err != nil {
 		t.Fatal(err)
+	}
+	// A step that lets the CLI's user become root is refused, the
+	// half-built distro removed.
+	loose := Spec{Name: name + "-loose", Dir: filepath.Join(disk, "loose"), RootFS: rootfs, CLI: cli, Packages: []string{"sudo"},
+		Setup: []string{"echo 'uncli ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/uncli"}}
+	if err := os.MkdirAll(loose.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := Build(ctx, loose, nil); err == nil || !strings.Contains(err.Error(), "become root") {
+		t.Errorf("sudo step: err = %v", err)
+	}
+	if st, _ := CheckStatus(ctx); slices.Contains(st.Distros, loose.Name) {
+		t.Errorf("%s was left behind", loose.Name)
+		_ = Remove(ctx, loose.Name)
 	}
 	if got := defaultDistro(); before != "" && got != before {
 		t.Errorf("the default distro is now %q, was %q", got, before)
@@ -59,6 +77,9 @@ func TestRealDistro(t *testing.T) {
 	}
 	r := New("it", func() (string, error) { return secrets.Get("claude-oauth-token") })
 	defer r.Close()
+	if b, err := r.ReadFile(ctx, "/etc/uncli-step"); err != nil || strings.Join(strings.Fields(string(b)), " ") != `{ "step": 1 } root` {
+		t.Errorf("setup steps left %q, %v", b, err)
+	}
 	p, err := r.Start(ctx, core.Command{Args: []string{"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
 		"--model", "haiku", "--tools", "Read", "--allowedTools", "Read", "--strict-mcp-config"}}, folder)
 	if err != nil {

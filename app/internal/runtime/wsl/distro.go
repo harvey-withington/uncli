@@ -128,6 +128,9 @@ type Spec struct {
 	RootFS   string   // a verified root filesystem tarball
 	CLI      string   // the verified Linux build of the CLI
 	Packages []string // apk packages beyond the base ones
+	// Setup is shell steps run as root after the packages, one at a time
+	// (each its own script, stopping at the first error).
+	Setup []string
 }
 
 // Build creates a locked-down distro from spec. On failure the half-built
@@ -177,6 +180,28 @@ func build(ctx context.Context, spec Spec, step func(string), run runner, def fu
 	step("packages")
 	if _, err := run(ctx, strings.NewReader(script), root...); err != nil {
 		return fmt.Errorf("setting up %s: %w", spec.Name, err)
+	}
+	if len(spec.Setup) > 0 {
+		step("setup")
+		for i, sh := range spec.Setup {
+			if _, err := run(ctx, strings.NewReader("set -e\n"+sh+"\n"), root...); err != nil {
+				return fmt.Errorf("setup step %d (%s) failed: %w", i+1, firstLine(sh), err)
+			}
+		}
+		out, err := run(ctx, strings.NewReader(relock), root...)
+		if err != nil {
+			return fmt.Errorf("locking %s down again after its setup steps: %w", spec.Name, err)
+		}
+		if f := strings.Fields(string(out)); len(f) == 0 || f[0] != wslConfSum() {
+			return fmt.Errorf("%s's lockdown settings couldn't be restored after its setup steps", spec.Name)
+		}
+		who, err := run(ctx, strings.NewReader(becomesRoot), "--distribution", spec.Name, "--user", User, "--exec", "sh", "-s")
+		if err != nil {
+			return fmt.Errorf("checking %s: %w", spec.Name, err)
+		}
+		if strings.TrimSpace(string(who)) != "user" {
+			return fmt.Errorf("a setup step lets %s's user become root (sudo or doas), which would undo its lockdown", spec.Name)
+		}
 	}
 	step("cli")
 	f, err := os.Open(spec.CLI)
@@ -237,4 +262,15 @@ func Remove(ctx context.Context, name string) error {
 		return ErrUnresponsive
 	}
 	return err
+}
+
+func firstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i] + " …"
+	}
+	if len(s) > 60 {
+		s = s[:59] + "…"
+	}
+	return s
 }

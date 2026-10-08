@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"uncli/internal/ide"
@@ -51,6 +52,20 @@ func (s *Service) OpenFile(sessionID, path string, line int) error {
 		}
 	}
 	return ide.OpenDefault(path)
+}
+
+// OpenPath follows a link in an answer to a file or folder: a file opens as
+// OpenFile does (never run: programs aren't opened, only shown), a folder
+// is shown.
+func (s *Service) OpenPath(sessionID, path string, line int) error {
+	st, err := os.Stat(path)
+	if err != nil {
+		return errors.New("that file doesn't exist")
+	}
+	if st.IsDir() {
+		return ide.Reveal(path)
+	}
+	return s.OpenFile(sessionID, path, line)
 }
 
 // RevealFile shows a file in its folder.

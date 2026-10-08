@@ -1,0 +1,2 @@
+{"event":"user","message":{"content":"Remember the number 42. Reply with just OK."}}
+{"event":"user","message":{"content":"Write a two-line markdown list of fruits, then a fenced js code block printing the number I gave you."}}

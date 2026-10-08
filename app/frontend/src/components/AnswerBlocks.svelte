@@ -1,6 +1,8 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { linkTarget } from '../lib/links'
+  import { showToast } from '../lib/toasts.svelte'
   import type { OutlineEntry } from '../lib/outline'
   import { toBlocks } from '../lib/render/markdown'
   import { KIND_ICONS } from '../lib/sections'
@@ -18,13 +20,19 @@
   const app = useApp()
   const blocks = $derived(toBlocks(markdown))
 
-  // Links open in the user's browser, never inside the app window.
+  // Links never open inside the app window: web links open in the user's
+  // browser, links to files in their editor or default app, at the line
+  // (lib/links.ts), and links to folders show the folder.
   function onclick(e: MouseEvent) {
     const a = (e.target as HTMLElement).closest('a')
     if (!a) return
     e.preventDefault()
-    const href = a.getAttribute('href')
-    if (href) app.backend.openURL(href)
+    const session = app.current
+    const target = linkTarget(a.getAttribute('href') ?? '', session?.workdir ?? '')
+    if (target?.kind === 'web') void app.backend.openURL(target.url)
+    else if (target?.kind === 'file' && session) {
+      app.backend.openPath(session.id, target.path, target.line).catch(err => showToast(String(err), 'error'))
+    }
   }
 </script>
 

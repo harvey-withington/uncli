@@ -16,9 +16,14 @@
 #                     container signs in to your whole account (Settings →
 #                     AI Providers), which anything running in it can use
 #   connectors: none  the models-only sign-in (the default)
+#   setup:            shell steps run as root, in order, after the packages
+#                     (with the network on), e.g. - pip install httpie;
+#                     a step that fails stops the build
 #
 # A user's containers.yaml in UNCLI's config folder adds profiles or
-# replaces these by id. Change a profile's packages, then Rebuild it.
+# replaces these by id; Settings → Containers edits it (Edit, New
+# container, Reset to built-in, Delete). Change a profile's packages or
+# setup steps, then Rebuild it.
 
 # Bases are pinned root filesystems, checked against their SHA-256. cli is
 # the build of the CLI that runs on them (from the same release manifest as

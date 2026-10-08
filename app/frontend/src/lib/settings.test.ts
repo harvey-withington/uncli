@@ -10,6 +10,7 @@ describe('settings tabs', () => {
     expect(tabOf('notify')).toBe('general')
     expect(tabOf('cli')).toBe('providers')
     expect(tabOf('containers')).toBe('containers')
+    expect(tabOf('provider-antigravity')).toBe('providers')
     expect(tabOf('nope')).toBeNull()
   })
 

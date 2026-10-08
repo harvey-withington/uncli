@@ -1,0 +1,1 @@
+--conversation 09eaf5e2-5697-4aaf-91a9-932ecfa392ec --gemini_dir=C:\uncli-agy --input-format stream-json --output-format stream-json --model gemini-3.8-flash-low

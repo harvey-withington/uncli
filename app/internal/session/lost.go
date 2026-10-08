@@ -19,7 +19,7 @@ const LostConversationNote = "The CLI no longer has this conversation: its files
 // lostConversationLocked handles a CLI that exited because the conversation
 // it was resuming is gone; it reports whether it did. Caller holds s.mu.
 func (s *Session) lostConversationLocked(stderr string) bool {
-	lc, ok := s.m.d.Adapter.(lostConversation)
+	lc, ok := s.ad().(lostConversation)
 	if !ok || s.rec.ProviderSID == "" || !lc.LostConversation(stderr) {
 		return false
 	}

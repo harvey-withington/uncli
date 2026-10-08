@@ -156,10 +156,13 @@ func (m *Manager) KnownTools(id string) ([]string, error) {
 // statePaths are the folders the CLI keeps its own files in, if its
 // adapter says.
 func (m *Manager) statePaths() []string {
-	if sp, ok := m.d.Adapter.(core.StatePather); ok {
-		return sp.StatePaths()
+	var out []string
+	for _, a := range append([]core.Adapter{m.d.Adapter}, m.d.Others...) {
+		if sp, ok := a.(core.StatePather); ok {
+			out = append(out, sp.StatePaths()...)
+		}
 	}
-	return nil
+	return out
 }
 
 // rejudgeAll looks again at every session's waiting requests.

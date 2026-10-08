@@ -420,7 +420,7 @@ func (s *Session) cliModeLocked(profileMode string) string {
 // live when the adapter can; otherwise the next turn respawns it (Send
 // compares the modes).
 func (s *Session) applyCLIModeLocked() {
-	if s.proc == nil || !s.m.d.Adapter.Capabilities().LivePermissionMode {
+	if s.proc == nil || !s.ad().Capabilities().LivePermissionMode {
 		return
 	}
 	want := s.cliModeLocked(s.profileMode)
@@ -430,7 +430,7 @@ func (s *Session) applyCLIModeLocked() {
 	if want == "" {
 		want = "default"
 	}
-	if b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlSetPermissionMode, Mode: want}); ok {
+	if b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlSetPermissionMode, Mode: want}); ok {
 		if _, err := s.proc.Stdin().Write(b); err == nil {
 			s.cliMode = s.cliModeLocked(s.profileMode)
 		}
@@ -507,7 +507,10 @@ func (s *Session) denyPendingLocked(reason string) {
 }
 
 func (s *Session) replyLocked(requestID string, allow bool, input json.RawMessage, message string) error {
-	b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlApprove, RequestID: requestID, Allow: allow, UpdatedInput: input, Message: message})
+	if s.replyHookLocked(requestID, allow, message) {
+		return nil
+	}
+	b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlApprove, RequestID: requestID, Allow: allow, UpdatedInput: input, Message: message})
 	if !ok || s.proc == nil {
 		return errors.New("the CLI isn't running")
 	}

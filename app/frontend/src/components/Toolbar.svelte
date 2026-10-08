@@ -15,7 +15,7 @@
   const app = useApp()
   const items = $derived(app.boot?.toolbar ?? [])
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
-  const models = $derived(modelOptions(app.boot?.models ?? null, session.model))
+  const models = $derived(modelOptions(app.modelsFor(session.adapter), session.model, t('model.cliDefault', app.namesFor(session.adapter))))
   // A modifier needs its tools to exist in the profile (empty = CLI defaults).
   const modifiers = $derived((app.boot?.modifiers ?? []).filter(m => {
     const tools = profile?.tools ?? []

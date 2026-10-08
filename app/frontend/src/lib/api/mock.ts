@@ -2,7 +2,7 @@
 // component tests). It behaves like the real one closely enough to
 // exercise streaming, states, bookmarks and errors, with canned content.
 import type {
-  ActivityState, Approval, Backend, Bootstrap, CLIStatus, Editor, Handlers, NewSessionChoices, Page, Preferences, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
+  ActivityState, Approval, Backend, Bootstrap, CLIStatus, Editor, Handlers, NewSessionChoices, Page, Preferences, Provider, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
 } from './types'
 import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type MockAsk, type Outcome } from './mock-access'
 import { SECTION_KINDS } from '../sections'
@@ -80,7 +80,9 @@ case "status":
 Now only the \`result\` line resets turn state. I re-ran the suite three times:
 
 - \`go test -count=3 ./internal/...\` passes
-- no data races in the session tests`
+- no data races in the session tests
+
+Turn state lives in [\`state.go\`](file:///C:/Users/you/code/internal/session/state.go#L50), and the session tests in [the session package](internal/session/).`
 
 const STREAM = `Sure. In short: **stream-json** keeps one CLI process alive and sends one JSON line per turn.
 
@@ -184,6 +186,18 @@ function session(id: string, profileId: string, title: string, state: ActivitySt
   }
 }
 
+// The AI providers the mock offers (config/defaults/providers.yaml).
+const MOCK_PROVIDERS: Provider[] = [
+  { id: 'claude', label: 'Claude Code', name: 'Claude Code', agent: 'Claude', account: 'Claude', signIn: 'link' },
+  {
+    id: 'antigravity', label: 'Antigravity CLI', name: 'Antigravity CLI', agent: 'Antigravity', account: 'Google', signIn: 'elsewhere',
+    capabilities: {
+      partialStreaming: true, resume: true, liveModelSwitch: false, interrupt: false, approvals: true, hookApprovals: true,
+      images: false, usageReporting: true, thinkingEvents: false, slashPassthrough: false,
+    },
+  },
+]
+
 export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; unattended?: boolean; mode?: SessionMode; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
     session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode }),
@@ -237,6 +251,19 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     ],
   }
   let cli: CLIStatus = { installed: true, version: '2.1.285', pinned: '2.1.285', custom: false, loggedIn: true, email: 'you@example.com', subscription: 'max', ...opts.cli }
+  // The second provider: ?agy=none (not installed), ?agy=signedout;
+  // otherwise installed and signed in.
+  const agyMode = new URLSearchParams(location.search).get('agy')
+  const agyModels = [
+    { value: 'gemini-3.8-flash-high', resolved: 'gemini-3.8-flash-high', displayName: 'Gemini 3.8 Flash (High)', description: '', effortLevels: [] },
+    { value: 'gemini-3.8-flash-low', resolved: 'gemini-3.8-flash-low', displayName: 'Gemini 3.8 Flash (Low)', description: '', effortLevels: [] },
+    { value: 'gemini-3.1-pro-high', resolved: 'gemini-3.1-pro-high', displayName: 'Gemini 3.1 Pro (High)', description: '', effortLevels: [] },
+  ]
+  let agy: CLIStatus = {
+    provider: 'antigravity', installed: agyMode !== 'none', version: '1.3.1', pinned: '1.3.1', custom: false,
+    loggedIn: !agyMode, models: agyMode ? undefined : agyModels,
+  }
+  const statusOf = (id: string) => (id === 'antigravity' ? agy : { ...cli, provider: 'claude' })
   let h: Handlers | null = null
   const containers = mockContainers(c => h?.containersChanged?.(c))
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
@@ -337,7 +364,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async bootstrap() {
       return {
         profiles, modifiers, toolbar, models, platform: 'windows', lastNewSession: structuredClone(lastNew),
-        preferences: structuredClone(prefs), providers: [{ id: 'claude', label: 'Claude Code', name: 'Claude Code', agent: 'Claude', account: 'Claude' }], editors: structuredClone(MOCK_EDITORS),
+        preferences: structuredClone(prefs), providers: structuredClone(MOCK_PROVIDERS), editors: structuredClone(MOCK_EDITORS),
         sessions: sessions.map(s => ({ ...s })),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
@@ -369,11 +396,32 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async cancelSignIn() {},
     async setCLIVersion(v) { cli = { ...cli, version: v || cli.pinned }; return cli },
     async cliChannels() { return { stable: '2.1.285', latest: '2.1.286' } },
+    async providerStatus(id) { return statusOf(id) },
+    async installProvider(id) {
+      if (id !== 'antigravity') return this.installCLI()
+      const total = 190286488
+      for (let done = 0; done <= total; done += total / 10) {
+        h?.cliProgress({ provider: id, done, total })
+        await new Promise(r => setTimeout(r, 40))
+      }
+      agy = { ...agy, installed: true, loggedIn: agyMode !== 'signedout', models: agyMode === 'signedout' ? undefined : agyModels }
+      h?.providerStatus?.(agy)
+      return agy
+    },
+    async setProviderVersion(id, v) {
+      if (id !== 'antigravity') return this.setCLIVersion(v)
+      agy = { ...agy, version: v || agy.pinned }
+      return agy
+    },
+    async providerChannels(id) { return id === 'antigravity' ? { stable: '1.3.1', latest: '1.3.1' } : this.cliChannels() },
     async pickFolder() { return 'C:\\Users\\you\\projects\\demo' },
-    async createSession(profileId, workdir, model, container) {
+    async createSession(profileId, workdir, model, container, provider) {
       const p = profiles.find(x => x.id === profileId)
+      const other = !!provider && provider !== 'claude'
+      if (other && container) throw new Error('containers can only run claude sessions for now')
       const s = session(newId(), profileId, '', 'idle', {
-        model: model || p?.model || 'sonnet', workdir: workdir || `C:\\scratch\\${idn}`, sortOrder: sessions.length + 10,
+        adapter: provider || 'claude',
+        model: model || (other ? '' : p?.model || 'sonnet'), workdir: workdir || `C:\\scratch\\${idn}`, sortOrder: sessions.length + 10,
         ...(container ? { runtime: 'wsl', runtimeRef: container } : {}),
       })
       sessions.unshift(s)
@@ -383,6 +431,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       lastNew.models[profileId] = s.model
       if (p?.folder !== 'scratch') lastNew.folders[profileId] = s.workdir
       ;(lastNew.containers ??= {})[profileId] = container
+      ;(lastNew.providers ??= {})[profileId] = s.adapter
       return { session: { ...s }, lastNewSession: structuredClone(lastNew) }
     },
     async pages(id) { return (pages[id] ?? []).map(p => ({ ...p })) },
@@ -687,6 +736,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     },
     async openFolder() {},
     async openFile() {},
+    async openPath() {},
     async revealFile() {},
     async usageReport(q) { return mockUsageReport(q) },
     async theme() { return mockTheme() },

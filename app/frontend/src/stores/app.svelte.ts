@@ -2,7 +2,7 @@
 // the live text of answers still streaming. All state is keyed by id.
 import type {
   ArtifactFile, AttachmentRef, Backend, ContainersInfo, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
-  ThinkingData, UsageLimit,
+  ModelInfo, ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
@@ -26,6 +26,9 @@ export class AppStore {
   ready = $state(false)
   boot = $state<Bootstrap | null>(null)
   cli = $state<CLIStatus | null>(null)
+  // Every other provider's CLI status, by provider id (the first's is cli),
+  // loaded once at start and kept up to date.
+  providerStatus = $state<Record<string, CLIStatus>>({})
   progress = $state<Progress | null>(null)
   // WSL and the container profiles (decision 0011); loaded on demand.
   containers = $state<ContainersInfo | null>(null)
@@ -109,6 +112,7 @@ export class AppStore {
       pageChanged: p => this.upsertPage(p),
       cliProgress: p => { this.progress = p },
       cliStatus: s => { this.cli = s },
+      providerStatus: s => { if (s.provider) this.providerStatus[s.provider] = s },
       containersChanged: c => { this.containers = c },
       notifyOpen: id => { void this.openFromNotification(id) },
     })
@@ -121,6 +125,7 @@ export class AppStore {
     void this.loadThemeFile(false)
     // Containers' labels, and whether one needs the user (the Settings dot).
     if (boot.platform === 'windows') void this.loadContainers()
+    void this.loadProviders()
     this.ready = true
     const first = this.activeSessions[0]
     if (first) await this.select(first.id)
@@ -281,6 +286,33 @@ export class AppStore {
     return namesOf(providerOf(this.boot, adapter))
   }
 
+  // The other providers' CLIs: installed, signed in, and their models.
+  async loadProviders(fresh = false) {
+    const others = (this.boot?.providers ?? []).slice(1)
+    await Promise.all(others.map(async p => {
+      try {
+        this.providerStatus[p.id] = await this.backend.providerStatus(p.id, fresh)
+      } catch {
+        // its status stays unknown: it's offered as not set up
+      }
+    }))
+  }
+
+  // statusOf is a provider's CLI status; the first's is cli.
+  statusOf(provider?: string): CLIStatus | null {
+    const first = this.boot?.providers[0]?.id
+    if (!provider || provider === first) return this.cli
+    return this.providerStatus[provider] ?? null
+  }
+
+  // modelsFor lists the models a provider's sessions can use: the first's
+  // as its CLI reported them, the others' from their sign-in check.
+  modelsFor(provider?: string): ModelInfo[] | null {
+    const first = this.boot?.providers[0]?.id
+    if (!provider || provider === first) return this.boot?.models?.length ? this.boot.models : null
+    return this.providerStatus[provider]?.models ?? []
+  }
+
   async loadContainers() {
     try {
       this.containers = await this.backend.containers()
@@ -289,9 +321,10 @@ export class AppStore {
     }
   }
 
-  // container: a container profile to run in, '' for this machine.
-  async createSession(profileId: string, workdir: string, model: string, container = '') {
-    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model, container)
+  // container: a container profile to run in, '' for this machine;
+  // provider: an AI provider's id, '' for the first.
+  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '') {
+    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model, container, provider)
     if (this.boot) this.boot.lastNewSession = lastNewSession
     this.upsertSession(v)
     this.pages[v.id] = []

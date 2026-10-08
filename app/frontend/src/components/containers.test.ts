@@ -57,7 +57,7 @@ describe('Containers', () => {
     expect(within(runIn).getAllByRole('option').map(o => o.textContent)).toEqual(['This computer', 'Sandbox'])
     await fireEvent.change(runIn, { target: { value: 'sandbox' } })
     await fireEvent.click(dialog.getByRole('button', { name: /Start/ }))
-    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', expect.any(String), 'sandbox'))
+    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', expect.any(String), 'sandbox', ''))
     expect(await screen.findByText(/in the Sandbox container/)).toBeInTheDocument()
   }, 15000)
 
@@ -119,6 +119,62 @@ describe('Containers', () => {
     await fireEvent.click(dialog.getByRole('button', { name: 'Rebuild' }))
     await waitFor(() => expect(screen.queryByRole('button', { name: /Something in Settings needs you/ })).not.toBeInTheDocument(), { timeout: 6000 })
   }, 10000)
+
+  it('edits a built container: packages and setup steps, then says to rebuild, and resets to built-in', async () => {
+    history.replaceState(null, '', '/?containers=built')
+    render(App, { props: { backend: mockBackend() } })
+    const settings = await openSettings('Containers')
+    await fireEvent.click(await settings.findByRole('button', { name: 'Rebuild' }))
+    await waitFor(() => expect(settings.getByText('Built')).toBeInTheDocument(), { timeout: 6000 })
+
+    await fireEvent.click(settings.getByRole('button', { name: 'Edit Sandbox' }))
+    const form = within(settings.getByRole('form', { name: 'Edit Sandbox' }))
+    expect(form.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(form.queryByRole('button', { name: 'Reset to built-in' })).not.toBeInTheDocument()
+    const pkg = form.getByRole('textbox', { name: 'Packages' })
+    await fireEvent.input(pkg, { target: { value: 'go;rm' } })
+    expect(form.getByText(/A package name is lower-case/)).toBeInTheDocument()
+    await fireEvent.input(pkg, { target: { value: 'go' } })
+    await fireEvent.keyDown(pkg, { key: 'Enter' })
+    expect(form.getByRole('button', { name: 'Remove go' })).toBeInTheDocument()
+    await fireEvent.click(form.getByRole('button', { name: 'Add a step' }))
+    await fireEvent.input(form.getByRole('textbox', { name: 'Setup step 1' }), { target: { value: 'pip install httpie' } })
+    await fireEvent.click(form.getByRole('button', { name: 'Save' }))
+
+    expect(await settings.findByText('Changed since it was built: its packages, its setup steps. Rebuild to update it.')).toBeInTheDocument()
+    expect(settings.getByText(/· py3-pip · go$/)).toBeInTheDocument()
+
+    await fireEvent.click(settings.getByRole('button', { name: 'Edit Sandbox' }))
+    await fireEvent.click(settings.getByRole('button', { name: 'Reset to built-in' }))
+    const confirm = within(await screen.findByRole('dialog', { name: 'Reset Sandbox?' }))
+    await fireEvent.click(confirm.getByRole('button', { name: 'Reset to built-in' }))
+    await waitFor(() => expect(settings.queryByText(/Changed since it was built/)).not.toBeInTheDocument())
+    expect(settings.getByText(/· py3-pip$/)).toBeInTheDocument()
+  }, 15000)
+
+  it('adds a container of the user\'s own, named, and deletes it', async () => {
+    const backend = mockBackend()
+    const save = vi.spyOn(backend, 'saveContainer')
+    render(App, { props: { backend } })
+    const settings = await openSettings('Containers')
+    await fireEvent.click(await settings.findByRole('button', { name: 'New container' }))
+    const form = within(settings.getByRole('form', { name: 'New container' }))
+    expect(form.getByRole('button', { name: 'Save' })).toBeDisabled() // no name yet
+    await fireEvent.input(form.getByRole('textbox', { name: 'Name' }), { target: { value: 'Go tools' } })
+    expect(form.getByText('Its distro: uncli-go-tools')).toBeInTheDocument()
+    await fireEvent.input(form.getByRole('textbox', { name: 'Packages' }), { target: { value: 'go, make' } })
+    await fireEvent.click(form.getByRole('checkbox', { name: 'Your connectors' }))
+    expect(form.getByText(/Connectors need the whole-account sign-in/)).toBeInTheDocument()
+    await fireEvent.click(form.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'go-tools', label: 'Go tools', packages: ['go', 'make'], setup: [], connectors: 'shared', brain: 'sandboxed' })))
+    expect(await settings.findByText('Go tools')).toBeInTheDocument()
+
+    await fireEvent.click(settings.getByRole('button', { name: 'Edit Go tools' }))
+    await fireEvent.click(settings.getByRole('button', { name: 'Delete' }))
+    const confirm = within(await screen.findByRole('dialog', { name: 'Delete Go tools?' }))
+    await fireEvent.click(confirm.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(settings.queryByText('Go tools')).not.toBeInTheDocument())
+  })
 
   it('without WSL, offers to turn it on', async () => {
     history.replaceState(null, '', '/?containers=nowsl')

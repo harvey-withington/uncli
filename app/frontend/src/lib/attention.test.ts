@@ -3,10 +3,10 @@ import type { ContainerInfo, ContainersInfo } from './api'
 import { needsAttention, settingsAttention } from './attention'
 
 const box = (over: Partial<ContainerInfo> = {}): ContainerInfo => ({
-  id: 'sandbox', label: 'Sandbox', base: 'alpine-3.24', baseLabel: 'Alpine', packages: [], built: true, ...over,
+  id: 'sandbox', label: 'Sandbox', base: 'alpine-3.24', baseLabel: 'Alpine', packages: [], setup: [], builtin: true, edited: false, built: true, ...over,
 })
 const info = (over: Partial<ContainersInfo> = {}): ContainersInfo => ({
-  wsl: { installed: true, distros: ['uncli-sandbox'] }, signedIn: true, accountSignedIn: true, containers: [box()], ...over,
+  wsl: { installed: true, distros: ['uncli-sandbox'] }, signedIn: true, accountSignedIn: true, containers: [box()], bases: [], ...over,
 })
 
 describe('settings attention', () => {

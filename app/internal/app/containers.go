@@ -63,6 +63,9 @@ type ContainerProfile struct {
 	// connectors (Jira, Office…), which needs the provider's full account
 	// sign-in; "none" (the default) keeps it to the models-only token.
 	Connectors string `yaml:"connectors" json:"connectors"`
+	// Setup is shell steps run as root after the packages when the
+	// container is built (for what isn't a package: npm i -g, pip install).
+	Setup []string `yaml:"setup,omitempty" json:"setup"`
 }
 
 const (
@@ -104,23 +107,41 @@ func loadContainers(defaults fs.FS, userDir string) (containersFile, error) {
 		}
 	}
 	for _, p := range c.Containers {
-		if !wsl.ValidProfile(p.ID) {
-			return c, fmt.Errorf("container id %q: use lower-case letters, digits and dashes", p.ID)
-		}
-		if !slices.ContainsFunc(c.Bases, func(b Base) bool { return b.ID == p.Base }) {
-			return c, fmt.Errorf("container %q: no base %q", p.ID, p.Base)
-		}
-		if p.Brain != "" && p.Brain != BrainShared && p.Brain != BrainSandboxed {
-			return c, fmt.Errorf("container %q: brain is shared or sandboxed, not %q", p.ID, p.Brain)
-		}
-		if p.MCP != "" && p.MCP != MCPShared && p.MCP != MCPNone {
-			return c, fmt.Errorf("container %q: mcp is shared or none, not %q", p.ID, p.MCP)
-		}
-		if p.Connectors != "" && p.Connectors != ConnectorsShared && p.Connectors != ConnectorsNone {
-			return c, fmt.Errorf("container %q: connectors is shared or none, not %q", p.ID, p.Connectors)
+		if err := validProfile(p, c.Bases); err != nil {
+			return c, err
 		}
 	}
 	return c, nil
+}
+
+// validProfile checks a container profile, from the file or the editor.
+func validProfile(p ContainerProfile, bases []Base) error {
+	if !wsl.ValidProfile(p.ID) {
+		return fmt.Errorf("container id %q: use lower-case letters, digits and dashes", p.ID)
+	}
+	if !slices.ContainsFunc(bases, func(b Base) bool { return b.ID == p.Base }) {
+		return fmt.Errorf("container %q: no base %q", p.ID, p.Base)
+	}
+	if p.Brain != "" && p.Brain != BrainShared && p.Brain != BrainSandboxed {
+		return fmt.Errorf("container %q: brain is shared or sandboxed, not %q", p.ID, p.Brain)
+	}
+	if p.MCP != "" && p.MCP != MCPShared && p.MCP != MCPNone {
+		return fmt.Errorf("container %q: mcp is shared or none, not %q", p.ID, p.MCP)
+	}
+	if p.Connectors != "" && p.Connectors != ConnectorsShared && p.Connectors != ConnectorsNone {
+		return fmt.Errorf("container %q: connectors is shared or none, not %q", p.ID, p.Connectors)
+	}
+	for _, pkg := range p.Packages {
+		if !wsl.ValidPackage(pkg) {
+			return fmt.Errorf("container %q: %q isn't a package name", p.ID, pkg)
+		}
+	}
+	for i, st := range p.Setup {
+		if strings.TrimSpace(st) == "" || len(st) > 4000 || strings.ContainsRune(st, 0) {
+			return fmt.Errorf("container %q: setup step %d is empty or too long", p.ID, i+1)
+		}
+	}
+	return nil
 }
 
 func mergeID[T any](base, over []T, id func(T) string) []T {
@@ -164,6 +185,8 @@ type ContainerInfo struct {
 	// base, cli, setup, or unknown when it predates the record); a rebuild
 	// brings it up to date.
 	Changes []string `json:"changes,omitempty"`
+	Builtin bool     `json:"builtin"` // ships with UNCLI
+	Edited  bool     `json:"edited"`  // the user's containers.yaml has their own version
 }
 
 // ContainersInfo is everything the containers settings show.
@@ -174,6 +197,7 @@ type ContainersInfo struct {
 	// containers that share connectors.
 	AccountSignedIn bool            `json:"accountSignedIn"`
 	Containers      []ContainerInfo `json:"containers"`
+	Bases           []Base          `json:"bases"`           // to build containers on
 	Error           string          `json:"error,omitempty"` // containers.yaml couldn't be read
 }
 
@@ -189,6 +213,7 @@ func (s *Service) Containers(ctx context.Context) ContainersInfo {
 
 // containersInfo reports with WSL as last asked.
 func (s *Service) containersInfo() ContainersInfo {
+	builtin, edited := s.editState()
 	c := &s.containers
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -196,15 +221,18 @@ func (s *Service) containersInfo() ContainersInfo {
 	if st.Distros == nil {
 		st.Distros = []string{}
 	}
-	info := ContainersInfo{WSL: st, SignedIn: s.containerToken() != "", AccountSignedIn: s.containerAccount() != "", Containers: []ContainerInfo{}}
+	info := ContainersInfo{WSL: st, SignedIn: s.containerToken() != "", AccountSignedIn: s.containerAccount() != "", Containers: []ContainerInfo{}, Bases: append([]Base{}, c.cfg.Bases...)}
 	if c.err != nil {
 		info.Error = c.err.Error()
 	}
 	for _, p := range c.cfg.Containers {
-		ci := ContainerInfo{ContainerProfile: p, Built: slices.Contains(st.Distros, wsl.DistroName(p.ID)),
+		ci := ContainerInfo{Builtin: builtin[p.ID], Edited: edited[p.ID], ContainerProfile: p, Built: slices.Contains(st.Distros, wsl.DistroName(p.ID)),
 			Step: c.building[p.ID], Percent: c.percent[p.ID], Error: c.failed[p.ID]}
 		if ci.Packages == nil {
 			ci.Packages = []string{}
+		}
+		if ci.Setup == nil {
+			ci.Setup = []string{}
 		}
 		for _, b := range c.cfg.Bases {
 			if b.ID == p.Base {
@@ -338,7 +366,7 @@ func (s *Service) buildContainer(p ContainerProfile, b Base) error {
 	}
 	dir := filepath.Join(s.Paths.Config, "wsl", p.ID)
 	_ = os.RemoveAll(dir)
-	return wsl.Build(ctx, wsl.Spec{Name: name, Dir: dir, RootFS: rootfs, CLI: cli, Packages: p.Packages}, step)
+	return wsl.Build(ctx, wsl.Spec{Name: name, Dir: dir, RootFS: rootfs, CLI: cli, Packages: p.Packages, Setup: p.Setup}, step)
 }
 
 // stopContainer stops a container gently (WSL is shared with other tools:

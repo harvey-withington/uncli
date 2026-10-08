@@ -370,7 +370,9 @@ export interface Capabilities {
   liveModelSwitch: boolean
   interrupt: boolean
   approvals: boolean
+  hookApprovals?: boolean // approvals come through UNCLI's hook (decision 0012)
   images: boolean
+  documents?: boolean
   usageReporting: boolean
   thinkingEvents: boolean
   slashPassthrough: boolean
@@ -429,6 +431,10 @@ export interface Provider {
   name: string // the CLI: in setup and settings
   agent: string // who acts in a session
   account: string // the account it signs in with
+  // How its CLI signs in: through a link UNCLI opens, or elsewhere (the
+  // provider's own app or terminal, whose sign-in the CLI shares).
+  signIn?: 'link' | 'elsewhere'
+  capabilities?: Capabilities
 }
 
 // What the user picked last time in the new-session dialog: the type, and
@@ -438,6 +444,7 @@ export interface NewSessionChoices {
   models: Record<string, string>
   folders: Record<string, string>
   containers?: Record<string, string> // where each profile last ran: a container id, or "" for this machine
+  providers?: Record<string, string> // the AI provider each profile last ran on
 }
 
 export interface CreatedSession {
@@ -460,6 +467,7 @@ export interface Bootstrap {
 }
 
 export interface CLIStatus {
+  provider?: string // whose CLI this is
   installed: boolean
   version: string
   pinned: string
@@ -468,6 +476,7 @@ export interface CLIStatus {
   email?: string
   subscription?: string
   error?: string
+  models?: ModelInfo[] // for CLIs whose sign-in check lists the account's models
 }
 
 // Starting sign-in gives a link (already opened in the browser), or says
@@ -486,6 +495,7 @@ export interface DroppedPath {
 }
 
 export interface Progress {
+  provider?: string // whose CLI is downloading
   done: number
   total: number
 }
@@ -577,6 +587,7 @@ export interface Handlers {
   pageChanged(p: Page): void
   cliProgress(p: Progress): void
   cliStatus(s: CLIStatus): void
+  providerStatus?(s: CLIStatus): void // any provider's, its provider field says which
   containersChanged?(c: ContainersInfo): void
   notifyOpen?(sessionId: string): void // the user clicked a notification ("" for the tray icon)
 }
@@ -594,8 +605,15 @@ export interface Backend {
   cancelSignIn(): Promise<void>
   setCLIVersion(version: string): Promise<CLIStatus>
   cliChannels(): Promise<Record<string, string>>
+  // Any provider's CLI, by its id: status (with the account's models, for
+  // CLIs that list them), install, version and release channels.
+  providerStatus(id: string, fresh: boolean): Promise<CLIStatus>
+  installProvider(id: string): Promise<CLIStatus>
+  setProviderVersion(id: string, version: string): Promise<CLIStatus>
+  providerChannels(id: string): Promise<Record<string, string>>
   pickFolder(title: string): Promise<string>
-  createSession(profileId: string, workdir: string, model: string, container: string): Promise<CreatedSession> // container: a container profile id, "" for this machine
+  // container: a container profile id, "" for this machine; provider: an AI provider's id, "" for the first
+  createSession(profileId: string, workdir: string, model: string, container: string, provider: string): Promise<CreatedSession>
   pages(sessionId: string): Promise<Page[]>
   send(sessionId: string, text: string, attachments?: AttachmentRef[]): Promise<void>
   interrupt(sessionId: string): Promise<void>
@@ -639,6 +657,8 @@ export interface Backend {
   stopContainers(): Promise<void> // stops UNCLI's own containers only (never wsl --shutdown: WSL is shared)
   buildContainer(id: string): Promise<void> // progress arrives as containersChanged
   removeContainer(id: string): Promise<void>
+  saveContainer(p: ContainerProfile): Promise<void> // into the user's containers.yaml; a built-in's id replaces it
+  removeContainerConfig(id: string): Promise<void> // a built-in: back to UNCLI's; the user's own: deleted with its container
   startContainerSignIn(): Promise<string> // the link to approve
   finishContainerSignIn(code: string): Promise<void>
   cancelContainerSignIn(): Promise<void>
@@ -650,6 +670,7 @@ export interface Backend {
   theme(): Promise<ThemeFileInfo> // the user's theme.yaml, if there is one (decision 0010)
   openFolder(path: string): Promise<void>
   openFile(sessionId: string, path: string, line: number): Promise<void> // editor at line (IDE-linked sessions) or default app (documents)
+  openPath(sessionId: string, path: string, line: number): Promise<void> // a link in an answer: a file as openFile, a folder shown
   revealFile(path: string): Promise<void> // shows it in its folder
   editors(): Promise<Editor[]>
   transcripts(): Promise<TranscriptEntry[]> // conversations the CLI saved, newest first
@@ -692,24 +713,36 @@ export interface WSLStatus {
   unresponsive?: boolean // wsl.exe didn't answer in time: WSL's service is stuck
 }
 
-export type ContainerStep = 'download' | 'remove' | 'import' | 'packages' | 'cli' | 'lockdown' | 'check'
+export type ContainerStep = 'download' | 'remove' | 'import' | 'packages' | 'setup' | 'cli' | 'lockdown' | 'check'
 
-export interface ContainerInfo {
+// A container as containers.yaml defines it; the editor saves one.
+export interface ContainerProfile {
   id: string
   label: string
   description?: string
   base: string
-  baseLabel: string
   packages: string[]
+  setup: string[] // shell steps run as root, in order, after the packages
   brain?: 'shared' | 'sandboxed' | '' // shared: the user's memories, skills, agents, commands, CLAUDE.md, git name
   mcp?: 'shared' | 'none' | '' // shared: the user's MCP servers that can run on Linux
   connectors?: 'shared' | 'none' | '' // shared: the user's claude.ai connectors, with the full account sign-in
+}
+
+export interface ContainerBase {
+  id: string
+  label: string
+}
+
+export interface ContainerInfo extends ContainerProfile {
+  baseLabel: string
+  builtin: boolean // ships with UNCLI
+  edited: boolean // the user's containers.yaml has their own version
   built: boolean
   step?: ContainerStep // being built
   percent?: number // download: how much is done
   error?: string // the last build failed
   // What differs from how a built container was built; a rebuild updates it.
-  changes?: Array<'packages' | 'base' | 'cli' | 'setup' | 'unknown'>
+  changes?: Array<'packages' | 'base' | 'cli' | 'steps' | 'setup' | 'unknown'>
 }
 
 export interface ContainersInfo {
@@ -717,5 +750,6 @@ export interface ContainersInfo {
   signedIn: boolean
   accountSignedIn?: boolean // the full account sign-in, for containers that share connectors
   containers: ContainerInfo[]
+  bases: ContainerBase[] // what a container can be built on
   error?: string // containers.yaml couldn't be read
 }

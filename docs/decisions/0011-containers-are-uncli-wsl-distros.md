@@ -179,6 +179,36 @@ needs `libgcc` and `libstdc++`):
   in such a container can use the sign-in, which Settings says before
   signing in; signing out deletes it.
 
+## Editing containers in Settings (2026-10-08)
+
+Harvey asked for a way to customise containers without editing YAML.
+Settings → Containers now edits them, and the file stays the one place
+they're defined: saving writes the user's `containers.yaml` (UNCLI's
+config folder), where a container under a built-in's id replaces it and
+any other id adds one. Reset to built-in removes the user's version; the
+distro stays until it's rebuilt. Delete, for the user's own, also stops
+its sessions and removes its distro and build record. Hand edits still
+work, but a save from Settings rewrites the file without comments (its
+header says so). The backend checks everything it saves (`validProfile`):
+the id, the base, package names (`wsl.ValidPackage`), the sharing values
+and the setup steps.
+
+Profiles gained **setup steps**: shell commands run as root with `set -e`,
+in order, after the packages and before the CLI, with the network on.
+They're for what packages can't do (`pip install`, `npm i -g`, fetching a
+tool). A failing step stops the build and names the step. They run only at
+build time, so they're part of the build record and a changed step shows
+as "Changed since it was built: its setup steps". They run as root, so they
+could loosen the lockdown, and the build's lockdown check wouldn't see it:
+WSL applies `/etc/wsl.conf` only at the distro's next start. So after the
+steps root writes `wsl.conf` again and the build compares its checksum,
+and the build fails if the CLI's user can become root without a password
+(`sudo -n` or `doas -n`), which would let a session mount Windows drives
+itself. Both checks run only for containers with steps, so they don't
+change the setup fingerprint of the others. Tested against real WSL: a
+step adding a `NOPASSWD` sudoers line is refused and the half-built
+distro removed.
+
 ## Coexisting with other WSL users (2026-10-08)
 
 All WSL2 distros on a Windows account share one VM, one kernel and one

@@ -327,3 +327,67 @@ func TestHas(t *testing.T) {
 		t.Errorf("call = %q", f.calls[0])
 	}
 }
+
+// Setup steps run as root after the packages, in order; a failing one
+// fails the build and says which.
+func TestBuildSetupSteps(t *testing.T) {
+	sp := spec(t)
+	sp.Setup = []string{"npm i -g pnpm", "echo two"}
+	// A distro whose relock prints sum and whose user is who.
+	distro := func(sum, who string) *fake {
+		f := &fake{}
+		f.answer = func(a []string) (string, error) {
+			switch f.stdins[len(f.stdins)-1] {
+			case relock:
+				return sum + "  /etc/wsl.conf\n", nil
+			case becomesRoot:
+				return who + "\n", nil
+			case checkLockdown:
+				return "uncli\ndisabled\n1\n", nil
+			}
+			if slices.Contains(a, "--version") {
+				return "2.1.285 (Claude Code)\n", nil
+			}
+			return "", nil
+		}
+		return f
+	}
+	f := distro(wslConfSum(), "user")
+	var steps []string
+	if err := build(context.Background(), sp, func(s string) { steps = append(steps, s) }, f.run, func() string { return "" }); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(steps, []string{"import", "packages", "setup", "cli", "lockdown", "check"}) {
+		t.Errorf("steps = %v", steps)
+	}
+	if !strings.Contains(f.stdins[2], "npm i -g pnpm") || !strings.Contains(f.stdins[3], "echo two") || f.calls[2][3] != "root" {
+		t.Errorf("setup calls = %q / %q", f.calls[2], f.stdins[2:4])
+	}
+	// wsl.conf is written again after the steps, and who's asked as the CLI's user.
+	if f.stdins[4] != relock || !strings.Contains(relock, wslConf) || f.stdins[5] != becomesRoot || f.calls[5][3] != User {
+		t.Errorf("after the steps: %q / %q", f.calls[4:6], f.stdins[4:6])
+	}
+
+	// A step that loosens the lockdown fails the build.
+	if err := build(context.Background(), sp, nil, distro("0000", "user").run, func() string { return "" }); err == nil || !strings.Contains(err.Error(), "lockdown settings couldn't be restored") {
+		t.Errorf("tampered wsl.conf: err = %v", err)
+	}
+	if err := build(context.Background(), sp, nil, distro(wslConfSum(), "root").run, func() string { return "" }); err == nil || !strings.Contains(err.Error(), "become root") {
+		t.Errorf("sudo: err = %v", err)
+	}
+
+	calls := 0
+	bad := &fake{answer: func(a []string) (string, error) {
+		if slices.Contains(a, "-s") && a[3] == "root" {
+			calls++
+			if calls == 3 { // packages, step 1, then step 2 fails
+				return "", errors.New("exit status 127")
+			}
+		}
+		return "", nil
+	}}
+	err := build(context.Background(), sp, nil, bad.run, func() string { return "" })
+	if err == nil || !strings.Contains(err.Error(), "setup step 2 (echo two) failed") {
+		t.Errorf("err = %v", err)
+	}
+}

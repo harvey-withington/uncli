@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/fs"
 
+	"uncli/internal/core"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,6 +17,11 @@ type Provider struct {
 	Name    string `yaml:"name" json:"name"`       // the CLI: Claude Code
 	Agent   string `yaml:"agent" json:"agent"`     // who acts in a session: Claude
 	Account string `yaml:"account" json:"account"` // the account it signs in with: Claude
+	// SignIn is how the CLI signs in: "link" (UNCLI opens its link and takes
+	// the code back) or "elsewhere" (in the provider's own app or terminal,
+	// whose sign-in the CLI shares).
+	SignIn       string            `yaml:"signin" json:"signIn"`
+	Capabilities core.Capabilities `yaml:"-" json:"capabilities"`
 }
 
 type providersFile struct {
@@ -40,13 +47,20 @@ func loadProviders(defaults fs.FS) ([]Provider, error) {
 	return f.Providers, nil
 }
 
-// Providers lists the AI providers UNCLI has an adapter for.
+// Providers lists the AI providers UNCLI has an adapter for, the first
+// first, with the names providers.yaml gives them.
 func (s *Service) Providers() []Provider {
-	for _, p := range s.providers {
-		if p.ID == s.Adapter.ID() {
-			return []Provider{p}
+	out := []Provider{}
+	for _, c := range s.clis {
+		id := c.adapter.ID()
+		p := Provider{ID: id, Label: id, Name: id, Agent: id, Account: id}
+		for _, q := range s.providers {
+			if q.ID == id {
+				p = q
+			}
 		}
+		p.Capabilities = c.adapter.Capabilities()
+		out = append(out, p)
 	}
-	id := s.Adapter.ID()
-	return []Provider{{ID: id, Label: id, Name: id, Agent: id}}
+	return out
 }

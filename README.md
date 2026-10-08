@@ -32,7 +32,13 @@ apply changes.
 ## Use
 
 - **New session** (Ctrl+N): pick Chat, Co-work (a folder) or Code (a
-  repository), and a model.
+  repository), the AI provider and a model.
+- **AI providers**: Claude Code, and the Antigravity CLI (Google). Settings
+  → AI Providers installs each one's pinned CLI and says whether it's
+  signed in. The Antigravity CLI uses the Google sign-in of the Antigravity
+  app on the same computer. Its tool calls are approved on the same cards
+  through a hook UNCLI gives it (decision 0012); it can't be sent files,
+  and stopping an answer stops its process.
 - Each question and its answer is a **page**. Page with ← and →, bookmark
   with B, and jump between bookmarks with the double arrows. Hover any
   paragraph, code block or the question to copy it (paragraphs copy their
@@ -64,9 +70,13 @@ apply changes.
   memories, skills, MCP servers and, once you sign in with your whole
   account (Settings → AI Providers), your claude.ai connectors; Isolated
   shares nothing. Containers are defined in `containers.yaml`: packages,
-  `brain: shared` or `sandboxed`, `mcp` and `connectors: shared` or `none` (add your own
-  in the config folder by `id`). Settings says when a container no longer
-  matches its config and needs a Rebuild; conversations survive rebuilds.
+  `setup` steps (shell commands run as root at build time), `brain: shared`
+  or `sandboxed`, `mcp` and `connectors: shared` or `none`. Settings →
+  Containers edits them (Edit on each, New container, Reset to built-in,
+  Delete), writing your `containers.yaml` in the config folder, which adds
+  containers or replaces the built-in ones by `id`. Settings says when a
+  container no longer matches its config and needs a Rebuild; conversations
+  survive rebuilds.
 
 ## Building
 

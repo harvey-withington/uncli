@@ -49,6 +49,17 @@ describe('toBlocks', () => {
     expect(b?.html).toContain('href="https://uncli.app"')
   })
 
+  // As the Antigravity CLI writes them: code as the text, a file URL.
+  it('renders links to files, but never to scripts', () => {
+    const [list] = toBlocks('* [`app/`](file:///S:/Local/Code/dummy/app) — the app, with [`README.md`](file:///S:/Local/Code/dummy/app/README.md).')
+    expect(list?.html).toContain('<a href="file:///S:/Local/Code/dummy/app" rel="noopener noreferrer" data-external=""><code>app/</code></a>')
+    expect(list?.html).toContain('href="file:///S:/Local/Code/dummy/app/README.md"')
+    expect(list?.html).not.toContain('](file:')
+    for (const bad of ['javascript:alert(1)', 'JAVASCRIPT:x', 'data:text/html,x', 'vbscript:x']) {
+      expect(toBlocks(`[x](${bad})`)[0]?.html).not.toContain('<a')
+    }
+  })
+
   it('copes with a half-streamed fence', () => {
     const partial = toBlocks('Text\n\n```ts\nconst a = 1')
     expect(partial.at(-1)?.kind).toBe('code')

@@ -65,7 +65,16 @@ type Session struct {
 	// between commands), as far as UNCLI can follow; empty: the session folder.
 	shellDialect, shellCwd string
 	hints                  map[string]core.ToolHint
+	// Hook approvals (hooks.go): the hooks waiting for an answer, by
+	// request, the running process's registration with the hook server, and
+	// the instructions its hook gives the model before each call.
+	hookWaits    map[string]chan hookReply
+	unhook       func()
+	instructions string
 }
+
+// ad is the adapter of the session's provider.
+func (s *Session) ad() core.Adapter { return s.m.adapterOf(s.rec) }
 
 func newSession(m *Manager, rec store.Session) *Session {
 	s := &Session{m: m, rec: rec, state: Idle}
@@ -129,7 +138,8 @@ func (s *Session) savePage() {
 // spawn starts the CLI for this session, resuming its conversation when
 // there is one. Caller holds s.mu.
 func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
-	bin, version, err := s.m.d.Binary(ctx)
+	ad := s.ad()
+	bin, version, err := s.m.d.Binary(ctx, ad.ID())
 	if err != nil {
 		return err
 	}
@@ -138,18 +148,24 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	} else {
 		spec.SessionID = s.rec.ID
 	}
-	cmd, err := s.m.d.Adapter.BuildCommand(bin, spec)
+	if err := s.hookLocked(&spec, ad); err != nil {
+		return err
+	}
+	cmd, err := ad.BuildCommand(bin, spec)
 	if err != nil {
+		s.unhookLocked()
 		return err
 	}
 	rt, err := s.m.runtime(s.rec)
 	if err != nil {
+		s.unhookLocked()
 		return err
 	}
 	pctx, cancel := context.WithCancel(context.Background())
 	proc, err := rt.Start(pctx, cmd, s.rec.Workdir)
 	if err != nil {
 		cancel()
+		s.unhookLocked()
 		return fmt.Errorf("could not start the CLI: %w", err)
 	}
 	s.gen++
@@ -158,11 +174,11 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	s.rec.CLIVersion = version
 	s.state = Starting
 	gen := s.gen
-	parser := s.m.d.Adapter.NewParser()
+	parser := ad.NewParser()
 	stderr := &tail{max: 4096, done: make(chan struct{})}
 	go func() { _, _ = io.Copy(stderr, proc.Stderr()); close(stderr.done) }()
 	go s.read(gen, proc, parser, stderr)
-	if b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlInitialize}); ok {
+	if b, ok := ad.EncodeControl(core.Control{Kind: core.CtlInitialize}); ok {
 		_, _ = proc.Stdin().Write(b)
 	}
 	s.changed()
@@ -175,6 +191,7 @@ func (s *Session) stopLocked() {
 		return
 	}
 	s.gen++
+	s.unhookLocked()
 	_ = s.proc.Kill()
 	s.cancel()
 	s.proc, s.cancel = nil, nil
@@ -215,7 +232,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	// Tool uses the CLI doesn't allow itself come to UNCLI when the CLI
 	// can route them (approvals.go); otherwise the CLI denies them. UNCLI
 	// then applies the allowlist itself, after the session mode and rules.
-	caps := s.m.d.Adapter.Capabilities()
+	caps := s.ad().Capabilities()
 	spec.Approvals = caps.Approvals
 	s.profileMode = spec.PermissionMode
 	if spec.Approvals {
@@ -244,7 +261,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 			return fmt.Errorf("this CLI can't take %s as an attachment", f.Name)
 		}
 	}
-	line, err := s.m.d.Adapter.EncodeTurn(core.UserTurn{Text: text, Directives: directives, Attachments: files})
+	line, err := s.ad().EncodeTurn(core.UserTurn{Text: text, Directives: directives, Attachments: files})
 	if err != nil {
 		return err
 	}
@@ -280,7 +297,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	// connect after the CLI starts, and the answer comes before the
 	// turn's first tool use.
 	if caps.ToolHints {
-		if b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlToolHints}); ok {
+		if b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlToolHints}); ok {
 			_, _ = s.proc.Stdin().Write(b)
 		}
 	}
@@ -341,7 +358,7 @@ func (s *Session) Interrupt() error {
 	}
 	// A tool use waiting for approval holds the turn: answer it first.
 	s.denyPendingLocked("The user stopped this turn.")
-	b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlInterrupt})
+	b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlInterrupt})
 	if ok {
 		if _, err := s.proc.Stdin().Write(b); err == nil {
 			page := s.page
@@ -385,8 +402,8 @@ func (s *Session) SetModel(model string) error {
 }
 
 func (s *Session) applyModelLocked(model string) {
-	if s.m.d.Adapter.Capabilities().LiveModelSwitch {
-		if b, ok := s.m.d.Adapter.EncodeControl(core.Control{Kind: core.CtlSetModel, Model: model}); ok {
+	if s.ad().Capabilities().LiveModelSwitch {
+		if b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlSetModel, Model: model}); ok {
 			if _, err := s.proc.Stdin().Write(b); err == nil {
 				return
 			}
@@ -468,6 +485,7 @@ func (s *Session) closePage(status, errText string) {
 		s.interrupting = nil
 	}
 	s.pending = nil // the CLI no longer waits on them
+	s.releaseHooksLocked("The turn has ended.")
 	if s.page == nil {
 		return
 	}
@@ -543,6 +561,7 @@ func (s *Session) exited(gen, code int, stderr string) {
 		return
 	}
 	s.proc, s.background = nil, nil
+	s.unhookLocked()
 	if s.cancel != nil {
 		s.cancel()
 		s.cancel = nil

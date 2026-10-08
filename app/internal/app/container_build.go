@@ -21,7 +21,8 @@ type buildRecord struct {
 	Setup      string   `json:"setup"` // wsl.SetupVersion()
 	Base       string   `json:"base"`  // id and checksum of the root filesystem
 	CLIVersion string   `json:"cliVersion"`
-	Packages   []string `json:"packages"` // sorted
+	Packages   []string `json:"packages"`        // sorted
+	Steps      []string `json:"steps,omitempty"` // setup steps, in order
 }
 
 // What changed since a container was built (ContainerInfo.Changes).
@@ -30,13 +31,14 @@ const (
 	ChangedBase     = "base"
 	ChangedCLI      = "cli"
 	ChangedSetup    = "setup"
+	ChangedSteps    = "steps"   // the container's own setup steps
 	ChangedUnknown  = "unknown" // built before UNCLI kept a record
 )
 
 func recordFor(p ContainerProfile, b Base, cliVersion string) buildRecord {
 	pkgs := append([]string{}, p.Packages...)
 	slices.Sort(pkgs)
-	return buildRecord{Setup: wsl.SetupVersion(), Base: b.ID + "@" + strings.ToLower(b.SHA256), CLIVersion: cliVersion, Packages: pkgs}
+	return buildRecord{Setup: wsl.SetupVersion(), Base: b.ID + "@" + strings.ToLower(b.SHA256), CLIVersion: cliVersion, Packages: pkgs, Steps: append([]string{}, p.Setup...)}
 }
 
 func (s *Service) buildRecordPath(id string) string {
@@ -75,6 +77,9 @@ func (s *Service) changesSince(id string, now buildRecord) []string {
 	}
 	if was.CLIVersion != now.CLIVersion {
 		out = append(out, ChangedCLI)
+	}
+	if !slices.Equal(was.Steps, now.Steps) {
+		out = append(out, ChangedSteps)
 	}
 	if was.Setup != now.Setup {
 		out = append(out, ChangedSetup)

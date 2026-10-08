@@ -29,6 +29,8 @@ break (`internal/core/seams_test.go` enforces the first two):
   fixtures, passing the tests, then bumping `PinnedVersion`.
 - UNCLI runs only its own pinned, checksum-verified CLI (or one the user
   chose at their own risk). Never bypass permissions in a profile default.
+  An adapter may switch off its CLI's own checks only when UNCLI gates every
+  tool call itself and fails closed (decision 0012).
 - Config over code: profiles, modifiers and the toolbar are YAML in
   `app/config/defaults/`, overridable by `id` from the user's config folder.
 - Pure logic lives in Go packages and `frontend/src/lib/`, with unit tests;

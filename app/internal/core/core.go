@@ -133,6 +133,9 @@ type Capabilities struct {
 	LiveModelSwitch  bool `json:"liveModelSwitch"` // control message instead of respawn
 	Interrupt        bool `json:"interrupt"`
 	Approvals        bool `json:"approvals"` // permission prompt routing
+	// HookApprovals: the CLI asks through a hook UNCLI supplies, not on its
+	// output; the adapter is a HookAdapter (decision 0012).
+	HookApprovals bool `json:"hookApprovals"`
 	// LivePermissionMode: the CLI's permission mode can change without a
 	// respawn (CtlSetPermissionMode).
 	LivePermissionMode bool `json:"livePermissionMode"`
@@ -152,6 +155,33 @@ type Capabilities struct {
 // bookkeeping, not a change to the user's files. Optional.
 type StatePather interface {
 	StatePaths() []string // absolute folders
+}
+
+// HookAdapter is an adapter whose CLI asks about each tool call by running a
+// hook UNCLI supplies (HookApprovals), and calls it before each model call
+// for the session's instructions, since it has no system prompt of its own.
+// The adapter reads the hook's calls and writes UNCLI's answers in the
+// CLI's terms; anything but an allow must refuse the call.
+type HookAdapter interface {
+	ReadHook(event string, payload []byte) (HookCall, error)
+	AnswerHook(call HookCall, a HookAnswer) ([]byte, error)
+}
+
+// Kinds of hook call.
+const (
+	HookTool         = "tool"         // a tool call to approve
+	HookInstructions = "instructions" // the session's instructions, before a model call
+)
+
+type HookCall struct {
+	Kind     string
+	Approval ApprovalAsked // HookTool: what it asks
+}
+
+type HookAnswer struct {
+	Allow        bool   // HookTool
+	Reason       string // HookTool: why it was refused, for the model
+	Instructions string // HookInstructions: the session's system prompt
 }
 
 // TextTasker is an adapter that can run one-off text tasks (page summaries,
