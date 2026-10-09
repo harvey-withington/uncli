@@ -1,35 +1,18 @@
-# Build Directory
+# Build files
 
-The build directory is used to house all the build files and assets for your application. 
+What `wails build` uses to package UNCLI. `bin/` is the output and isn't
+versioned.
 
-The structure is:
+- `appicon.png`: the app icon. `windows/icon.ico` is made from it when
+  missing.
+- `windows/info.json`: the exe's version information, filled from
+  `app/wails.json` (product name, version, company, copyright).
+  `npm run release` stamps the release's version into `wails.json` for the
+  build and puts it back afterwards.
+- `windows/installer/project.nsi`: the NSIS installer script
+  (`wails build -nsis`). It installs the WebView2 runtime if Windows lacks
+  it. `wails_tools.nsh` beside it is generated on each build.
+- `windows/wails.exe.manifest`: the Windows application manifest.
+- `darwin/`: Wails' macOS defaults. UNCLI isn't built for macOS yet.
 
-* bin - Output directory
-* darwin - macOS specific files
-* windows - Windows specific files
-
-## Mac
-
-The `darwin` directory holds files specific to Mac builds.
-These may be customised and used as part of the build. To return these files to the default state, simply delete them
-and
-build with `wails build`.
-
-The directory contains the following files:
-
-- `Info.plist` - the main plist file used for Mac builds. It is used when building using `wails build`.
-- `Info.dev.plist` - same as the main plist file but used when building using `wails dev`.
-
-## Windows
-
-The `windows` directory contains the manifest and rc files used when building with `wails build`.
-These may be customised for your application. To return these files to the default state, simply delete them and
-build with `wails build`.
-
-- `icon.ico` - The icon used for the application. This is used when building using `wails build`. If you wish to
-  use a different icon, simply replace this file with your own. If it is missing, a new `icon.ico` file
-  will be created using the `appicon.png` file in the build directory.
-- `installer/*` - The files used to create the Windows installer. These are used when building using `wails build`.
-- `info.json` - Application details used for Windows builds. The data here will be used by the Windows installer,
-  as well as the application itself (right click the exe -> properties -> details)
-- `wails.exe.manifest` - The main application manifest file.
+Delete a file here and `wails build` writes Wails' default back.

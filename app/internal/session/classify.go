@@ -1,6 +1,8 @@
 package session
 
 import (
+	"strings"
+
 	"uncli/internal/core"
 )
 
@@ -100,6 +102,27 @@ var lookCommands = set("ls", "dir", "pwd", "echo", "exit", "throw", "read", "dis
 	"test-path", "resolve-path", "split-path", "join-path", "get-command", "gcm", "get-process", "gps", "get-date",
 	"get-help", "get-filehash", "write-output", "write-host", "set-location", "sl", "push-location", "pop-location")
 
+// inPlace reports whether a filter that usually only reads (sed, awk)
+// edits its files in place: sed -i, -i.bak, -Ei or --in-place, and gawk's
+// -i inplace.
+func inPlace(prog string, args []string) bool {
+	switch prog {
+	case "sed":
+		for _, a := range args {
+			if strings.HasPrefix(a, "--in-place") || strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.Contains(a, "i") {
+				return true
+			}
+		}
+	case "awk", "gawk":
+		for i, a := range args {
+			if a == "-iinplace" || a == "--include=inplace" || (a == "-i" || a == "--include") && i+1 < len(args) && args[i+1] == "inplace" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Programs that reach outside this computer.
 var outsideCommands = set("curl", "wget", "ssh", "scp", "sftp", "rsync", "ftp", "telnet", "nc", "gh",
 	"invoke-webrequest", "iwr", "invoke-restmethod", "irm")
@@ -127,6 +150,8 @@ func commandClass(w []string) Class {
 		out := len(w) > 1 && (w[1] == "fetch" || w[1] == "pull" || w[1] == "push" || w[1] == "clone" || w[1] == "ls-remote")
 		return Class{Write: g != GitRead, Destructive: g == GitDestructive, OpenWorld: out}
 	case prog == "find" && has(w[1:], findActions...), prog == "sort" && has(w[1:], "-o", "--output"):
+		return Class{Write: true}
+	case inPlace(prog, w[1:]):
 		return Class{Write: true}
 	case lookCommands[prog] || outputFilters[prog]:
 		return Class{}

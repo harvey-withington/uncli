@@ -248,6 +248,31 @@ var corpus = []struct{ dialect, command, want string }{
 	{"bash", "dotnet publish -c Release -o out", "run"}, // builds the output folder here
 	{"bash", "dotnet nuget push bin/App.nupkg --source nuget.org", "prompt dotnet nuget|--publish"},
 	{"powershell", "dotnet test --no-build", "run"},
+	// From a WinForms project's real session (2026-10-09).
+	{"powershell", `dotnet new xunit -n App.Tests -o App.Tests; dotnet add App.Tests reference App\App.csproj`, "run"},
+	{"bash", "dotnet ef database update", "run"},  // the dev database, like rails db:migrate
+	{"bash", "msbuild App.sln /t:Publish", "run"}, // a local publish folder, like dotnet publish
+	{"powershell", `& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" App.sln -restore`, "run"},
+	{"bash", "dotnet publish -p:PublishProfile=Azure -p:DeployOnBuild=true", "prompt dotnet publish|--publish"},
+	{"powershell", `msbuild App.csproj /p:DeployOnBuild=true /p:PublishProfile=Prod`, "prompt msbuild|--publish"},
+	{"bash", "dotnet workload install maui", "prompt dotnet workload|"},
+	{"bash", "dotnet workload list", "run"},
+	{"bash", "dotnet new install Avalonia.Templates", "prompt dotnet new|"},
+	{"bash", "dotnet dev-certs https --trust", "prompt dotnet dev-certs|"},
+	{"bash", "dotnet dev-certs https --check", "run"},
+	{"bash", "dotnet nuget add source https://pkgs.example.com/feed -n example", "prompt dotnet nuget|"},
+	{"bash", "dotnet nuget add source ./packages -n local --configfile nuget.config", "run"},
+	{"bash", "dotnet nuget list source", "run"},
+	// A program held in a variable and called: whatever it holds runs.
+	{"powershell", `$msb = & vswhere.exe -latest -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1; & $msb App.sln`, "unknown"},
+	{"powershell", `& $tool --version`, "unknown"},
+	{"powershell", `. $profileScript`, "unknown"},
+	{"powershell", `$items | Where-Object { $_ -match 'x' }`, "run"},
+	// sed and awk edit in place with -i: file work, not reading.
+	{"bash", `sed -i 's/net9\.0/net10.0/g' App/App.csproj`, "run"},
+	{"bash", `sed -n '1,20p' App/App.csproj`, "run"},
+	{"bash", `sed -i.bak 's/a/b/' /etc/hosts`, "prompt !context"},
+	{"bash", `gawk -i inplace '{print}' /etc/hosts`, "prompt !context"},
 	// Ruby.
 	{"bash", "bundle install", "run"},
 	{"bash", "bundle exec rspec", "run"},

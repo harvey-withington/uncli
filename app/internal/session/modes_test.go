@@ -108,6 +108,14 @@ func TestJudgeLevels(t *testing.T) {
 			[3]want{{actionRun, "looks"}, {actionRun, "looks"}, {actionRun, "never"}}},
 		{"not recognised", "Bash", "frobnicate --all",
 			[3]want{{actionPrompt, ""}, {actionPrompt, ""}, {actionRun, "never"}}},
+		// A called variable runs whatever it holds: never just a value.
+		{"called variable", "PowerShell", `$p = Get-Content prog.txt; & $p`,
+			[3]want{{actionPrompt, ""}, {actionPrompt, ""}, {actionRun, "never"}}},
+		// sed -i edits: safe work in the folder, never reading.
+		{"sed in place", "Bash", `sed -i 's/a/b/' src/a.go`,
+			[3]want{{actionPrompt, ""}, {actionRun, "safe"}, {actionRun, "never"}}},
+		{"sed in place outside", "Bash", `sed -i 's/a/b/' /etc/hosts`,
+			[3]want{{actionPrompt, ""}, {actionPrompt, ""}, {actionRun, "never"}}},
 		{"question", "AskUserQuestion", "",
 			[3]want{{actionPrompt, ""}, {actionPrompt, ""}, {actionPrompt, ""}}},
 	}

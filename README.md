@@ -2,27 +2,46 @@
 
 AI CLIs if you're not a CLI guy.
 
-UNCLI is a desktop app for running Claude Code without a terminal. Run
-several Claude sessions side by side (Chat, Co-work on a folder, or Code on
-a repository), read each answer as a page you can bookmark and copy from,
-and switch models or modifiers like Efficiency Mode with a click. It drives
-the official Claude CLI with your Claude subscription; it never calls a
-model API itself.
+UNCLI is a desktop app for running AI coding CLIs without a terminal:
+Claude Code and the Antigravity CLI built in, and more through provider
+plugins. Run several sessions side by side (Chat, Co-work on a folder, or
+Code on a repository), read each answer as a page you can bookmark and copy
+from, approve what the agent does on cards that say what it means, and
+switch models or modifiers like Efficiency Mode with a click. It drives each
+provider's official CLI with your own subscription; sessions never call a
+model API directly.
+
+Website: <https://harvey-withington.github.io/UNCLI-1.0/>
 
 ## Install
 
-Download the latest release from
-[GitHub Releases](https://github.com/harvey-withington/UNCLI-1.0/releases/latest).
+Requires Windows 10 or 11 (x64). Download the installer from
+[GitHub Releases](https://github.com/harvey-withington/UNCLI-1.0/releases/latest);
+`SHA256SUMS.txt` beside it has its checksum. The installer adds Microsoft's
+WebView2 runtime if Windows doesn't have it yet.
 
 On first run UNCLI downloads its own copy of Claude Code (the version this
 release is tested with, about 240 MB, checked against Anthropic's published
 checksum) and asks you to sign in with your Claude account in the browser.
-It doesn't use or change any Claude Code you already have installed.
+Other providers are installed the same way from Settings → AI Providers.
+UNCLI doesn't use or change any copy of a CLI you already have installed.
 
 App data (sessions, pages, bookmarks) lives in your user config folder
-(`%AppData%\uncli` on Windows); the downloaded CLI in your user cache folder
-(`%LocalAppData%\uncli\cli`). Chat sessions get their own folder under
-`%AppData%\uncli\scratch`.
+(`%AppData%\uncli` on Windows); the downloaded CLIs in your user cache
+folder (`%LocalAppData%\uncli\cli`). Chat sessions get their own folder under
+`%AppData%\uncli\scratch`. Uninstalling UNCLI leaves both folders; delete
+them to remove everything.
+
+### What goes over the network
+
+UNCLI has no account, telemetry or update check of its own. It connects to:
+
+- each provider's download host, to install the pinned CLI you chose;
+- the Alpine Linux mirror, when you build a container;
+- a decision model's endpoint, only if you set one up in Settings.
+
+Everything else is the provider's CLI talking to its own service, under
+your account with that provider.
 
 To restyle UNCLI, put a `theme.yaml` in that folder: colours, fonts and
 radii for light and dark, by the token names in the "Theme override" section
@@ -53,24 +72,24 @@ apply changes.
 - The toolbar switches model mid-conversation, toggles modifiers (Use
   Agents, Efficiency Mode, Thorough), runs `/compact` and `/context`, and
   shows your subscription usage.
-- **Prompt me** (Always, When unsafe or Never) decides when Claude stops to
-  ask before using a tool. A card shows what it wants to do, and "This is
+- **Prompt me** (Always, When unsafe or Never) decides when the agent stops
+  to ask before using a tool. A card shows what it wants to do, and "This is
   safe" teaches UNCLI for next time. The shield opens the safe list.
-- Each page lists the **files Claude changed**. In Code sessions, Open takes
+- Each page lists the **files the agent changed**. In Code sessions, Open takes
   you to the line in your editor (Settings → Editor).
 - Chat and Co-work sessions keep their **artifacts** (HTML, SVG, Mermaid,
   Markdown, images) version by version. The side panel's Artifacts tab (or
   A) shows them as they were at the page you're on, beside On this page (O).
 - A **desktop notification** says when a session you aren't looking at
   finishes or needs approval (Settings → Notifications).
-- **Import** a conversation the Claude CLI saved (New session → Continue a
+- **Import** a conversation Claude Code saved (New session → Continue a
   conversation from the terminal…) to read it in UNCLI and carry on. A
   deleted UNCLI chat can be brought back the same way.
 - **Pin** pages you want at hand (P), **archive** finished sessions, see
   **usage** over time, and find any action in the **command palette**
   (Ctrl+Shift+P); ? lists every shortcut.
 - **Containers** (Windows): run a session in a Linux that UNCLI builds with
-  WSL, where Claude sees only the session's folder and can't start Windows
+  WSL, where the agent sees only the session's folder and can't start Windows
   programs. Settings → Containers turns WSL on (one administrator prompt and
   a restart), builds containers and signs them in. Then pick the container
   under Run in when you start a session. The built-in Sandbox shares your
@@ -97,6 +116,8 @@ npm test                  # Go tests (parser over recorded CLI streams) and fron
 npm run test:integration  # real CLI: downloads the pinned version, uses your sign-in
 npm run test:e2e          # real app and CLI on Windows, driven in headless Edge
 npm run website           # landing page on http://localhost:5180
+npm run notices           # regenerate THIRD-PARTY-NOTICES.md after changing dependencies
+npm run release           # build a release into dist/ (needs RELEASE_VERSION and NSIS)
 ```
 
 The npm scripts are the only entry points; VS Code tasks and CI call the
@@ -112,8 +133,32 @@ For development, `UNCLI_DATA_DIR` moves the app data elsewhere and
 | `app/` | The app: Go backend (`internal/`), Svelte frontend (`frontend/`), built-in profiles (`config/defaults/`), recorded CLI streams (`testdata/streams/`) |
 | `website/` | The landing page, published to GitHub Pages by `.github/workflows/deploy-pages.yml` |
 | `docs/` | The build brief, UI conventions and decision records |
-| `scripts/` | Build and dev helpers, and the end-to-end check |
+| `scripts/` | Build, release and dev helpers, and the end-to-end check |
+
+## Releasing
+
+1. Add a `## <version>` section to [CHANGELOG.md](CHANGELOG.md); it becomes
+   the release notes.
+2. Run `npm run notices` if dependencies changed, and commit.
+3. Tag and push: `git tag v1.0.0 && git push origin v1.0.0`.
+
+The Release workflow builds the installer with `npm run release` and
+publishes it with its checksum, `LICENSE` and the third-party notices. A
+tag with a pre-release suffix (`v1.0.0-rc1`, `v1.0.0b1`) is published as a
+pre-release; the installer itself carries the numeric part (1.0.0).
+
+## Security
+
+See [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
 ## Licence
 
-MIT
+UNCLI is released under the [MIT licence](LICENSE). The open-source
+packages built into it are listed, with their licences, in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). UNCLI doesn't include
+any provider's CLI: it downloads each one from its provider, and you use it
+under that provider's terms.
+
+Claude and Claude Code are trademarks of Anthropic, Antigravity of Google,
+and Grok of xAI. UNCLI is an independent project, not made or endorsed by
+any of them.

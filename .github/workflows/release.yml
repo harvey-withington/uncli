@@ -1,7 +1,7 @@
 # Pushing a v* tag builds with `npm run release` and publishes everything it
-# leaves in dist/ as a GitHub release. The tag's version, without the v, is
-# passed as RELEASE_VERSION. Add build tools the release script needs below
-# (e.g. the Wails CLI, or NSIS for a Windows installer).
+# leaves in dist/ (the installer, its checksum and the licences) as a GitHub
+# release, with CHANGELOG.md's section for the version as the release notes.
+# The tag's version, without the v, is passed as RELEASE_VERSION.
 name: Release
 
 on:
@@ -27,16 +27,18 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # - name: Tools
-      #   shell: pwsh
-      #   run: |
-      #     go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
-      #     choco install nsis -y --no-progress
-      #     echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - name: Tools
+        shell: pwsh
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Append
 
+      # The frontend's packages too: the notices check reads their licences.
       - name: npm ci
-        if: hashFiles('package-lock.json') != ''
-        run: npm ci
+        run: |
+          npm ci
+          npm --prefix app/frontend ci
 
       - name: Build
         shell: pwsh
@@ -50,6 +52,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
+          body_path: release-notes.md
           # v1.0.0a, v1.0.0b1, v1.0.0-rc1 ... publish as pre-releases
           prerelease: ${{ contains(github.ref_name, 'a') || contains(github.ref_name, 'b') || contains(github.ref_name, 'rc') || contains(github.ref_name, '-') }}

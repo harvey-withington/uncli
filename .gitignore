@@ -1,5 +1,6 @@
 # Build output
 /dist/
+/release-notes.md
 /build/bin/
 **/build/bin/
 coverage/

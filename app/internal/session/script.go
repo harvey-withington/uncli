@@ -410,9 +410,12 @@ func (r *reader) part(text string, piped bool) []part {
 	if strings.Contains(text, "$HEREDOC") || strings.Contains(text, "<<") {
 		p.inline = true // marked here; only interpreters treat it as code (classOf)
 	}
-	// The PowerShell call operator and dot-sourcing.
+	// The PowerShell call operator and dot-sourcing. What follows them is
+	// always run, even a variable, so it is never just a value.
+	called := false
 	for len(words) > 0 && (words[0] == "&" || words[0] == "." && len(words) > 1) {
 		words = words[1:]
+		called = true
 	}
 	// Assignments.
 	if r.dialect == DialectPowerShell {
@@ -496,10 +499,10 @@ func (r *reader) part(text string, piped bool) []part {
 	if literalWord.MatchString(strings.TrimRight(words[0], ",")) && strings.HasSuffix(words[0], ",") {
 		return []part{{text: text, kind: "literal"}} // a list: 0, $s
 	}
-	if len(words) == 1 && (literalWord.MatchString(words[0]) || isQuoted(text)) || isQuoted(text) && !strings.ContainsAny(text, " \t") {
+	if !called && (len(words) == 1 && (literalWord.MatchString(words[0]) || isQuoted(text)) || isQuoted(text) && !strings.ContainsAny(text, " \t")) {
 		return []part{{text: text, kind: "literal"}}
 	}
-	if isQuoted(strings.TrimSpace(strings.SplitN(text, " ", 2)[0])) && r.dialect == DialectPowerShell && len(words) == 1 {
+	if !called && isQuoted(strings.TrimSpace(strings.SplitN(text, " ", 2)[0])) && r.dialect == DialectPowerShell && len(words) == 1 {
 		return []part{{text: text, kind: "literal"}}
 	}
 	// Wrappers run what follows them.
@@ -518,11 +521,13 @@ func (r *reader) part(text string, piped bool) []part {
 		words = rest
 	}
 	// A program held in a variable; in PowerShell a statement that starts
-	// with a variable is an expression ($_ -match 'x'), not a program.
+	// with a variable is an expression ($_ -match 'x'), not a program,
+	// unless it is called (& $msb): then it runs whatever the variable
+	// holds, and an unknown value is an unknown program.
 	if strings.HasPrefix(words[0], "$") {
 		if v, ok := r.vars[strings.ToLower(strings.Trim(words[0], "{}"))]; ok && v != "" && !strings.ContainsAny(v, " ") {
 			words[0] = v
-		} else if r.dialect == DialectPowerShell {
+		} else if r.dialect == DialectPowerShell && !called {
 			return []part{{text: text, kind: "literal"}}
 		}
 	}

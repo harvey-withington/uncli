@@ -12,7 +12,9 @@
     "The root scripts are the one command surface for every stack: VS Code tasks, CI and Claude all call npm run dev | build | check | test.",
     "test:integration drives the real Claude CLI (it downloads the pinned version and uses your sign-in); it is not part of npm test.",
     "test:e2e drives the real app and CLI on Windows (wails dev + headless Edge); it is not part of npm test.",
-    "publish-build builds the installer and copies it, stamped with the date and a build number, to the test server named by UNCLI_BUILD_HOST and UNCLI_BUILD_USER, keeping the last 6."
+    "publish-build builds the installer and copies it, stamped with the date and a build number, to the test server named by UNCLI_BUILD_HOST and UNCLI_BUILD_USER, keeping the last 6.",
+    "notices regenerates THIRD-PARTY-NOTICES.md from the Go modules and frontend packages in the build; run it after changing dependencies.",
+    "release builds dist/ for a GitHub release (installer, checksum, licences) and release-notes.md from CHANGELOG.md; the Release workflow runs it for a v* tag with RELEASE_VERSION set."
   ],
   "scripts": {
     "website": "node scripts/serve-website.mjs",
@@ -22,7 +24,9 @@
     "test": "cd app && go test ./... && npm --prefix frontend run test:run",
     "test:integration": "cd app && go test -tags integration -count=1 -timeout 20m ./internal/integration/",
     "test:e2e": "node scripts/e2e.mjs",
-    "publish-build": "node scripts/publish-build.mjs"
+    "publish-build": "node scripts/publish-build.mjs",
+    "notices": "node scripts/notices.mjs",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^23.11.1"

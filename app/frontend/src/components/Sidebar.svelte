@@ -97,10 +97,13 @@
     border-right: 1px solid var(--border);
     background: var(--bg);
   }
+  /* The tagline drops under the wordmark when the sidebar is too narrow for
+     both on one line. */
   .brand {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--space-2);
+    gap: 2px var(--space-2);
     padding: var(--space-1) var(--space-2) var(--space-4);
   }
   .mark {
@@ -116,6 +119,7 @@
   .tag {
     font-size: var(--text-xs);
     color: var(--text-faint);
+    text-wrap: balance;
   }
   .new {
     justify-content: flex-start;

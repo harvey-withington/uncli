@@ -240,6 +240,9 @@ func programRisk(prog string, args []string, piped bool) Risk {
 		if prog == "find" && has(args, findActions...) {
 			return risky(WhyDeletes)
 		}
+		if inPlace(prog, args) {
+			return routine // edits its files: judged by where they are
+		}
 		return looks
 	case deleteCommands[prog]:
 		if !has(args, "-r", "-R", "-rf", "-fr", "-Recurse", "-recurse", "/s", "/S", "--recursive") && !wildcard(args) {
@@ -275,11 +278,21 @@ func programRisk(prog string, args []string, piped bool) Risk {
 		}
 		return routine
 	case prog == "dotnet":
-		if sub == "nuget" && hasWord(args, "push", "delete") {
-			return risky(WhyPublishes)
+		second := ""
+		if len(args) > 1 {
+			second = strings.ToLower(args[1])
 		}
-		if sub == "tool" && has(args, "-g", "--global") {
+		switch {
+		case sub == "nuget" && hasWord(args, "push", "delete"):
+			return risky(WhyPublishes)
+		case sub == "nuget" && hasWord(args, "source") && hasWord(args, "add", "remove", "update", "enable", "disable") && !has(args, "--configfile"):
+			return risky(WhyOutside) // the user's own NuGet.Config, not the project's
+		case sub == "tool" && has(args, "-g", "--global"),
+			sub == "workload" && second != "list" && second != "search",    // SDK-wide, often as admin
+			sub == "new" && (second == "install" || second == "uninstall"): // templates for the whole account
 			return risky(WhyInstalls)
+		case sub == "dev-certs" && has(args, "--trust", "-t", "--clean", "-c"):
+			return risky(WhySystem) // Windows' trusted certificates
 		}
 		return routine
 	case prog == "docker" || prog == "podman":
@@ -412,6 +425,16 @@ func taskWord(w string) bool {
 // --push. "release" as an option's value (-c release, --config Release) is
 // a build configuration, and dotnet publish only builds locally.
 func publishing(prog string, args []string) bool {
+	// MSBuild deploys a web project's publish profile with DeployOnBuild,
+	// whether run as msbuild or through dotnet build or publish.
+	if prog == "dotnet" || prog == "msbuild" {
+		for _, a := range args {
+			if l := strings.ToLower(a); (strings.HasPrefix(l, "-p:") || strings.HasPrefix(l, "/p:") || strings.HasPrefix(l, "-property:") || strings.HasPrefix(l, "/property:")) &&
+				strings.Contains(l, "deployonbuild=true") {
+				return true
+			}
+		}
+	}
 	if prog == "dotnet" && len(args) > 0 && strings.EqualFold(args[0], "publish") {
 		return false
 	}
