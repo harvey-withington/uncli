@@ -198,6 +198,33 @@ const MOCK_PROVIDERS: Provider[] = [
   },
 ]
 
+// Provider plugins the mock offers with ?plugins (decision 0013).
+const MOCK_PLUGINS: Provider[] = [
+  {
+    id: 'example-cli', label: 'Example CLI', name: 'Example CLI', agent: 'Example', account: 'Example', signIn: 'elsewhere',
+    capabilities: {
+      partialStreaming: true, resume: true, liveModelSwitch: false, interrupt: false, approvals: true, hookApprovals: true,
+      images: false, usageReporting: true, thinkingEvents: false, slashPassthrough: false,
+    },
+    plugin: {
+      folder: 'C:/Users/you/AppData/Roaming/uncli/providers/example-cli', hash: 'abc123', enabled: false, bypasses: true, hooked: true,
+      command: ['example', '--state={state}', '--json', '--yes-to-all'], sources: ['downloads.example.com'],
+    },
+  },
+  {
+    id: 'grok', label: 'Grok Build', name: 'Grok Build', agent: 'Grok', account: 'Grok', signIn: 'device',
+    capabilities: {
+      partialStreaming: true, resume: true, liveModelSwitch: false, interrupt: true, approvals: true, hookApprovals: false,
+      images: false, usageReporting: true, thinkingEvents: true, slashPassthrough: false,
+    },
+    plugin: { folder: 'C:/Users/you/AppData/Roaming/uncli/providers/grok', hash: 'g1', enabled: true, bypasses: false, hooked: false, command: ['grok', 'agent', '--no-leader', 'stdio'], sources: ['x.ai'] },
+  },
+  {
+    id: 'half-done', label: 'half-done', name: 'half-done', agent: 'half-done', account: 'half-done', signIn: 'elsewhere',
+    plugin: { folder: 'C:/Users/you/AppData/Roaming/uncli/providers/half-done', enabled: false, bypasses: false, hooked: false, error: 'provider.yaml: launch.args is empty' },
+  },
+]
+
 export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; unattended?: boolean; mode?: SessionMode; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
     session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode }),
@@ -263,7 +290,18 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     provider: 'antigravity', installed: agyMode !== 'none', version: '1.3.1', pinned: '1.3.1', custom: false,
     loggedIn: !agyMode, models: agyMode ? undefined : agyModels,
   }
-  const statusOf = (id: string) => (id === 'antigravity' ? agy : { ...cli, provider: 'claude' })
+  // ?plugins: a provider plugin (disabled) and a broken one.
+  const providers: Provider[] = structuredClone(MOCK_PROVIDERS)
+  if (new URLSearchParams(location.search).has('plugins')) providers.push(...structuredClone(MOCK_PLUGINS))
+  const plugin = (id: string) => providers.find(p => p.id === id)?.plugin
+  let example: CLIStatus = { provider: 'example-cli', installed: false, version: '0.4.2', pinned: '0.4.2', custom: false, loggedIn: false }
+  let grok: CLIStatus = { provider: 'grok', installed: true, version: '1.0.50', pinned: '1.0.50', custom: false, loggedIn: false }
+  const statusOf = (id: string): CLIStatus => {
+    if (id === 'antigravity') return agy
+    if (id === 'grok') return plugin(id)?.enabled ? grok : { ...grok, error: "the Grok Build plugin isn't enabled" }
+    if (id === 'example-cli') return plugin(id)?.enabled ? example : { ...example, error: "the Example CLI plugin isn't enabled: enable it in Settings → AI Providers" }
+    return { ...cli, provider: 'claude' }
+  }
   let h: Handlers | null = null
   const containers = mockContainers(c => h?.containersChanged?.(c))
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
@@ -364,7 +402,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async bootstrap() {
       return {
         profiles, modifiers, toolbar, models, platform: 'windows', lastNewSession: structuredClone(lastNew),
-        preferences: structuredClone(prefs), providers: structuredClone(MOCK_PROVIDERS), editors: structuredClone(MOCK_EDITORS),
+        preferences: structuredClone(prefs), providers: structuredClone(providers), editors: structuredClone(MOCK_EDITORS),
         sessions: sessions.map(s => ({ ...s })),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
@@ -398,6 +436,12 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     async cliChannels() { return { stable: '2.1.285', latest: '2.1.286' } },
     async providerStatus(id) { return statusOf(id) },
     async installProvider(id) {
+      if (id === 'example-cli') {
+        if (!plugin(id)?.enabled) throw new Error("the Example CLI plugin isn't enabled")
+        example = { ...example, installed: true, loggedIn: true, models: [{ value: 'example-large', resolved: 'example-large', displayName: 'Example Large', description: '', effortLevels: [] }] }
+        h?.providerStatus?.(example)
+        return example
+      }
       if (id !== 'antigravity') return this.installCLI()
       const total = 190286488
       for (let done = 0; done <= total; done += total / 10) {
@@ -412,6 +456,35 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       if (id !== 'antigravity') return this.setCLIVersion(v)
       agy = { ...agy, version: v || agy.pinned }
       return agy
+    },
+    async signInTerminal(id) {
+      if (id !== 'antigravity') return
+      setTimeout(() => {
+        agy = { ...agy, loggedIn: true, models: agyModels }
+        h?.providerStatus?.(agy)
+      }, 600)
+    },
+    async revealCLI() {},
+    async startDeviceSignIn(id) {
+      setTimeout(() => {
+        if (id === 'grok') {
+          grok = { ...grok, loggedIn: true, models: [{ value: 'grok-4.7', resolved: 'grok-4.7', displayName: 'grok-4.7', description: '', effortLevels: [] }] }
+          h?.providerStatus?.(grok)
+        }
+      }, 800)
+      return { url: 'https://accounts.x.ai/oauth2/device?user_code=ABCD-1234', code: 'ABCD-1234' }
+    },
+    async cancelDeviceSignIn() {},
+    async enablePlugin(id, hash) {
+      const p = plugin(id)
+      if (!p || p.error) throw new Error(`no plugin ${id}`)
+      if (hash !== p.hash) throw new Error("the plugin's manifest has changed: look at it again")
+      p.enabled = true
+      p.changed = false
+    },
+    async disablePlugin(id) {
+      const p = plugin(id)
+      if (p) p.enabled = false
     },
     async providerChannels(id) { return id === 'antigravity' ? { stable: '1.3.1', latest: '1.3.1' } : this.cliChannels() },
     async pickFolder() { return 'C:\\Users\\you\\projects\\demo' },

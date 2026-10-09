@@ -430,7 +430,7 @@ func (s *Session) applyCLIModeLocked() {
 	if want == "" {
 		want = "default"
 	}
-	if b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlSetPermissionMode, Mode: want}); ok {
+	if b, ok := s.encodeControl(core.Control{Kind: core.CtlSetPermissionMode, Mode: want}); ok {
 		if _, err := s.proc.Stdin().Write(b); err == nil {
 			s.cliMode = s.cliModeLocked(s.profileMode)
 		}
@@ -510,7 +510,7 @@ func (s *Session) replyLocked(requestID string, allow bool, input json.RawMessag
 	if s.replyHookLocked(requestID, allow, message) {
 		return nil
 	}
-	b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlApprove, RequestID: requestID, Allow: allow, UpdatedInput: input, Message: message})
+	b, ok := s.encodeControl(core.Control{Kind: core.CtlApprove, RequestID: requestID, Allow: allow, UpdatedInput: input, Message: message})
 	if !ok || s.proc == nil {
 		return errors.New("the CLI isn't running")
 	}

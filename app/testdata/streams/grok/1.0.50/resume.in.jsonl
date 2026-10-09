@@ -1,0 +1,3 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"uncli","version":"1"}}}
+{"jsonrpc":"2.0","id":2,"method":"session/load","params":{"cwd":"C:\\uncli-spike","mcpServers":[],"sessionId":"01a12053-acda-7900-8713-41501e0ebff8"}}
+{"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"01a12053-acda-7900-8713-41501e0ebff8","prompt":[{"type":"text","text":"What colour did you write into colour.txt earlier? Reply with just the colour."}]}}

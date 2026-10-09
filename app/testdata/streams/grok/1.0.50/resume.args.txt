@@ -1,0 +1,1 @@
+agent --no-leader stdio

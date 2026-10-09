@@ -39,6 +39,13 @@ apply changes.
   app on the same computer. Its tool calls are approved on the same cards
   through a hook UNCLI gives it (decision 0012); it can't be sent files,
   and stopping an answer stops its process.
+- **Provider plugins** add more CLIs without code: a `provider.yaml` in the
+  config folder's `providers/<id>/` describes the CLI, and UNCLI runs it
+  (decision 0013, [docs/PLUGINS.md](docs/PLUGINS.md)). A plugin does nothing
+  until you enable it in Settings → AI Providers, which shows what it would
+  download and run first. CLIs that speak ACP need the least
+  (decision 0014): Grok Build is one (`app/testdata/providers/grok`), signed
+  in with a code you approve on any device.
 - Each question and its answer is a **page**. Page with ← and →, bookmark
   with B, and jump between bookmarks with the double arrows. Hover any
   paragraph, code block or the question to copy it (paragraphs copy their

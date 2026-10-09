@@ -68,6 +68,8 @@ type Session struct {
 	// Hook approvals (hooks.go): the hooks waiting for an answer, by
 	// request, the running process's registration with the hook server, and
 	// the instructions its hook gives the model before each call.
+	// The running process's driver, when its adapter has one (driver.go).
+	driver       core.Driver
 	hookWaits    map[string]chan hookReply
 	unhook       func()
 	instructions string
@@ -174,11 +176,14 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	s.rec.CLIVersion = version
 	s.state = Starting
 	gen := s.gen
-	parser := ad.NewParser()
+	if spec.Workdir == "" {
+		spec.Workdir = s.rec.Workdir
+	}
+	feed := s.feederFor(ad, spec)
 	stderr := &tail{max: 4096, done: make(chan struct{})}
 	go func() { _, _ = io.Copy(stderr, proc.Stderr()); close(stderr.done) }()
-	go s.read(gen, proc, parser, stderr)
-	if b, ok := ad.EncodeControl(core.Control{Kind: core.CtlInitialize}); ok {
+	go s.read(gen, proc, feed, stderr)
+	for _, b := range s.opening(ad) {
 		_, _ = proc.Stdin().Write(b)
 	}
 	s.changed()
@@ -261,7 +266,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 			return fmt.Errorf("this CLI can't take %s as an attachment", f.Name)
 		}
 	}
-	line, err := s.ad().EncodeTurn(core.UserTurn{Text: text, Directives: directives, Attachments: files})
+	line, err := s.encodeTurn(core.UserTurn{Text: text, Directives: directives, Attachments: files})
 	if err != nil {
 		return err
 	}
@@ -287,17 +292,20 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	}
 	_ = s.m.d.Store.UpdateSession(&s.rec)
 	s.savePage()
-	if _, err := s.proc.Stdin().Write(line); err != nil {
-		s.closePage("error", "Could not send to the CLI: "+err.Error())
-		s.stopLocked()
-		return err
+	// No line: the driver sends the turn once the CLI is ready.
+	if len(line) > 0 {
+		if _, err := s.proc.Stdin().Write(line); err != nil {
+			s.closePage("error", "Could not send to the CLI: "+err.Error())
+			s.stopLocked()
+			return err
+		}
 	}
 	s.toldLocked()
 	// Ask again what the MCP servers say about their tools: servers
 	// connect after the CLI starts, and the answer comes before the
 	// turn's first tool use.
 	if caps.ToolHints {
-		if b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlToolHints}); ok {
+		if b, ok := s.encodeControl(core.Control{Kind: core.CtlToolHints}); ok {
 			_, _ = s.proc.Stdin().Write(b)
 		}
 	}
@@ -358,7 +366,7 @@ func (s *Session) Interrupt() error {
 	}
 	// A tool use waiting for approval holds the turn: answer it first.
 	s.denyPendingLocked("The user stopped this turn.")
-	b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlInterrupt})
+	b, ok := s.encodeControl(core.Control{Kind: core.CtlInterrupt})
 	if ok {
 		if _, err := s.proc.Stdin().Write(b); err == nil {
 			page := s.page
@@ -403,7 +411,7 @@ func (s *Session) SetModel(model string) error {
 
 func (s *Session) applyModelLocked(model string) {
 	if s.ad().Capabilities().LiveModelSwitch {
-		if b, ok := s.ad().EncodeControl(core.Control{Kind: core.CtlSetModel, Model: model}); ok {
+		if b, ok := s.encodeControl(core.Control{Kind: core.CtlSetModel, Model: model}); ok {
 			if _, err := s.proc.Stdin().Write(b); err == nil {
 				return
 			}
@@ -522,17 +530,15 @@ func (s *Session) closePage(status, errText string) {
 	s.changed()
 }
 
-func (s *Session) read(gen int, proc core.Proc, parser core.Parser, stderr *tail) {
+func (s *Session) read(gen int, proc core.Proc, feed feeder, stderr *tail) {
 	sc := bufio.NewScanner(proc.Stdout())
 	sc.Buffer(make([]byte, 1<<20), 64<<20)
 	for sc.Scan() {
-		evs, err := parser.Feed(sc.Bytes())
-		if err != nil {
-			evs = []core.Event{core.NewEvent(core.EvError, core.ErrorInfo{Message: err.Error()}, sc.Bytes())}
-		}
+		evs, replies := feed.feed(sc.Bytes())
 		for _, ev := range evs {
 			s.handle(gen, ev)
 		}
+		s.writeBack(gen, proc, replies)
 	}
 	if err := sc.Err(); err != nil {
 		// Can't keep reading (a line over 64 MB, say): report it and stop
@@ -623,8 +629,10 @@ func (s *Session) handle(gen int, ev core.Event) {
 			s.state = Idle
 		}
 	case core.EvAccount:
+		// The models list is the first provider's (others report theirs
+		// through their sign-in check).
 		a, _ := core.Decode[core.Account](ev)
-		if len(a.Models) > 0 {
+		if len(a.Models) > 0 && s.ad() == s.m.d.Adapter {
 			go s.m.setModels(a.Models)
 		}
 	case core.EvToolHints:

@@ -1,0 +1,7 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"uncli","version":"1"}}}
+{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"C:\\uncli-spike","mcpServers":[]}}
+{"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"01a12053-acda-7900-8713-41501e0ebff8","prompt":[{"type":"text","text":"Reply with just: OK"}]}}
+{"jsonrpc":"2.0","id":4,"method":"session/prompt","params":{"sessionId":"01a12053-acda-7900-8713-41501e0ebff8","prompt":[{"type":"text","text":"Read note.txt, then create a file colour.txt containing just the colour from it, then run the shell command that prints colour.txt. Reply with the command output."}]}}
+{"jsonrpc":"2.0","id":0,"result":{"outcome":{"outcome":"selected","optionId":"allow-once"}}}
+{"jsonrpc":"2.0","id":1,"result":{"outcome":{"outcome":"selected","optionId":"allow-once"}}}
+{"jsonrpc":"2.0","id":2,"result":{"outcome":{"outcome":"selected","optionId":"allow-once"}}}

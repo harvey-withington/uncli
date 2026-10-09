@@ -1,0 +1,5 @@
+You are not authenticated.
+
+Default model: grok-4.6
+
+Available models:

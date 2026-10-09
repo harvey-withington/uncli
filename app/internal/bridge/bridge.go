@@ -159,6 +159,31 @@ func (a *App) ProviderChannels(id string) (map[string]string, error) {
 	return a.svc.ProviderChannels(a.ctx, id)
 }
 
+// SignInTerminal opens a provider's CLI in a terminal window to sign in
+// (for CLIs that sign in only there); UNCLI notices when it has.
+func (a *App) SignInTerminal(id string) error { return a.svc.SignInTerminal(a.ctx, id) }
+
+// StartDeviceSignIn starts a provider's device sign-in and opens its link
+// in the browser; the code is returned for the UI to show (it can be
+// approved on any device).
+func (a *App) StartDeviceSignIn(id string) (app.DeviceSignIn, error) {
+	d, err := a.svc.StartDeviceSignIn(a.ctx, id)
+	if err == nil && d.URL != "" {
+		wruntime.BrowserOpenURL(a.ctx, d.URL)
+	}
+	return d, err
+}
+
+func (a *App) CancelDeviceSignIn(id string) { a.svc.CancelDeviceSignIn(id) }
+
+// RevealCLI shows a provider's CLI binary in its folder.
+func (a *App) RevealCLI(id string) error { return a.svc.RevealCLI(a.ctx, id) }
+
+// EnablePlugin lets a provider plugin run, as its manifest is now (hash).
+func (a *App) EnablePlugin(id, hash string) error { return a.svc.EnablePlugin(id, hash) }
+
+func (a *App) DisablePlugin(id string) error { return a.svc.DisablePlugin(id) }
+
 func (a *App) PickFolder(title string) (string, error) {
 	return wruntime.OpenDirectoryDialog(a.ctx, wruntime.OpenDialogOptions{Title: title})
 }

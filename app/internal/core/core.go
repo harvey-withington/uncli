@@ -157,6 +157,29 @@ type StatePather interface {
 	StatePaths() []string // absolute folders
 }
 
+// DriverAdapter is an adapter whose CLI holds a conversation with UNCLI (a
+// protocol with requests both ways, such as ACP) instead of taking one line
+// per turn: each process gets a Driver of its own (decision 0014). The
+// session then uses the driver in place of the parser and encoders.
+type DriverAdapter interface {
+	NewDriver(spec LaunchSpec) Driver // nil: none, the parser and encoders as usual
+}
+
+// Driver speaks to one CLI process.
+type Driver interface {
+	// Start is what to write when the process starts (a handshake).
+	Start() [][]byte
+	// Feed reads one output line: the events in it, and lines to write back
+	// (answers to the CLI's requests, a turn that was waiting for the
+	// session to be ready).
+	Feed(line []byte) (events []Event, replies [][]byte)
+	// Turn encodes a user turn; nil with no error means it waits, and Feed
+	// writes it once it can go.
+	Turn(t UserTurn) ([]byte, error)
+	// Control encodes a control; false when the CLI can't take it.
+	Control(c Control) ([]byte, bool)
+}
+
 // HookAdapter is an adapter whose CLI asks about each tool call by running a
 // hook UNCLI supplies (HookApprovals), and calls it before each model call
 // for the session's instructions, since it has no system prompt of its own.

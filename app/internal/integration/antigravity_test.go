@@ -88,13 +88,56 @@ func TestAntigravity(t *testing.T) {
 	svc, _ := open(t, config)
 	installAgy(t, svc)
 	t.Logf("Antigravity CLI %s installed and signed in", antigravity.PinnedVersion)
+	agyPath(t, svc, config, "antigravity")
+}
 
-	work := t.TempDir()
-	v, _, err := svc.CreateSessionWith(session.NewSession{Profile: "code", Workdir: work, Model: "gemini-3.8-flash-low", Provider: "antigravity"})
+// The same CLI as a provider plugin (decision 0013): its manifest, run by
+// the generic adapter, through the same path.
+func TestAntigravityAsAPlugin(t *testing.T) {
+	hookCommand(t)
+	config := t.TempDir()
+	dir := filepath.Join(config, "providers", "antigravity-manifest")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile("../../testdata/providers/antigravity/provider.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.Adapter != "antigravity" {
+	if err := os.WriteFile(filepath.Join(dir, "provider.yaml"), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc, _ := open(t, config)
+	var hash string
+	for _, p := range svc.Providers() {
+		if p.ID == "antigravity-manifest" && p.Plugin != nil {
+			hash = p.Plugin.Hash
+		}
+	}
+	if err := svc.EnablePlugin("antigravity-manifest", hash); err != nil {
+		t.Fatal(err)
+	}
+	st, err := svc.InstallProvider(context.Background(), "antigravity-manifest")
+	if err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	if !st.LoggedIn || len(st.Models) == 0 {
+		t.Skipf("not signed in: %+v", st)
+	}
+	t.Logf("the plugin's CLI %s installed and signed in, %d models", st.Version, len(st.Models))
+	agyPath(t, svc, config, "antigravity-manifest")
+}
+
+// agyPath: a write allowed on a card, a delete denied on one, and the
+// conversation resumed after a restart.
+func agyPath(t *testing.T, svc *app.Service, config, provider string) {
+	t.Helper()
+	work := t.TempDir()
+	v, _, err := svc.CreateSessionWith(session.NewSession{Profile: "code", Workdir: work, Model: "gemini-3.8-flash-low", Provider: provider})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Adapter != provider {
 		t.Fatalf("session = %+v", v)
 	}
 	if _, err := svc.Sessions.SetMode(v.ID, session.ModeAlways); err != nil {
@@ -147,6 +190,13 @@ func TestAntigravity(t *testing.T) {
 	svc.Close()
 	svc, _ = open(t, config)
 	defer svc.Close()
+	if provider != "antigravity" {
+		for _, p := range svc.Providers() {
+			if p.ID == provider && (p.Plugin == nil || !p.Plugin.Enabled) {
+				t.Fatalf("the plugin isn't enabled after a restart: %+v", p.Plugin)
+			}
+		}
+	}
 	p = send(t, svc, v.ID, "What is the name of the file you created earlier? Reply with just the file name.")
 	if !strings.Contains(strings.ToLower(p.AnswerMD), "hello.txt") {
 		t.Errorf("after a restart: %q", p.AnswerMD)

@@ -1,0 +1,72 @@
+# Grok Build, xAI's coding agent (`grok`), as a provider plugin that speaks
+# ACP (decisions 0013, 0014). Copy this folder to <config>/providers/grok/
+# and enable it in Settings → AI Providers.
+id: grok
+name: Grok Build
+agent: Grok
+account: Grok
+signin: device
+protocol: acp
+
+install:
+  pinned: 1.0.50
+  binary: grok
+  builds:
+    # xAI publishes no checksum for the binary: this one was taken from the
+    # official download on 2026-10-09 and matches the md5 Google Cloud
+    # Storage reports for the mirror (grok-build-public-artifacts).
+    1.0.50:
+      windows/amd64:
+        url: https://x.ai/cli/grok-1.0.50-windows-x86_64.exe
+        sha256: 591675b998575204e41c59765b7dcb7496aa6b21bfccb3e98d2cd6fed9f7925a
+
+# Grok keeps everything (config, sign-in, sessions) in GROK_HOME: UNCLI's
+# folder, so its sign-in and sessions are UNCLI's own.
+state: true
+env:
+  GROK_HOME: "{state}"
+statePaths: ["{state}/sessions", "{state}/logs"]
+files:
+  "{state}/config.toml": |
+    [cli]
+    auto_update = false
+
+launch:
+  # Options before the subcommand: `grok agent [OPTIONS] stdio`.
+  args: ["agent", "--no-leader"]
+  model: ["--model", "{model}"]
+  effort: ["--reasoning-effort", "{effort}"]
+  tail: ["stdio"]
+
+# Signed in, `grok models` lists them one a line, the default starred
+# ("* grok-4.7 (default)"); lines are matched trimmed.
+models:
+  line: '^\*?\s*([a-z0-9][a-z0-9.\-]*)'
+
+# Signed out, `grok models` says so. Only real subcommands: grok takes any
+# other word as a prompt and starts its own interface.
+status:
+  args: ["models"]
+  signedOut: "(?i)not authenticated"
+  login: ["login", "--device-auth"]
+  deviceUrl: 'https://accounts\.x\.ai/\S+'
+  deviceCode: '\b[A-Z0-9]{4}-[A-Z0-9]{4}\b'
+
+capabilities:
+  thinkingEvents: true
+  usageReporting: true
+
+tools:
+  # Recorded with 1.0.50: commands run in PowerShell on Windows.
+  shell: {dialect: {windows: powershell, other: bash}}
+
+# Each prompt's result carries the turn's usage; cost is in ticks of
+# 10^-10 US dollars.
+acp:
+  usage:
+    input: _meta.usage.inputTokens
+    output: _meta.usage.outputTokens
+    cacheRead: _meta.usage.cachedReadTokens
+    cacheWrite: _meta.usage.cacheCreationTokens
+    cost: _meta.usage.costUsdTicks
+    costScale: 0.0000000001

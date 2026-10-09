@@ -1,0 +1,4 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"uncli","version":"1"}}}
+{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"C:\\uncli-spike","mcpServers":[]}}
+{"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"01a12054-82f7-7670-b3da-303137fd9b8d","prompt":[{"type":"text","text":"Run the shell command: Remove-Item note.txt . Then say what happened."}]}}
+{"jsonrpc":"2.0","id":0,"result":{"outcome":{"outcome":"selected","optionId":"reject-once"}}}

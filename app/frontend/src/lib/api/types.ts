@@ -433,8 +433,29 @@ export interface Provider {
   account: string // the account it signs in with
   // How its CLI signs in: through a link UNCLI opens, or elsewhere (the
   // provider's own app or terminal, whose sign-in the CLI shares).
-  signIn?: 'link' | 'elsewhere'
+  signIn?: 'link' | 'elsewhere' | 'device' // device: a link and a code, approved on any device
   capabilities?: Capabilities
+  plugin?: PluginInfo // a provider plugin (decision 0013)
+}
+
+// A device sign-in: the link to open and the code to approve there.
+export interface DeviceSignIn {
+  url: string
+  code: string
+}
+
+// A provider plugin: a CLI described by a provider.yaml in UNCLI's config
+// folder. It starts disabled; enabling approves this exact manifest (hash).
+export interface PluginInfo {
+  folder: string
+  hash?: string
+  enabled: boolean
+  changed?: boolean // enabled before, but its manifest changed since
+  bypasses: boolean // runs its CLI with the CLI's own permission checks off, UNCLI's hook deciding instead
+  hooked: boolean // UNCLI's hook decides its tool calls
+  command?: string[] // what it runs for a session, before per-session flags
+  sources?: string[] // where its CLI is downloaded from
+  error?: string // why it can't be used
 }
 
 // What the user picked last time in the new-session dialog: the type, and
@@ -611,6 +632,12 @@ export interface Backend {
   installProvider(id: string): Promise<CLIStatus>
   setProviderVersion(id: string, version: string): Promise<CLIStatus>
   providerChannels(id: string): Promise<Record<string, string>>
+  enablePlugin(id: string, hash: string): Promise<void> // as its manifest is now
+  signInTerminal(id: string): Promise<void> // opens a CLI that signs in elsewhere in a terminal window; its status follows by itself
+  revealCLI(id: string): Promise<void> // shows a provider's CLI binary in its folder
+  startDeviceSignIn(id: string): Promise<DeviceSignIn> // the link (already opened) and the code to approve; status follows by itself
+  cancelDeviceSignIn(id: string): Promise<void>
+  disablePlugin(id: string): Promise<void>
   pickFolder(title: string): Promise<string>
   // container: a container profile id, "" for this machine; provider: an AI provider's id, "" for the first
   createSession(profileId: string, workdir: string, model: string, container: string, provider: string): Promise<CreatedSession>

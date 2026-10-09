@@ -169,3 +169,20 @@ func run(event string, stdin io.Reader, stdout io.Writer, getenv func(string) st
 	_, err = stdout.Write(out)
 	return err
 }
+
+// CmdEnv carries UNCLI's hook command line (quoted, as the shell needs it)
+// to the CLI's hooks.
+const CmdEnv = "UNCLI_HOOK_CMD"
+
+// Command is what a CLI's hook configuration runs for an event. CLIs hand
+// it to cmd /c on Windows, escaping any quotes so cmd can't read them, so
+// it names the environment variable that holds UNCLI's command line: cmd
+// expands it after the escaping, and sh reads it again with eval. Without
+// the variable the command isn't found, and the call is refused (decision
+// 0012).
+func Command(goos, event string) string {
+	if goos == "windows" {
+		return "%" + CmdEnv + "% " + event
+	}
+	return `eval "$` + CmdEnv + ` ` + event + `"`
+}

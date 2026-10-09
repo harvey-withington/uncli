@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 
+	"uncli/internal/adapter/manifest"
 	"uncli/internal/core"
 
 	"gopkg.in/yaml.v3"
@@ -22,6 +23,7 @@ type Provider struct {
 	// whose sign-in the CLI shares).
 	SignIn       string            `yaml:"signin" json:"signIn"`
 	Capabilities core.Capabilities `yaml:"-" json:"capabilities"`
+	Plugin       *PluginInfo       `yaml:"-" json:"plugin,omitempty"` // a provider plugin (decision 0013)
 }
 
 type providersFile struct {
@@ -53,6 +55,9 @@ func (s *Service) Providers() []Provider {
 	out := []Provider{}
 	for _, c := range s.clis {
 		id := c.adapter.ID()
+		if _, ok := c.adapter.(*manifest.Adapter); ok {
+			continue // a plugin: listed below, with what Settings shows about it
+		}
 		p := Provider{ID: id, Label: id, Name: id, Agent: id, Account: id}
 		for _, q := range s.providers {
 			if q.ID == id {
@@ -61,6 +66,9 @@ func (s *Service) Providers() []Provider {
 		}
 		p.Capabilities = c.adapter.Capabilities()
 		out = append(out, p)
+	}
+	for _, p := range s.plugins {
+		out = append(out, s.pluginProvider(p))
 	}
 	return out
 }

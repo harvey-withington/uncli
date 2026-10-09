@@ -28,7 +28,8 @@
   if (app.boot?.platform === 'windows' && !app.containers) void app.loadContainers()
   let creating = $state(false)
   // The AI provider (its CLI) the session runs on, when there's a choice.
-  const providers = $derived(app.boot?.providers ?? [])
+  // Plugins only once enabled (decision 0013).
+  const providers = $derived((app.boot?.providers ?? []).filter(p => !p.plugin || (p.plugin.enabled && !p.plugin.error)))
   let provider = $state('')
   const isFirst = $derived(!provider || provider === providers[0]?.id)
   const status = $derived(app.statusOf(provider))

@@ -89,8 +89,9 @@ type Service struct {
 	Installer *claude.Installer
 	Sessions  *session.Manager
 
-	clis  []*cliProvider // every provider's CLI, the first first (clis.go)
-	hooks *hook.Server   // where CLIs' hooks ask about tool calls
+	clis    []*cliProvider // every provider's CLI, the first first (clis.go), plugins last
+	plugins []*plugin      // provider plugins, loaded or not (plugins.go)
+	hooks   *hook.Server   // where CLIs' hooks ask about tool calls
 
 	// ShowWindow brings UNCLI's window to the front (set by the bridge);
 	// clicking a notification uses it.
@@ -104,8 +105,10 @@ type Service struct {
 	transcripts   *core.TranscriptLocation // where saved conversations are read from; nil: the CLI's own (tests set it)
 
 	signInMu        sync.Mutex
-	containerSignIn *containerSignIn // setup-token waiting for its code
-	accountLogin    *accountSignIn   // the full account sign-in waiting for its code
+	containerSignIn *containerSignIn              // setup-token waiting for its code
+	accountLogin    *accountSignIn                // the full account sign-in waiting for its code
+	watching        map[string]bool               // providers whose terminal sign-in is being watched for
+	devices         map[string]*local.Interactive // device sign-ins in progress, by provider
 
 	loginMu sync.Mutex
 	login   *local.Interactive
@@ -135,6 +138,12 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		{adapter: s.Adapter, installer: inst, binEnv: "UNCLI_CLAUDE_BIN"},
 		{adapter: agy, installer: agyInst, binEnv: "UNCLI_AGY_BIN"},
 	}
+	s.plugins = s.loadPlugins([]string{s.Adapter.ID(), agy.ID()})
+	s.clis = append(s.clis, s.pluginAdapters()...)
+	others := []core.Adapter{}
+	for _, c := range s.clis[1:] {
+		others = append(others, c.adapter)
+	}
 	if s.hooks, err = hook.Listen(); err != nil {
 		db.Close()
 		return nil, err
@@ -153,7 +162,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		func() string { return s.Preferences().Notifications },
 		func(n notify.Note) { go s.showNote(n) })
 	s.Sessions, err = session.NewManager(session.Deps{
-		Store: db, Adapter: s.Adapter, Others: []core.Adapter{agy}, Hooks: s.hooks,
+		Store: db, Adapter: s.Adapter, Others: others, Hooks: s.hooks,
 		Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,
 		Binary: s.binaryOf, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
 		Judge: s.judgeCommand, JudgeTools: s.judgeTools, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
@@ -167,6 +176,11 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 
 func (s *Service) Close() {
 	s.CancelSignIn()
+	s.signInMu.Lock()
+	for id := range s.devices {
+		defer s.CancelDeviceSignIn(id)
+	}
+	s.signInMu.Unlock()
 	s.Sessions.Close()
 	s.CancelContainerSignIn()
 	s.CancelContainerAccountSignIn()
@@ -490,6 +504,9 @@ func (s *Service) CreateSessionIn(profileID, workdir, model, container string) (
 // CreateSessionWith creates a session on a provider (empty: the first) and
 // remembers the choices for next time.
 func (s *Service) CreateSessionWith(n session.NewSession) (session.View, NewSessionChoices, error) {
+	if err := s.pluginAllowed(n.Provider); err != nil {
+		return session.View{}, s.lastNewSession(), err
+	}
 	v, err := s.Sessions.CreateWith(n)
 	if err != nil {
 		return v, s.lastNewSession(), err

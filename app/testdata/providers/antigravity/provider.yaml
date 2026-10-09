@@ -1,0 +1,162 @@
+# The Antigravity CLI as a provider plugin (decision 0013). UNCLI's own
+# Antigravity adapter is Go code (internal/adapter/antigravity); this
+# manifest describes the same CLI as data, and a comparison test requires
+# the two to behave alike on every recorded fixture. It's kept with the
+# tests, not shipped.
+id: antigravity-manifest
+name: Antigravity CLI
+agent: Antigravity
+account: Google
+signin: elsewhere
+
+install:
+  pinned: 1.3.1
+  binary: agy
+  builds:
+    1.3.1:
+      windows/amd64:
+        url: https://storage.googleapis.com/antigravity-public/antigravity-cli/1.3.1-4582356770750464/windows-x64/cli_windows_x64.exe
+        sha512: f346d2cd9d68e7e5395cb94ff95e7e8ab2e0c65cf2ad835d0eb671fb41f12f5fc713d7a26ceb4510678eb9baa62c6cd9ab8205211e3661c6cd1e23ca7bc69781
+  # The latest build, as the CLI's own installer finds it.
+  latest:
+    url: https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/{platform}.json
+    platforms: {windows/amd64: windows_amd64, windows/arm64: windows_arm64, darwin/arm64: darwin_arm64, linux/amd64: linux_amd64}
+    version: version
+    binary: url
+    sha512: sha512
+
+# Every process: the pinned binary never updates itself.
+env:
+  AGY_CLI_DISABLE_AUTO_UPDATE: "true"
+
+# The CLI keeps its conversations and configuration in a folder of UNCLI's
+# ({state}), where UNCLI's hooks are too.
+state: true
+statePaths: ["{state}/antigravity-cli"]
+
+launch:
+  args: ["--gemini_dir={state}", "--input-format", "stream-json", "--output-format", "stream-json"]
+  approvals: ["--dangerously-skip-permissions"]
+  resume: ["--conversation", "{resume}"]
+  model: ["--model", "{model}"]
+  effort: ["--effort", "{effort}"]
+  plan: ["--mode", "plan"]
+
+# One user message a line; directives first.
+turn:
+  line: {event: user, message: {content: "{text}"}}
+
+capabilities:
+  partialStreaming: true
+  resume: true
+  usageReporting: true
+
+# Signed in when the model list comes back; the list is the account's models.
+status:
+  args: ["--gemini_dir={state}", "models"]
+  login: ["--gemini_dir={state}"]
+  method: Google
+models:
+  line: '^([^\s:]+)\t(.+)$'
+
+lostConversation: ["conversation not found", "no such conversation"]
+
+# Each output line is matched against every rule in order; each rule whose
+# "when" holds does what it says. Paths are dotted JSON paths into the line.
+events:
+  - when: {event: init}
+    session: {id: conversation_id, model: init.model, tools: init.tools, permissionMode: init.permission_mode}
+  - when: {event: step_update, step_update.step_type: user_input, step_update.state: DONE}
+    turnStarted: true
+  - when: {event: step_update, step_update.step_type: agent_response}
+    text: {delta: step_update.text_delta, block: step_update.step_index, done: {step_update.state: [DONE, ERROR]}}
+    usage: {input: step_update.usage.input_tokens, output: [step_update.usage.output_tokens, step_update.usage.thinking_tokens], cacheRead: step_update.usage.cache_read_tokens}
+  - when: {event: step_update, step_update.step_type: [tool, subagent]}
+    tool:
+      id: "{session}:{step_update.step_index}"
+      name: [step_update.tool_info.name, step_update.tool_name]
+      input: step_update.tool_info.parameters
+      done: {step_update.state: [DONE, ERROR]}
+      ok: {step_update.state: DONE}
+      output: step_update.tool_info.output
+      error: step_update.tool_info.error.message
+      denied: "denied by pre-tool hook"
+  - when: {event: result}
+    result:
+      ok: {result.status: SUCCESS}
+      text: result.response
+      error: result.error
+      errorCode: result.status
+      interrupted: {result.status: [CANCELED, INTERRUPTED]}
+      durationSeconds: result.duration_seconds
+      durationTotal: true
+      usage: turn
+      denials: result.denied_actions
+  # Other steps (system messages) are known, and say nothing.
+  - when: {event: step_update}
+
+# What each tool does (UNCLI's action kinds) and where its command or path is.
+tools:
+  shell: {dialect: {windows: powershell, other: bash}}
+  kinds:
+    run_command: shell
+    view_file: read
+    command_status: read
+    read_resource: read
+    list_dir: search
+    grep_search: search
+    find_by_name: search
+    list_resources: search
+    write_to_file: write
+    replace_file_content: edit
+    multi_replace_file_content: edit
+    sed_file: edit
+    notebook_edit: edit
+    read_url_content: web
+    search_web: web
+    call_mcp_tool: mcp
+    ask_question: question
+    ask_permission: question
+    ask_custom_permission: question
+    invoke_subagent: agent
+    define_subagent: agent
+    manage_subagents: agent
+    browser_subagent: agent
+    send_message: internal
+    wait: internal
+    wait_5_seconds: internal
+    finish: internal
+    manage_task: internal
+    manage_inbox: internal
+    list_permissions: internal
+  command: [CommandLine]
+  path: [AbsolutePath, TargetFile, File, FilePath, Path, DirectoryPath, SearchPath, SearchDirectory]
+  mcp: {server: [ServerName, Server], tool: [ToolName, Tool, Name]}
+  summary: [toolAction, toolSummary, CommandLine, AbsolutePath, TargetFile, Url, query]
+  touched: {write_to_file: write, replace_file_content: edit, multi_replace_file_content: edit, sed_file: edit}
+
+# Approvals through UNCLI's hook (decision 0012). The files are written into
+# the state folder before the CLI starts; {hook:<event>} is the command that
+# runs UNCLI's hook for an event.
+approvals:
+  hook:
+    files:
+      "{state}/config/hooks.json":
+        uncli:
+          PreToolUse:
+            - matcher: "*"
+              hooks: [{type: command, command: "{hook:pre-tool}", timeout: 86400}]
+          PreInvocation:
+            - {type: command, command: "{hook:pre-invocation}", timeout: 30}
+    events:
+      pre-tool:
+        kind: tool
+        id: "{conversationId}:{stepIdx}"
+        name: toolCall.name
+        input: toolCall.args
+        allow: {decision: allow}
+        deny: {decision: deny, reason: "{reason}"}
+      pre-invocation:
+        kind: instructions
+        answer: {injectSteps: [{ephemeralMessage: "{instructions}"}]}
+        none: {}

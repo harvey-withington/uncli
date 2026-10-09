@@ -22,6 +22,9 @@ type cliProvider struct {
 	adapter   core.Adapter
 	installer core.Installer
 	binEnv    string // a binary to use instead of a managed one (development)
+	// allowed: nil when the CLI may be downloaded and run (a plugin the
+	// user hasn't enabled may not; plugins.go).
+	allowed func() error
 
 	mu       sync.Mutex
 	auth     *core.AuthInfo
@@ -69,10 +72,20 @@ func (s *Service) overrideOf(c *cliProvider) string {
 	return p
 }
 
+func (c *cliProvider) check() error {
+	if c.allowed != nil {
+		return c.allowed()
+	}
+	return nil
+}
+
 // binaryOf is a provider's CLI binary and its version (session.Deps.Binary).
 func (s *Service) binaryOf(ctx context.Context, id string) (string, string, error) {
 	c, err := s.cli(id)
 	if err != nil {
+		return "", "", err
+	}
+	if err := c.check(); err != nil {
 		return "", "", err
 	}
 	if p := s.overrideOf(c); p != "" {
@@ -93,6 +106,11 @@ func (s *Service) ProviderStatus(ctx context.Context, id string, fresh bool) CLI
 		return CLIStatus{Error: err.Error()}
 	}
 	st := CLIStatus{Provider: c.adapter.ID(), Version: s.versionOf(c), Pinned: c.installer.Pinned(), Custom: s.overrideOf(c) != ""}
+	if err := c.check(); err != nil {
+		_, st.Installed = c.installer.Path(st.Version)
+		st.Error = err.Error()
+		return st // not run until it may be
+	}
 	bin, _, err := s.binaryOf(ctx, c.adapter.ID())
 	if err != nil {
 		return st
@@ -162,6 +180,9 @@ func (s *Service) InstallProvider(ctx context.Context, id string) (CLIStatus, er
 	if err != nil {
 		return CLIStatus{}, err
 	}
+	if err := c.check(); err != nil {
+		return CLIStatus{}, err
+	}
 	pid := c.adapter.ID()
 	_, err = c.installer.Ensure(ctx, s.versionOf(c), func(done, total int64) {
 		s.emit.Emit(EvtCLIProgress, Progress{Provider: pid, Done: done, Total: total})
@@ -189,6 +210,9 @@ func (s *Service) SetProviderVersion(ctx context.Context, id, version string) (C
 	if err != nil {
 		return CLIStatus{}, err
 	}
+	if err := c.check(); err != nil {
+		return CLIStatus{}, err
+	}
 	version = strings.TrimSpace(version)
 	if version == c.installer.Pinned() {
 		version = ""
@@ -203,6 +227,9 @@ func (s *Service) SetProviderVersion(ctx context.Context, id, version string) (C
 func (s *Service) ProviderChannels(ctx context.Context, id string) (map[string]string, error) {
 	c, err := s.cli(id)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.check(); err != nil {
 		return nil, err
 	}
 	return c.installer.Channels(ctx)

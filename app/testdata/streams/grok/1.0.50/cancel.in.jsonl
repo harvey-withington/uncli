@@ -1,0 +1,5 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false},"clientInfo":{"name":"uncli","version":"1"}}}
+{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"C:\\uncli-spike","mcpServers":[]}}
+{"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"01a12054-bd50-7c93-a8db-4136067c27f8","prompt":[{"type":"text","text":"Write a 600-word story about a lighthouse keeper. Do not use any tools."}]}}
+{"jsonrpc":"2.0","method":"session/cancel","params":{"sessionId":"01a12054-bd50-7c93-a8db-4136067c27f8"}}
+{"jsonrpc":"2.0","id":4,"method":"session/prompt","params":{"sessionId":"01a12054-bd50-7c93-a8db-4136067c27f8","prompt":[{"type":"text","text":"Reply with just: AFTER"}]}}

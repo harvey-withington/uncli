@@ -64,3 +64,26 @@ after the previous turn's `result`. `<name>.hook.jsonl` holds what the
 | `tools-hook-allow` | `--dangerously-skip-permissions` with UNCLI's hook allowing: `view_file`, `write_to_file` and `run_command` (PowerShell) as `tool` steps (`ACTIVE`, then `DONE` with `output`); the hook gets each call's full arguments and a `stepIdx` equal to the step's `step_index` |
 | `tools-hook-deny` | The hook denying a `run_command`: the step ends `ERROR` with `tool call denied by pre-tool hook: <reason>`, and the agent says so |
 | `subagent` | `invoke_subagent`: a `subagent` step with `subagent_info`, the main agent's reply, a `system_message` step when the sub-agent's report comes back, and the final answer, all in one turn; the sub-agent's own tool calls reach the hook under its conversation id |
+
+## grok/1.0.50
+
+Recorded with Grok Build (`grok`) 1.0.50 on Windows on 2026-10-09, over ACP
+(`grok agent --no-leader stdio`, decision 0014), with a private `GROK_HOME`.
+Each `.jsonl` is everything grok printed; `.in.jsonl` is what the client
+sent, as UNCLI does: no files or terminal offered, permission requests
+answered with the agent's `allow-once` or `reject-once`, any other agent
+request refused. Paths are `C:\uncli-spike` (the work folder),
+`C:\uncli-grok` (GROK_HOME) and `C:\Users\user`. The commands and skills
+grok lists (`available_commands_update`) are emptied, since they include
+the user's own.
+
+| Fixture | What it shows |
+| --- | --- |
+| `initialize-signed-out` | `initialize` answered without a sign-in (capabilities, `_meta.modelState`), then `session/new` refused: `Authentication required` |
+| `tools-allow` | A plain answer, then a turn with a PowerShell command, a file read (not asked about), a write (a diff with `oldText: ""`) and another command, each asked and allowed; the first `tool_call` names the tool only in its title and `_meta["x.ai/tool"]`, its kind comes in the next update; each prompt's result has the turn's usage and cost in `_meta.usage` (cost in 10^-10 US dollars) |
+| `tools-deny` | A command refused (`reject-once`): the tool fails with "User rejected the execution…" and the turn ends `cancelled` |
+| `cancel` | `session/cancel` while it thinks: `stopReason: cancelled`, then the same process answers the next prompt |
+| `resume` | `session/load` of the `tools-allow` session: the whole conversation replayed as updates before the load's answer, then a prompt answered from it |
+
+`models-signed-in.txt` and `models-signed-out.txt` are what `grok models`
+prints in each state.
