@@ -12,7 +12,7 @@ likewise downloaded when you build the container, under Alpine's licences.
 
 ## Go modules (28)
 
-### Go standard library go1.26.3
+### Go standard library
 
 ```text
 Copyright 2009 The Go Authors.

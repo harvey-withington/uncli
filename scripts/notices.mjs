@@ -44,9 +44,10 @@ function goModules() {
     const [name, version, dir] = line.split('\t')
     seen.set(name, { name, version, texts: licenceTexts(dir) })
   }
+  // No version for the standard library: it would change with whichever Go
+  // patch release builds UNCLI, which doesn't change the licence.
   const goroot = execFileSync('go', ['env', 'GOROOT'], { encoding: 'utf8' }).trim()
-  const goVersion = execFileSync('go', ['env', 'GOVERSION'], { encoding: 'utf8' }).trim()
-  return [{ name: 'Go standard library', version: goVersion, texts: licenceTexts(goroot) }, ...[...seen.values()].sort((a, b) => a.name.localeCompare(b.name))]
+  return [{ name: 'Go standard library', version: '', texts: licenceTexts(goroot) }, ...[...seen.values()].sort((a, b) => a.name.localeCompare(b.name))]
 }
 
 function npmPackages() {
@@ -72,7 +73,7 @@ function npmPackages() {
 }
 
 function section(p) {
-  const head = `### ${p.name} ${p.version}${p.licence ? ` (${p.licence})` : ''}`
+  const head = `### ${[p.name, p.version].filter(Boolean).join(' ')}${p.licence ? ` (${p.licence})` : ''}`
   const body = p.texts.length
     ? p.texts.map(t => '```text\n' + t.replace(/```/g, "'''") + '\n```').join('\n\n')
     : p.licence
@@ -108,7 +109,14 @@ ${npmList.map(section).join('\n\n')}
 if (process.argv.includes('--check')) {
   const current = existsSync(out) ? readFileSync(out, 'utf8').replace(/\r\n/g, '\n') : ''
   if (current !== text) {
-    console.error('THIRD-PARTY-NOTICES.md is out of date: run npm run notices.')
+    // Say where it differs, so a check that fails only in CI can be read.
+    const want = text.split('\n')
+    const have = current.split('\n')
+    const i = want.findIndex((l, k) => l !== have[k])
+    const at = i < 0 ? want.length : i
+    console.error(`THIRD-PARTY-NOTICES.md is out of date: run npm run notices. First difference at line ${at + 1}:`)
+    console.error(`  file:      ${JSON.stringify(have[at] ?? '(end of file)')}`)
+    console.error(`  generated: ${JSON.stringify(want[at] ?? '(end of file)')}`)
     process.exit(1)
   }
   console.log('THIRD-PARTY-NOTICES.md is up to date.')
