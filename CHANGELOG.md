@@ -4,9 +4,9 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
-## 1.0.0
+## 0.1.0-alpha
 
-The first release. UNCLI runs AI coding CLIs in a desktop app, so you can
+The first public alpha. UNCLI runs AI coding CLIs in a desktop app, so you can
 work with them without a terminal. Windows 10 and 11 (x64).
 
 ### Sessions

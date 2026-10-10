@@ -140,12 +140,12 @@ For development, `UNCLI_DATA_DIR` moves the app data elsewhere and
 1. Add a `## <version>` section to [CHANGELOG.md](CHANGELOG.md); it becomes
    the release notes.
 2. Run `npm run notices` if dependencies changed, and commit.
-3. Tag and push: `git tag v1.0.0 && git push origin v1.0.0`.
+3. Tag and push: `git tag v0.1.0-alpha`, then `git push origin v0.1.0-alpha`.
 
 The Release workflow builds the installer with `npm run release` and
 publishes it with its checksum, `LICENSE` and the third-party notices. A
-tag with a pre-release suffix (`v1.0.0-rc1`, `v1.0.0b1`) is published as a
-pre-release; the installer itself carries the numeric part (1.0.0).
+tag with a pre-release suffix (`v0.1.0-alpha`, `v1.0.0-rc1`) is published as a
+pre-release; the installer itself carries the numeric part (0.1.0).
 
 ## Security
 
