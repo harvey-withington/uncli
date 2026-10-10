@@ -38,9 +38,15 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # Build runs wails build.
+      - name: Tools
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
+
+      # The frontend's packages too: check and test run svelte-check and vitest.
       - name: npm ci
-        if: hashFiles('package-lock.json') != ''
-        run: npm ci
+        run: |
+          npm ci
+          npm --prefix app/frontend ci
 
       - name: Check
         run: npm run check --if-present
