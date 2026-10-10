@@ -9,7 +9,7 @@
     content="UNCLI is a desktop app for AI coding CLIs like Claude Code: sessions side by side, every answer a page you can read, and approvals in plain words. Free, open source, for Windows." />
   <meta name="theme-color" content="#0b0806" />
 
-  <link rel="canonical" href="https://harvey-withington.github.io/UNCLI-1.0/" />
+  <link rel="canonical" href="https://uncli.app/" />
 
   <!-- Open Graph / social. og:url and an absolute og:image are needed by
        scrapers: relative paths don't resolve off-site. -->
@@ -17,13 +17,14 @@
   <meta property="og:description"
     content="A desktop app for AI coding CLIs like Claude Code: sessions side by side, answers as pages, approvals in plain words." />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://harvey-withington.github.io/UNCLI-1.0/" />
-  <meta property="og:image" content="https://harvey-withington.github.io/UNCLI-1.0/images/shot-session.png" />
+  <meta property="og:url" content="https://uncli.app/" />
+  <meta property="og:image" content="https://uncli.app/images/shot-session.png" />
 
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap"
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -112,10 +113,10 @@
       <a href="#approvals">Approvals</a>
       <a href="#providers">Providers</a>
       <a href="#closer-look">A closer look</a>
-      <a class="nav-cta" href="https://github.com/harvey-withington/UNCLI-1.0"><svg class="gh-ico" aria-hidden="true">
+      <a class="nav-cta" href="https://github.com/harvey-withington/uncli"><svg class="gh-ico" aria-hidden="true">
           <use href="#i-github" />
         </svg> GitHub</a>
-      <a href="https://github.com/harvey-withington/UNCLI-1.0#readme">Docs</a>
+      <a href="https://github.com/harvey-withington/uncli#readme">Docs</a>
     </nav>
   </header>
 
@@ -134,14 +135,14 @@
           It drives each provider's official CLI with your own subscription, and it never switches the
           approvals off to look clever.</p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="https://github.com/harvey-withington/UNCLI-1.0/releases/latest">
+          <a class="btn btn-primary" href="https://github.com/harvey-withington/uncli/releases/latest">
             <svg viewBox="0 0 24 24" class="btn-ico" aria-hidden="true">
               <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
               <path d="M5 19h14" />
             </svg>
             Get it for Windows
           </a>
-          <a class="btn btn-ghost" href="https://github.com/harvey-withington/UNCLI-1.0">View on GitHub</a>
+          <a class="btn btn-ghost" href="https://github.com/harvey-withington/uncli">View on GitHub</a>
         </div>
         <p class="fineprint">Free, MIT. No account, no telemetry. Bring your own AI subscription.</p>
       </div>
@@ -159,22 +160,30 @@
     <!-- ───────────────── Pillars ───────────────── -->
     <section class="pillars">
       <div class="pillar reveal">
-        <svg class="ico"><use href="#i-pages" /></svg>
+        <svg class="ico">
+          <use href="#i-pages" />
+        </svg>
         <h3>Pages, not scrollback</h3>
         <p>Every question and its answer is a page. Page through them, bookmark them, copy any bit with a click.</p>
       </div>
       <div class="pillar reveal">
-        <svg class="ico"><use href="#i-shield" /></svg>
+        <svg class="ico">
+          <use href="#i-shield" />
+        </svg>
         <h3>Asks in plain words</h3>
         <p>Before anything risky runs, a card says what it is and why it matters. You decide how often it asks.</p>
       </div>
       <div class="pillar reveal">
-        <svg class="ico"><use href="#i-plug" /></svg>
+        <svg class="ico">
+          <use href="#i-plug" />
+        </svg>
         <h3>Any agent, one window</h3>
         <p>Claude Code and the Antigravity CLI built in. More through plugins, described in a single YAML file.</p>
       </div>
       <div class="pillar reveal">
-        <svg class="ico"><use href="#i-lock" /></svg>
+        <svg class="ico">
+          <use href="#i-lock" />
+        </svg>
         <h3>Careful by default</h3>
         <p>Pinned, checksum-checked CLIs, plugins off until you say so, and a locked-down Linux when you want one.</p>
       </div>
@@ -189,9 +198,12 @@
           card instead: what it wants to run, what that would do, and three sensible answers.</p>
       </div>
       <div class="spotlight-art reveal">
-        <div class="approval" role="img" aria-label="An approval card: Run a command, git push origin main, which sends or publishes something beyond this computer. Allow once, This is safe, or Deny.">
+        <div class="approval" role="img"
+          aria-label="An approval card: Run a command, git push origin main, which sends or publishes something beyond this computer. Allow once, This is safe, or Deny.">
           <div class="approval-head">
-            <svg class="ico"><use href="#i-shield" /></svg>
+            <svg class="ico">
+              <use href="#i-shield" />
+            </svg>
             Run a command
             <span class="approval-badge">Waiting for you</span>
           </div>
@@ -205,7 +217,8 @@
         </div>
       </div>
       <p class="platform-note reveal">Prompt me: <strong>Always</strong>, <strong>When unsafe</strong> or
-        <strong>Never</strong>. "This is safe" teaches UNCLI for next time; the shield shows everything it has learnt.</p>
+        <strong>Never</strong>. "This is safe" teaches UNCLI for next time; the shield shows everything it has learnt.
+      </p>
     </section>
 
     <!-- ───────────────── Features ───────────────── -->
@@ -217,37 +230,49 @@
       </div>
       <div class="grid">
         <article class="card reveal">
-          <svg class="ico"><use href="#i-columns" /></svg>
+          <svg class="ico">
+            <use href="#i-columns" />
+          </svg>
           <h3>Several sessions at once</h3>
           <p>Chat, work on a folder of documents, or code in a repository, as many side by side as you like. A
             notification says when one finishes or needs you.</p>
         </article>
         <article class="card reveal">
-          <svg class="ico"><use href="#i-bookmark" /></svg>
+          <svg class="ico">
+            <use href="#i-bookmark" />
+          </svg>
           <h3>Bookmarks and pins</h3>
           <p>Bookmark the good answers, pin the ones you keep coming back to, and search every session at once.
             Finished? Archive it.</p>
         </article>
         <article class="card reveal">
-          <svg class="ico"><use href="#i-files" /></svg>
+          <svg class="ico">
+            <use href="#i-files" />
+          </svg>
           <h3>See what changed</h3>
           <p>Each page lists the files the agent touched and opens them in your editor at the right line. Artifacts
             (HTML, diagrams, images) are kept version by version.</p>
         </article>
         <article class="card reveal">
-          <svg class="ico"><use href="#i-sliders" /></svg>
+          <svg class="ico">
+            <use href="#i-sliders" />
+          </svg>
           <h3>Switch with a click</h3>
           <p>Change model mid-conversation, turn on Efficiency Mode or Thorough, compact the context. No slash
             commands to remember.</p>
         </article>
         <article class="card reveal">
-          <svg class="ico"><use href="#i-chart" /></svg>
+          <svg class="ico">
+            <use href="#i-chart" />
+          </svg>
           <h3>Know what it cost</h3>
           <p>Usage by day, model, session type and session, so the monthly allowance stops being a mystery. (It was
             probably the Opus.)</p>
         </article>
         <article class="card reveal">
-          <svg class="ico"><use href="#i-pages" /></svg>
+          <svg class="ico">
+            <use href="#i-pages" />
+          </svg>
           <h3>Bring your old chats</h3>
           <p>Import a conversation you started in the terminal and carry on in UNCLI. Ctrl+Shift+P finds anything
             else; ? lists every shortcut.</p>
@@ -283,7 +308,8 @@
           <span class="tag tag-plugin">Plugin</span>
           <h3>Yours</h3>
           <p>Describe another CLI in one <code>provider.yaml</code>. No code.
-            <a href="https://github.com/harvey-withington/UNCLI-1.0/blob/main/docs/PLUGINS.md">How plugins work</a></p>
+            <a href="https://github.com/harvey-withington/uncli/blob/main/docs/PLUGINS.md">How plugins work</a>
+          </p>
         </article>
       </div>
       <p class="platform-note reveal">A plugin does nothing until you enable it, after UNCLI shows you where it
@@ -308,8 +334,11 @@
           </ul>
         </div>
         <div class="spotlight-art reveal">
-          <div class="reach" role="img" aria-label="What the agent can reach in a container: the session folder, yes. Windows drives, Windows programs and root, no.">
-            <div class="reach-head"><svg class="ico"><use href="#i-box" /></svg> Inside a container, the agent gets</div>
+          <div class="reach" role="img"
+            aria-label="What the agent can reach in a container: the session folder, yes. Windows drives, Windows programs and root, no.">
+            <div class="reach-head"><svg class="ico">
+                <use href="#i-box" />
+              </svg> Inside a container, the agent gets</div>
             <ul>
               <li>The session's folder <span class="yes">✓</span></li>
               <li>Your other Windows drives <span class="no">✗</span></li>
@@ -330,23 +359,27 @@
       </div>
       <div class="gallery">
         <figure class="shot reveal">
-          <img src="images/shot-approval.png" alt="An approval card for git push in a Code session, with Allow once, This is safe and Deny."
-            width="1440" height="900" loading="lazy" decoding="async" />
+          <img src="images/shot-approval.png"
+            alt="An approval card for git push in a Code session, with Allow once, This is safe and Deny." width="1440"
+            height="900" loading="lazy" decoding="async" />
           <figcaption>An approval, mid-answer. The session in the sidebar says it needs you.</figcaption>
         </figure>
         <figure class="shot reveal">
-          <img src="images/shot-usage.png" alt="The usage dashboard: cost by day for 30 days, and breakdowns by model, session type and session."
+          <img src="images/shot-usage.png"
+            alt="The usage dashboard: cost by day for 30 days, and breakdowns by model, session type and session."
             width="1440" height="900" loading="lazy" decoding="async" />
           <figcaption>Usage over 30 days, by model, session type and session.</figcaption>
         </figure>
         <figure class="shot reveal">
-          <img src="images/shot-providers.png" alt="Settings, AI Providers: Claude Code's pinned version, account, and sign-in for containers."
+          <img src="images/shot-providers.png"
+            alt="Settings, AI Providers: Claude Code's pinned version, account, and sign-in for containers."
             width="1440" height="900" loading="lazy" decoding="async" />
           <figcaption>Each provider's pinned version and sign-in, in one place.</figcaption>
         </figure>
         <figure class="shot reveal">
-          <img src="images/shot-containers.png" alt="Settings, Containers: the Sandbox and a Node container, each with Build and Edit."
-            width="1440" height="900" loading="lazy" decoding="async" />
+          <img src="images/shot-containers.png"
+            alt="Settings, Containers: the Sandbox and a Node container, each with Build and Edit." width="1440"
+            height="900" loading="lazy" decoding="async" />
           <figcaption>Containers: build one, edit it, or make your own.</figcaption>
         </figure>
       </div>
@@ -400,17 +433,17 @@
           <img class="note-avatar" src="images/harvey.png" alt="Harvey" width="56" height="56" loading="lazy" />
           <span class="eyebrow">Author's note</span>
         </div>
-        <p>I'm a software engineer about 35 years in, and UNCLI is the third thing out of my weekends with Claude,
-          after <a href="https://bruv-ai.app/">BRUV</a> and
-          <a href="https://harvey-withington.github.io/port-authority/">Port Authority</a>. All three were built by
-          an agent in a terminal, so yes, I can cope with a terminal. Coping isn't enjoying.</p>
-        <p>What I wanted was simple: each answer on its own page, a list of the files it touched, and a straight
-          answer to "what is it about to run?" before it runs it. Several of those at once, without a stack of
-          windows full of scrollback. That's UNCLI.</p>
-        <p>The one rule I won't bend: UNCLI never switches approvals off for you. If a CLI can't ask, UNCLI asks for
-          it, and if that goes wrong, the answer is no.</p>
-        <p>It's a 1.0, tested on one machine with one person's habits, which is to say yours will find something
-          mine couldn't. An issue is the best present you can give me. If it's not for you, no worries.</p>
+        <p>I'm a software engineer of about ~35 years. I was around when terminals were all we had.
+          For some reason they are cool now -- not to me.</p>
+        <p>I have been pushing out a backlog of project ideas that I would never have had time to tackle without AI.
+          I built <a href="https://bruv-ai.app/">BRUV</a> and
+          <a href="https://harvey-withington.github.io/port-authority/">Port Authority</a>, suffering with the Claude
+          vscode extension and CLI, and now I realise everyone should probably vibe code their own personal chat
+          harness.
+        </p>
+        <p>Just in case you want to save some tokens, and have similar taste, here's mine.</p>
+        <p>It's alpha -- maybe forever -- tested on one machine with one person's habits, which is to say yours will
+          find something mine couldn't. If it's not for you, no worries; to each his own.</p>
         <p class="note-sign">— Harvey</p>
       </div>
     </section>
@@ -422,9 +455,9 @@
       <p>Version 1.0, Windows for now. The installer isn't code-signed, so SmartScreen will have opinions. (Noted,
         Windows.)</p>
       <div class="cta-row center">
-        <a class="btn btn-primary" href="https://github.com/harvey-withington/UNCLI-1.0/releases/latest">Get it for
+        <a class="btn btn-primary" href="https://github.com/harvey-withington/uncli/releases/latest">Get it for
           Windows</a>
-        <a class="btn btn-ghost" href="https://github.com/harvey-withington/UNCLI-1.0">Star on GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/harvey-withington/uncli">Star on GitHub</a>
       </div>
       <ul class="deal">
         <li><strong>Free, MIT, no strings.</strong> No account, no telemetry, no paid tier.</li>
@@ -445,19 +478,20 @@
     </div>
     <nav class="footer-links">
       <a href="https://ko-fi.com/harveywithington" target="_blank" rel="noopener">☕ Buy me a coffee</a>
-      <a href="https://github.com/harvey-withington/UNCLI-1.0/blob/main/CHANGELOG.md">Changelog</a>
-      <a href="https://github.com/harvey-withington/UNCLI-1.0/blob/main/SECURITY.md">Security</a>
-      <a href="https://github.com/harvey-withington/UNCLI-1.0"><svg class="gh-ico" aria-hidden="true">
+      <a href="https://github.com/harvey-withington/uncli/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://github.com/harvey-withington/uncli/blob/main/SECURITY.md">Security</a>
+      <a href="https://github.com/harvey-withington/uncli"><svg class="gh-ico" aria-hidden="true">
           <use href="#i-github" />
         </svg> GitHub</a>
       <a href="https://bruv-ai.app/">BRUV</a>
       <a href="https://harvey-withington.github.io/port-authority/">Port Authority</a>
     </nav>
     <p class="legal">© 2026 Harvey ·
-      <a href="https://github.com/harvey-withington/UNCLI-1.0/blob/main/LICENSE">MIT licence</a> ·
-      <a href="https://github.com/harvey-withington/UNCLI-1.0/blob/main/THIRD-PARTY-NOTICES.md">Third-party notices</a>.
+      <a href="https://github.com/harvey-withington/uncli/blob/main/LICENSE">MIT licence</a> ·
+      <a href="https://github.com/harvey-withington/uncli/blob/main/THIRD-PARTY-NOTICES.md">Third-party notices</a>.
       Claude and Claude Code are trademarks of Anthropic, Antigravity of Google, and Grok of xAI. UNCLI is an
-      independent project, not made or endorsed by any of them.</p>
+      independent project, not made or endorsed by any of them.
+    </p>
   </footer>
 
   <!-- Lightbox viewer for screenshots -->

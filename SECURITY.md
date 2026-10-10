@@ -7,7 +7,7 @@ bug that weakens either is a security bug, and reports are welcome.
 ## Reporting a vulnerability
 
 Report it privately through GitHub:
-[Report a vulnerability](https://github.com/harvey-withington/UNCLI-1.0/security/advisories/new).
+[Report a vulnerability](https://github.com/harvey-withington/uncli/security/advisories/new).
 Please don't open a public issue for it.
 
 Say what you did, what happened and what you expected, with the UNCLI

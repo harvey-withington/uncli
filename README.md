@@ -11,12 +11,12 @@ switch models or modifiers like Efficiency Mode with a click. It drives each
 provider's official CLI with your own subscription; sessions never call a
 model API directly.
 
-Website: <https://harvey-withington.github.io/UNCLI-1.0/>
+Website: <https://uncli.app>
 
 ## Install
 
 Requires Windows 10 or 11 (x64). Download the installer from
-[GitHub Releases](https://github.com/harvey-withington/UNCLI-1.0/releases/latest);
+[GitHub Releases](https://github.com/harvey-withington/uncli/releases/latest);
 `SHA256SUMS.txt` beside it has its checksum. The installer adds Microsoft's
 WebView2 runtime if Windows doesn't have it yet.
 
