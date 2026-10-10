@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"uncli/internal/store"
 )
 
 // A session whose conversation the CLI no longer has (fixture resume-lost:
@@ -25,9 +27,16 @@ func TestLostConversationStartsAfresh(t *testing.T) {
 	h.rt.turns = lost
 	h.rt.fail = string(stderr)
 
-	pages := h.send(v.ID, "hi")
-	waitUntil(t, "the session ready again", func() bool { return s.View().State == Idle })
-	if len(pages) != 1 || pages[0].Status != "error" || pages[0].Error != LostConversationNote {
+	// The CLI's error result closes the page first ("The turn failed"); the
+	// note replaces that when the process exits, so wait for the note rather
+	// than reading the pages as the turn closes.
+	h.send(v.ID, "hi")
+	var pages []store.Page
+	waitUntil(t, "the page to say the conversation is gone", func() bool {
+		pages, _ = h.m.Pages(v.ID)
+		return len(pages) == 1 && pages[0].Error == LostConversationNote && s.View().State == Idle
+	})
+	if pages[0].Status != "error" {
 		t.Fatalf("page = %+v", pages[0])
 	}
 	if vw := s.View(); vw.ProviderSID != "" || vw.Error != "" {
