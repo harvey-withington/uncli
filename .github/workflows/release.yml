@@ -20,7 +20,9 @@ jobs:
       - uses: actions/setup-go@v5
         if: hashFiles('**/go.mod') != ''
         with:
-          go-version: stable
+          # Go 1.26, as the README says: Wails v2.10.1 fails under Go 1.27
+          # ("package embed without types"). Move up together with Wails.
+          go-version: "1.26.x"
           cache-dependency-path: '**/go.sum'
 
       - uses: actions/setup-node@v4
