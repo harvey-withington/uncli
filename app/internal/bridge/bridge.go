@@ -54,6 +54,17 @@ func (a *App) context() context.Context {
 	return a.ctx
 }
 
+// raise brings the window to the front as it was: maximized stays
+// maximized. Unminimise restores a window that isn't minimized to its
+// normal size, so it only runs on a minimized one, which comes back
+// maximized if it was.
+func raise(ctx context.Context) {
+	if wruntime.WindowIsMinimised(ctx) {
+		wruntime.WindowUnminimise(ctx)
+	}
+	wruntime.Show(ctx)
+}
+
 // Run starts the desktop app with the embedded frontend.
 func Run(assets fs.FS) error {
 	paths, err := app.DefaultPaths()
@@ -68,8 +79,7 @@ func Run(assets fs.FS) error {
 	a.svc = svc
 	svc.ShowWindow = func() {
 		if ctx := a.context(); ctx != nil {
-			wruntime.WindowUnminimise(ctx)
-			wruntime.Show(ctx)
+			raise(ctx)
 		}
 	}
 	defer svc.Close()
@@ -86,8 +96,7 @@ func Run(assets fs.FS) error {
 			UniqueId: "app.uncli.desktop",
 			OnSecondInstanceLaunch: func(options.SecondInstanceData) {
 				if a.ctx != nil {
-					wruntime.WindowUnminimise(a.ctx)
-					wruntime.Show(a.ctx)
+					raise(a.ctx)
 				}
 			},
 		},

@@ -62,6 +62,10 @@ type Deps struct {
 	JudgeTools JudgeToolsFunc
 	Unknown    func() string
 	DeciderKey func() string
+	// Online fails when the machine is clearly offline, so a turn stops
+	// at once instead of the CLI retrying and then blaming the sign-in;
+	// nil: no check.
+	Online func(ctx context.Context) error
 }
 
 // RuntimeWSL is the runtime of sessions in a container (a WSL distro).
@@ -265,6 +269,11 @@ func (m *Manager) Send(ctx context.Context, id, text string, files ...core.Attac
 	s, err := m.get(id)
 	if err != nil {
 		return err
+	}
+	if m.d.Online != nil {
+		if err := m.d.Online(ctx); err != nil {
+			return err
+		}
 	}
 	return s.Send(ctx, text, files)
 }

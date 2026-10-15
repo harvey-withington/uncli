@@ -368,6 +368,24 @@ func TestErrorTurn(t *testing.T) {
 	}
 }
 
+// Offline, a turn fails at once with the reason: the CLI doesn't start
+// and no page opens.
+func TestOfflineSendFailsAtOnce(t *testing.T) {
+	h := newHarness(t, "chat-profile-minimal")
+	offline := errors.New("offline")
+	h.m.d.Online = func(context.Context) error { return offline }
+	v, _ := h.m.Create("chat", "", "haiku")
+	if err := h.m.Send(context.Background(), v.ID, "Say hello."); !errors.Is(err, offline) {
+		t.Fatalf("err = %v", err)
+	}
+	if len(h.rt.starts) != 0 {
+		t.Errorf("the CLI started %d time(s)", len(h.rt.starts))
+	}
+	if pages, _ := h.db.ListPages(v.ID); len(pages) != 0 {
+		t.Errorf("pages = %+v", pages)
+	}
+}
+
 func TestModelSwitchIsLive(t *testing.T) {
 	h := newHarness(t, "set-model-live")
 	v, _ := h.m.Create("chat", "", "haiku")
