@@ -46,7 +46,9 @@
   import Rewind from 'lucide-svelte/icons/rewind'
   import ScanSearch from 'lucide-svelte/icons/scan-search'
   import Search from 'lucide-svelte/icons/search'
+  import KeyRound from 'lucide-svelte/icons/key-round'
   import Plug from 'lucide-svelte/icons/plug'
+  import RotateCcw from 'lucide-svelte/icons/rotate-ccw'
   import Shield from 'lucide-svelte/icons/shield'
   import Unplug from 'lucide-svelte/icons/unplug'
   import Settings from 'lucide-svelte/icons/settings'
@@ -85,7 +87,7 @@
     'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code, coffee: Coffee,
     copy: Copy, download: Download, file: File, 'file-text': FileText, image: ImageIcon, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,
     'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,
-    plus: Plus, play: Play, rewind: Rewind, search: Search, plug: Plug, unplug: Unplug, shield: Shield, 'fast-forward': FastForward, settings: Settings, 'shield-check': ShieldCheck, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
+    plus: Plus, play: Play, rewind: Rewind, search: Search, plug: Plug, unplug: Unplug, 'key-round': KeyRound, 'rotate-ccw': RotateCcw, shield: Shield, 'fast-forward': FastForward, settings: Settings, 'shield-check': ShieldCheck, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
     sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
     eye: Eye, 'globe-lock': GlobeLock, hand: Hand, zap: Zap,

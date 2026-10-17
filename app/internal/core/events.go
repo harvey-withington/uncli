@@ -231,6 +231,11 @@ type TurnResult struct {
 	Denials     int     `json:"denials,omitempty"`
 }
 
+// ErrAuthFailed is the TurnResult.ErrorCode of a turn the provider refused
+// because the CLI's sign-in failed or expired. Adapters report it in these
+// words, so the session knows a new sign-in needs a new process.
+const ErrAuthFailed = "authentication_failed"
+
 type ErrorInfo struct {
 	Message string `json:"message"`
 }

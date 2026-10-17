@@ -1,0 +1,2 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --strict-mcp-config --setting-sources "" --tools WebSearch --disable-slash-commands
+env: CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-invalidinvalidinvalid (a token the API rejects, standing in for an expired sign-in)

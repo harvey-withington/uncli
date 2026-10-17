@@ -471,6 +471,31 @@ func (m *Manager) setUsage(u core.UsageLimit) {
 	m.mu.Unlock()
 }
 
+// Reconnect stops the idle CLI processes of a provider's sessions after it
+// signs in again (or its CLI changes): a running CLI keeps the sign-in it
+// started with, so each session's next message starts one that has the new
+// sign-in, on the same conversation. A session mid-turn is left to finish.
+// It returns how many it stopped.
+func (m *Manager) Reconnect(adapterID string) int {
+	m.mu.Lock()
+	all := make([]*Session, 0, len(m.sessions))
+	for _, s := range m.sessions {
+		all = append(all, s)
+	}
+	m.mu.Unlock()
+	n := 0
+	for _, s := range all {
+		s.mu.Lock()
+		if s.proc != nil && s.page == nil && s.ad().ID() == adapterID {
+			s.stopLocked()
+			s.changed()
+			n++
+		}
+		s.mu.Unlock()
+	}
+	return n
+}
+
 // Close stops every CLI process.
 func (m *Manager) Close() {
 	m.mu.Lock()

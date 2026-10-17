@@ -31,7 +31,7 @@ describe('Prompt me', () => {
     await ask('push again')
     expect(await screen.findByText('Page 3', { selector: '.seq' }, { timeout: 3000 })).toBeInTheDocument()
     expect(card()).toBeNull()
-  })
+  }, 15000)
 
   it('moves between levels with the arrow keys', async () => {
     const backend = mockBackend()

@@ -10,6 +10,8 @@
   import FilesStrip from './FilesStrip.svelte'
   import Icon from './Icon.svelte'
   import PageChips from './PageChips.svelte'
+  import SignInFailed from './SignInFailed.svelte'
+  import { signInFailed } from '../lib/signin'
   import TraceStrip from './TraceStrip.svelte'
 
   interface Props {
@@ -98,6 +100,8 @@
 
       {#if page.status === 'interrupted'}
         <p class="banner warn"><Icon name="square" size={14} />{t('page.interrupted')}</p>
+      {:else if signInFailed(page)}
+        <SignInFailed {page} />
       {:else if page.status === 'error'}
         <p class="banner err" role="alert"><Icon name="triangle-alert" size={14} />{page.error || t('page.failed')}</p>
       {/if}

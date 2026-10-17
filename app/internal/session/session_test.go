@@ -368,6 +368,40 @@ func TestErrorTurn(t *testing.T) {
 	}
 }
 
+// A sign-in the provider refuses ends the turn and the CLI: it keeps the
+// sign-in it started with, so the next message (after signing in again)
+// starts a new one on the same conversation.
+func TestAuthFailureRestartsTheCLI(t *testing.T) {
+	h := newHarness(t, "error-token-rejected")
+	v, _ := h.m.Create("chat", "", "haiku")
+	pages := h.send(v.ID, "hi")
+	if pages[0].Status != "error" || !strings.HasPrefix(pages[0].Error, core.ErrAuthFailed+": ") {
+		t.Errorf("page = %+v", pages[0])
+	}
+	s, _ := h.m.get(v.ID)
+	if s.View().Running {
+		t.Error("the CLI should have been stopped")
+	}
+}
+
+// Signing in again restarts a provider's idle CLIs at their next message,
+// and leaves a session mid-turn alone.
+func TestReconnect(t *testing.T) {
+	h := newHarness(t, "multi-turn-partial")
+	v, _ := h.m.Create("chat", "", "sonnet")
+	h.send(v.ID, "one")
+	if n := h.m.Reconnect("antigravity"); n != 0 {
+		t.Errorf("another provider's sign-in stopped %d", n)
+	}
+	if n := h.m.Reconnect("claude"); n != 1 {
+		t.Fatalf("stopped %d, want 1", n)
+	}
+	h.send(v.ID, "two")
+	if len(h.rt.starts) != 2 || !strings.Contains(strings.Join(h.rt.starts[1].Args, " "), "--resume") {
+		t.Errorf("the next message should start the CLI again on the conversation: %d starts", len(h.rt.starts))
+	}
+}
+
 // Offline, a turn fails at once with the reason: the CLI doesn't start
 // and no page opens.
 func TestOfflineSendFailsAtOnce(t *testing.T) {

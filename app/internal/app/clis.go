@@ -195,12 +195,21 @@ func (s *Service) InstallProvider(ctx context.Context, id string) (CLIStatus, er
 	return st, nil
 }
 
-// emitStatus tells the UI a provider's status changed.
+// emitStatus tells the UI a provider's status changed, after a sign-in or
+// an install. Signed in, its sessions' idle CLIs restart at their next
+// message, so they use the new sign-in (or version).
 func (s *Service) emitStatus(st CLIStatus) {
-	if st.Provider == "" || st.Provider == s.clis[0].adapter.ID() {
+	id := st.Provider
+	if id == "" {
+		id = s.clis[0].adapter.ID()
+	}
+	if id == s.clis[0].adapter.ID() {
 		s.emit.Emit(EvtCLIStatus, st)
 	}
 	s.emit.Emit(EvtProviderStatus, st)
+	if st.LoggedIn && s.Sessions != nil {
+		s.Sessions.Reconnect(id)
+	}
 }
 
 // SetProviderVersion selects a version of a provider's CLI; empty returns

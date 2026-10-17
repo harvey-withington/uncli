@@ -6,6 +6,7 @@
   import { namesOf } from '../lib/providers'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import CodeSignIn from './CodeSignIn.svelte'
   import LinkSignIn from './LinkSignIn.svelte'
 
   // Settings → AI Providers: one of these per CLI sessions can run on. Its
@@ -245,10 +246,14 @@
             <Icon name="folder-open" size={13} />{t('settings.showCLI', names)}
           </button>
         </div>
-      {:else if status?.email}
-        <p class="muted">{t('settings.signedIn', { email: status.email, plan: status.subscription ?? '' })}</p>
       {:else}
-        <p class="muted">{t('settings.notSignedIn', names)}</p>
+        <p class="muted">{status?.email ? t('settings.signedIn', { email: status.email, plan: status.subscription ?? '' }) : t('settings.notSignedIn', names)}</p>
+        {#if first && provider.signIn === 'link'}
+          <!-- A sign-in can look fine here and still fail: the CLI checks
+               only that one is saved, not that it still works. -->
+          <p class="muted small">{t('settings.signInAgain.hint', names)}</p>
+          <CodeSignIn label={t(status?.loggedIn ? 'settings.signInAgain.link' : 'setup.signin.button')} primary={!status?.loggedIn} />
+        {/if}
       {/if}
     </div>
   {/if}

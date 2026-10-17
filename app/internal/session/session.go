@@ -780,6 +780,11 @@ func (s *Session) finishTurn(r core.TurnResult) {
 			msg = r.ErrorCode + ": " + msg
 		}
 		s.closePage("error", msg)
+		if r.ErrorCode == core.ErrAuthFailed {
+			// The CLI keeps the sign-in it started with, so signing in
+			// again only helps a new process: the next message starts one.
+			s.stopLocked()
+		}
 	default:
 		s.closePage("done", "")
 	}

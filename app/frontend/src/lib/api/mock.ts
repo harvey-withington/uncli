@@ -239,7 +239,7 @@ const MOCK_PLUGINS: Provider[] = [
   },
 ]
 
-export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; unattended?: boolean; mode?: SessionMode; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
+export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
     session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode }),
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2 }),
@@ -281,6 +281,12 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     's-chat': [
       page('s-chat', 1, 'Sketch our Lisbon route as a diagram and draft an itinerary page.', 'Done: **route.mmd** sketches the route and **itinerary.html** has a first draft.', MOCK_CHAT_ARTIFACTS.page1),
       page('s-chat', 2, 'Plan a relaxed weekend in Lisbon for two, mostly on foot.', LISBON, MOCK_CHAT_ARTIFACTS.page2),
+      // ?signin=expired (or opts.signInFailed): the latest turn failed on the sign-in.
+      ...(opts.signInFailed || new URLSearchParams(location.search).get('signin') === 'expired'
+        ? [page('s-chat', 3, 'Which of those cafés open before 8?', '', {
+          status: 'error', error: 'authentication_failed: Failed to authenticate. API Error: 401 OAuth token has expired.', outputTokens: 0, costUsd: 0,
+        })]
+        : []),
     ],
     's-old': [
       page('s-old', 1, 'Compare these three standing desks for a small flat.', 'The **Flexi Pro** is the best fit: it is the narrowest and the quietest of the three.', { pinned: true, startedAt: Date.now() - 9 * 86400000 }),

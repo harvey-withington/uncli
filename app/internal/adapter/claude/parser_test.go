@@ -374,7 +374,9 @@ func TestApprovalAndAccount(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
-	for name, code := range map[string]string{"error-not-logged-in": "authentication_failed", "error-bad-model": "model_not_found"} {
+	// error-token-rejected: a sign-in the API refuses (as an expired one is),
+	// after the CLI's retries (system api_retry lines, kept as unknown).
+	for name, code := range map[string]string{"error-not-logged-in": core.ErrAuthFailed, "error-token-rejected": core.ErrAuthFailed, "error-bad-model": "model_not_found"} {
 		rs := results(t, parseFixture(t, name))
 		if len(rs) != 1 || !rs[0].IsError || rs[0].ErrorCode != code {
 			t.Errorf("%s: result = %+v, want error %s", name, rs, code)
