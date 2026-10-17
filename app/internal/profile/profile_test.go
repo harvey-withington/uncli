@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"uncli/internal/core"
 )
 
 func load(t *testing.T, userFiles map[string]string) *Set {
@@ -38,11 +40,11 @@ func TestBuiltIns(t *testing.T) {
 	}
 	chat, _ := s.Profile("chat")
 	spec := s.Resolve(chat, "sonnet", nil, "/w")
-	if !spec.Isolated || spec.SystemPrompt == "" || !slices.Contains(spec.Tools, "Write") || spec.Workdir != "/w" {
+	if !spec.Isolated || spec.SystemPrompt == "" || !slices.Contains(spec.Tools, "Write") || spec.Workdir != "/w" || !spec.ShareMCP || !spec.ShareConnectors {
 		t.Errorf("chat spec = %+v", spec)
 	}
 	code, _ := s.Profile("code")
-	if spec := s.Resolve(code, "opus", nil, "/r"); spec.PermissionMode != "acceptEdits" || len(spec.Tools) != 0 {
+	if spec := s.Resolve(code, "opus", nil, "/r"); spec.PermissionMode != "acceptEdits" || len(spec.Tools) != 0 || spec.ShareMCP {
 		t.Errorf("code spec = %+v", spec)
 	}
 	if len(s.Toolbar) == 0 || s.Toolbar[0].Kind != "model_picker" {
@@ -82,6 +84,15 @@ func TestBypassRefused(t *testing.T) {
 	defaults, _ := fsSub()
 	if _, err := Load(defaults, dir); err == nil {
 		t.Error("bypassPermissions must be refused")
+	}
+}
+
+func TestSharingValues(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "profiles.yaml"), []byte("profiles:\n  - id: chat\n    isolated: true\n    mcp: everything\n"), 0o644)
+	defaults, _ := fsSub()
+	if _, err := Load(defaults, dir); err == nil || !strings.Contains(err.Error(), "mcp is shared or none") {
+		t.Errorf("err = %v", err)
 	}
 }
 
@@ -149,5 +160,36 @@ func TestAvailable(t *testing.T) {
 	}
 	if !s.Available(code, agents) {
 		t.Error("code uses CLI default tools, which include Task")
+	}
+}
+
+// A session's choice of tools gives what its type shares of the MCP
+// servers and connectors, or both when the type shares neither.
+func TestApplyShares(t *testing.T) {
+	for name, tc := range map[string]struct {
+		p                 Profile
+		shares            []string
+		mcp, conn, skills bool
+	}{
+		"chat, all":            {Profile{MCP: Shared, Connectors: Shared}, []string{ShareTools, ShareSkills}, true, true, true},
+		"chat, none":           {Profile{MCP: Shared, Connectors: Shared}, []string{}, false, false, false},
+		"servers only by type": {Profile{MCP: Shared}, []string{ShareTools}, true, false, false},
+		"connectors only":      {Profile{MCP: None, Connectors: Shared}, []string{ShareTools}, false, true, false},
+		"type shares neither":  {Profile{}, []string{ShareTools}, true, true, false},
+		"skills without tools": {Profile{MCP: Shared}, []string{ShareSkills}, false, false, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var spec core.LaunchSpec
+			ApplyShares(&spec, tc.p, tc.shares)
+			if spec.ShareMCP != tc.mcp || spec.ShareConnectors != tc.conn || spec.ShareSkills != tc.skills {
+				t.Errorf("got mcp %v connectors %v skills %v", spec.ShareMCP, spec.ShareConnectors, spec.ShareSkills)
+			}
+		})
+	}
+	s := load(t, nil)
+	chat, _ := s.Profile("chat")
+	code, _ := s.Profile("code")
+	if !slices.Equal(chat.Shares, []string{ShareTools, ShareSkills}) || len(code.Shares) != 0 || code.Shares == nil {
+		t.Errorf("defaults: chat %v code %v", chat.Shares, code.Shares)
 	}
 }

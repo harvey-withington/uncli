@@ -33,6 +33,10 @@ type View struct {
 	Unattended bool `json:"unattended"`
 	// Background is what runs in the background now (sub-agents, shells).
 	Background []core.BackgroundTask `json:"background"`
+	// Shares is what the session has of the user's own (profile.ShareTools,
+	// ShareSkills), and Shareable what it could have (shares.go).
+	Shares    []string `json:"shares"`
+	Shareable []string `json:"shareable"`
 }
 
 // Sink receives everything the UI needs. Implementations must not call

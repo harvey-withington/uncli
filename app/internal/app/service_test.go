@@ -5,10 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
 	"uncli/internal/core"
+	"uncli/internal/profile"
+	"uncli/internal/session"
 	"uncli/internal/store"
 )
 
@@ -34,7 +37,7 @@ func TestNewSessionChoicesAreRemembered(t *testing.T) {
 	if _, _, err := svc.CreateSession("code", repo, "haiku"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := svc.CreateSession("chat", "", "sonnet"); err != nil {
+	if _, _, err := svc.CreateSessionWith(session.NewSession{Profile: "chat", Model: "sonnet", Shares: []string{profile.ShareSkills}}); err != nil {
 		t.Fatal(err)
 	}
 	svc.Close()
@@ -47,6 +50,12 @@ func TestNewSessionChoicesAreRemembered(t *testing.T) {
 	last := svc.Bootstrap().LastNew
 	if last.ProfileID != "chat" || last.Models["code"] != "haiku" || last.Models["chat"] != "sonnet" || last.Folders["code"] != repo {
 		t.Errorf("remembered = %+v", last)
+	}
+	if !slices.Equal(last.Shares["chat"], []string{profile.ShareSkills}) {
+		t.Errorf("chat's shares = %v", last.Shares["chat"])
+	}
+	if _, ok := last.Shares["code"]; ok {
+		t.Error("code shares nothing, so there's nothing to remember")
 	}
 	if _, ok := last.Folders["chat"]; ok {
 		t.Error("chat's scratch folder is per session and shouldn't be remembered")

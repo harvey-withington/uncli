@@ -75,6 +75,9 @@ type LaunchSpec struct {
 	Approvals       bool              // phase 2: route prompts to UNCLI; false = deny automatically
 	Isolated        bool              // ignore user settings, MCP servers and skills (chat)
 	MCPConfig       []string          // MCP server config files to load, besides the user's own
+	ShareMCP        bool              // with Isolated: the user's own MCP servers all the same
+	ShareConnectors bool              // with Isolated: the account's connectors all the same
+	ShareSkills     bool              // with Isolated: the user's own skills all the same
 	Env             map[string]string //
 }
 
@@ -148,6 +151,11 @@ type Capabilities struct {
 	SlashPassthrough bool `json:"slashPassthrough"`
 	// Import: the adapter is a TranscriptReader (saved conversations can be imported).
 	Import bool `json:"import"`
+	// SharedTools and SharedSkills: an isolated session can still be given
+	// the user's own MCP servers and connectors, and their skills
+	// (LaunchSpec.ShareMCP, ShareConnectors, ShareSkills).
+	SharedTools  bool `json:"sharedTools"`
+	SharedSkills bool `json:"sharedSkills"`
 }
 
 // StatePather is an adapter whose CLI keeps files of its own outside the

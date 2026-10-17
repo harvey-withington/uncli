@@ -27,7 +27,7 @@ describe('A second AI provider', () => {
     expect(dialog.queryByRole('combobox', { name: 'Run in' })).not.toBeInTheDocument()
     await fireEvent.change(model, { target: { value: 'gemini-3.8-flash-low' } })
     await fireEvent.click(dialog.getByRole('button', { name: /Start/ }))
-    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', 'gemini-3.8-flash-low', '', 'antigravity'))
+    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', 'gemini-3.8-flash-low', '', 'antigravity', null))
 
     // Its session's model picker offers its models, and its text names it.
     const picker = await screen.findByRole('combobox', { name: /Model/ })

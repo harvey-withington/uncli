@@ -57,7 +57,7 @@ describe('Containers', () => {
     expect(within(runIn).getAllByRole('option').map(o => o.textContent)).toEqual(['This computer', 'Sandbox'])
     await fireEvent.change(runIn, { target: { value: 'sandbox' } })
     await fireEvent.click(dialog.getByRole('button', { name: /Start/ }))
-    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', expect.any(String), 'sandbox', ''))
+    await waitFor(() => expect(create).toHaveBeenCalledWith('chat', '', expect.any(String), 'sandbox', '', null))
     expect(await screen.findByText(/in the Sandbox container/)).toBeInTheDocument()
   }, 15000)
 

@@ -9,6 +9,7 @@
   import ActivityBadge from './ActivityBadge.svelte'
   import ModeSwitch from './ModeSwitch.svelte'
   import SessionStatus from './SessionStatus.svelte'
+  import SharesNote from './SharesNote.svelte'
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
   import NavBar from './NavBar.svelte'
@@ -106,9 +107,9 @@
       {#if app.headerCompact}
         <!-- Compact: the folder follows the title on its line. -->
         <span class="path" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
-      {:else}
-        <span class="gap"></span>
+        <SharesNote {session} compact />
       {/if}
+      <span class="gap"></span>
       <ModeSwitch {session} />
       <button
         class="btn ghost small away-btn"
@@ -148,7 +149,10 @@
       </button>
     </div>
     {#if !app.headerCompact}
-      <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
+      <div class="where">
+        <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
+        <SharesNote {session} />
+      </div>
       <SessionStatus {session} />
     {/if}
     <Toolbar {session} />
@@ -252,7 +256,7 @@
   /* Compact: the folder takes the room between the title and the controls,
      cut short (from the end) before anything else gives way. */
   .path {
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 0;
     font-size: var(--text-xs);
     color: var(--text-faint);
@@ -272,9 +276,17 @@
     margin-left: calc(-1 * var(--space-2));
     color: var(--text-faint);
   }
+  .where {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    margin: -4px 0 2px 38px;
+    font-size: var(--text-xs);
+  }
   .workdir {
     display: block;
-    margin: -4px 0 2px 38px;
+    min-width: 0;
     font-size: var(--text-xs);
     color: var(--text-faint);
     white-space: nowrap;

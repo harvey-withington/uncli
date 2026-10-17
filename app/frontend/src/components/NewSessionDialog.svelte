@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte'
-  import type { Profile } from '../lib/api'
+  import type { Profile, Share } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
@@ -8,6 +8,8 @@
   import Modal from './Modal.svelte'
   import { modelOptions } from '../lib/models'
   import { tintStyle } from '../lib/tint'
+  import { providerOf } from '../lib/providers'
+  import { SHARES, shareableFor, startingShares, toggled } from '../lib/shares'
 
   const app = useApp()
   const profiles = $derived(app.boot?.profiles ?? [])
@@ -39,6 +41,10 @@
   const profile = $derived<Profile | undefined>(profiles.find(p => p.id === profileId))
   const needsFolder = $derived(profile?.folder !== 'scratch')
   const options = $derived(modelOptions(app.modelsFor(provider), model, t('model.cliDefault', names)))
+  // What an isolated type can use of the user's own (decision 0016).
+  const caps = $derived(providerOf(app.boot, provider)?.capabilities ?? (isFirst ? app.boot?.capabilities : undefined))
+  const shareable = $derived(shareableFor(profile, caps, container))
+  let shares = $state<Share[]>([])
 
   // The model a provider starts on: the last one used with this profile on
   // it, else the profile's (the first provider's) or the CLI's first.
@@ -66,6 +72,7 @@
       folder = (id === firstProfile && dropped) || last?.folders?.[id] || ''
       const wasIn = last?.containers?.[id] ?? ''
       container = isFirst && built.some(c => c.id === wasIn) ? wasIn : ''
+      shares = startingShares(profiles.find(p => p.id === id), last, SHARES)
     })
   })
 
@@ -101,7 +108,7 @@
     if (!profile || (needsFolder && !folder) || !ready) return
     creating = true
     try {
-      await app.createSession(profile.id, needsFolder ? folder : '', model, container, isFirst ? '' : provider)
+      await app.createSession(profile.id, needsFolder ? folder : '', model, container, isFirst ? '' : provider, shareable.length ? shares.filter(s => shareable.includes(s)) : null)
       app.newSessionOpen = false
     } catch (e) {
       showToast(String(e), 'error')
@@ -169,6 +176,19 @@
       {#if container && !app.containers?.signedIn}
         <p class="hint">{t('newSession.containerSignIn')}</p>
       {/if}
+    {/if}
+
+    {#if shareable.length}
+      <fieldset class="field shares">
+        <legend class="flabel">{t('newSession.shares')}</legend>
+        {#each shareable as s (s)}
+          <label class="check">
+            <input type="checkbox" checked={shares.includes(s)} onchange={e => (shares = toggled(shares, s, e.currentTarget.checked))} />
+            {t(`shares.${s}`)}
+          </label>
+        {/each}
+        <span class="fhint">{t('shares.hint', names)}</span>
+      </fieldset>
     {/if}
 
     <label class="field">
@@ -285,6 +305,25 @@
   }
   .hint.setup .btn {
     flex: none;
+  }
+  .shares {
+    gap: 4px;
+    border: 0;
+    padding: 0;
+  }
+  .shares legend {
+    padding: 0;
+    margin-bottom: 4px;
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+  }
+  .fhint {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
   .import-link {
     margin-right: auto;

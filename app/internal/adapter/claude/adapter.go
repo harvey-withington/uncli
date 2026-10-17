@@ -13,7 +13,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 
 	"uncli/internal/core"
 )
@@ -23,9 +25,22 @@ const PinnedVersion = "2.1.285"
 
 type Adapter struct {
 	installer *Installer
+	// userConfig stands in for ~/.claude.json in tests; nil reads the file.
+	userConfig func() []byte
+	// skillsDir is the folder of the plugin that gives isolated sessions
+	// the user's skills (skills.go); empty: they can't have them.
+	skillsDir string
+	skillsMu  sync.Mutex
 }
 
 func New(installer *Installer) *Adapter { return &Adapter{installer: installer} }
+
+// WithSkills keeps the plugin of the user's skills in dir, a folder of
+// UNCLI's own.
+func (a *Adapter) WithSkills(dir string) *Adapter {
+	a.skillsDir = dir
+	return a
+}
 
 func (a *Adapter) ID() string { return "claude" }
 
@@ -51,7 +66,7 @@ func (a *Adapter) Capabilities() core.Capabilities {
 		PartialStreaming: true, Resume: true, LiveModelSwitch: true, Interrupt: true,
 		Approvals: true, LivePermissionMode: true, ToolHints: true,
 		Images: true, Documents: true, UsageReporting: true, ThinkingEvents: true, SlashPassthrough: true,
-		Import: true,
+		Import: true, SharedTools: true, SharedSkills: true,
 	}
 }
 
@@ -77,6 +92,13 @@ func (a *Adapter) BuildCommand(bin string, s core.LaunchSpec) (core.Command, err
 	if !permissionModes[s.PermissionMode] {
 		return core.Command{}, errors.New("unsupported permission mode: " + s.PermissionMode)
 	}
+	plugin := "" // the user's skills, for an isolated session that shares them
+	if s.Isolated && s.ShareSkills {
+		var err error
+		if plugin, err = a.skillsPlugin(); err != nil {
+			return core.Command{}, fmt.Errorf("giving the session your skills: %w", err)
+		}
+	}
 	args := []string{"-p",
 		"--input-format", "stream-json", "--output-format", "stream-json",
 		"--verbose", "--include-partial-messages"}
@@ -99,7 +121,18 @@ func (a *Adapter) BuildCommand(bin string, s core.LaunchSpec) (core.Command, err
 		args = append(args, "--append-system-prompt", s.AppendPrompt)
 	}
 	if len(s.Tools) > 0 {
-		args = append(args, "--tools", strings.Join(s.Tools, ","))
+		tools := slices.Clone(s.Tools)
+		// Skills are run with Skill and read their own files with Read.
+		// With ToolSearch the CLI sends MCP tools' descriptions only when a
+		// turn looks them up: ~4k tokens a Sonnet turn for 70 tools instead
+		// of ~39k (Haiku doesn't use it).
+		if plugin != "" {
+			tools = addTools(tools, "Skill", "Read")
+		}
+		if s.Isolated && (s.ShareMCP || s.ShareConnectors) {
+			tools = addTools(tools, "ToolSearch")
+		}
+		args = append(args, "--tools", strings.Join(tools, ","))
 	}
 	// Patterns such as "Bash(git status:*)" contain spaces, so each one is
 	// its own argument and the list always ends before another flag.
@@ -121,10 +154,45 @@ func (a *Adapter) BuildCommand(bin string, s core.LaunchSpec) (core.Command, err
 		args = append(args, "--mcp-config", c)
 	}
 	if s.Isolated {
-		args = append(args, "--strict-mcp-config", "--setting-sources", "", "--disable-slash-commands")
+		// With no setting sources the CLI drops the user's MCP servers but
+		// keeps the account's connectors; --strict-mcp-config drops those
+		// too, keeping only the servers given here (CLI 2.1.285).
+		if s.ShareMCP {
+			if servers := UserMCP(a.claudeJSON()); len(servers) > 0 {
+				b, err := json.Marshal(map[string]any{"mcpServers": servers})
+				if err != nil {
+					return core.Command{}, err
+				}
+				args = append(args, "--mcp-config", string(b))
+			}
+		}
+		if !s.ShareConnectors {
+			args = append(args, "--strict-mcp-config")
+		}
+		args = append(args, "--setting-sources", "")
+		if plugin == "" {
+			args = append(args, "--disable-slash-commands") // which also turns skills off
+		} else {
+			// The CLI's own skills are for coding; the user's are wanted.
+			args = append(args, "--plugin-dir", plugin)
+			extra := map[string]string{"CLAUDE_CODE_DISABLE_BUNDLED_SKILLS": "1"}
+			for k, v := range s.Env {
+				extra[k] = v
+			}
+			s.Env = extra
+		}
 	}
 	env, drop := childEnv(s.Env)
 	return core.Command{Path: bin, Args: args, Env: env, EnvDrop: drop}, nil
+}
+
+func addTools(tools []string, add ...string) []string {
+	for _, t := range add {
+		if !slices.Contains(tools, t) {
+			tools = append(tools, t)
+		}
+	}
+	return tools
 }
 
 func (a *Adapter) AuthStatusCommand(bin string) core.Command {

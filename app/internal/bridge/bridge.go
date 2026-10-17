@@ -199,8 +199,8 @@ func (a *App) PickFolder(title string) (string, error) {
 
 // CreateSession creates a session; the choices made are remembered for the
 // next new-session dialog and returned with it.
-func (a *App) CreateSession(profileID, workdir, model, container, provider string) (app.CreatedSession, error) {
-	v, last, err := a.svc.CreateSessionWith(session.NewSession{Profile: profileID, Workdir: workdir, Model: model, Container: container, Provider: provider})
+func (a *App) CreateSession(profileID, workdir, model, container, provider string, shares []string) (app.CreatedSession, error) {
+	v, last, err := a.svc.CreateSessionWith(session.NewSession{Profile: profileID, Workdir: workdir, Model: model, Container: container, Provider: provider, Shares: shares})
 	return app.CreatedSession{Session: v, LastNew: last}, err
 }
 
@@ -280,6 +280,12 @@ func (a *App) ExplainCommand(sessionID, command string) (session.Explanation, er
 // SessionAllowlist is the list of what a session's type counts as safe, as written.
 func (a *App) SessionAllowlist(sessionID string) ([]string, error) {
 	return a.svc.Sessions.SessionAllowlist(sessionID)
+}
+
+// SetShares changes what a session shares of the user's own (their MCP
+// servers and connectors, their skills), from its next turn.
+func (a *App) SetShares(sessionID string, shares []string) (session.View, error) {
+	return a.svc.Sessions.SetShares(sessionID, shares)
 }
 
 func (a *App) SetModel(sessionID, model string) error {

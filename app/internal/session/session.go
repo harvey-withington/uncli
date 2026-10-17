@@ -15,6 +15,7 @@ import (
 
 	"uncli/internal/artifacts"
 	"uncli/internal/core"
+	"uncli/internal/profile"
 	"uncli/internal/store"
 )
 
@@ -32,6 +33,7 @@ type Session struct {
 	proc       core.Proc
 	cancel     context.CancelFunc
 	procEffort string
+	procShares string  // what the running CLI was given of the user's own (sharesKey)
 	lastCost   float64 // the CLI's running cost total on this process
 	// The profile's permission mode, and the one the running CLI is in
 	// (they differ in Read-only; approvals.go).
@@ -99,7 +101,8 @@ func (s *Session) View() View {
 
 func (s *Session) viewLocked() View {
 	return View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err,
-		Approvals: append([]Approval{}, s.pending...), Unattended: s.unattended, Background: append([]core.BackgroundTask{}, s.background...)}
+		Approvals: append([]Approval{}, s.pending...), Unattended: s.unattended, Background: append([]core.BackgroundTask{}, s.background...),
+		Shares: s.sharesLocked(), Shareable: s.m.shareable(s.rec, s.ad().Capabilities())}
 }
 
 func (s *Session) changed() { s.m.d.Sink.SessionChanged(s.viewLocked()) }
@@ -150,6 +153,11 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	} else {
 		spec.SessionID = s.rec.ID
 	}
+	// The user's MCP servers and connectors are this machine's: a session
+	// in a container gets what its container profile shares.
+	if s.rec.Runtime != "" && s.rec.Runtime != s.m.d.Runtime.ID() {
+		spec.ShareMCP, spec.ShareConnectors, spec.ShareSkills = false, false, false
+	}
 	if err := s.hookLocked(&spec, ad); err != nil {
 		return err
 	}
@@ -172,6 +180,7 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	}
 	s.gen++
 	s.proc, s.cancel, s.procEffort, s.lastCost = proc, cancel, spec.Effort, 0
+	s.procShares = sharesKey(spec)
 	s.cliMode = spec.PermissionMode
 	s.rec.CLIVersion = version
 	s.state = Starting
@@ -234,6 +243,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	}
 	active := append([]string{}, s.rec.Modifiers...)
 	spec := set.Resolve(prof, s.rec.Model, active, s.rec.Workdir)
+	profile.ApplyShares(&spec, prof, s.sharesLocked())
 	// Tool uses the CLI doesn't allow itself come to UNCLI when the CLI
 	// can route them (approvals.go); otherwise the CLI denies them. UNCLI
 	// then applies the allowlist itself, after the session mode and rules.
@@ -246,9 +256,9 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		spec.PermissionMode = s.cliModeLocked(spec.PermissionMode)
 	}
 
-	// Effort and the permission mode are launch flags, so a change the
-	// CLI can't take live respawns with resume.
-	if s.proc != nil && (spec.Effort != s.procEffort || spec.PermissionMode != s.cliMode) {
+	// Effort, the permission mode and what the session shares are launch
+	// flags, so a change the CLI can't take live respawns with resume.
+	if s.proc != nil && (spec.Effort != s.procEffort || spec.PermissionMode != s.cliMode || sharesKey(spec) != s.procShares) {
 		s.stopLocked()
 	}
 	if s.proc == nil {

@@ -13,7 +13,7 @@ import { mockContainers } from './mock-containers'
 import { mockTranscriptPages, mockTranscripts } from './mock-import'
 
 const profiles: Bootstrap['profiles'] = [
-  { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false, artifacts: true },
+  { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false, artifacts: true, isolated: true, shares: ['tools', 'skills'] },
   { id: 'cowork', label: 'Co-work', icon: 'briefcase', hue: 38, folder: 'pick', model: 'sonnet', tools: null, modifiersOn: null, ideLinks: false, artifacts: true },
   { id: 'code', label: 'Code', icon: 'code', hue: 280, folder: 'repo', model: 'opus', tools: [], modifiersOn: null, ideLinks: true },
 ]
@@ -182,13 +182,27 @@ function session(id: string, profileId: string, title: string, state: ActivitySt
     id, title, adapter: 'claude', runtime: 'local', profileId, workdir: `C:\\Users\\you\\${profileId}`,
     providerSid: '', cliVersion: '2.1.285', model: profiles.find(p => p.id === profileId)?.model ?? 'sonnet',
     modifiers: [], sortOrder: 0, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
-    state, running: state !== 'idle', busy: false, ...extra,
+    state, running: state !== 'idle', busy: false, ...shareFields(profileId, extra), ...extra,
   }
+}
+
+// Isolated types on this machine share the user's tools and skills
+// (decision 0016); other sessions have nothing to share.
+function shareFields(profileId: string, extra: Partial<SessionView>): Pick<SessionView, 'shares' | 'shareable'> {
+  const p = profiles.find(x => x.id === profileId)
+  if (!p?.isolated || extra.runtime === 'wsl' || (extra.adapter && extra.adapter !== 'claude')) return { shares: [], shareable: [] }
+  return { shares: [...(p.shares ?? [])], shareable: ['tools', 'skills'] }
 }
 
 // The AI providers the mock offers (config/defaults/providers.yaml).
 const MOCK_PROVIDERS: Provider[] = [
-  { id: 'claude', label: 'Claude Code', name: 'Claude Code', agent: 'Claude', account: 'Claude', signIn: 'link' },
+  {
+    id: 'claude', label: 'Claude Code', name: 'Claude Code', agent: 'Claude', account: 'Claude', signIn: 'link',
+    capabilities: {
+      partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
+      images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true, sharedTools: true, sharedSkills: true,
+    },
+  },
   {
     id: 'antigravity', label: 'Antigravity CLI', name: 'Antigravity CLI', agent: 'Antigravity', account: 'Google', signIn: 'elsewhere',
     capabilities: {
@@ -406,7 +420,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
         sessions: sessions.map(s => ({ ...s })),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
-          images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true,
+          images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true, sharedTools: true, sharedSkills: true,
         },
       }
     },
@@ -488,7 +502,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
     },
     async providerChannels(id) { return id === 'antigravity' ? { stable: '1.3.1', latest: '1.3.1' } : this.cliChannels() },
     async pickFolder() { return 'C:\\Users\\you\\projects\\demo' },
-    async createSession(profileId, workdir, model, container, provider) {
+    async createSession(profileId, workdir, model, container, provider, shares) {
       const p = profiles.find(x => x.id === profileId)
       const other = !!provider && provider !== 'claude'
       if (other && container) throw new Error('containers can only run claude sessions for now')
@@ -497,6 +511,10 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
         model: model || (other ? '' : p?.model || 'sonnet'), workdir: workdir || `C:\\scratch\\${idn}`, sortOrder: sessions.length + 10,
         ...(container ? { runtime: 'wsl', runtimeRef: container } : {}),
       })
+      if (shares) {
+        if (shares.some(x => !s.shareable?.includes(x))) throw new Error(`this session can't share ${shares.join(', ')}`)
+        s.shares = [...shares]
+      }
       sessions.unshift(s)
       pages[s.id] = []
       changed(s)
@@ -505,6 +523,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
       if (p?.folder !== 'scratch') lastNew.folders[profileId] = s.workdir
       ;(lastNew.containers ??= {})[profileId] = container
       ;(lastNew.providers ??= {})[profileId] = s.adapter
+      if (s.shareable?.length) (lastNew.shares ??= {})[profileId] = [...(s.shares ?? [])]
       return { session: { ...s }, lastNewSession: structuredClone(lastNew) }
     },
     async pages(id) { return (pages[id] ?? []).map(p => ({ ...p })) },
@@ -638,6 +657,13 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; empty?: boolean; u
         if (waiting.length) setState(s, 'running_tools')
         waiting.forEach(a => approvalWaits.get(a.requestId)?.('away'))
       }
+      changed(s)
+      return { ...s }
+    },
+    async setShares(sid, shares) {
+      const s = find(sid)
+      if (shares.some(x => !s.shareable?.includes(x))) throw new Error(`this session can't share ${shares.join(', ')}`)
+      s.shares = [...shares]
       changed(s)
       return { ...s }
     },

@@ -29,12 +29,20 @@ type Profile struct {
 	Tools           []string `yaml:"tools" json:"tools"`
 	AllowedTools    []string `yaml:"allowed_tools" json:"-"`
 	DisallowedTools []string `yaml:"disallowed_tools" json:"-"`
-	Isolated        bool     `yaml:"isolated" json:"-"`
+	Isolated        bool     `yaml:"isolated" json:"isolated"`
 	MCPConfig       []string `yaml:"mcp_config" json:"-"` // extra MCP server configs (--mcp-config); relative paths are from the session folder
-	PermissionMode  string   `yaml:"permission_mode" json:"-"`
-	ModifiersOn     []string `yaml:"modifiers_on" json:"modifiersOn"`
-	IDELinks        bool     `yaml:"ide_links" json:"ideLinks"`
-	Artifacts       bool     `yaml:"artifacts" json:"artifacts"` // versions ./artifacts/ per page and shows it in the artifact pane
+	// What an isolated profile's sessions get of the user's own by default:
+	// MCP is "shared" for the MCP servers they set up for the CLI,
+	// Connectors for their account's connectors, Skills for their skills;
+	// "none" (the default) for none. Each session can change it (Shares).
+	MCP            string   `yaml:"mcp" json:"-"`
+	Connectors     string   `yaml:"connectors" json:"-"`
+	Skills         string   `yaml:"skills" json:"-"`
+	Shares         []string `yaml:"-" json:"shares"` // DefaultShares, for the UI
+	PermissionMode string   `yaml:"permission_mode" json:"-"`
+	ModifiersOn    []string `yaml:"modifiers_on" json:"modifiersOn"`
+	IDELinks       bool     `yaml:"ide_links" json:"ideLinks"`
+	Artifacts      bool     `yaml:"artifacts" json:"artifacts"` // versions ./artifacts/ per page and shows it in the artifact pane
 }
 
 type Modifier struct {
@@ -113,6 +121,9 @@ func Load(defaults fs.FS, userDir string) (*Set, error) {
 			s.Toolbar = utf.Toolbar
 		}
 	}
+	for i := range s.Profiles {
+		s.Profiles[i].Shares = s.Profiles[i].DefaultShares()
+	}
 	return &s, s.validate()
 }
 
@@ -135,6 +146,11 @@ func (s *Set) validate() error {
 		}
 		if p.PermissionMode == "bypassPermissions" {
 			return fmt.Errorf("profile %s: bypassPermissions is never allowed as a default", p.ID)
+		}
+		for name, v := range map[string]string{"mcp": p.MCP, "connectors": p.Connectors, "skills": p.Skills} {
+			if v != "" && v != Shared && v != None {
+				return fmt.Errorf("profile %s: %s is shared or none, not %q", p.ID, name, v)
+			}
 		}
 	}
 	for _, m := range s.Modifiers {
@@ -211,6 +227,45 @@ func (s *Set) ordered(set map[string]bool) []string {
 	return out
 }
 
+// Values of a profile's mcp, connectors and skills.
+const (
+	Shared = "shared"
+	None   = "none"
+)
+
+// What a session can share of the user's own (store.Session.Shares): their
+// MCP servers and connectors together, and their skills.
+const (
+	ShareTools  = "tools"
+	ShareSkills = "skills"
+)
+
+// DefaultShares is what a new session of an isolated profile shares.
+func (p Profile) DefaultShares() []string {
+	out := []string{}
+	if !p.Isolated {
+		return out
+	}
+	if p.MCP == Shared || p.Connectors == Shared {
+		out = append(out, ShareTools)
+	}
+	if p.Skills == Shared {
+		out = append(out, ShareSkills)
+	}
+	return out
+}
+
+// ApplyShares sets what an isolated spec shares from a session's choice.
+// Tools on gives what the profile shares of the MCP servers and the
+// connectors, or both when it shares neither by default.
+func ApplyShares(spec *core.LaunchSpec, p Profile, shares []string) {
+	tools := slices.Contains(shares, ShareTools)
+	either := p.MCP == Shared || p.Connectors == Shared
+	spec.ShareMCP = tools && (p.MCP == Shared || !either)
+	spec.ShareConnectors = tools && (p.Connectors == Shared || !either)
+	spec.ShareSkills = slices.Contains(shares, ShareSkills)
+}
+
 // Resolve turns a profile, model and active modifiers into a LaunchSpec.
 // Session ids are filled in by the session.
 func (s *Set) Resolve(p Profile, model string, active []string, workdir string) core.LaunchSpec {
@@ -220,6 +275,7 @@ func (s *Set) Resolve(p Profile, model string, active []string, workdir string) 
 		Tools: p.Tools, AllowedTools: p.AllowedTools, DisallowedTools: p.DisallowedTools,
 		PermissionMode: p.PermissionMode, Isolated: p.Isolated, MCPConfig: p.MCPConfig,
 	}
+	ApplyShares(&spec, p, p.DefaultShares())
 	for _, id := range active {
 		if m, ok := s.Modifier(id); ok {
 			if e := m.Settings["effort"]; e != "" {

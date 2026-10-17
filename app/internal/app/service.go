@@ -132,7 +132,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		return nil, err
 	}
 	inst := claude.NewInstaller(filepath.Join(paths.Cache, "cli", "claude"))
-	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst), emit: emit}
+	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst).WithSkills(filepath.Join(paths.Cache, "skills", "claude")), emit: emit}
 	agyInst := antigravity.NewInstaller(filepath.Join(paths.Cache, "cli", "antigravity"))
 	agy := antigravity.New(agyInst, filepath.Join(paths.Config, "agy"), hookCommand())
 	s.clis = []*cliProvider{
@@ -462,6 +462,9 @@ type NewSessionChoices struct {
 	// none for this machine.
 	Containers map[string]string `json:"containers"`
 	Providers  map[string]string `json:"providers"` // the AI provider each profile last ran on
+	// Shares is what each isolated profile's last session shared of the
+	// user's own (session.View.Shares).
+	Shares map[string][]string `json:"shares"`
 }
 
 const settingLastNew = "ui.newSession.last"
@@ -488,6 +491,9 @@ func (s *Service) lastNewSession() NewSessionChoices {
 	}
 	if c.Providers == nil {
 		c.Providers = map[string]string{}
+	}
+	if c.Shares == nil {
+		c.Shares = map[string][]string{}
 	}
 	return c
 }
@@ -518,6 +524,9 @@ func (s *Service) CreateSessionWith(n session.NewSession) (session.View, NewSess
 	c.Models[v.ProfileID] = v.Model
 	c.Containers[v.ProfileID] = v.RuntimeRef
 	c.Providers[v.ProfileID] = v.Adapter
+	if len(v.Shareable) > 0 {
+		c.Shares[v.ProfileID] = v.Shares
+	}
 	if p, ok := s.Profiles.Profile(v.ProfileID); ok && p.Folder != "scratch" {
 		c.Folders[v.ProfileID] = v.Workdir
 	}

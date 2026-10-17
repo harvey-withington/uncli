@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   sort_order    REAL,
   archived      INTEGER DEFAULT 0,
   mode          TEXT,              -- when to prompt: always | unsafe | never (NULL = unsafe)
+  shares        TEXT,              -- JSON list of what it shares of the user's own (NULL = its type's)
   created_at    INTEGER, updated_at INTEGER
 );
 
@@ -109,7 +110,7 @@ func migrate(db *sql.DB) error {
 	}
 	for _, c := range []struct{ table, col, def string }{
 		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"}, {"pages", "origin", "TEXT"},
-		{"sessions", "mode", "TEXT"},
+		{"sessions", "mode", "TEXT"}, {"sessions", "shares", "TEXT"},
 		{"risk_judgements", "decider", "TEXT"}, {"risk_judgements", "confidence", "REAL"},
 		{"safe_list", "label", "TEXT NOT NULL DEFAULT ''"},
 	} {
@@ -173,9 +174,12 @@ type Session struct {
 	Archived    bool     `json:"archived"`
 	// Mode is when Claude stops to prompt the user: always (anything but
 	// reading), unsafe (only what's unsafe; empty means this) or never.
-	Mode      string `json:"mode"`
-	CreatedAt int64  `json:"createdAt"`
-	UpdatedAt int64  `json:"updatedAt"`
+	Mode string `json:"mode"`
+	// ShareChoice is what an isolated session shares of the user's own
+	// (profile.ShareTools, ShareSkills); nil: what its type does.
+	ShareChoice []string `json:"-"`
+	CreatedAt   int64    `json:"createdAt"`
+	UpdatedAt   int64    `json:"updatedAt"`
 }
 
 func now() int64 { return time.Now().UnixMilli() }
@@ -186,6 +190,14 @@ func jsonList(v []string) string {
 	}
 	b, _ := json.Marshal(v)
 	return string(b)
+}
+
+// sharesCol stores a session's share choice: NULL for none made.
+func sharesCol(v []string) any {
+	if v == nil {
+		return nil
+	}
+	return jsonList(v)
 }
 
 func parseList(s sql.NullString) []string {
@@ -205,9 +217,9 @@ func (s *Store) CreateSession(x *Session) error {
 		x.SortOrder = max.Float64 + 1
 	}
 	_, err := s.db.Exec(`INSERT INTO sessions (id, title, adapter, runtime, runtime_ref, profile_id, workdir, provider_sid, cli_version,
-		model, modifiers, sort_order, archived, mode, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		model, modifiers, sort_order, archived, mode, shares, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		x.ID, x.Title, x.Adapter, x.Runtime, nullStr(x.RuntimeRef), x.ProfileID, x.Workdir, nullStr(x.ProviderSID), nullStr(x.CLIVersion),
-		x.Model, jsonList(x.Modifiers), x.SortOrder, x.Archived, nullStr(x.Mode), x.CreatedAt, x.UpdatedAt)
+		x.Model, jsonList(x.Modifiers), x.SortOrder, x.Archived, nullStr(x.Mode), sharesCol(x.ShareChoice), x.CreatedAt, x.UpdatedAt)
 	return err
 }
 
@@ -216,9 +228,9 @@ func (s *Store) UpdateSession(x *Session) error {
 	var old sql.NullString
 	_ = s.db.QueryRow(`SELECT title FROM sessions WHERE id=?`, x.ID).Scan(&old)
 	_, err := s.db.Exec(`UPDATE sessions SET title=?, workdir=?, provider_sid=?, cli_version=?, model=?, modifiers=?,
-		sort_order=?, archived=?, mode=?, updated_at=? WHERE id=?`,
+		sort_order=?, archived=?, mode=?, shares=?, updated_at=? WHERE id=?`,
 		x.Title, x.Workdir, nullStr(x.ProviderSID), nullStr(x.CLIVersion), x.Model, jsonList(x.Modifiers),
-		x.SortOrder, x.Archived, nullStr(x.Mode), x.UpdatedAt, x.ID)
+		x.SortOrder, x.Archived, nullStr(x.Mode), sharesCol(x.ShareChoice), x.UpdatedAt, x.ID)
 	if err == nil && old.String != x.Title {
 		err = retitleSession(s.db, x.ID, x.Title)
 	}
@@ -226,18 +238,21 @@ func (s *Store) UpdateSession(x *Session) error {
 }
 
 const sessionCols = `id, title, adapter, runtime, runtime_ref, profile_id, workdir, provider_sid, cli_version, model, modifiers,
-	sort_order, archived, mode, created_at, updated_at`
+	sort_order, archived, mode, shares, created_at, updated_at`
 
 func scanSession(r interface{ Scan(...any) error }) (Session, error) {
 	var x Session
-	var title, ref, sid, ver, mods, mode sql.NullString
+	var title, ref, sid, ver, mods, mode, shares sql.NullString
 	var order sql.NullFloat64
 	var archived sql.NullBool
 	var created, updated sql.NullInt64
 	err := r.Scan(&x.ID, &title, &x.Adapter, &x.Runtime, &ref, &x.ProfileID, &x.Workdir, &sid, &ver, &x.Model, &mods,
-		&order, &archived, &mode, &created, &updated)
+		&order, &archived, &mode, &shares, &created, &updated)
 	x.Title, x.RuntimeRef, x.ProviderSID, x.CLIVersion, x.Mode = title.String, ref.String, sid.String, ver.String, mode.String
 	x.Modifiers = parseList(mods)
+	if shares.Valid {
+		x.ShareChoice = parseList(shares)
+	}
 	x.SortOrder, x.Archived, x.CreatedAt, x.UpdatedAt = order.Float64, archived.Bool, created.Int64, updated.Int64
 	return x, err
 }

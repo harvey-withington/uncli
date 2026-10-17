@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -198,6 +199,9 @@ type NewSession struct {
 	Profile, Workdir, Model string
 	Container               string // a container profile; empty: this machine
 	Provider                string // the AI provider (an adapter's id); empty: the first
+	// Shares is what it shares of the user's own (shares.go); nil: what its
+	// type does.
+	Shares []string
 }
 
 // CreateWith makes a new session on a provider. A profile's model is the
@@ -241,6 +245,12 @@ func (m *Manager) CreateWith(n NewSession) (View, error) {
 			return View{}, err
 		}
 		rec.Runtime, rec.RuntimeRef = RuntimeWSL, container
+	}
+	if n.Shares != nil {
+		if err := checkShares(n.Shares, m.shareable(rec, ad.Capabilities())); err != nil {
+			return View{}, err
+		}
+		rec.ShareChoice = slices.Clone(n.Shares)
 	}
 	if err := m.d.Store.CreateSession(&rec); err != nil {
 		return View{}, err

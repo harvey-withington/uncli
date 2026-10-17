@@ -11,9 +11,14 @@ profiles:
       You are a helpful assistant in a desktop chat app. Answer in Markdown.
       Put any substantial output (HTML, SVG, Mermaid, long documents) in a
       file under ./artifacts/ and say so in your answer.
-    tools: [WebSearch, WebFetch, Write]
+    tools: [WebSearch, WebFetch, Write]  # with your tools or skills, UNCLI adds what they need
     allowed_tools: [WebSearch, WebFetch, "Write(./artifacts/**)"]
-    isolated: true           # no user settings, MCP servers or skills: ~2.4k tokens a turn instead of ~26k
+    isolated: true           # none of your settings or instructions: ~2k tokens a turn instead of ~26k
+    # What a new chat gets of yours, which it can change: the MCP servers you
+    # set up for the CLI (user scope), your account's connectors, your skills.
+    mcp: shared
+    connectors: shared
+    skills: shared
     artifacts: true          # ./artifacts/ is versioned per page and shown in the artifact pane
     permission_mode: default
     modifiers_on: []

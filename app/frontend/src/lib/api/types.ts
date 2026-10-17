@@ -36,7 +36,12 @@ export interface SessionView {
   unattended?: boolean // requests that would wait for the user are declined
   mode?: SessionMode | '' // when Claude stops to prompt; empty = when unsafe
   background?: BackgroundTask[] // what runs in the background now (sub-agents, shells)
+  shares?: Share[] // what it has of the user's own: their MCP servers and connectors, their skills
+  shareable?: Share[] // what it could have (an isolated type, on this machine, a CLI that can)
 }
+
+// What an isolated session can have of the user's own (decision 0016).
+export type Share = 'tools' | 'skills'
 
 // A task running in the background. When it finishes, the CLI may carry on
 // by itself in a turn of its own (a page with origin 'cli').
@@ -336,6 +341,8 @@ export interface Profile {
   modifiersOn: string[] | null
   ideLinks: boolean
   artifacts?: boolean // ./artifacts/ is versioned per page and shown in the artifact pane
+  isolated?: boolean // reads none of the user's settings; can still share some of their own
+  shares?: Share[] // what a new session of this type shares by default
 }
 
 export interface Modifier {
@@ -377,6 +384,8 @@ export interface Capabilities {
   thinkingEvents: boolean
   slashPassthrough: boolean
   import?: boolean // saved CLI conversations can be imported
+  sharedTools?: boolean // an isolated session can be given the user's MCP servers and connectors
+  sharedSkills?: boolean // and their skills
 }
 
 // One model, chosen by the user, for every quick task (summaries now,
@@ -466,6 +475,7 @@ export interface NewSessionChoices {
   folders: Record<string, string>
   containers?: Record<string, string> // where each profile last ran: a container id, or "" for this machine
   providers?: Record<string, string> // the AI provider each profile last ran on
+  shares?: Record<string, Share[]> // what each isolated profile's last session shared
 }
 
 export interface CreatedSession {
@@ -640,7 +650,9 @@ export interface Backend {
   disablePlugin(id: string): Promise<void>
   pickFolder(title: string): Promise<string>
   // container: a container profile id, "" for this machine; provider: an AI provider's id, "" for the first
-  createSession(profileId: string, workdir: string, model: string, container: string, provider: string): Promise<CreatedSession>
+  // shares: what it has of the user's own; null for its type's defaults.
+  createSession(profileId: string, workdir: string, model: string, container: string, provider: string, shares: Share[] | null): Promise<CreatedSession>
+  setShares(sessionId: string, shares: Share[]): Promise<SessionView> // from the next turn
   pages(sessionId: string): Promise<Page[]>
   send(sessionId: string, text: string, attachments?: AttachmentRef[]): Promise<void>
   interrupt(sessionId: string): Promise<void>

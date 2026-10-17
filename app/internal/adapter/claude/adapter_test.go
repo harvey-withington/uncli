@@ -167,6 +167,60 @@ func TestBuildCommand(t *testing.T) {
 	}
 }
 
+// An isolated session can still have the user's own MCP servers (given
+// with --mcp-config) and their connectors (no --strict-mcp-config); the
+// user's settings stay out either way.
+func TestBuildCommandSharesMCP(t *testing.T) {
+	a := New(nil)
+	a.userConfig = func() []byte {
+		return []byte(`{"mcpServers":{"board":{"type":"http","url":"https://board.example/mcp","headers":{"Authorization":"Bearer x"}}},
+			"projects":{"S:/elsewhere":{"mcpServers":{"local":{"command":"node"}}}}}`)
+	}
+	for name, tc := range map[string]struct {
+		spec           core.LaunchSpec
+		config, strict bool
+	}{
+		"servers only":           {core.LaunchSpec{Isolated: true, ShareMCP: true}, true, true},
+		"connectors only":        {core.LaunchSpec{Isolated: true, ShareConnectors: true}, false, false},
+		"both":                   {core.LaunchSpec{Isolated: true, ShareMCP: true, ShareConnectors: true}, true, false},
+		"neither":                {core.LaunchSpec{Isolated: true}, false, true},
+		"not isolated: settings": {core.LaunchSpec{ShareMCP: true, ShareConnectors: true}, false, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cmd, err := a.BuildCommand("x", tc.spec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			i := slices.Index(cmd.Args, "--mcp-config")
+			if (i >= 0) != tc.config {
+				t.Fatalf("--mcp-config given = %v:\n%q", i >= 0, cmd.Args)
+			}
+			if i >= 0 {
+				var got struct {
+					MCPServers map[string]map[string]any `json:"mcpServers"`
+				}
+				if err := json.Unmarshal([]byte(cmd.Args[i+1]), &got); err != nil {
+					t.Fatal(err)
+				}
+				if len(got.MCPServers) != 1 || got.MCPServers["board"]["url"] != "https://board.example/mcp" {
+					t.Errorf("servers = %v (user scope only)", got.MCPServers)
+				}
+			}
+			if slices.Contains(cmd.Args, "--strict-mcp-config") != tc.strict {
+				t.Errorf("--strict-mcp-config = %v, want %v", !tc.strict, tc.strict)
+			}
+			if tc.spec.Isolated && !strings.Contains(strings.Join(cmd.Args, "|"), "--setting-sources||") {
+				t.Errorf("isolated without --setting-sources \"\": %q", cmd.Args)
+			}
+		})
+	}
+	a.userConfig = func() []byte { return nil }
+	cmd, _ := a.BuildCommand("x", core.LaunchSpec{Isolated: true, ShareMCP: true})
+	if slices.Contains(cmd.Args, "--mcp-config") {
+		t.Errorf("no servers set up, yet --mcp-config: %q", cmd.Args)
+	}
+}
+
 func TestParseAuthStatus(t *testing.T) {
 	info, err := New(nil).ParseAuthStatus([]byte(`{"loggedIn":true,"authMethod":"claude.ai","email":"a@b.c","subscriptionType":"max"}`))
 	if err != nil || !info.LoggedIn || info.Subscription != "max" {

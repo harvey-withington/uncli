@@ -2,7 +2,7 @@
 // the live text of answers still streaming. All state is keyed by id.
 import type {
   ArtifactFile, AttachmentRef, Backend, ContainersInfo, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
-  ModelInfo, ThinkingData, UsageLimit,
+  ModelInfo, Share, ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
@@ -323,8 +323,9 @@ export class AppStore {
 
   // container: a container profile to run in, '' for this machine;
   // provider: an AI provider's id, '' for the first.
-  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '') {
-    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model, container, provider)
+  // shares: what it can use of the user's own; null for its type's defaults.
+  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null) {
+    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model, container, provider, shares)
     if (this.boot) this.boot.lastNewSession = lastNewSession
     this.upsertSession(v)
     this.pages[v.id] = []

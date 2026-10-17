@@ -52,6 +52,14 @@ apply changes.
 
 - **New session** (Ctrl+N): pick Chat, Co-work (a folder) or Code (a
   repository), the AI provider and a model.
+- **Chat** reads none of your CLI settings or instructions. Each chat can
+  still use your MCP servers (the ones added for the CLI everywhere,
+  `claude mcp add -s user`) and claude.ai connectors, and your skills: tick
+  them in the new-session dialog, or change them later from the note after
+  the chat's folder in its header (decision 0016). MCP tools load only when
+  a turn needs them, and each tool use is approved like any other. The
+  chat profile's `mcp`, `connectors` and `skills` in your `profiles.yaml`
+  set what a new chat starts with.
 - **AI providers**: Claude Code, and the Antigravity CLI (Google). Settings
   → AI Providers installs each one's pinned CLI and says whether it's
   signed in. The Antigravity CLI uses the Google sign-in of the Antigravity
