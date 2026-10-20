@@ -357,6 +357,21 @@ describe('Settings', () => {
     await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ quickTaskModel: { provider: 'claude', model: 'sonnet' }, autoSummary: 'always' }))
     expect(await within(dialog).findByText(/Every answer of more than one paragraph/)).toBeInTheDocument()
   })
+
+  it('saves the conversation cache and explains each choice', async () => {
+    const backend = mockBackend()
+    const spy = vi.spyOn(backend, 'setPreferences')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: /Claude Code 2./ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+    await fireEvent.click(within(dialog).getByRole('tab', { name: 'AI Providers' }))
+    const cache = within(dialog).getByRole('combobox', { name: 'Conversation cache' })
+    expect(cache).toHaveValue('auto')
+    expect(within(dialog).getByText(/an hour while your Claude subscription is within its plan/)).toBeInTheDocument()
+    await fireEvent.change(cache, { target: { value: '1h' } })
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ promptCache: '1h' })))
+    expect(await within(dialog).findByText(/costs 2× the normal input price/)).toBeInTheDocument()
+  })
 })
 
 describe('Sidebar resizing', () => {

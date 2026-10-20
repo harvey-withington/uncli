@@ -33,6 +33,7 @@ type Session struct {
 	proc       core.Proc
 	cancel     context.CancelFunc
 	procEffort string
+	procCache  string // the PromptCache the process was launched with
 	procShares string  // what the running CLI was given of the user's own (sharesKey)
 	lastCost   float64 // the CLI's running cost total on this process
 	// The profile's permission mode, and the one the running CLI is in
@@ -179,7 +180,7 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 		return fmt.Errorf("could not start the CLI: %w", err)
 	}
 	s.gen++
-	s.proc, s.cancel, s.procEffort, s.lastCost = proc, cancel, spec.Effort, 0
+	s.proc, s.cancel, s.procEffort, s.procCache, s.lastCost = proc, cancel, spec.Effort, spec.PromptCache, 0
 	s.procShares = sharesKey(spec)
 	s.cliMode = spec.PermissionMode
 	s.rec.CLIVersion = version
@@ -256,9 +257,14 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		spec.PermissionMode = s.cliModeLocked(spec.PermissionMode)
 	}
 
-	// Effort, the permission mode and what the session shares are launch
-	// flags, so a change the CLI can't take live respawns with resume.
-	if s.proc != nil && (spec.Effort != s.procEffort || spec.PermissionMode != s.cliMode || sharesKey(spec) != s.procShares) {
+	if s.m.d.PromptCache != nil {
+		spec.PromptCache = s.m.d.PromptCache()
+	}
+
+	// Effort, the permission mode, what the session shares and the cache
+	// lifetime are launch settings, so a change the CLI can't take live
+	// respawns with resume.
+	if s.proc != nil && (spec.Effort != s.procEffort || spec.PermissionMode != s.cliMode || sharesKey(spec) != s.procShares || spec.PromptCache != s.procCache) {
 		s.stopLocked()
 	}
 	if s.proc == nil {

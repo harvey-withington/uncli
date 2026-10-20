@@ -473,6 +473,27 @@ func TestModifiersRenderAndEffortRespawns(t *testing.T) {
 	}
 }
 
+// A changed conversation cache setting reaches a running session at its
+// next message: the CLI takes it at launch, so it respawns with resume.
+func TestPromptCacheChangeRespawns(t *testing.T) {
+	h := newHarness(t, "multi-turn-partial")
+	ttl := "5m"
+	h.m.d.PromptCache = func() string { return ttl }
+	v, _ := h.m.Create("code", t.TempDir(), "opus")
+	h.send(v.ID, "one")
+	if got := h.rt.starts[0].Env["CLAUDE_CODE_PROMPT_CACHE_TTL"]; got != "5m" {
+		t.Errorf("first launch ttl = %q, want 5m", got)
+	}
+	ttl = "1h"
+	h.send(v.ID, "two")
+	if len(h.rt.starts) != 2 {
+		t.Fatalf("a cache change should respawn: %d starts", len(h.rt.starts))
+	}
+	if got := h.rt.starts[1].Env["CLAUDE_CODE_PROMPT_CACHE_TTL"]; got != "1h" || !strings.Contains(strings.Join(h.rt.starts[1].Args, " "), "--resume") {
+		t.Errorf("respawn must resume with the hour: ttl %q, args %v", got, h.rt.starts[1].Args)
+	}
+}
+
 func TestUnexpectedExitMidTurn(t *testing.T) {
 	h := newHarness(t, "single-turn")
 	h.rt.turns = nil

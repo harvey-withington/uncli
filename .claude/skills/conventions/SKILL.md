@@ -1,6 +1,6 @@
 ---
 name: conventions
-description: UNCLI's contributor conventions - architecture rules, frontend contract, tests and checks, and commit message format. Use before changing code in this repo or writing a commit message.
+description: UNCLI's contributor conventions - architecture rules, frontend contract, tests and checks, where requirements, plans and docs go, and commit message format. Use before changing code, docs or plans in this repo, or writing a commit message.
 ---
 
 # UNCLI conventions
@@ -30,7 +30,8 @@ break (`internal/core/seams_test.go` enforces the first two):
 - UNCLI runs only its own pinned, checksum-verified CLI (or one the user
   chose at their own risk). Never bypass permissions in a profile default.
   An adapter may switch off its CLI's own checks only when UNCLI gates every
-  tool call itself and fails closed (decision 0012).
+  tool call itself and fails closed: a hook that crashes, times out or
+  answers nonsense blocks the call, with a test for each (decision 0012).
 - Config over code: profiles, modifiers and the toolbar are YAML in
   `app/config/defaults/`, overridable by `id` from the user's config folder.
 - Pure logic lives in Go packages and `frontend/src/lib/`, with unit tests;
@@ -82,11 +83,36 @@ and the user commits. The suggestion covers everything uncommitted since the
 last commit (check `git log -1` and `git status`), not only the latest
 change: the user commits once a batch of work is done.
 
+## Requirements, planning and working rules
+
+- Requirements and next steps live on the UNCLI project on BRUV (its id is
+  in Claude's memory). A feature is fleshed out on its card as it's built.
+- `plan/` is a private scratchpad: its own git repo, ignored here. Designs,
+  drafts, proposed decisions, notes and TODOs go there as dated files
+  (`YYYY-MM-DD topic.md`), and a design is also attached to its card.
+  Nothing in `plan/` is a requirement until it's on a card. Planning never
+  goes in this repo's `docs/`.
+- Read `docs/BRIEF.md` before structural work, and follow its "Working rules
+  for the builder" alongside this file. If the two ever disagree, stop and
+  flag it rather than picking one. The brief is frozen (final as of
+  2026-10-04): don't edit it for new work.
+- Work one task at a time, and tick off the phase's definition of done as
+  items pass.
+- If the CLI behaves differently from what the brief assumes, record it on
+  the relevant card (and in a decision record if it changes the design)
+  before changing the code.
+
 ## Documentation
 
-- `README.md` is for people who run or contribute to the app.
-- `docs/decisions/` holds decision records; write one when a choice shapes
-  the architecture or rules out an alternative for a reason a later reader
-  would otherwise have to rediscover.
-- Requirements and next steps live on the BRUV card. Planning notes and
-  TODOs live in `plan/`, never in this repo.
+What's public in this repo, and nothing else:
+
+- `README.md`, for people who run or contribute to the app.
+- `docs/BRIEF.md`, the frozen design handover.
+- `docs/decisions/`, decision records, which extend the brief. Write one
+  when a choice shapes the architecture or rules out an alternative for a
+  reason a later reader would otherwise have to rediscover. Only accepted
+  decisions go here; a proposal stays in `plan/` and on its card until
+  Harvey rules on it.
+- `docs/UI-CONVENTIONS.md`, the frontend contract.
+- Reference for people extending UNCLI, such as `docs/PLUGINS.md` for
+  plugin authors.

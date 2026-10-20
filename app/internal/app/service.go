@@ -167,7 +167,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,
 		Binary: s.binaryOf, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
 		Judge: s.judgeCommand, JudgeTools: s.judgeTools, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
-		Online: netcheck.Online,
+		Online: netcheck.Online, PromptCache: func() string { return s.Preferences().PromptCacheTTL() },
 	})
 	if err != nil {
 		db.Close()

@@ -88,8 +88,14 @@ func TestPreferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer svc.Close()
-	if p := svc.Preferences(); p.QuickTaskModel != (ModelRef{"claude", "haiku"}) || p.AutoSummary != SummaryOff {
+	if p := svc.Preferences(); p.QuickTaskModel != (ModelRef{"claude", "haiku"}) || p.AutoSummary != SummaryOff || p.PromptCache != CacheAuto || p.PromptCacheTTL() != "" {
 		t.Errorf("defaults = %+v", p)
+	}
+	if _, err := svc.SetPreferences(Preferences{QuickTaskModel: ModelRef{"claude", "haiku"}, AutoSummary: SummaryOff, PromptCache: "1d"}); err == nil {
+		t.Error("an unknown cache setting must be refused")
+	}
+	if p, err := svc.SetPreferences(Preferences{QuickTaskModel: ModelRef{"claude", "haiku"}, AutoSummary: SummaryOff, PromptCache: CacheLong}); err != nil || p.PromptCacheTTL() != "1h" {
+		t.Errorf("long cache = %+v, %v", p, err)
 	}
 	if _, err := svc.SetPreferences(Preferences{QuickTaskModel: ModelRef{"qwen-local", "qwen3"}}); err == nil {
 		t.Error("an unknown provider must be refused")
