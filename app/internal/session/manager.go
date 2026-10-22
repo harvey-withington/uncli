@@ -291,6 +291,15 @@ func (m *Manager) Send(ctx context.Context, id, text string, files ...core.Attac
 	return s.Send(ctx, text, files)
 }
 
+// AnswerAsk answers a waiting question or plan (Session.AnswerAsk).
+func (m *Manager) AnswerAsk(id, requestID string, allow bool, answers map[string]string, note string) error {
+	s, err := m.get(id)
+	if err != nil {
+		return err
+	}
+	return s.AnswerAsk(requestID, allow, answers, note)
+}
+
 // Answer gives the user's decision on a waiting request: allow (once),
 // safe (and remember it, in scope "project" or "all") or deny.
 func (m *Manager) Answer(id, requestID, decision, scope string) error {

@@ -321,6 +321,24 @@ func (a *Adapter) EncodeControl(c core.Control) ([]byte, bool) {
 	return b, err == nil
 }
 
+// WithAnswers gives AskUserQuestion the user's answers: its input as asked,
+// plus "answers" by question text; several picks are one answer, joined
+// with ", " (fixture ask-user-question, CLI 2.1.285).
+func (a *Adapter) WithAnswers(input json.RawMessage, answers map[string]string) (json.RawMessage, error) {
+	doc := map[string]json.RawMessage{}
+	if len(input) > 0 {
+		if err := json.Unmarshal(input, &doc); err != nil {
+			return nil, err
+		}
+	}
+	b, err := json.Marshal(answers)
+	if err != nil {
+		return nil, err
+	}
+	doc["answers"] = b
+	return json.Marshal(doc)
+}
+
 func (a *Adapter) NewParser() core.Parser { return newParser() }
 
 func marshalLine(v any) ([]byte, error) {

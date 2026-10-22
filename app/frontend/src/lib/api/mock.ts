@@ -564,7 +564,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
           const requestId = `req_${++requestSeq}`
           const approval: Approval = {
             requestId, tool: ask.tool, input: ask.input, toolUseId: `toolu_${requestSeq}`,
-            learn: [ask.learn], class: ask.class, why: v.why, askedAt: Date.now(),
+            learn: ask.ask ? [] : [ask.learn], class: ask.class, why: v.why, askedAt: Date.now(), ...(ask.ask ? { ask: ask.ask } : {}),
           }
           if (v.action === 'judge') {
             // The quick-task model checks a tool UNCLI can't place: the
@@ -652,6 +652,16 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       else changed(s)
       approvalWaits.get(rid)?.(decision === 'deny' ? 'deny' : 'allow')
       if (decision === 'safe') rejudgeAll()
+    },
+    async answerAsk(sid, rid, allow, answers) {
+      const s = find(sid)
+      const a = (s.approvals ?? []).find(x => x.requestId === rid)
+      if (!a?.ask) throw new Error('that request is no longer waiting for an answer')
+      if (allow && a.ask === 'question' && !answers) throw new Error('answer the question first')
+      s.approvals = (s.approvals ?? []).filter(x => x.requestId !== rid)
+      if (s.approvals.length === 0) setState(s, 'running_tools')
+      else changed(s)
+      approvalWaits.get(rid)?.(allow ? 'allow' : 'deny')
     },
     async setUnattended(sid, on) {
       const s = find(sid)

@@ -467,3 +467,41 @@ func TestBackgroundTasks(t *testing.T) {
 		t.Errorf("results = %d, want the user's turn and the one the CLI started", n)
 	}
 }
+
+// A question and a plan reach UNCLI as requests to the user, carrying
+// what the card shows: the questions with their options, the plan as
+// Markdown (fixtures ask-user-question and exit-plan-mode, CLI 2.1.285).
+func TestQuestionAndPlanRequests(t *testing.T) {
+	asks := ofKind(parseFixture(t, "ask-user-question"), core.EvApprovalAsked)
+	if len(asks) != 1 {
+		t.Fatalf("question asks = %d", len(asks))
+	}
+	q := decode[core.ApprovalAsked](t, asks[0])
+	if q.Action.Kind != core.ActQuestion || !strings.Contains(string(q.Input), `"multiSelect":true`) || !strings.Contains(string(q.Input), `"label":"Porto"`) {
+		t.Errorf("question = %+v %s", q.Action, q.Input)
+	}
+	asks = ofKind(parseFixture(t, "exit-plan-mode"), core.EvApprovalAsked)
+	plans := 0
+	for _, e := range asks {
+		a := decode[core.ApprovalAsked](t, e)
+		if a.Action.Kind == core.ActPlan {
+			plans++
+			var in struct{ Plan string }
+			_ = json.Unmarshal(a.Input, &in)
+			if !strings.HasPrefix(in.Plan, "# Plan:") {
+				t.Errorf("plan = %q", in.Plan)
+			}
+		}
+	}
+	if plans != 2 { // sent back once, then approved
+		t.Errorf("plans = %d", plans)
+	}
+}
+
+func TestWithAnswers(t *testing.T) {
+	in := json.RawMessage(`{"questions":[{"question":"Which city?","options":[{"label":"Porto"}]}]}`)
+	out, err := New(nil).WithAnswers(in, map[string]string{"Which city?": "Porto"})
+	if err != nil || !strings.Contains(string(out), `"answers":{"Which city?":"Porto"}`) || !strings.Contains(string(out), `"questions":[`) {
+		t.Errorf("%s %v", out, err)
+	}
+}

@@ -282,6 +282,12 @@ func (a *App) SessionAllowlist(sessionID string) ([]string, error) {
 	return a.svc.Sessions.SessionAllowlist(sessionID)
 }
 
+// AnswerAsk answers a question the model asked (allow, with answers by
+// question) or a plan (allow; or deny with a note on what to change).
+func (a *App) AnswerAsk(sessionID, requestID string, allow bool, answers map[string]string, note string) error {
+	return a.svc.Sessions.AnswerAsk(sessionID, requestID, allow, answers, note)
+}
+
 // SetShares changes what a session shares of the user's own (their MCP
 // servers and connectors, their skills), from its next turn.
 func (a *App) SetShares(sessionID string, shares []string) (session.View, error) {

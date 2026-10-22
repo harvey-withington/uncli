@@ -6,6 +6,8 @@
   import { showToast } from '../lib/toasts.svelte'
   import CommandView from './CommandView.svelte'
   import Icon from './Icon.svelte'
+  import PlanCard from './PlanCard.svelte'
+  import QuestionCard from './QuestionCard.svelte'
 
   // A tool use waiting for the user's answer: what Claude wants to do (a
   // command coloured part by part, CommandView), a line on why when the
@@ -52,6 +54,11 @@
   }
 </script>
 
+{#if approval.ask === 'question'}
+  <QuestionCard {session} {approval} />
+{:else if approval.ask === 'plan'}
+  <PlanCard {session} {approval} />
+{:else}
 <div class="card" role="alertdialog" aria-label={view.title} aria-describedby="approval-{approval.requestId}">
   <div class="head">
     <span class="icon"><Icon name="shield" size={16} /></span>
@@ -96,6 +103,7 @@
     <p class="remember">{fixed}</p>
   {/if}
 </div>
+{/if}
 
 <style>
   .card {

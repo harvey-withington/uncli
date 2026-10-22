@@ -1,0 +1,1 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --strict-mcp-config --setting-sources "" --permission-prompt-tool stdio --tools Read,Edit,Write,ExitPlanMode --permission-mode plan

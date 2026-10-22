@@ -159,6 +159,14 @@ type Capabilities struct {
 	SharedSkills bool `json:"sharedSkills"`
 }
 
+// QuestionAnswerer is an adapter whose CLI takes the user's answers to the
+// model's questions (ActQuestion) with the allow: WithAnswers puts them,
+// by question, into the tool's input. Optional; without it a question can
+// only be allowed or denied.
+type QuestionAnswerer interface {
+	WithAnswers(input json.RawMessage, answers map[string]string) (json.RawMessage, error)
+}
+
 // StatePather is an adapter whose CLI keeps files of its own outside the
 // session folder (plans, memory, todo lists): writing there is the CLI's
 // bookkeeping, not a change to the user's files. Optional.

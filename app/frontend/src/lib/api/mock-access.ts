@@ -13,6 +13,7 @@ export interface MockAsk {
   more?: TraceReason[] // the other parts of a chained command
   learn: SafeClass // what "This is safe" remembers
   answers: Record<Outcome, string>
+  ask?: 'question' | 'plan' // always goes to the user, on its own card
 }
 
 // How a tool use ended: run, denied on its card (or blocked), declined
@@ -77,6 +78,34 @@ MOCK_ASKS.push({
   },
 })
 
+// A question with a single and a multiple choice ("ask me"), and a plan
+// to approve ("plan"), as the CLI asks them (fixtures ask-user-question,
+// exit-plan-mode).
+MOCK_ASKS.push({
+  match: /\bask me\b/i, tool: 'AskUserQuestion', ask: 'question',
+  input: { questions: [
+    { question: 'Which city do you prefer?', header: 'City', multiSelect: false, options: [
+      { label: 'Lisbon', description: 'The capital, hilly and busy' }, { label: 'Porto', description: 'The river, the wine' }, { label: 'Faro', description: 'The Algarve coast' }] },
+    { question: 'Which meals should I plan?', header: 'Meals', multiSelect: true, options: [{ label: 'Breakfast' }, { label: 'Lunch' }, { label: 'Dinner' }] },
+  ] },
+  class: { write: false, source: 'built-in' }, why: { by: 'looks' }, learn: { kind: 'tool', words: 'AskUserQuestion' },
+  answers: {
+    allow: 'Thanks. Here are some places that fit what you picked.',
+    deny: "No problem, I'll suggest a bit of everything instead.",
+    away: "You're away, so I'll suggest a bit of everything for now.",
+  },
+})
+MOCK_ASKS.push({
+  match: /\bplan\b/i, tool: 'ExitPlanMode', ask: 'plan',
+  input: { plan: '# Plan: tidy the parser tests\n\n## Context\nThe flaky test shares a fixture with two others.\n\n## Steps\n1. Read `parser_test.go` and the three fixtures\n2. Give each test its own fixture copy\n3. Run the tests twenty times to check the flake is gone' },
+  class: { write: false, source: 'built-in' }, why: { by: 'looks' }, learn: { kind: 'tool', words: 'ExitPlanMode' },
+  answers: {
+    allow: 'Going ahead with the plan.',
+    deny: "I'll rework the plan with that in mind.",
+    away: "You're away, so I've kept the plan and haven't started.",
+  },
+})
+
 // The session types' lists, as in config/defaults/profiles.yaml.
 export const MOCK_ALLOWLISTS: Record<string, string[]> = {
   chat: ['WebSearch', 'WebFetch', 'Write(./artifacts/**)'],
@@ -112,6 +141,7 @@ const JUDGED: TraceReason = { by: 'unsafe', risk: 'publishes', judged: 'haiku', 
 
 // mockJudge: what a session does with one of the mock's tool uses.
 export function mockJudge(s: SessionView, ask: MockAsk, list: SafeEntry[], setting: UnknownCommands, judged: boolean): MockVerdict {
+  if (ask.ask) return { action: 'ask', why: [] } // questions and plans are always the user's
   const mode = s.mode || 'unsafe'
   const base = ask.why
   const entry = entryFor(list, ask.learn, s.workdir)

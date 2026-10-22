@@ -33,7 +33,7 @@ type Session struct {
 	proc       core.Proc
 	cancel     context.CancelFunc
 	procEffort string
-	procCache  string // the PromptCache the process was launched with
+	procCache  string  // the PromptCache the process was launched with
 	procShares string  // what the running CLI was given of the user's own (sharesKey)
 	lastCost   float64 // the CLI's running cost total on this process
 	// The profile's permission mode, and the one the running CLI is in

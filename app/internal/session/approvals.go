@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"uncli/internal/core"
@@ -23,14 +25,18 @@ import (
 
 // Approval is a tool use waiting for the user's answer.
 type Approval struct {
-	RequestID   string              `json:"requestId"`
-	Tool        string              `json:"tool"`
-	Input       json.RawMessage     `json:"input,omitempty"`
-	Description string              `json:"description,omitempty"`
-	ToolUseID   string              `json:"toolUseId,omitempty"`
-	Action      core.ToolAction     `json:"-"`     // what it does, in provider-neutral terms
-	Class       Class               `json:"class"` // what UNCLI takes it to do
-	Why         []store.TraceReason `json:"why"`   // what each part does, and why it prompts
+	RequestID   string          `json:"requestId"`
+	Tool        string          `json:"tool"`
+	Input       json.RawMessage `json:"input,omitempty"`
+	Description string          `json:"description,omitempty"`
+	ToolUseID   string          `json:"toolUseId,omitempty"`
+	// Ask is "question" for a question the user can answer on the card,
+	// "plan" for a plan to approve or send back with a note (AnswerAsk);
+	// empty for an ordinary tool use.
+	Ask    string              `json:"ask,omitempty"`
+	Action core.ToolAction     `json:"-"`     // what it does, in provider-neutral terms
+	Class  Class               `json:"class"` // what UNCLI takes it to do
+	Why    []store.TraceReason `json:"why"`   // what each part does, and why it prompts
 	// Learn is what "This is safe" would remember: a class for each part
 	// that prompts. Empty when it can't be learned (the card says why).
 	Learn []store.SafeClass `json:"learn"`
@@ -131,6 +137,7 @@ func (s *Session) askLocked(a core.ApprovalAsked) bool {
 	}
 	ap := Approval{RequestID: a.RequestID, Tool: a.Tool, Input: a.Input, Description: a.Description, ToolUseID: a.ToolUseID,
 		Action: action, AskedAt: time.Now().UnixMilli()}
+	ap.Ask = s.askKindLocked(action)
 	ap.update(v)
 	s.pending = append(s.pending, ap)
 	if v.action == actionJudge {
@@ -511,6 +518,70 @@ func (s *Session) denyPendingLocked(reason string) {
 		_ = s.replyLocked(a.RequestID, false, nil, reason)
 	}
 	s.pending = nil
+}
+
+// askKindLocked is what kind of answer a request takes on its card
+// (Approval.Ask). A question takes answers only when the CLI can carry
+// them with the allow, which a hook can't. Caller holds s.mu.
+func (s *Session) askKindLocked(a core.ToolAction) string {
+	switch a.Kind {
+	case core.ActPlan:
+		return AskPlan
+	case core.ActQuestion:
+		if _, ok := s.ad().(core.QuestionAnswerer); ok && !s.ad().Capabilities().HookApprovals {
+			return AskQuestion
+		}
+	}
+	return ""
+}
+
+// What a card asks for (Approval.Ask).
+const (
+	AskQuestion = "question"
+	AskPlan     = "plan"
+)
+
+// AnswerAsk answers a question (allow, with the user's answers by
+// question) or a plan (allow to go ahead; deny to keep planning, with the
+// user's note as what to change).
+func (s *Session) AnswerAsk(requestID string, allow bool, answers map[string]string, note string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	i := slices.IndexFunc(s.pending, func(a Approval) bool { return a.RequestID == requestID })
+	if i < 0 {
+		return errors.New("that request is no longer waiting for an answer")
+	}
+	a := s.pending[i]
+	if a.Ask == "" {
+		return errors.New("that request takes Allow or Deny")
+	}
+	input := a.Input
+	if allow && a.Ask == AskQuestion {
+		qa, ok := s.ad().(core.QuestionAnswerer)
+		if !ok || len(answers) == 0 {
+			return errors.New("answer the question first")
+		}
+		var err error
+		if input, err = qa.WithAnswers(a.Input, answers); err != nil {
+			return err
+		}
+	}
+	message := deniedOnCard
+	if note = strings.TrimSpace(note); note != "" {
+		message = "The user wants changes before going ahead: " + note
+	}
+	if err := s.replyLocked(a.RequestID, allow, input, message); err != nil {
+		return err
+	}
+	s.pending = append(s.pending[:i:i], s.pending[i+1:]...)
+	if allow {
+		s.markApprovedLocked(a.ToolUseID, "you", nil)
+	} else {
+		s.markDeniedLocked(a.ToolUseID, nil)
+	}
+	s.resumeLocked()
+	s.changed()
+	return nil
 }
 
 func (s *Session) replyLocked(requestID string, allow bool, input json.RawMessage, message string) error {

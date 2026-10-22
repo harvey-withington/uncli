@@ -276,6 +276,9 @@ export interface Approval {
   marked?: boolean // "This is safe" is on: its classes are on the safe list, and it waits for Allow once or Deny
   markedScope?: Scope
   askedAt: number
+  // question: the model asks the user something (QuestionCard); plan: it
+  // wants a plan approved (PlanCard). Absent for an ordinary tool use.
+  ask?: 'question' | 'plan'
 }
 
 // allow: this once; safe: and remember it as safe (with a scope); deny.
@@ -669,6 +672,8 @@ export interface Backend {
   describeAttachments(paths: string[]): Promise<AttachmentInfo[]>
   search(q: SearchQuery): Promise<SearchResult>
   answerApproval(sessionId: string, requestId: string, decision: ApprovalDecision, scope?: Scope): Promise<void>
+  // A question (allow, with answers by question) or a plan (allow; or deny with a note on what to change).
+  answerAsk(sessionId: string, requestId: string, allow: boolean, answers: Record<string, string> | null, note: string): Promise<void>
   setUnattended(sessionId: string, on: boolean): Promise<SessionView>
   setMode(sessionId: string, mode: SessionMode): Promise<SessionView>
   safeList(sessionId: string): Promise<SafeEntry[]>
