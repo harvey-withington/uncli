@@ -251,7 +251,7 @@ const MOCK_PLUGINS: Provider[] = [
   },
 ]
 
-export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
+export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; commandsLate?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
     session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode }),
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2 }),
@@ -396,6 +396,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     s.state = state
     changed(s)
   }
+  const reported = new Set<string>() // sessions whose CLI has reported its commands (opts.commandsLate)
   const emit = (sessionId: string, kind: UEvent['kind'], turnSeq: number, data?: unknown) =>
     h?.sessionEvent({ sessionId, event: { kind, turnSeq, at: new Date().toISOString(), data } })
   // A background task finished: like the CLI, the mock carries on by
@@ -667,7 +668,17 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     },
     async commands(sid) {
       const s = find(sid)
-      return s.adapter === 'claude' ? structuredClone(MOCK_COMMANDS) : []
+      if (s.adapter !== 'claude') return []
+      // opts.commandsLate: no CLI has reported its commands yet; asking
+      // starts one, which reports them a moment later (as the backend does).
+      if (opts.commandsLate && !reported.has(sid)) {
+        setTimeout(() => {
+          reported.add(sid)
+          emit(sid, 'commands', 0, { list: MOCK_COMMANDS })
+        }, 300)
+        return []
+      }
+      return structuredClone(MOCK_COMMANDS)
     },
     async answerAsk(sid, rid, allow, answers) {
       const s = find(sid)

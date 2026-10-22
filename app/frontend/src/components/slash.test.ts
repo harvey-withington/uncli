@@ -70,3 +70,17 @@ describe('Slash commands', () => {
     history.replaceState(null, '', '/')
   })
 })
+
+describe('Slash commands before any CLI has reported them', () => {
+  it('says it is getting them, then shows them when the CLI reports', async () => {
+    const backend = mockBackend({ commandsLate: true })
+    render(App, { props: { backend } })
+    await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
+    const el = await box()
+    await type(el, '/')
+    const menu = within(await screen.findByRole('listbox', { name: 'Commands' }))
+    expect(menu.getByText("Getting Claude Code's commands…")).toBeInTheDocument()
+    await waitFor(() => expect(menu.getAllByRole('option').length).toBe(8), { timeout: 3000 })
+    expect(menu.queryByText(/Getting/)).not.toBeInTheDocument()
+  })
+})

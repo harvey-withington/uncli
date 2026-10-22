@@ -74,3 +74,31 @@ func TestSessionCommands(t *testing.T) {
 		t.Error("/always-approve must never be sent")
 	}
 }
+
+// Asking for a session's commands before its CLI has run starts the CLI,
+// with no turn: it reports its commands as it starts.
+func TestCommandsStartTheCLI(t *testing.T) {
+	h := newHarness(t, "single-turn")
+	v, _ := h.m.Create("chat", "", "haiku")
+	if _, err := h.m.Commands(v.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "the CLI", func() bool {
+		h.rt.mu.Lock()
+		defer h.rt.mu.Unlock()
+		return len(h.rt.starts) == 1
+	})
+	if pages, _ := h.m.Pages(v.ID); len(pages) != 0 {
+		t.Errorf("no turn should be sent: %d pages", len(pages))
+	}
+	if vw, _ := h.m.View(v.ID); vw.Busy {
+		t.Error("warming isn't a turn")
+	}
+	// Asking again while it runs starts nothing more.
+	_, _ = h.m.Commands(v.ID)
+	h.rt.mu.Lock()
+	defer h.rt.mu.Unlock()
+	if len(h.rt.starts) != 1 {
+		t.Errorf("starts = %d", len(h.rt.starts))
+	}
+}

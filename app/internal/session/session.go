@@ -229,6 +229,50 @@ func (s *Session) stop() {
 }
 
 // Send starts a turn: the text and any attached files.
+// launchSpecLocked is what the session's CLI starts with now: its type,
+// model, modifiers, what it shares, and how its tool uses come to UNCLI.
+// Caller holds s.mu.
+func (s *Session) launchSpecLocked() (core.LaunchSpec, error) {
+	set := s.m.d.Profiles
+	prof, ok := set.Profile(s.rec.ProfileID)
+	if !ok {
+		return core.LaunchSpec{}, fmt.Errorf("profile %q no longer exists", s.rec.ProfileID)
+	}
+	spec := set.Resolve(prof, s.rec.Model, append([]string{}, s.rec.Modifiers...), s.rec.Workdir)
+	profile.ApplyShares(&spec, prof, s.sharesLocked())
+	// Tool uses the CLI doesn't allow itself come to UNCLI when the CLI
+	// can route them (approvals.go); otherwise the CLI denies them. UNCLI
+	// then applies the allowlist itself, after the session mode and rules.
+	spec.Approvals = s.ad().Capabilities().Approvals
+	s.profileMode = spec.PermissionMode
+	if spec.Approvals {
+		s.allowlist = parseAllowlist(spec.AllowedTools, s.rec.Workdir)
+		spec.AllowedTools = nil
+		spec.PermissionMode = s.cliModeLocked(spec.PermissionMode)
+	}
+	if s.m.d.PromptCache != nil {
+		spec.PromptCache = s.m.d.PromptCache()
+	}
+	return spec, nil
+}
+
+// warm starts the session's CLI without a turn, so it reports what it
+// reports on starting (its slash commands) before the first message.
+// Nothing is sent to the model. It does nothing if the CLI is running or
+// the session is archived.
+func (s *Session) warm(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.proc != nil || s.page != nil || s.rec.Archived {
+		return nil
+	}
+	spec, err := s.launchSpecLocked()
+	if err != nil {
+		return err
+	}
+	return s.spawn(ctx, spec)
+}
+
 func (s *Session) Send(ctx context.Context, text string, files []core.Attachment) error {
 	text = strings.TrimSpace(text)
 	if text == "" && len(files) == 0 {
@@ -246,28 +290,12 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		return errors.New("this session is archived; restore it to continue")
 	}
 	set := s.m.d.Profiles
-	prof, ok := set.Profile(s.rec.ProfileID)
-	if !ok {
-		return fmt.Errorf("profile %q no longer exists", s.rec.ProfileID)
+	spec, err := s.launchSpecLocked()
+	if err != nil {
+		return err
 	}
 	active := append([]string{}, s.rec.Modifiers...)
-	spec := set.Resolve(prof, s.rec.Model, active, s.rec.Workdir)
-	profile.ApplyShares(&spec, prof, s.sharesLocked())
-	// Tool uses the CLI doesn't allow itself come to UNCLI when the CLI
-	// can route them (approvals.go); otherwise the CLI denies them. UNCLI
-	// then applies the allowlist itself, after the session mode and rules.
 	caps := s.ad().Capabilities()
-	spec.Approvals = caps.Approvals
-	s.profileMode = spec.PermissionMode
-	if spec.Approvals {
-		s.allowlist = parseAllowlist(spec.AllowedTools, s.rec.Workdir)
-		spec.AllowedTools = nil
-		spec.PermissionMode = s.cliModeLocked(spec.PermissionMode)
-	}
-
-	if s.m.d.PromptCache != nil {
-		spec.PromptCache = s.m.d.PromptCache()
-	}
 
 	// Effort, the permission mode, what the session shares and the cache
 	// lifetime are launch settings, so a change the CLI can't take live

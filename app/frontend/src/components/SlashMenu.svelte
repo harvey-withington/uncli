@@ -22,7 +22,8 @@
   const query = $derived(app.takesSlash(session) ? slashQuery(text, input?.selectionStart ?? text.length) : null)
   const list = $derived(app.commands[session.id] ?? [])
   const matches = $derived(query === null ? [] : matchCommands(list, query))
-  const open = $derived(query !== null && matches.length > 0 && closedFor !== text)
+  const waiting = $derived(query !== null && list.length === 0 && !!app.commandsPending[session.id])
+  const open = $derived(query !== null && (matches.length > 0 || waiting) && closedFor !== text)
 
   // The commands are fetched when the first "/" is typed.
   $effect(() => {
@@ -46,7 +47,7 @@
   // onkey handles a key press in the message box; true when it was the
   // menu's.
   export function onkey(e: KeyboardEvent): boolean {
-    if (!open || e.isComposing) return false
+    if (!open || e.isComposing || matches.length === 0) return false
     switch (e.key) {
       case 'ArrowDown':
         active = (active + 1) % matches.length
@@ -72,6 +73,9 @@
 
 {#if open}
   <div class="menu" role="listbox" id="slash-menu-{session.id}" aria-label={t('slash.title')}>
+    {#if waiting}
+      <div class="item waiting" role="option" aria-selected="false" aria-disabled="true">{t('slash.loading', app.namesFor(session.adapter))}</div>
+    {/if}
     {#each matches as c, i (c.name)}
       <!-- svelte-ignore a11y_click_events_have_key_events (the message box's keys drive it) -->
       <div class="item" class:active={i === active} role="option" aria-selected={i === active} tabindex="-1" onmousedown={e => e.preventDefault()} onclick={() => choose(i)} onmouseenter={() => (active = i)}>
@@ -128,6 +132,11 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+  .waiting {
+    cursor: default;
+    font-size: var(--text-sm);
     color: var(--text-muted);
   }
   .keys {

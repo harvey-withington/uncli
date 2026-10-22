@@ -761,6 +761,7 @@
   "newSession.setUp": "Set up under AI Providers",
   "newSession.shares": "Can use of yours",
   "slash.title": "Commands",
+  "slash.loading": "Getting {cli}'s commands…",
   "slash.keys": "↑↓ to move · Tab or Enter to choose · Esc to close",
   "cmd.runSlash": "Run /{name}",
   "ask.title": "{agent} asks",

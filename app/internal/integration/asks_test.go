@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"uncli/internal/core"
 	"uncli/internal/session"
 )
 
@@ -94,6 +95,37 @@ func TestSlashCommands(t *testing.T) {
 	}
 	if !names["compact"] || !names["context"] || names["doctor"] {
 		t.Errorf("commands = %v", names)
+	}
+	t.Logf("%d commands", len(cs))
+}
+
+// On a fresh install nothing has reported commands yet: asking for them
+// starts the session's CLI (no turn), which reports them as it starts.
+func TestSlashCommandsBeforeAnyTurn(t *testing.T) {
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	v, err := svc.Sessions.Create("chat", "", "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cs, _ := svc.Sessions.Commands(v.ID); len(cs) != 0 {
+		t.Fatalf("nothing should be known yet: %d", len(cs))
+	}
+	deadline := time.Now().Add(time.Minute)
+	var cs []core.CommandInfo
+	for time.Now().Before(deadline) && len(cs) == 0 {
+		time.Sleep(500 * time.Millisecond)
+		cs, _ = svc.Sessions.Commands(v.ID)
+	}
+	if len(cs) == 0 {
+		t.Fatal("the CLI never reported its commands")
+	}
+	if pages, _ := svc.Sessions.Pages(v.ID); len(pages) != 0 {
+		t.Errorf("no turn should have been sent: %d pages", len(pages))
 	}
 	t.Logf("%d commands", len(cs))
 }

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -93,6 +94,10 @@ func (m *Manager) Commands(id string) ([]core.CommandInfo, error) {
 	if have != nil {
 		return have, nil
 	}
+	// Its CLI reports its commands as it starts, so start it now (nothing
+	// goes to the model): they arrive as an EvCommands the UI reloads on.
+	// Meanwhile, what that CLI reported last, if anything.
+	go func() { _ = s.warm(context.Background()) }()
 	out := []core.CommandInfo{}
 	if raw, err := m.d.Store.Setting(commandsKey(ad.ID())); err == nil && raw != "" {
 		if json.Unmarshal([]byte(raw), &out) != nil {

@@ -33,7 +33,10 @@ uses tools, which the rule that UNCLI gates every tool call forbids.
   description, hint), Claude's less its terminal-only ones. An empty ACP
   list keeps the last one. The manager keeps each CLI's latest list (in the
   settings store), so a session that hasn't started its CLI yet still has
-  one to offer.
+  one to offer. When a session's own list isn't known, asking for it
+  starts the session's CLI with no turn (nothing goes to the model), which
+  reports its commands as it starts: on a fresh install the menu says it's
+  getting them and fills in about a second and a half later.
 - **Guard:** a command whose name could switch off prompting (matching
   approve, bypass, yolo, skip-perm, dangerous, auto-mode or trust) is
   neither offered nor sent. Sending one is refused with the reason. A CLI

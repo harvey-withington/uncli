@@ -41,6 +41,7 @@ export class AppStore {
   index = $state<Record<string, number>>({})
   live = $state<Record<string, Live>>({})
   commands = $state<Record<string, CommandInfo[]>>({}) // session id → the slash commands its CLI takes
+  commandsPending = $state<Record<string, boolean>>({}) // session id → its CLI is starting, to report them
   usage = $state<UsageLimit | null>(null)
   newSessionOpen = $state(false)
   newSessionProfile = $state<string | null>(null) // profile the dialog opens on
@@ -372,11 +373,23 @@ export class AppStore {
   }
 
   // loadCommands fetches the slash commands a session's CLI takes.
+  // None known yet means the backend has started the CLI to report them:
+  // they come with a 'commands' event (pending until then, or 20 s).
   async loadCommands(id: string) {
     try {
-      this.commands[id] = await this.backend.commands(id)
+      const list = await this.backend.commands(id)
+      this.commands[id] = list
+      const s = this.sessions.find(x => x.id === id)
+      if (list.length === 0 && s && this.takesSlash(s)) {
+        if (!this.commandsPending[id]) {
+          this.commandsPending[id] = true
+          setTimeout(() => (this.commandsPending[id] = false), 20000)
+        }
+      } else {
+        this.commandsPending[id] = false
+      }
     } catch {
-      // none offered; typing a command still works
+      this.commandsPending[id] = false // none offered; typing a command still works
     }
   }
 
