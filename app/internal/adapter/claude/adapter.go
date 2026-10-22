@@ -183,6 +183,12 @@ func (a *Adapter) BuildCommand(bin string, s core.LaunchSpec) (core.Command, err
 		}
 	}
 	env, drop := childEnv(s.Env)
+	// The main conversation's cache lifetime (CLI 2.1.242+). Unset, the CLI
+	// picks: an hour on a subscription within its plan, five minutes on an
+	// API key or once drawing on usage credits. Subagents keep their own.
+	if s.PromptCache == "5m" || s.PromptCache == "1h" {
+		env["CLAUDE_CODE_PROMPT_CACHE_TTL"] = s.PromptCache
+	}
 	return core.Command{Path: bin, Args: args, Env: env, EnvDrop: drop}, nil
 }
 

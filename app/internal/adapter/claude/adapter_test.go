@@ -157,6 +157,16 @@ func TestBuildCommand(t *testing.T) {
 	if cmd.Env["DISABLE_AUTOUPDATER"] != "1" || !slices.Contains(cmd.EnvDrop, "CLAUDE_CODE_") || !slices.Contains(cmd.EnvDrop, "NODE_OPTIONS") {
 		t.Errorf("env = %v drop = %v", cmd.Env, cmd.EnvDrop)
 	}
+	// No cache lifetime chosen: the CLI's own default (an hour on a plan).
+	if _, set := cmd.Env["CLAUDE_CODE_PROMPT_CACHE_TTL"]; set {
+		t.Errorf("cache ttl set without a choice: %v", cmd.Env)
+	}
+	for _, ttl := range []string{"5m", "1h"} {
+		c, err := a.BuildCommand("x", core.LaunchSpec{PromptCache: ttl})
+		if err != nil || c.Env["CLAUDE_CODE_PROMPT_CACHE_TTL"] != ttl {
+			t.Errorf("PromptCache %s: env = %v, %v", ttl, c.Env, err)
+		}
+	}
 	if _, err := a.BuildCommand("x", core.LaunchSpec{PermissionMode: "bypassPermissions"}); err == nil {
 		t.Error("bypass mode must be refused")
 	}

@@ -67,6 +67,9 @@ type Deps struct {
 	// at once instead of the CLI retrying and then blaming the sign-in;
 	// nil: no check.
 	Online func(ctx context.Context) error
+	// PromptCache is the user's conversation cache lifetime for the next
+	// launch ("" = provider default, "5m", "1h"); nil: provider default.
+	PromptCache func() string
 }
 
 // RuntimeWSL is the runtime of sessions in a container (a WSL distro).

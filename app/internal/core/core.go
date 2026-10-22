@@ -78,6 +78,7 @@ type LaunchSpec struct {
 	ShareMCP        bool              // with Isolated: the user's own MCP servers all the same
 	ShareConnectors bool              // with Isolated: the account's connectors all the same
 	ShareSkills     bool              // with Isolated: the user's own skills all the same
+	PromptCache     string            // how long the conversation stays cached: "" = provider default, "5m" or "1h"
 	Env             map[string]string //
 }
 

@@ -5,6 +5,7 @@
   import { showToast } from '../lib/toasts.svelte'
   import Modal from './Modal.svelte'
   import AppearanceSection from './AppearanceSection.svelte'
+  import CacheSection from './CacheSection.svelte'
   import ContainersSection from './ContainersSection.svelte'
   import DecisionSection from './DecisionSection.svelte'
   import EditorSection from './EditorSection.svelte'
@@ -104,6 +105,7 @@
         {#each app.boot?.providers ?? [] as p (p.id)}
           <ProviderSection provider={p} />
         {/each}
+        {#if prefs}<CacheSection {prefs} {savePrefs} />{/if}
       {:else if tab === 'containers'}
         <ContainersSection />
       {/if}

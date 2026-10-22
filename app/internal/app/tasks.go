@@ -44,6 +44,29 @@ type Preferences struct {
 	// preset id, auto (the first installed) or custom (EditorCommand).
 	Editor        string `json:"editor"`
 	EditorCommand string `json:"editorCommand,omitempty"`
+	// PromptCache is how long a session's conversation stays cached after
+	// its last message: auto (the CLI decides), 5m or 1h. The hour costs
+	// more to write on an API key (2x input price instead of 1.25x).
+	PromptCache string `json:"promptCache"`
+}
+
+// Conversation cache lifetimes. Auto leaves it to the CLI: Claude Code
+// keeps an hour on a subscription within its plan and five minutes on an
+// API key or once drawing on usage credits.
+const (
+	CacheAuto  = "auto"
+	CacheShort = "5m"
+	CacheLong  = "1h"
+)
+
+func validCache(v string) bool { return v == CacheAuto || v == CacheShort || v == CacheLong }
+
+// PromptCacheTTL is the lifetime to launch sessions with; "" = the CLI's own.
+func (p Preferences) PromptCacheTTL() string {
+	if p.PromptCache == CacheAuto {
+		return ""
+	}
+	return p.PromptCache
 }
 
 // Automatic summaries: none, answers long enough to need one (the UI
@@ -62,7 +85,7 @@ const settingPrefs = "prefs"
 
 func defaultPreferences() Preferences {
 	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}, AutoSummary: SummaryOff, UnknownCommands: session.UnknownModel,
-		DecisionModel: DecisionModel{Provider: DeciderQuickTask}, Notifications: NotifyAll, Editor: ide.Auto}
+		DecisionModel: DecisionModel{Provider: DeciderQuickTask}, Notifications: NotifyAll, Editor: ide.Auto, PromptCache: CacheAuto}
 }
 
 func (s *Service) Preferences() Preferences {
@@ -95,6 +118,9 @@ func (s *Service) Preferences() Preferences {
 	}
 	if validEditor(p.Editor, p.EditorCommand) != nil {
 		p.Editor, p.EditorCommand = ide.Auto, ""
+	}
+	if !validCache(p.PromptCache) {
+		p.PromptCache = CacheAuto
 	}
 	return p
 }
@@ -132,6 +158,12 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 	}
 	if err := validEditor(p.Editor, p.EditorCommand); err != nil {
 		return s.Preferences(), err
+	}
+	if p.PromptCache == "" {
+		p.PromptCache = CacheAuto
+	}
+	if !validCache(p.PromptCache) {
+		return s.Preferences(), fmt.Errorf("unknown conversation cache setting %q", p.PromptCache)
 	}
 	b, err := json.Marshal(p)
 	if err != nil {

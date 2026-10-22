@@ -18,6 +18,7 @@ const SECTION_TAB: Record<string, SettingsTab> = {
   cli: 'providers',
   account: 'providers',
   'provider-containers': 'providers',
+  cache: 'providers',
   containers: 'containers',
 }
 
