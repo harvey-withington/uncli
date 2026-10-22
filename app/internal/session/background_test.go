@@ -2,9 +2,13 @@ package session
 
 import (
 	"bytes"
+	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"uncli/internal/core"
 )
 
 // A background sub-agent finishes after the turn that started it: the CLI
@@ -92,5 +96,44 @@ func TestForegroundSubagentIsOnePage(t *testing.T) {
 	}
 	if len(pages[0].Trace) != 1 || pages[0].Trace[0].Name != "Agent" || !pages[0].Trace[0].OK {
 		t.Errorf("trace = %+v", pages[0].Trace)
+	}
+}
+
+// A sub-agent still running in the background asks for a tool after the
+// turn that started it ended: the request opens the CLI's own page and is
+// judged there like any other, instead of being refused for want of a turn.
+func TestBackgroundRequestOpensAPage(t *testing.T) {
+	h := newHarness(t, "single-turn")
+	v, _ := h.m.Create("chat", "", "haiku")
+	h.send(v.ID, "hi")
+	s, _ := h.m.get(v.ID)
+	s.mu.Lock()
+	gen := s.gen
+	s.mu.Unlock()
+	s.handle(gen, core.NewEvent(core.EvBackground, core.BackgroundTasks{Tasks: []core.BackgroundTask{{ID: "a1", Kind: "local_agent", Description: "Check the board"}}}, nil))
+	s.handle(gen, core.NewEvent(core.EvApprovalAsked, core.ApprovalAsked{RequestID: "r1", Tool: "Bash",
+		Input: json.RawMessage(`{"command":"rm -rf build"}`), Action: core.ToolAction{Kind: core.ActShell, Tool: "Bash", Command: "rm -rf build"}}, nil))
+	for _, l := range h.rt.lines() {
+		if strings.Contains(l, "There is no turn") {
+			t.Fatalf("refused: %s", l)
+		}
+	}
+	vw, _ := h.m.View(v.ID)
+	pages, _ := h.m.Pages(v.ID)
+	if !vw.Busy || len(pages) != 2 || pages[1].Origin != OriginCLI {
+		t.Errorf("busy %v, pages %d", vw.Busy, len(pages))
+	}
+
+	// With nothing in the background, a request outside a turn is still refused.
+	h2 := newHarness(t, "single-turn")
+	v2, _ := h2.m.Create("chat", "", "haiku")
+	h2.send(v2.ID, "hi")
+	s2, _ := h2.m.get(v2.ID)
+	s2.mu.Lock()
+	gen2 := s2.gen
+	s2.mu.Unlock()
+	s2.handle(gen2, core.NewEvent(core.EvApprovalAsked, core.ApprovalAsked{RequestID: "r2", Tool: "Bash", Action: core.ToolAction{Kind: core.ActShell, Tool: "Bash", Command: "ls"}}, nil))
+	if !slices.ContainsFunc(h2.rt.lines(), func(l string) bool { return strings.Contains(l, "There is no turn") }) {
+		t.Error("a request with no turn and nothing in the background should be refused")
 	}
 }

@@ -63,6 +63,12 @@ type ContainerProfile struct {
 	// connectors (Jira, Office…), which needs the provider's full account
 	// sign-in; "none" (the default) keeps it to the models-only token.
 	Connectors string `yaml:"connectors" json:"connectors"`
+	// Secrets is "shared" to mount the user's secrets folder
+	// (%USERPROFILE%\.secrets) read-only at ~/.secrets; "none" (the
+	// default) doesn't.
+	Secrets string `yaml:"secrets,omitempty" json:"secrets"`
+	// Folders are more Windows folders it mounts (container_folders.go).
+	Folders []ContainerFolder `yaml:"folders,omitempty" json:"folders"`
 	// Setup is shell steps run as root after the packages when the
 	// container is built (for what isn't a package: npm i -g, pip install).
 	Setup []string `yaml:"setup,omitempty" json:"setup"`
@@ -131,6 +137,12 @@ func validProfile(p ContainerProfile, bases []Base) error {
 	if p.Connectors != "" && p.Connectors != ConnectorsShared && p.Connectors != ConnectorsNone {
 		return fmt.Errorf("container %q: connectors is shared or none, not %q", p.ID, p.Connectors)
 	}
+	if p.Secrets != "" && p.Secrets != SecretsShared && p.Secrets != SecretsNone {
+		return fmt.Errorf("container %q: secrets is shared or none, not %q", p.ID, p.Secrets)
+	}
+	if err := validFolders(p.ID, p.Folders); err != nil {
+		return err
+	}
 	for _, pkg := range p.Packages {
 		if !wsl.ValidPackage(pkg) {
 			return fmt.Errorf("container %q: %q isn't a package name", p.ID, pkg)
@@ -187,6 +199,9 @@ type ContainerInfo struct {
 	Changes []string `json:"changes,omitempty"`
 	Builtin bool     `json:"builtin"` // ships with UNCLI
 	Edited  bool     `json:"edited"`  // the user's containers.yaml has their own version
+	// Missing: folders it would mount (secrets, its own) that aren't there;
+	// its sessions start without them.
+	Missing []string `json:"missing"`
 }
 
 // ContainersInfo is everything the containers settings show.
@@ -234,6 +249,10 @@ func (s *Service) containersInfo() ContainersInfo {
 		if ci.Setup == nil {
 			ci.Setup = []string{}
 		}
+		if ci.Folders == nil {
+			ci.Folders = []ContainerFolder{}
+		}
+		ci.Missing = missingFolders(p)
 		for _, b := range c.cfg.Bases {
 			if b.ID == p.Base {
 				ci.BaseLabel = b.Label
@@ -477,6 +496,7 @@ func (s *Service) runtimeFor(id, ref string) (core.Runtime, error) {
 	for _, p := range c.cfg.Containers {
 		if p.ID == ref {
 			r.Prepare = prepareContainer(func() ContainerProfile { q, _ := s.profile(ref); return q }, filepath.Join(s.Paths.Config, "wsl-data", p.ID), s.containerAccount)
+			r.Briefing = func() string { q, _ := s.profile(ref); return containerBrief(q, r.Mounts()) }
 			r.Account = func() bool {
 				q, _ := s.profile(ref)
 				return q.Connectors == ConnectorsShared && s.containerAccount() != ""

@@ -38,6 +38,9 @@ type Session struct {
 	// The profile's permission mode, and the one the running CLI is in
 	// (they differ in Read-only; approvals.go).
 	profileMode, cliMode string
+	// What the model was last told about where it runs (place.go), and
+	// what it's told with the turn being sent.
+	toldPlace, placeBrief string
 
 	page         *store.Page // the open page, nil when idle
 	closed       *store.Page // the page closed last
@@ -158,15 +161,15 @@ func (s *Session) spawn(ctx context.Context, spec core.LaunchSpec) error {
 	if s.rec.Runtime != "" && s.rec.Runtime != s.m.d.Runtime.ID() {
 		spec.ShareMCP, spec.ShareConnectors, spec.ShareSkills = false, false, false
 	}
+	rt, err := s.m.runtime(s.rec)
+	if err != nil {
+		return err
+	}
+	s.artifactsEnvLocked(&spec, rt)
 	if err := s.hookLocked(&spec, ad); err != nil {
 		return err
 	}
 	cmd, err := ad.BuildCommand(bin, spec)
-	if err != nil {
-		s.unhookLocked()
-		return err
-	}
-	rt, err := s.m.runtime(s.rec)
 	if err != nil {
 		s.unhookLocked()
 		return err
@@ -270,7 +273,7 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		}
 	}
 
-	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods, s.modeDirectives()...)
+	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods, append(s.modeDirectives(), s.placeDirectives()...)...)
 	for _, f := range files {
 		if strings.HasPrefix(f.MediaType, "image/") && !caps.Images || !strings.HasPrefix(f.MediaType, "image/") && !caps.Documents {
 			return fmt.Errorf("this CLI can't take %s as an attachment", f.Name)

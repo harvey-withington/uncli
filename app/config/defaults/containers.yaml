@@ -16,6 +16,18 @@
 #                     container signs in to your whole account (Settings →
 #                     AI Providers), which anything running in it can use
 #   connectors: none  the models-only sign-in (the default)
+#   secrets: shared   your secrets folder (%USERPROFILE%\.secrets, one file
+#                     per service) read-only at ~/.secrets, with
+#                     $UNCLI_SECRETS_DIR set; none (the default) leaves it out
+#   folders:          more Windows folders, each at /home/uncli/<name>,
+#                     read-only unless access: rw, e.g.
+#                       - {source: '%USERPROFILE%\notes', name: notes}
+#                     (only %USERPROFILE%, %APPDATA% and %LOCALAPPDATA%
+#                     expand; a drive, your profile, system folders and
+#                     folders holding sign-ins are refused)
+#
+# Every mount is listed in /etc/uncli/mounts.json ($UNCLI_MOUNTS) inside the
+# container, and a missing folder is skipped (Settings says which).
 #   setup:            shell steps run as root, in order, after the packages
 #                     (with the network on), e.g. - pip install httpie;
 #                     a step that fails stops the build

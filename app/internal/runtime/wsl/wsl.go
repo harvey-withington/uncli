@@ -15,6 +15,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -50,10 +51,14 @@ type Runtime struct {
 	Token func() (string, error)
 	// Prepare runs before each CLI start, once the session folder (host)
 	// is mounted at cli: what the container shares of the user's setup
-	// (memories, MCP servers). Optional.
-	Prepare func(ctx context.Context, r *Runtime, host, cli string) error
+	// (memories, MCP servers, folders). It returns environment for that CLI
+	// alone (where a share is, say). Optional.
+	Prepare func(ctx context.Context, r *Runtime, host, cli string) (map[string]string, error)
 	// Env is added to every CLI the runtime starts (through WSLENV).
 	Env map[string]string
+	// Briefing is what a session is told about the container (what's
+	// mounted, where the secrets are), once it has been prepared. Optional.
+	Briefing func() string
 	// Account reports whether the CLI signs in with an account of its own
 	// in the container (mounted by Prepare) instead of the token, which
 	// would take priority over it. Optional.
@@ -64,6 +69,7 @@ type Runtime struct {
 	mu     sync.Mutex
 	keeper core.Proc
 	live   map[*gentle]bool // the CLIs it started that are still running
+	mounts map[string]Mount // what UNCLI mounted while the keeper holds the distro up, by target
 }
 
 // New is the runtime for a container profile's distro.
@@ -91,16 +97,27 @@ func (r *Runtime) Start(ctx context.Context, cmd core.Command, workdir string) (
 	}
 	var err error
 	dir := "/home/" + User
+	extra := map[string]string{MountsEnv: ManifestPath}
 	if workdir != "" {
 		if dir, err = r.Mount(ctx, workdir); err != nil {
 			return nil, err
 		}
 		if r.Prepare != nil {
-			if err := r.Prepare(ctx, r, workdir, dir); err != nil {
+			env, err := r.Prepare(ctx, r, workdir, dir)
+			if err != nil {
 				return nil, err
+			}
+			for k, v := range env {
+				extra[k] = v
 			}
 		}
 	}
+	if len(cmd.Env) > 0 {
+		for k, v := range cmd.Env {
+			extra[k] = v
+		}
+	}
+	cmd.Env = extra
 	p, err := local.New().Start(ctx, r.command(cmd, dir, token), "")
 	if err != nil {
 		return nil, err
@@ -194,17 +211,6 @@ func HostPath(host, p string) (string, bool) {
 // HostPath maps a path the CLI reported for a session in host back to it.
 func (r *Runtime) HostPath(host, p string) (string, bool) { return HostPath(host, p) }
 
-// mountScript mounts $2 (a Windows folder) at $1 unless something already
-// is; drvfs with metadata keeps Linux permissions, owned by the CLI's user.
-// Folders it creates in the user's home are the user's.
-const mountScript = `mountpoint -q "$1" && exit 0
-mkdir -p "$1"
-d="$1"
-while d=$(dirname "$d"); [ "$d" != / ] && [ "$d" != /home ]; do
-  case "$d" in /home/uncli|/home/uncli/*) chown 1000:1000 "$d" ;; esac
-done
-mount -t drvfs "$2" "$1" -o metadata,uid=1000,gid=1000`
-
 // Mount makes a Windows folder visible in the distro and returns where.
 // Mounts last while the distro runs, so the runtime keeps it running.
 func (r *Runtime) Mount(ctx context.Context, host string) (string, error) {
@@ -215,24 +221,24 @@ func (r *Runtime) Mount(ctx context.Context, host string) (string, error) {
 		return "", fmt.Errorf("the folder %s doesn't exist", host)
 	}
 	point := MountPoint(host)
-	return point, r.MountAt(ctx, host, point)
+	return point, r.MountFolder(ctx, Mount{Name: "project", Source: host, Target: point, Access: ReadWrite, Kind: KindBuiltin})
 }
 
-// MountAt mounts a Windows folder at a path in the distro (kept running so
-// it stays).
+// MountAt mounts a Windows folder read-write at a path in the distro, as
+// one of UNCLI's own (kept running so it stays).
 func (r *Runtime) MountAt(ctx context.Context, host, at string) error {
-	if err := r.keepRunning(ctx); err != nil {
-		return err
-	}
-	if _, err := r.run(ctx, nil, "--distribution", r.Distro, "--user", "root", "--exec", "sh", "-c", mountScript, "sh", at, filepath.Clean(host)); err != nil {
-		return fmt.Errorf("could not mount %s in %s: %w", host, r.Distro, err)
-	}
-	return nil
+	return r.MountFolder(ctx, Mount{Name: path.Base(at), Source: host, Target: at, Access: ReadWrite, Kind: KindBuiltin})
 }
 
-// Unmount unmounts a path in the distro if something is mounted there.
+// Unmount unmounts a path in the distro if something is mounted there,
+// with whatever is mounted under it.
 func (r *Runtime) Unmount(ctx context.Context, at string) error {
-	_, err := r.run(ctx, nil, "--distribution", r.Distro, "--user", "root", "--exec", "sh", "-c", `if mountpoint -q "$1"; then umount "$1" || umount -l "$1"; fi`, "sh", at)
+	_, err := r.run(ctx, nil, "--distribution", r.Distro, "--user", "root", "--exec", "sh", "-c", `if mountpoint -q "$1"; then umount "$1" 2>/dev/null || umount -l "$1"; fi`, "sh", at)
+	if err == nil {
+		r.mu.Lock()
+		r.forget(at)
+		r.mu.Unlock()
+	}
 	return err
 }
 
@@ -267,6 +273,9 @@ func (r *Runtime) keepRunning(ctx context.Context) error {
 	if r.keeper != nil {
 		return nil
 	}
+	// A new keeper means the distro may have stopped: what was mounted may
+	// be gone, so nothing is taken for granted.
+	r.mounts = map[string]Mount{}
 	// It waits on its input: closing that ends it, with nothing killed.
 	lp, err := local.New().Start(context.Background(), core.Command{Path: Exe,
 		Args: []string{"--distribution", r.Distro, "--user", "root", "--exec", "sh", "-c", "read _ || true"},

@@ -54,12 +54,34 @@ func SharedBrain(configDir, host, cli, home string, synced bool) []Share {
 	for name, dir := range skillDirs(filepath.Join(configDir, "skills"), synced) {
 		out = append(out, Share{Host: dir, Path: path.Join(in, "skills", name)})
 	}
+	for name, dir := range supportDirs(filepath.Join(configDir, "skills")) {
+		out = append(out, Share{Host: dir, Path: path.Join(in, "skills", name)})
+	}
 	sort.Slice(out[1:], func(i, j int) bool { return out[1+i].Path < out[1+j].Path })
 	return append(out,
 		Share{Host: filepath.Join(configDir, "agents"), Path: path.Join(in, "agents")},
 		Share{Host: filepath.Join(configDir, "commands"), Path: path.Join(in, "commands")},
 		Share{Host: filepath.Join(configDir, "CLAUDE.md"), Path: path.Join(in, "CLAUDE.md"), File: true},
 	)
+}
+
+// supportDirs finds the folders beside the user's own skills that aren't
+// skills themselves (no SKILL.md), such as _shared: skills link to files in
+// them (../_shared/guide.md), so they go in with the skills, at the same
+// place beside them. Skills synced from claude.ai come whole, with none.
+func supportDirs(dir string) map[string]string {
+	found := map[string]string{}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		n := e.Name()
+		if !e.IsDir() || strings.HasPrefix(n, ".") || n == "synced" {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(dir, n, "SKILL.md")); err != nil {
+			found[n] = filepath.Join(dir, n)
+		}
+	}
+	return found
 }
 
 // skillDirs finds the skills under dir by name: the user's own (a folder

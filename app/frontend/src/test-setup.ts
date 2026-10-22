@@ -2,7 +2,14 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/svelte'
 import { afterEach } from 'vitest'
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  // What the app keeps between runs (lib/keep.ts) mustn't carry from one
+  // test into the next: each starts on the first session, with no draft.
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith('uncli-draft:') || k === 'uncli-last-session' || k === 'uncli-scroll') localStorage.removeItem(k)
+  }
+})
 
 // jsdom has no Web Animations API; Svelte transitions call element.animate.
 if (typeof Element !== 'undefined' && !Element.prototype.animate) {

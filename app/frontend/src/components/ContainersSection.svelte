@@ -95,6 +95,8 @@
       c.brain === 'shared' && t('containers.share.brain'),
       c.mcp === 'shared' && t('containers.share.mcp'),
       c.connectors === 'shared' && t('containers.share.connectors'),
+      c.secrets === 'shared' && t('containers.share.secrets'),
+      (c.folders?.length ?? 0) > 0 && t(c.folders?.length === 1 ? 'containers.share.folders.one' : 'containers.share.folders.other', { n: c.folders?.length ?? 0 }),
     ].filter((x): x is string => !!x)
     if (!what.length) return ''
     return t('containers.shares', { what: new Intl.ListFormat(i18n.locale, { type: 'conjunction' }).format(what) })
@@ -150,6 +152,7 @@
             <span class="name">{c.label}</span>
             <span class="detail" title={c.packages.join(' ')}>{[c.baseLabel, ...c.packages].join(' · ')}</span>
             {#if shares(c)}<span class="shares">{shares(c)}</span>{/if}
+            {#if c.missing?.length}<span class="missing" role="note"><Icon name="triangle-alert" size={13} />{t('containers.missing', { list: c.missing.join(', ') })}</span>{/if}
             {#if waitsForAccount(c)}<span class="changed">{t('containers.needsAccount')}</span>{/if}
             {#if changed(c)}<span class="changed">{changedLine(c)}</span>{/if}
             {#if c.error}<span class="error" role="alert">{c.error}</span>{/if}
@@ -270,6 +273,13 @@
     white-space: nowrap;
     font-size: var(--text-xs);
     color: var(--text-faint);
+  }
+  .missing {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: var(--text-xs);
+    color: var(--warning);
   }
   .shares {
     font-size: var(--text-xs);

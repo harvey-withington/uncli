@@ -6,6 +6,7 @@ import type {
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
+import { loadLastSession, saveLastSession } from '../lib/keep'
 import { toBlocks } from '../lib/render/markdown'
 import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
@@ -127,7 +128,9 @@ export class AppStore {
     if (boot.platform === 'windows') void this.loadContainers()
     void this.loadProviders()
     this.ready = true
-    const first = this.activeSessions[0]
+    // The session open last time, else the first.
+    const last = loadLastSession()
+    const first = this.activeSessions.find(s => s.id === last) ?? this.activeSessions[0]
     if (first) await this.select(first.id)
   }
 
@@ -137,6 +140,7 @@ export class AppStore {
 
   async select(id: string) {
     this.currentId = id
+    saveLastSession(id)
     if (!this.pages[id]) {
       try {
         const pages = await this.backend.pages(id)

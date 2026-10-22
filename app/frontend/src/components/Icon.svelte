@@ -1,4 +1,5 @@
 <script lang="ts" module>
+  import ArrowDownToLine from 'lucide-svelte/icons/arrow-down-to-line'
   import ArrowUp from 'lucide-svelte/icons/arrow-up'
   import BarChart from 'lucide-svelte/icons/chart-no-axes-column'
   import Bookmark from 'lucide-svelte/icons/bookmark'
@@ -82,7 +83,7 @@
   // Icon names as used in YAML config (Lucide's kebab-case), plus a few
   // the app uses itself. Unknown names fall back to a neutral glyph.
   const ICONS = {
-    'arrow-up': ArrowUp, 'bar-chart': BarChart, bookmark: Bookmark, 'bookmark-check': BookmarkCheck,
+    'arrow-up': ArrowUp, 'arrow-down-to-line': ArrowDownToLine, 'bar-chart': BarChart, bookmark: Bookmark, 'bookmark-check': BookmarkCheck,
     briefcase: Briefcase, check: Check, 'chevron-down': ChevronDown, 'chevron-up': ChevronUp, 'chevron-left': ChevronLeft, 'chevron-right': ChevronRight,
     'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code, coffee: Coffee,
     copy: Copy, download: Download, file: File, 'file-text': FileText, image: ImageIcon, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addPackages, blank, idFor, problems, same, splitPackages, tidy } from './containers'
+import { addPackages, blank, folderNameFor, folderProblem, idFor, problems, same, splitPackages, tidy } from './containers'
 
 describe('container editor rules', () => {
   it('makes an id from the name, unlike the others', () => {
@@ -27,5 +27,33 @@ describe('container editor rules', () => {
     expect(tidy({ ...p, label: ' Web ', setup: ['npm i -g pnpm', '  '] })).toEqual(p)
     expect(same(p, { ...p, setup: [...p.setup, ''] })).toBe(true)
     expect(same(p, { ...p, packages: ['go'] })).toBe(false)
+  })
+})
+
+describe('a container’s folders', () => {
+  const f = (source: string, name: string, access: 'ro' | 'rw' = 'ro') => ({ source, name, access })
+
+  it('takes full paths and the three variables, and refuses what is too wide', () => {
+    expect(folderProblem(f('%USERPROFILE%\\notes', 'notes'))).toBe('')
+    expect(folderProblem(f('S:\\Source\\arc', 'arc', 'rw'))).toBe('')
+    expect(folderProblem(f('%TEMP%\\x', 'x'))).toBe('containerEdit.folderBadVar')
+    expect(folderProblem(f('notes', 'notes'))).toBe('containerEdit.folderNotFull')
+    expect(folderProblem(f('C:\\', 'c'))).toBe('containerEdit.folderTooWide')
+    expect(folderProblem(f('%USERPROFILE%\\', 'me'))).toBe('containerEdit.folderTooWide')
+    expect(folderProblem(f('C:\\Program Files (x86)', 'pf'))).toBe('containerEdit.folderTooWide')
+    expect(folderProblem(f('S:\\Source', '.ssh'))).toBe('containerEdit.folderBadName')
+  })
+
+  it('names a folder from its last part', () => {
+    expect(folderNameFor('%USERPROFILE%\\My Notes\\')).toBe('my-notes')
+    expect(folderNameFor('%APPDATA%')).toBe('appdata')
+  })
+
+  it('stops a save on a bad or repeated folder, and leaves out empty rows', () => {
+    const p = { ...blank('dev', 'alpine-3.24'), label: 'Dev' }
+    expect(problems({ ...p, folders: [f('S:\\A', 'a'), f('S:\\B', 'a')] })).toContain('containerEdit.problem.folderTwice')
+    expect(problems({ ...p, folders: [f('C:\\', 'c')] })).toContain('containerEdit.problem.folder')
+    expect(problems({ ...p, folders: [f('', '')] })).toEqual([])
+    expect(tidy({ ...p, folders: [f(' S:\\A ', ' a '), f('', '')] }).folders).toEqual([f('S:\\A', 'a')])
   })
 })

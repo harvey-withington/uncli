@@ -8,6 +8,7 @@
   import ApprovalCard from './ApprovalCard.svelte'
   import ActivityBadge from './ActivityBadge.svelte'
   import ModeSwitch from './ModeSwitch.svelte'
+  import ScrollKeeper from './ScrollKeeper.svelte'
   import SessionStatus from './SessionStatus.svelte'
   import SharesNote from './SharesNote.svelte'
   import Composer from './Composer.svelte'
@@ -69,10 +70,6 @@
     }
   }
 
-  // A different page starts at the top.
-  $effect(() => {
-    if (page?.id && scroller) scroller.scrollTop = 0
-  })
 
   // Opened from search: once the page has rendered, scroll to the first
   // block holding a search word (below the sticky question) and flash it.
@@ -179,6 +176,9 @@
           {/if}
         </div>
       </div>
+      <!-- Where the scroller sits through updates, and whether it follows
+           the end (the toggle under its scrollbar). -->
+      <ScrollKeeper {scroller} pageId={page?.id} />
       {#if cards.length || checking}
         <div class="approvals" class:more-below={moreBelow} bind:this={approvalsEl} onscroll={measureApprovals}>
           {#each cards as a (a.requestId)}

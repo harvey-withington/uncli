@@ -38,7 +38,15 @@ func TestRealContainerSession(t *testing.T) {
 	if err := os.MkdirAll(cfg, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(cfg, "containers.yaml"), []byte("containers:\n  - id: it-app\n    label: Test\n    base: alpine-3.24\n    brain: shared\n    mcp: shared\n    packages: []\n"), 0o644); err != nil {
+	// A folder of its own, read-only (decision 0017).
+	extra := filepath.Join(dir, "reference")
+	if err := os.MkdirAll(extra, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(extra, "guide.md"), []byte("read me\n"), 0o644)
+	yml := "containers:\n  - id: it-app\n    label: Test\n    base: alpine-3.24\n    brain: shared\n    mcp: shared\n    packages: []\n" +
+		"    folders:\n      - {source: '" + extra + "', name: reference}\n"
+	if err := os.WriteFile(filepath.Join(cfg, "containers.yaml"), []byte(yml), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	svc, err := New(Paths{Config: cfg, Cache: filepath.Join(cache, "uncli"), Scratch: filepath.Join(dir, "s")}, nopEmitter{})
@@ -100,6 +108,24 @@ func TestRealContainerSession(t *testing.T) {
 		t.Fatalf("page = %s %q, session error %q", last.Status, last.AnswerMD, vw.Error)
 	}
 
+	// The model was told where it runs, and the session's mounts are listed
+	// where it can read them but not change them; the folder of its own is
+	// there, read-only.
+	if !strings.Contains(last.Directives, "Linux container") || !strings.Contains(last.Directives, wsl.ManifestPath) {
+		t.Errorf("not told about the container: %q", last.Directives)
+	}
+	sh := func(script string) string {
+		out, _ := exec.Command(wsl.Exe, "--distribution", wsl.DistroName("it-app"), "--user", "uncli", "--exec", "sh", "-c", script).CombinedOutput()
+		return string(out)
+	}
+	if out := sh(`cat /etc/uncli/mounts.json; (echo x >> /etc/uncli/mounts.json) 2>/dev/null && echo MANIFEST-WRITABLE`); !strings.Contains(out, `"name": "reference"`) ||
+		!strings.Contains(out, `"access": "ro"`) || !strings.Contains(out, `"name": "project"`) || strings.Contains(out, "MANIFEST-WRITABLE") {
+		t.Errorf("manifest: %s", out)
+	}
+	if out := sh(`cat ~/reference/guide.md; (echo x > ~/reference/new) 2>/dev/null && echo WRITE-OK || echo refused`); !strings.Contains(out, "read me") || !strings.Contains(out, "refused") {
+		t.Errorf("reference folder: %s", out)
+	}
+
 	// The shell tool works (it needs bash), so git does.
 	if err := svc.Send(context.Background(), v.ID, "Use the Bash tool to run: git --version. Reply with only what it printed.", nil); err != nil {
 		t.Fatal(err)
@@ -118,6 +144,25 @@ func TestRealContainerSession(t *testing.T) {
 	}
 	if !strings.Contains(last.AnswerMD, "git version") {
 		t.Errorf("git: %s %q", last.Status, last.AnswerMD)
+	}
+	// Co-work keeps artifacts: the CLI is told where, at its own path.
+	if err := svc.Send(context.Background(), v.ID, "Use the Bash tool to run: echo $UNCLI_ARTIFACTS_DIR. Reply with only what it printed.", nil); err != nil {
+		t.Fatal(err)
+	}
+	last = store.Page{}
+	for time.Now().Before(deadline) {
+		ps, _ := svc.Sessions.Pages(v.ID)
+		if len(ps) == 3 && ps[2].Status != "open" {
+			last = ps[2]
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+		for _, a := range func() []session.Approval { vw, _ := svc.Sessions.View(v.ID); return vw.Approvals }() {
+			_ = svc.Sessions.Answer(v.ID, a.RequestID, session.Allow, "")
+		}
+	}
+	if want := wsl.MountPoint(folder) + "/artifacts"; !strings.Contains(last.AnswerMD, want) {
+		t.Errorf("artifacts folder: %q, want %s", last.AnswerMD, want)
 	}
 
 	// The shared brain: the project's memory folder is the user's, mounted

@@ -765,6 +765,16 @@ export interface ContainerProfile {
   brain?: 'shared' | 'sandboxed' | '' // shared: the user's memories, skills, agents, commands, CLAUDE.md, git name
   mcp?: 'shared' | 'none' | '' // shared: the user's MCP servers that can run on Linux
   connectors?: 'shared' | 'none' | '' // shared: the user's claude.ai connectors, with the full account sign-in
+  secrets?: 'shared' | 'none' | '' // shared: %USERPROFILE%\.secrets, read-only at ~/.secrets
+  folders?: ContainerFolder[] // more Windows folders it mounts, at /home/uncli/<name>
+}
+
+// A Windows folder a container mounts (decision 0017). source may start
+// with %USERPROFILE%, %APPDATA% or %LOCALAPPDATA%.
+export interface ContainerFolder {
+  source: string
+  name: string
+  access?: 'ro' | 'rw' | '' // read-only unless rw
 }
 
 export interface ContainerBase {
@@ -782,6 +792,7 @@ export interface ContainerInfo extends ContainerProfile {
   error?: string // the last build failed
   // What differs from how a built container was built; a rebuild updates it.
   changes?: Array<'packages' | 'base' | 'cli' | 'steps' | 'setup' | 'unknown'>
+  missing?: string[] // folders it would mount that aren't there; its sessions start without them
 }
 
 export interface ContainersInfo {

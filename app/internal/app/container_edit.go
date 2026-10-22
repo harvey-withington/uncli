@@ -85,6 +85,16 @@ func (s *Service) SaveContainer(p ContainerProfile) error {
 		}
 	}
 	p.Setup = steps
+	for i := range p.Folders {
+		f := &p.Folders[i]
+		f.Source, f.Name = strings.TrimSpace(f.Source), strings.TrimSpace(f.Name)
+		if f.Access != "rw" {
+			f.Access = "" // read-only, the default
+		}
+	}
+	if p.Secrets != SecretsShared {
+		p.Secrets = ""
+	}
 	s.reloadContainers()
 	s.containers.mu.Lock()
 	bases := append([]Base{}, s.containers.cfg.Bases...)

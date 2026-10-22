@@ -5,6 +5,7 @@
   import { t } from '../lib/i18n.svelte'
   import { attachmentIcon, formatSize, pendingKey, readImage, toRefs, type Pending } from '../lib/attachments'
   import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/drops'
+  import { loadDraft, saveDraft } from '../lib/keep'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
 
@@ -19,20 +20,23 @@
   let input: HTMLTextAreaElement | undefined = $state()
   let attachments = $state<Pending[]>([]) // files going with the next turn
 
-  // Drafts (text and attachments) are per session and survive switching
-  // between sessions.
-  const drafts = new Map<string, { text: string; attachments: Pending[] }>()
+  // Drafts are per session. The text is kept on every change, so it
+  // survives switching sessions and restarting UNCLI (lib/keep.ts);
+  // attachments survive switching sessions.
+  const drafts = new Map<string, Pending[]>()
   let shownFor = ''
   $effect(() => {
     const id = session.id
     if (id !== shownFor) {
-      if (shownFor) drafts.set(shownFor, { text, attachments })
-      const d = drafts.get(id)
-      text = d?.text ?? ''
-      attachments = d?.attachments ?? []
+      if (shownFor) drafts.set(shownFor, attachments)
+      text = loadDraft(id)
+      attachments = drafts.get(id) ?? []
       shownFor = id
       queueMicrotask(() => input?.focus())
     }
+  })
+  $effect(() => {
+    if (shownFor) saveDraft(shownFor, text)
   })
 
   const canSend = $derived((text.trim() !== '' || attachments.length > 0) && !sending)
@@ -46,6 +50,7 @@
       text = ''
       attachments = []
       drafts.delete(session.id)
+      saveDraft(session.id, '')
     } catch (e) {
       showToast(String(e), 'error')
     } finally {

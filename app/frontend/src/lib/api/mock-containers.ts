@@ -4,6 +4,8 @@
 import type { ContainerInfo, ContainerProfile, ContainerStep, ContainersInfo } from './types'
 
 const STEPS: ContainerStep[] = ['download', 'remove', 'import', 'packages', 'setup', 'cli', 'lockdown', 'check']
+// The mock's user has no secrets folder yet, so a container sharing it says so.
+const SECRETS = 'C:\\Users\\you\\.secrets'
 
 export function mockContainers(emit: (c: ContainersInfo) => void) {
   const mode = new URLSearchParams(location.search).get('containers')
@@ -13,7 +15,10 @@ export function mockContainers(emit: (c: ContainersInfo) => void) {
     bases: [{ id: 'alpine-3.24', label: 'Alpine Linux 3.24' }],
     containers: [
       { id: 'sandbox', label: 'Sandbox', description: 'Linux with the usual tools, your memories and your MCP servers. A session there sees only its own folder.', base: 'alpine-3.24', baseLabel: 'Alpine Linux 3.24', brain: 'shared', mcp: 'shared', connectors: 'shared', packages: ['coreutils', 'findutils', 'grep', 'sed', 'less', 'curl', 'jq', 'ripgrep', 'make', 'nodejs', 'npm', 'python3', 'py3-pip'], setup: [], builtin: true, edited: false, built: mode === 'built', changes: mode === 'built' ? ['packages'] : [] },
-      { id: 'node-dev', label: 'Node', base: 'alpine-3.24', baseLabel: 'Alpine Linux 3.24', packages: ['nodejs', 'npm'], setup: [], builtin: false, edited: true, built: false },
+      {
+        id: 'node-dev', label: 'Node', base: 'alpine-3.24', baseLabel: 'Alpine Linux 3.24', packages: ['nodejs', 'npm'], setup: [], builtin: false, edited: true, built: false,
+        secrets: 'shared', folders: [{ source: '%USERPROFILE%\\notes', name: 'notes', access: 'ro' }], missing: [SECRETS],
+      },
     ],
   }
   // The built-in ones as shipped, for Reset; what each was built from, for changes.
@@ -70,7 +75,10 @@ export function mockContainers(emit: (c: ContainersInfo) => void) {
       if (!base) throw new Error(`no base ${p.base}`)
       const i = state.containers.findIndex(c => c.id === p.id)
       const old = state.containers[i]
-      const next: ContainerInfo = { ...p, baseLabel: base.label, builtin: shipped.has(p.id), edited: true, built: old?.built ?? false, changes: old?.changes }
+      const next: ContainerInfo = {
+        ...p, baseLabel: base.label, builtin: shipped.has(p.id), edited: true, built: old?.built ?? false, changes: old?.changes,
+        missing: p.secrets === 'shared' ? [SECRETS] : [],
+      }
       next.changes = changesOf(next)
       if (old) state.containers[i] = next
       else state.containers.push(next)

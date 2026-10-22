@@ -176,6 +176,35 @@ describe('Containers', () => {
     await waitFor(() => expect(settings.queryByText('Go tools')).not.toBeInTheDocument())
   })
 
+  it('shares the secrets folder and more folders, says what is missing, and refuses a whole drive', async () => {
+    const backend = mockBackend()
+    const save = vi.spyOn(backend, 'saveContainer')
+    render(App, { props: { backend } })
+    const settings = await openSettings('Containers')
+    expect(await settings.findByText('Shares your secrets folder and one more folder')).toBeInTheDocument()
+    expect(settings.getByText(/Not there, so its sessions start without them: C:\\Users\\you\\\.secrets/)).toBeInTheDocument()
+
+    await fireEvent.click(settings.getByRole('button', { name: 'Edit Node' }))
+    const form = within(settings.getByRole('form', { name: 'Edit Node' }))
+    expect(form.getByRole('checkbox', { name: /Your secrets folder/ })).toBeChecked()
+    expect(form.getByRole('textbox', { name: 'Folder 1: Windows folder' })).toHaveValue('%USERPROFILE%\\notes')
+    expect(form.getByText('Mounted at /home/uncli/notes')).toBeInTheDocument()
+
+    await fireEvent.click(form.getByRole('button', { name: 'Add a folder' }))
+    await fireEvent.input(form.getByRole('textbox', { name: 'Folder 2: Windows folder' }), { target: { value: 'C:\\' } })
+    expect(form.getByText(/A whole drive, your user profile or a system folder/)).toBeInTheDocument()
+    expect(form.getByRole('button', { name: 'Save' })).toBeDisabled()
+
+    await fireEvent.input(form.getByRole('textbox', { name: 'Folder 2: Windows folder' }), { target: { value: 'S:\\Source\\arc' } })
+    expect(form.getByRole('textbox', { name: 'Folder 2: name' })).toHaveValue('arc')
+    await fireEvent.change(form.getByRole('combobox', { name: 'Folder 2: access' }), { target: { value: 'rw' } })
+    await fireEvent.click(form.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'node-dev', secrets: 'shared',
+      folders: [{ source: '%USERPROFILE%\\notes', name: 'notes', access: 'ro' }, { source: 'S:\\Source\\arc', name: 'arc', access: 'rw' }],
+    })))
+  })
+
   it('without WSL, offers to turn it on', async () => {
     history.replaceState(null, '', '/?containers=nowsl')
     render(App, { props: { backend: mockBackend() } })

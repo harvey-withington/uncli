@@ -24,11 +24,12 @@ func TestSharedBrain(t *testing.T) {
 	cfg := filepath.Join(t.TempDir(), ".claude")
 	// The user's own skills, and claude.ai ones synced for their account; a
 	// folder without a SKILL.md isn't a skill.
-	for _, d := range []string{"skills/mine", "skills/docs", "skills/synced/org_acct/docs", "skills/synced/org_acct/pdf", "skills/synced/org_acct/broken"} {
+	// _shared holds files the user's skills link to (../_shared/guide.md).
+	for _, d := range []string{"skills/mine", "skills/docs", "skills/_shared", "skills/synced/org_acct/docs", "skills/synced/org_acct/pdf", "skills/synced/org_acct/broken"} {
 		if err := os.MkdirAll(filepath.Join(cfg, filepath.FromSlash(d)), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if !strings.HasSuffix(d, "broken") {
+		if !strings.HasSuffix(d, "broken") && !strings.HasSuffix(d, "_shared") {
 			_ = os.WriteFile(filepath.Join(cfg, filepath.FromSlash(d), "SKILL.md"), []byte("---\nname: x\n---\n"), 0o644)
 		}
 	}
@@ -42,7 +43,7 @@ func TestSharedBrain(t *testing.T) {
 			skills[strings.TrimPrefix(s.Path, "/home/uncli/.claude/skills/")] = s.Host
 		}
 	}
-	if len(skills) != 3 || skills["mine"] == "" || skills["pdf"] != filepath.Join(cfg, "skills", "synced", "org_acct", "pdf") ||
+	if len(skills) != 4 || skills["mine"] == "" || skills["_shared"] != filepath.Join(cfg, "skills", "_shared") || skills["pdf"] != filepath.Join(cfg, "skills", "synced", "org_acct", "pdf") ||
 		skills["docs"] != filepath.Join(cfg, "skills", "docs") { // the user's own wins
 		t.Errorf("skills = %v", skills)
 	}
@@ -56,7 +57,8 @@ func TestSharedBrain(t *testing.T) {
 			}
 		}
 	}
-	if own != 2 {
+	if own != 3 { // mine, docs and _shared
+
 		t.Errorf("own skills = %d", own)
 	}
 	last := sh[len(sh)-1]

@@ -6,6 +6,7 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
+  import ContainerFolders from './ContainerFolders.svelte'
   import Icon from './Icon.svelte'
 
   // Edits one container in the user's containers.yaml (Settings →
@@ -52,7 +53,7 @@
     }
   }
 
-  const toggle = (k: 'brain' | 'mcp' | 'connectors', on: boolean) => {
+  const toggle = (k: 'brain' | 'mcp' | 'connectors' | 'secrets', on: boolean) => {
     if (k === 'brain') draft.brain = on ? 'shared' : 'sandboxed'
     else draft[k] = on ? 'shared' : 'none'
   }
@@ -139,8 +140,13 @@
       <label class="check"><input type="checkbox" checked={draft.mcp === 'shared'} onchange={e => toggle('mcp', e.currentTarget.checked)} />{t('containerEdit.shareMCP')}</label>
       <label class="check"><input type="checkbox" checked={draft.connectors === 'shared'} onchange={e => toggle('connectors', e.currentTarget.checked)} />{t('containerEdit.shareConnectors')}</label>
       {#if draft.connectors === 'shared'}<span class="hint warn">{t('containerEdit.connectorsNote')}</span>{/if}
+      <label class="check"><input type="checkbox" checked={draft.secrets === 'shared'} onchange={e => toggle('secrets', e.currentTarget.checked)} />{t('containerEdit.shareSecrets')}</label>
+      {#if draft.secrets === 'shared'}<span class="hint">{t('containerEdit.secretsNote')}</span>{/if}
       <span class="hint">{t('containerEdit.whenApplied')}</span>
     </div>
+
+    <span class="label">{t('containerEdit.folders')}</span>
+    <ContainerFolders bind:folders={() => draft.folders ?? [], v => (draft.folders = v)} {uid} />
   </div>
 
   {#if wrong.length && !isNew}<p class="err" role="alert">{wrong.map(k => t(k)).join(' ')}</p>{/if}
@@ -166,7 +172,7 @@
   }
   .grid {
     display: grid;
-    grid-template-columns: 110px 1fr;
+    grid-template-columns: 110px minmax(0, 1fr);
     gap: var(--space-2) var(--space-3);
     align-items: start;
   }

@@ -111,6 +111,12 @@ func unattendedMessage(a core.ToolAction) string {
 // askLocked handles a permission request from the CLI. Caller holds s.mu.
 // It reports whether the request now waits for the user.
 func (s *Session) askLocked(a core.ApprovalAsked) bool {
+	// A sub-agent left running in the background asks after the turn that
+	// started it has ended: its request opens the page of the turn the CLI
+	// carries on with, as that turn's start would, so it can be answered.
+	if s.page == nil && s.proc != nil && len(s.background) > 0 {
+		s.continueLocked()
+	}
 	if s.page == nil || s.proc == nil {
 		_ = s.replyLocked(a.RequestID, false, nil, "There is no turn to approve this for.")
 		return false
@@ -464,6 +470,7 @@ func (s *Session) modeDirectives() []string {
 
 // toldLocked records that the model now knows the current modes.
 func (s *Session) toldLocked() {
+	s.toldPlace = s.placeBrief
 	s.toldUnattended = s.unattended
 	s.toldMode = modeOf(s.rec.Mode)
 }

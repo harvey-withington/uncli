@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -38,7 +39,7 @@ func TestSessionStartsInItsRuntime(t *testing.T) {
 	v, _ := h.m.Create("chat", "", "haiku")
 	placeIn(t, h, v.ID, "wsl", "go-dev")
 	pages := h.send(v.ID, "hi")
-	if len(asked) != 1 || asked[0] != "wsl/go-dev" || len(pages) != 1 {
+	if len(asked) == 0 || slices.ContainsFunc(asked, func(a string) bool { return a != "wsl/go-dev" }) || len(pages) != 1 {
 		t.Errorf("asked %v, pages %d", asked, len(pages))
 	}
 }
@@ -123,5 +124,36 @@ func TestStopIn(t *testing.T) {
 	}
 	if !so.View().Running {
 		t.Error("a session elsewhere was stopped")
+	}
+}
+
+// briefRuntime is a container that says where the session folder is and
+// has something to tell the model.
+type briefRuntime struct{ otherRuntime }
+
+func (briefRuntime) GuestPath(host string) string { return "/workspace/chat-1234" }
+func (briefRuntime) Brief() string                { return "This session runs in a Linux container." }
+
+// A session type with artifacts is told where they go, at the path its CLI
+// sees; in a container, the model is told about it once.
+func TestArtifactsEnvAndContainerBrief(t *testing.T) {
+	h := newHarness(t, "multi-turn-partial")
+	v, _ := h.m.Create("chat", "", "haiku")
+	h.send(v.ID, "one")
+	if got := h.rt.starts[0].Env[ArtifactsEnv]; got != filepath.Join(v.Workdir, "artifacts") {
+		t.Errorf("local: %s = %q", ArtifactsEnv, got)
+	}
+
+	h2 := newHarness(t, "multi-turn-partial")
+	h2.m.d.Runtimes = func(id, ref string) (core.Runtime, error) { return briefRuntime{otherRuntime{h2.rt}}, nil }
+	v2, _ := h2.m.Create("chat", "", "haiku")
+	placeIn(t, h2, v2.ID, "wsl", "sandbox")
+	pages := h2.send(v2.ID, "one")
+	pages = append(pages[:0], h2.send(v2.ID, "two")...)
+	if got := h2.rt.starts[0].Env[ArtifactsEnv]; got != "/workspace/chat-1234/artifacts" {
+		t.Errorf("container: %s = %q", ArtifactsEnv, got)
+	}
+	if !strings.Contains(pages[0].Directives, "Linux container") || strings.Contains(pages[1].Directives, "Linux container") {
+		t.Errorf("told %q then %q", pages[0].Directives, pages[1].Directives)
 	}
 }

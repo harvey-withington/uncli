@@ -105,7 +105,12 @@ apply changes.
   account (Settings → AI Providers), your claude.ai connectors; Isolated
   shares nothing. Containers are defined in `containers.yaml`: packages,
   `setup` steps (shell commands run as root at build time), `brain: shared`
-  or `sandboxed`, `mcp` and `connectors: shared` or `none`. Settings →
+  or `sandboxed`, `mcp` and `connectors: shared` or `none`, `secrets:
+  shared` (your `%USERPROFILE%\.secrets` folder, one file per service,
+  read-only at `~/.secrets`) and `folders` (more Windows folders at
+  `/home/uncli/<name>`, read-only unless `access: rw`; decision 0017). Each
+  container lists what's mounted, from where and how, in
+  `/etc/uncli/mounts.json` (`$UNCLI_MOUNTS`). Settings →
   Containers edits them (Edit on each, New container, Reset to built-in,
   Delete), writing your `containers.yaml` in the config folder, which adds
   containers or replaces the built-in ones by `id`. Settings says when a
