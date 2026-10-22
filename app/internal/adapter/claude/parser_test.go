@@ -505,3 +505,26 @@ func TestWithAnswers(t *testing.T) {
 		t.Errorf("%s %v", out, err)
 	}
 }
+
+// The handshake lists the commands with what they do and take; the ones
+// init says only work in the CLI's terminal are left out (fixture
+// ask-user-question, CLI 2.1.285).
+func TestCommands(t *testing.T) {
+	evs := ofKind(parseFixture(t, "ask-user-question"), core.EvCommands)
+	if len(evs) == 0 {
+		t.Fatal("no commands")
+	}
+	c := decode[core.Commands](t, evs[len(evs)-1])
+	names := map[string]core.CommandInfo{}
+	for _, x := range c.List {
+		names[x.Name] = x
+	}
+	if len(c.List) != 50 || names["design"].Hint != "consent | revoke" || names["compact"].Description == "" {
+		t.Errorf("commands = %d, design %+v, compact %+v", len(c.List), names["design"], names["compact"])
+	}
+	for _, terminal := range []string{"doctor", "color", "focus", "reload-plugins"} {
+		if _, ok := names[terminal]; ok {
+			t.Errorf("/%s only works in the CLI's terminal", terminal)
+		}
+	}
+}

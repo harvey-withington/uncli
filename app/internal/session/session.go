@@ -43,6 +43,8 @@ type Session struct {
 	// what it's told with the turn being sent.
 	toldPlace, placeBrief string
 
+	commands []core.CommandInfo // the slash commands its CLI reported (slash.go); nil until it has
+
 	page         *store.Page // the open page, nil when idle
 	closed       *store.Page // the page closed last
 	evN          int         // events logged on the open page
@@ -231,6 +233,9 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 	text = strings.TrimSpace(text)
 	if text == "" && len(files) == 0 {
 		return errors.New("nothing to send")
+	}
+	if err := checkSlash(text, "This session's CLI", s.ad().Capabilities()); err != nil {
+		return err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -659,6 +664,9 @@ func (s *Session) handle(gen int, ev core.Event) {
 		s.hints = h.Tools
 		s.m.prejudge(h.Tools, s.rec.Workdir)
 		s.rejudgeLocked()
+	case core.EvCommands:
+		c, _ := core.Decode[core.Commands](ev)
+		s.setCommandsLocked(c)
 	case core.EvBackground:
 		b, _ := core.Decode[core.BackgroundTasks](ev)
 		s.background = b.Tasks

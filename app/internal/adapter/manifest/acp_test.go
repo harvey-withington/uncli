@@ -300,3 +300,23 @@ func TestGrokModels(t *testing.T) {
 		t.Errorf("models = %+v", ms)
 	}
 }
+
+// ACP's available_commands_update is the agent's slash commands, with what
+// they do and take.
+func TestGrokCommands(t *testing.T) {
+	r := play(t, "tools-allow", core.LaunchSpec{Workdir: `C:\uncli-spike`}, func(core.ApprovalAsked) bool { return true }, 0)
+	cs := eventsOf[core.Commands](t, r.events, core.EvCommands)
+	if len(cs) == 0 {
+		t.Fatal("no commands")
+	}
+	names := map[string]core.CommandInfo{}
+	for _, c := range cs[len(cs)-1].List {
+		names[c.Name] = c
+	}
+	if names["compact"].Description == "" || names["always-approve"].Hint != "on|off" {
+		t.Errorf("commands = %+v", cs[len(cs)-1].List)
+	}
+	if !grokAdapter(t).Capabilities().SlashPassthrough {
+		t.Error("an ACP agent takes slash commands")
+	}
+}

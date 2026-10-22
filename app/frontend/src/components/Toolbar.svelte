@@ -81,7 +81,7 @@
       {/each}
     {:else if item.kind === 'separator'}
       <span class="sep" aria-hidden="true"></span>
-    {:else if item.kind === 'slash'}
+    {:else if item.kind === 'slash' && app.takesSlash(session)}
       <button class="btn small ghost" onclick={() => slash(item)} disabled={session.busy} title={item.command}>
         <Icon name={item.icon ?? 'terminal'} size={13} />{item.label}
       </button>

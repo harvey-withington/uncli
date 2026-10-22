@@ -374,6 +374,14 @@ export interface ModelInfo {
   effortLevels: string[] | null
 }
 
+// A slash command the session's CLI takes (core.CommandInfo): its name
+// without the slash, what it does, and what it takes after it.
+export interface CommandInfo {
+  name: string
+  description?: string
+  hint?: string
+}
+
 export interface Capabilities {
   partialStreaming: boolean
   resume: boolean
@@ -582,6 +590,7 @@ export interface UsageLimit {
 
 export type EventKind =
   | 'session_ready'
+  | 'commands' // the slash commands the CLI takes changed (Backend.commands)
   | 'account'
   | 'turn_started'
   | 'thinking'
@@ -674,6 +683,7 @@ export interface Backend {
   answerApproval(sessionId: string, requestId: string, decision: ApprovalDecision, scope?: Scope): Promise<void>
   // A question (allow, with answers by question) or a plan (allow; or deny with a note on what to change).
   answerAsk(sessionId: string, requestId: string, allow: boolean, answers: Record<string, string> | null, note: string): Promise<void>
+  commands(sessionId: string): Promise<CommandInfo[]> // the slash commands its CLI takes (none for a CLI that takes none)
   setUnattended(sessionId: string, on: boolean): Promise<SessionView>
   setMode(sessionId: string, mode: SessionMode): Promise<SessionView>
   safeList(sessionId: string): Promise<SafeEntry[]>

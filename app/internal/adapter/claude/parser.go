@@ -25,6 +25,10 @@ type parser struct {
 	touching    map[string]core.FileTouched // tool use id -> the file it will write
 	errorCode   string                      // from a synthetic assistant message, folded into the result
 	interrupted bool
+	// The commands the handshake reported, and those init says only work
+	// in the CLI's terminal (fixture ask-user-question, CLI 2.1.285).
+	commands []core.CommandInfo
+	terminal map[string]bool
 }
 
 func newParser() *parser {
@@ -43,6 +47,7 @@ type line struct {
 	Tools          []string `json:"tools"`
 	PermissionMode string   `json:"permissionMode"`
 	Version        string   `json:"claude_code_version"`
+	TerminalSlash  []string `json:"terminal_slash_commands"`
 
 	// system/status
 	Status *string `json:"status"`
@@ -144,14 +149,24 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 	case "system":
 		switch l.Subtype {
 		case "init":
+			var out []core.Event
+			if p.terminal == nil && l.TerminalSlash != nil {
+				p.terminal = map[string]bool{}
+				for _, n := range l.TerminalSlash {
+					p.terminal[n] = true
+				}
+				if p.commands != nil {
+					out = append(out, ev(core.EvCommands, p.commandList()))
+				}
+			}
 			if l.SessionID == p.sid && l.Model == p.model {
-				return nil, nil
+				return out, nil
 			}
 			p.sid, p.model = l.SessionID, l.Model
-			return []core.Event{ev(core.EvSessionReady, core.SessionReady{
+			return append([]core.Event{ev(core.EvSessionReady, core.SessionReady{
 				ProviderSID: l.SessionID, Model: l.Model, CLIVersion: l.Version,
 				Tools: l.Tools, PermissionMode: l.PermissionMode,
-			})}, nil
+			})}, out...), nil
 		case "status":
 			switch {
 			case l.Status != nil && *l.Status == "requesting": // repeats per API call within a turn
@@ -315,6 +330,11 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 					SubscriptionType string `json:"subscriptionType"`
 				} `json:"account"`
 				MCPServers []mcpServer `json:"mcpServers"`
+				Commands   []struct {
+					Name         string `json:"name"`
+					Description  string `json:"description"`
+					ArgumentHint string `json:"argumentHint"`
+				} `json:"commands"`
 			} `json:"response"`
 		}
 		_ = json.Unmarshal(l.Response, &resp)
@@ -333,11 +353,31 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 			if resp.Response.Account != nil {
 				a.Subscription = resp.Response.Account.SubscriptionType
 			}
-			return []core.Event{ev(core.EvAccount, a)}, nil
+			out := []core.Event{ev(core.EvAccount, a)}
+			if resp.Response.Commands != nil {
+				p.commands = []core.CommandInfo{}
+				for _, c := range resp.Response.Commands {
+					p.commands = append(p.commands, core.CommandInfo{Name: c.Name, Description: c.Description, Hint: c.ArgumentHint})
+				}
+				out = append(out, ev(core.EvCommands, p.commandList()))
+			}
+			return out, nil
 		}
 		return nil, nil
 	}
 	return unknown(), nil
+}
+
+// commandList is the commands the handshake reported, less those that only
+// work in the CLI's own terminal.
+func (p *parser) commandList() core.Commands {
+	out := core.Commands{List: []core.CommandInfo{}}
+	for _, c := range p.commands {
+		if !p.terminal[c.Name] {
+			out.List = append(out.List, c)
+		}
+	}
+	return out
 }
 
 type initModel struct {

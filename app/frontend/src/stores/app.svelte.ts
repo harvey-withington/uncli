@@ -2,7 +2,7 @@
 // the live text of answers still streaming. All state is keyed by id.
 import type {
   ArtifactFile, AttachmentRef, Backend, ContainersInfo, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
-  ModelInfo, Share, ThinkingData, UsageLimit,
+  CommandInfo, ModelInfo, Share, ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
@@ -40,6 +40,7 @@ export class AppStore {
   pages = $state<Record<string, Page[]>>({})
   index = $state<Record<string, number>>({})
   live = $state<Record<string, Live>>({})
+  commands = $state<Record<string, CommandInfo[]>>({}) // session id → the slash commands its CLI takes
   usage = $state<UsageLimit | null>(null)
   newSessionOpen = $state(false)
   newSessionProfile = $state<string | null>(null) // profile the dialog opens on
@@ -151,6 +152,7 @@ export class AppStore {
       }
     }
     if (this.outline.open) void this.refreshArtifacts(id)
+    void this.loadCommands(id)
     await this.backend.focus(id)
   }
 
@@ -363,6 +365,21 @@ export class AppStore {
     await this.refreshPins()
   }
 
+  // takesSlash: the session's CLI takes slash commands.
+  takesSlash(session: SessionView): boolean {
+    const caps = providerOf(this.boot, session.adapter)?.capabilities ?? this.boot?.capabilities
+    return !!caps?.slashPassthrough
+  }
+
+  // loadCommands fetches the slash commands a session's CLI takes.
+  async loadCommands(id: string) {
+    try {
+      this.commands[id] = await this.backend.commands(id)
+    } catch {
+      // none offered; typing a command still works
+    }
+  }
+
   async refreshPins() {
     try {
       this.pins = await this.backend.pinned()
@@ -498,6 +515,9 @@ export class AppStore {
         if (cur) cur.text = ''
         break
       }
+      case 'commands':
+        void this.loadCommands(sessionId)
+        break
       case 'turn_result':
         delete this.live[sessionId]
         if (this.outline.open && sessionId === this.currentId) void this.refreshArtifacts(sessionId)

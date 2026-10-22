@@ -161,6 +161,10 @@ func (d *acp) response(m rpc, raw []byte) ([]core.Event, [][]byte) {
 	switch method {
 	case "initialize":
 		var evs []core.Event
+		// Grok lists its commands here, ahead of ACP's update (fixture tools-allow, 1.0.50).
+		if c, ok := acpCommands(get(res, "_meta.availableCommands")); ok {
+			evs = append(evs, core.NewEvent(core.EvCommands, c, nil))
+		}
 		if ms, cur := acpModels(get(res, "_meta.modelState")); len(ms) > 0 {
 			evs = append(evs, core.NewEvent(core.EvAccount, core.Account{Models: ms}, nil))
 			if d.model == "" {
@@ -382,10 +386,43 @@ func (d *acp) notification(m rpc, raw []byte) []core.Event {
 			evs = append(evs, d.finish(id, t, st == "completed", u, raw)...)
 		}
 		return evs
-	case "plan", "available_commands_update", "current_mode_update", "config_option_update", "session_info_update", "usage_update", "user_message_chunk":
+	case "available_commands_update":
+		// Grok follows its list with empty ones whose _meta still counts
+		// them (fixture tools-allow, 1.0.50): an empty list keeps the last.
+		if c, ok := acpCommands(get(u, "availableCommands")); ok {
+			return []core.Event{core.NewEvent(core.EvCommands, c, raw)}
+		}
+		return nil
+	case "plan", "current_mode_update", "config_option_update", "session_info_update", "usage_update", "user_message_chunk":
 		return nil
 	}
 	return []core.Event{core.NewEvent(core.EvUnknown, core.Unknown{Type: str(u, "sessionUpdate")}, raw)}
+}
+
+// acpCommands reads an ACP command list (name, description, an input
+// hint); false when it holds none.
+func acpCommands(v any) (core.Commands, bool) {
+	var list []struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Input       *struct {
+			Hint string `json:"hint"`
+		} `json:"input"`
+	}
+	b, _ := json.Marshal(v)
+	_ = json.Unmarshal(b, &list)
+	out := core.Commands{List: []core.CommandInfo{}}
+	for _, x := range list {
+		if x.Name == "" {
+			continue
+		}
+		ci := core.CommandInfo{Name: x.Name, Description: x.Description}
+		if x.Input != nil {
+			ci.Hint = x.Input.Hint
+		}
+		out.List = append(out.List, ci)
+	}
+	return out, len(out.List) > 0
 }
 
 func (d *acp) finish(id string, t *acpTool, ok bool, u any, raw []byte) []core.Event {

@@ -66,3 +66,34 @@ func TestQuestionAnswered(t *testing.T) {
 		t.Errorf("page = %s %q", p.Status, p.AnswerMD)
 	}
 }
+
+// The CLI's slash commands reach the session from its handshake, without
+// the ones that only work in its terminal.
+func TestSlashCommands(t *testing.T) {
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	v, err := svc.Sessions.Create("chat", "", "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Sessions.Send(ctx, v.ID, "Reply with only OK."); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, svc, v.ID)
+	cs, err := svc.Sessions.Commands(v.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, c := range cs {
+		names[c.Name] = true
+	}
+	if !names["compact"] || !names["context"] || names["doctor"] {
+		t.Errorf("commands = %v", names)
+	}
+	t.Logf("%d commands", len(cs))
+}

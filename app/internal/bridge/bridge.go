@@ -282,6 +282,12 @@ func (a *App) SessionAllowlist(sessionID string) ([]string, error) {
 	return a.svc.Sessions.SessionAllowlist(sessionID)
 }
 
+// Commands lists the slash commands a session's CLI takes, for the menu
+// the message box opens on "/".
+func (a *App) Commands(sessionID string) ([]core.CommandInfo, error) {
+	return a.svc.Sessions.Commands(sessionID)
+}
+
 // AnswerAsk answers a question the model asked (allow, with answers by
 // question) or a plan (allow; or deny with a note on what to change).
 func (a *App) AnswerAsk(sessionID, requestID string, allow bool, answers map[string]string, note string) error {

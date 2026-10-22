@@ -67,6 +67,8 @@ func (a *Adapter) Capabilities() core.Capabilities {
 		c.Approvals, c.HookApprovals, c.Interrupt, c.Resume, c.PartialStreaming = true, false, true, true, true
 	}
 	c.Images, c.Documents, c.SlashPassthrough, c.Import = false, false, false, false
+	// ACP agents take slash commands in the prompt, and say which.
+	c.SlashPassthrough = a.ACP()
 	return c
 }
 

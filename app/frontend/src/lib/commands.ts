@@ -133,10 +133,20 @@ export function commands(app: AppStore): Command[] {
       run: () => run(app.backend.toggleModifier(session.id, m.id, !on).then(v => app.upsertSession(v))),
     })
   }
-  if (!session.archived && !session.busy) {
+  if (!session.archived && !session.busy && app.takesSlash(session)) {
+    const shown = new Set<string>()
     for (const item of app.boot?.toolbar ?? []) {
       const command = item.command
-      if (item.kind === 'slash' && command) add({ id: `slash.${command}`, group: 'model', label: t('cmd.slash', { label: item.label ?? command }), run: () => run(app.send(command)) })
+      if (item.kind === 'slash' && command) {
+        shown.add(command)
+        add({ id: `slash.${command}`, group: 'model', label: t('cmd.slash', { label: item.label ?? command }), run: () => run(app.send(command)) })
+      }
+    }
+    // The CLI's own commands, run as they are (the message box's menu
+    // is for adding what one takes).
+    for (const c of app.commands[session.id] ?? []) {
+      if (shown.has(`/${c.name}`)) continue
+      add({ id: `cli.${c.name}`, group: 'model', label: t('cmd.runSlash', { name: c.name }), run: () => run(app.send(`/${c.name}`)) })
     }
   }
   return out

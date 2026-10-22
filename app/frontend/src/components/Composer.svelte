@@ -8,6 +8,7 @@
   import { loadDraft, saveDraft } from '../lib/keep'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import SlashMenu from './SlashMenu.svelte'
 
   interface Props {
     session: SessionView
@@ -18,6 +19,7 @@
   let text = $state('')
   let sending = $state(false)
   let input: HTMLTextAreaElement | undefined = $state()
+  let menu: SlashMenu | undefined = $state() // the slash-command menu, which sees keys first
   let attachments = $state<Pending[]>([]) // files going with the next turn
 
   // Drafts are per session. The text is kept on every change, so it
@@ -154,6 +156,7 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    if (menu?.onkey(e)) return
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault()
       send()
@@ -162,6 +165,7 @@
 </script>
 
 <div class="composer">
+  <SlashMenu bind:this={menu} {session} bind:text {input} />
   <div class="field">
     {#if attachments.length > 0}
       <ul class="attachments" aria-label={t('composer.attachments')}>
@@ -205,6 +209,7 @@
 
 <style>
   .composer {
+    position: relative; /* the slash-command menu sits above it */
     display: flex;
     align-items: flex-end;
     gap: var(--space-2);

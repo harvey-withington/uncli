@@ -194,6 +194,18 @@ function shareFields(profileId: string, extra: Partial<SessionView>): Pick<Sessi
   return { shares: [...(p.shares ?? [])], shareable: ['tools', 'skills'] }
 }
 
+// Slash commands as the mock's Claude reports them (a few of the real ones).
+const MOCK_COMMANDS = [
+  { name: 'compact', description: 'Clear conversation history but keep a summary in context', hint: '<optional custom summarization instructions>' },
+  { name: 'context', description: 'Visualize current context usage as a colored grid' },
+  { name: 'clear', description: 'Clear conversation history and free up context' },
+  { name: 'code-review', description: 'Review the current diff for correctness bugs', hint: '[low|medium|high]' },
+  { name: 'cost', description: 'Show the total cost and duration of the current session' },
+  { name: 'design', description: 'Grant or revoke Claude agent access to your Design projects', hint: 'consent | revoke' },
+  { name: 'my:bruv-card-writer', description: 'Create cards in BRUV’s import format for any project' },
+  { name: 'simplify', description: 'Review the changed code for reuse and simplification, then apply the fixes' },
+]
+
 // The AI providers the mock offers (config/defaults/providers.yaml).
 const MOCK_PROVIDERS: Provider[] = [
   {
@@ -652,6 +664,10 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       else changed(s)
       approvalWaits.get(rid)?.(decision === 'deny' ? 'deny' : 'allow')
       if (decision === 'safe') rejudgeAll()
+    },
+    async commands(sid) {
+      const s = find(sid)
+      return s.adapter === 'claude' ? structuredClone(MOCK_COMMANDS) : []
     },
     async answerAsk(sid, rid, allow, answers) {
       const s = find(sid)

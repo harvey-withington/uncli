@@ -77,6 +77,7 @@ export function wailsBackend(): Backend {
     search: q => call('Search', q),
     answerApproval: (s, r, d, scope) => call('AnswerApproval', s, r, d, scope ?? ''),
     answerAsk: (s, r, allow, answers, note) => call('AnswerAsk', s, r, allow, answers, note),
+    commands: id => call('Commands', id),
     setUnattended: (s, on) => call('SetUnattended', s, on),
     setMode: (s, m) => call('SetMode', s, m),
     safeList: s => call('SafeList', s),

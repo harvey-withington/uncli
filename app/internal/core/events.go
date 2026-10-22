@@ -32,6 +32,7 @@ const (
 	EvError      EventKind = "error"       //
 	EvExited     EventKind = "exited"      // exit code
 	EvUnknown    EventKind = "unknown"     // raw line kept, never dropped
+	EvCommands   EventKind = "commands"    // the slash commands the CLI takes, as it reports them
 )
 
 type Event struct {
@@ -229,6 +230,21 @@ type TurnResult struct {
 	CostIsTotal bool    `json:"costIsTotal"`
 	DurationMS  int     `json:"durationMs"`
 	Denials     int     `json:"denials,omitempty"`
+}
+
+// Commands is the slash commands a CLI takes in this session (its skills,
+// plugins' and the user's commands, and its own), as the CLI reports them;
+// ones that only work in the CLI's own terminal are left out.
+type Commands struct {
+	List []CommandInfo `json:"list"`
+}
+
+// CommandInfo is one slash command: its name without the slash, what it
+// does, and what it takes after it.
+type CommandInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Hint        string `json:"hint,omitempty"`
 }
 
 // ErrAuthFailed is the TurnResult.ErrorCode of a turn the provider refused
