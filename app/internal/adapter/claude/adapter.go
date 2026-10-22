@@ -182,7 +182,11 @@ func (a *Adapter) BuildCommand(bin string, s core.LaunchSpec) (core.Command, err
 			s.Env = extra
 		}
 	}
-	env, drop := childEnv(s.Env)
+	wait := mcpWaitEnv()
+	for k, v := range s.Env {
+		wait[k] = v
+	}
+	env, drop := childEnv(wait)
 	// The main conversation's cache lifetime (CLI 2.1.242+). Unset, the CLI
 	// picks: an hour on a subscription within its plan, five minutes on an
 	// API key or once drawing on usage credits. Subagents keep their own.

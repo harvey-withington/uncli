@@ -353,3 +353,16 @@ func TestTextTask(t *testing.T) {
 		t.Errorf("error = %v", err)
 	}
 }
+
+// Every session waits for its MCP servers before its first turn, so their
+// tools are there in the first message; the profile's own env still wins.
+func TestBuildCommandWaitsForMCP(t *testing.T) {
+	cmd, _ := New(nil).BuildCommand("x", core.LaunchSpec{})
+	if cmd.Env["MCP_CONNECTION_NONBLOCKING"] != "0" || cmd.Env["MCP_CONNECT_TIMEOUT_MS"] != "15000" {
+		t.Errorf("env = %v", cmd.Env)
+	}
+	cmd, _ = New(nil).BuildCommand("x", core.LaunchSpec{Env: map[string]string{"MCP_CONNECT_TIMEOUT_MS": "5000"}})
+	if cmd.Env["MCP_CONNECT_TIMEOUT_MS"] != "5000" {
+		t.Errorf("env = %v", cmd.Env)
+	}
+}

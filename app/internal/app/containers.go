@@ -447,16 +447,6 @@ func (s *Service) reloadContainers() {
 		return
 	}
 	c.cfg = cfg
-	for id, r := range c.runtimes {
-		for _, p := range cfg.Containers {
-			if p.ID == id {
-				r.Env = nil
-				if p.MCP == MCPShared || p.Connectors == ConnectorsShared {
-					r.Env = claude.ContainerMCPEnv()
-				}
-			}
-		}
-	}
 }
 
 // profile is a container profile as configured now.
@@ -501,9 +491,6 @@ func (s *Service) runtimeFor(id, ref string) (core.Runtime, error) {
 				q, _ := s.profile(ref)
 				return q.Connectors == ConnectorsShared && s.containerAccount() != ""
 			}
-		}
-		if p.ID == ref && (p.MCP == MCPShared || p.Connectors == ConnectorsShared) {
-			r.Env = claude.ContainerMCPEnv() // their tools in the first message too
 		}
 	}
 	c.runtimes[ref] = r

@@ -127,5 +127,9 @@ func TestSlashCommandsBeforeAnyTurn(t *testing.T) {
 	if pages, _ := svc.Sessions.Pages(v.ID); len(pages) != 0 {
 		t.Errorf("no turn should have been sent: %d pages", len(pages))
 	}
+	// Ready, not stuck on Starting: the CLI says nothing more until a turn.
+	if st := view(svc, v.ID).State; st != session.Idle {
+		t.Errorf("state = %s, want idle", st)
+	}
 	t.Logf("%d commands", len(cs))
 }

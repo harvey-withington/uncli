@@ -91,8 +91,17 @@ func TestCommandsStartTheCLI(t *testing.T) {
 	if pages, _ := h.m.Pages(v.ID); len(pages) != 0 {
 		t.Errorf("no turn should be sent: %d pages", len(pages))
 	}
-	if vw, _ := h.m.View(v.ID); vw.Busy {
-		t.Error("warming isn't a turn")
+	if vw, _ := h.m.View(v.ID); vw.Busy || vw.State != Starting {
+		t.Errorf("warming isn't a turn: busy %v, state %s", vw.Busy, vw.State)
+	}
+	// The handshake's answer means it's ready: no turn will say so.
+	s, _ := h.m.get(v.ID)
+	s.mu.Lock()
+	gen := s.gen
+	s.mu.Unlock()
+	s.handle(gen, core.NewEvent(core.EvAccount, core.Account{}, nil))
+	if vw, _ := h.m.View(v.ID); vw.State != Idle {
+		t.Errorf("after the handshake: %s", vw.State)
 	}
 	// Asking again while it runs starts nothing more.
 	_, _ = h.m.Commands(v.ID)

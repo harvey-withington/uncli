@@ -216,11 +216,13 @@ func WithMCP(existing []byte, servers map[string]json.RawMessage) ([]byte, error
 	return json.MarshalIndent(doc, "", "  ")
 }
 
-// ContainerMCPEnv makes the CLI wait for MCP servers before its first turn.
+// mcpWaitEnv makes the CLI wait for its MCP servers before its first turn.
 // By default it connects them in the background, so a server still
-// connecting (a few seconds from a container, over WSL's network) has no
-// tools in the session's first message. It waits at most 15 s, so a server
-// that never answers only delays the start.
-func ContainerMCPEnv() map[string]string {
+// connecting has no tools in the session's first message, and the model
+// says it's missing: measured with CLI 2.1.285, the first turn had 33 of
+// 71 tools (the claude.ai connectors still connecting); waiting gave all 71
+// for about 0.9 s more. It waits at most 15 s, so a server that never
+// answers only delays the start. Every session gets it (BuildCommand).
+func mcpWaitEnv() map[string]string {
 	return map[string]string{"MCP_CONNECTION_NONBLOCKING": "0", "MCP_CONNECT_TIMEOUT_MS": "15000"}
 }

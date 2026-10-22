@@ -681,6 +681,11 @@ func (s *Session) handle(gen int, ev core.Event) {
 			s.state = Idle
 		}
 	case core.EvAccount:
+		// The CLI answered the handshake. Started with no turn (warm), it
+		// says nothing more until the first message, so it's ready now.
+		if s.state == Starting && !turnOpen {
+			s.state = Idle
+		}
 		// The models list is the first provider's (others report theirs
 		// through their sign-in check).
 		a, _ := core.Decode[core.Account](ev)
