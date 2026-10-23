@@ -145,6 +145,45 @@
   .md :global(li::marker) {
     color: var(--text-faint);
   }
+  .md :global(li.task) {
+    list-style: none;
+  }
+  .md :global(input.task) {
+    margin: 0 0.45em 0 -1.35em;
+    vertical-align: -0.1em;
+    accent-color: var(--accent);
+    opacity: 1;
+  }
+  .md :global(li.task:has(> input.task:checked)),
+  .md :global(li.task:has(> p > input.task:checked)) {
+    color: var(--text-muted);
+  }
+  .md :global(details) {
+    margin: 0 0 var(--space-4);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .md :global(summary) {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .md :global(details[open] > summary) {
+    margin-bottom: var(--space-2);
+  }
+  .md :global(kbd) {
+    padding: 0.05em 0.4em;
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--surface-2);
+    font-family: var(--font);
+    font-size: 0.85em;
+  }
+  .md :global(img) {
+    max-width: 100%;
+    height: auto;
+  }
   .md :global(code) {
     padding: 0.12em 0.36em;
     border-radius: 5px;

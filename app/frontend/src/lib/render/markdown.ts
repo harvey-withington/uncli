@@ -1,11 +1,18 @@
 // Answers render as a list of top-level blocks, each carrying the exact
 // markdown source it came from (via markdown-it's line maps), so every block
 // can copy its original markdown and every code block its code.
+//
+// Model output (and a watched file) is untrusted, and the app window holds
+// the bridge to the Go side, so raw HTML renders only through DOMPurify:
+// no scripts, event handlers, styles, forms, frames or ids, and links still
+// go through the click handler (lib/links.ts). Task lists ("- [ ] thing")
+// show as checkboxes, read only.
+import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
 import type Token from 'markdown-it/lib/token.mjs'
 
 const md = new MarkdownIt({
-  html: false, // model output is untrusted: no raw HTML
+  html: true, // cleaned by DOMPurify below
   linkify: true,
   typographer: false,
   breaks: false,
@@ -17,13 +24,62 @@ const md = new MarkdownIt({
 const unsafeLink = /^\s*(javascript|vbscript|data):/i
 md.validateLink = url => !unsafeLink.test(url)
 
-// Links never navigate the app window; the click handler opens web links
-// in the user's browser and files in their editor (lib/links.ts).
-const defaultLink = md.renderer.rules.link_open ?? ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
-md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-  tokens[idx]?.attrSet('rel', 'noopener noreferrer')
-  tokens[idx]?.attrSet('data-external', '')
-  return defaultLink(tokens, idx, options, env, self)
+// A list item that starts "[ ] " or "[x] " is a task: its marker becomes a
+// checkbox (GitHub's task lists).
+const TASK = /^\[([ xX])\][ \t]/
+md.core.ruler.after('inline', 'tasks', state => {
+  const tokens = state.tokens
+  for (let i = 2; i < tokens.length; i++) {
+    const inline = tokens[i]
+    if (!inline || inline.type !== 'inline' || tokens[i - 1]?.type !== 'paragraph_open' || tokens[i - 2]?.type !== 'list_item_open') continue
+    const first = inline.children?.[0]
+    const m = first?.type === 'text' ? TASK.exec(first.content) : null
+    if (!first || !m) continue
+    first.content = first.content.slice(m[0].length)
+    const box = new state.Token('html_inline', '', 0)
+    box.content = `<input type="checkbox" class="task" disabled${m[1] === ' ' ? '' : ' checked'}> `
+    inline.children?.unshift(box)
+    tokens[i - 2]?.attrSet('class', 'task')
+  }
+})
+
+// What raw HTML may keep: the HTML profile (no SVG or MathML), less what
+// could run, submit, restyle or cover the app, or clash with its ids and
+// classes. URLs may also be file: links, as markdown ones may.
+const PURIFY = {
+  USE_PROFILES: { html: true },
+  FORBID_TAGS: ['style', 'form', 'button', 'textarea', 'select', 'option', 'iframe', 'frame', 'object', 'embed', 'dialog', 'template', 'link', 'meta', 'base'],
+  FORBID_ATTR: ['style', 'id', 'name', 'target', 'form', 'formaction', 'srcset', 'autofocus', 'tabindex', 'contenteditable', 'popover'],
+  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|file):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+}
+const KEEP_CLASS = new Set(['task'])
+
+let purify: ReturnType<typeof DOMPurify> | null = null
+
+function clean(html: string): string {
+  if (!purify) {
+    if (typeof window === 'undefined') return md.utils.escapeHtml(html)
+    purify = DOMPurify(window)
+    purify.addHook('uponSanitizeAttribute', (_node, data) => {
+      if (data.attrName !== 'class') return
+      data.attrValue = data.attrValue.split(/\s+/).filter(c => KEEP_CLASS.has(c)).join(' ')
+      if (!data.attrValue) data.keepAttr = false
+    })
+    purify.addHook('afterSanitizeAttributes', node => {
+      // Only read-only checkboxes are inputs. Links never navigate the app
+      // window: the click handler opens web links in the user's browser and
+      // files in their editor (lib/links.ts).
+      if (node.tagName === 'INPUT') {
+        if (node.getAttribute('type') !== 'checkbox') node.remove()
+        else node.setAttribute('disabled', '')
+      }
+      if (node.tagName === 'A') {
+        node.setAttribute('rel', 'noopener noreferrer')
+        node.setAttribute('data-external', '')
+      }
+    })
+  }
+  return purify.sanitize(html, PURIFY)
 }
 
 export interface MdBlock {
@@ -56,21 +112,32 @@ function parseBlocks(src: string): MdBlock[] {
   const tokens = md.parse(src, {})
   const lines = src.split('\n')
   const out: MdBlock[] = []
-  let i = 0
-  while (i < tokens.length) {
-    const start = i
-    const t = tokens[i] as Token
-    if (t.nesting === 1) {
+  // The end (exclusive) of the top-level block starting at i.
+  const end = (i: number) => {
+    if ((tokens[i] as Token).nesting === 1) {
       let depth = 0
       for (; i < tokens.length; i++) {
         depth += (tokens[i] as Token).nesting
         if (depth === 0) break
       }
     }
-    i++
+    return i + 1
+  }
+  let i = 0
+  while (i < tokens.length) {
+    const start = i
+    i = end(i)
+    // HTML that wraps markdown (<details> … blank line … </details>) spans
+    // several blocks: they stay one, up to the tag that closes it.
+    let open = tokens[start]?.type === 'html_block' ? unclosed(tokens[start]?.content ?? '') : 0
+    while (open > 0 && i < tokens.length) {
+      if (tokens[i]?.type === 'html_block') open += unclosed(tokens[i]?.content ?? '')
+      i = end(i)
+    }
     const group = tokens.slice(start, i)
     const first = group[0] as Token
-    const map = first.map ?? group.find(g => g.map)?.map
+    const last = [...group].reverse().find(g => g.map && g.level === 0)
+    const map = first.map && last?.map ? [first.map[0], last.map[1]] : (first.map ?? group.find(g => g.map)?.map)
     const source = map ? lines.slice(map[0], map[1]).join('\n').replace(/\s+$/, '') : first.content
     const key = `${out.length}:${first.type}`
     if (first.type === 'fence' || first.type === 'code_block') {
@@ -80,7 +147,7 @@ function parseBlocks(src: string): MdBlock[] {
         lang: (first.info || '').trim().split(/\s+/)[0] || '',
       })
     } else {
-      const block: MdBlock = { key, kind: 'md', html: md.renderer.render(group, md.options, {}), source }
+      const block: MdBlock = { key, kind: 'md', html: clean(md.renderer.render(group, md.options, {})), source }
       if (first.type === 'heading_open') {
         const text = plainText(group[1] as Token | undefined)
         if (text) block.heading = { level: Number(first.tag.slice(1)) || 1, text }
@@ -92,6 +159,18 @@ function parseBlocks(src: string): MdBlock[] {
     }
   }
   return out
+}
+
+// unclosed is how many more container tags an HTML block opens than it
+// closes (void and self-closed tags don't count).
+const VOID = new Set(['area', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
+function unclosed(html: string): number {
+  let n = 0
+  for (const m of html.matchAll(/<(\/?)([a-z][a-z0-9-]*)\b[^>]*?(\/?)>/gi)) {
+    if (VOID.has((m[2] ?? '').toLowerCase()) || m[3]) continue
+    n += m[1] ? -1 : 1
+  }
+  return n
 }
 
 // plainText is an inline token's text without its markup.

@@ -14,7 +14,7 @@
   // origin (sandbox without allow-same-origin) and a policy that allows no
   // network, so it can't reach UNCLI, the bridge or the web; SVG and
   // Mermaid diagrams show the same way with no scripts at all. Markdown
-  // goes through the app's renderer (raw HTML off), text through Shiki.
+  // goes through the app's renderer (raw HTML cleaned), text through Shiki.
 
   interface Props {
     sessionId: string

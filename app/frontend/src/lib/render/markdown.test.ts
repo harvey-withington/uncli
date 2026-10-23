@@ -36,11 +36,53 @@ describe('toBlocks', () => {
     expect(blocks[2]?.source).toBe('```go\nfmt.Println("hi")\n```')
   })
 
-  it('renders html for markdown blocks and never raw html', () => {
+  it('renders html for markdown blocks, and raw html only cleaned', () => {
     expect(blocks[0]?.html).toContain('<strong>bold</strong>')
     expect(blocks[3]?.html).toContain('<table>')
-    expect(blocks[5]?.html).not.toContain('<script>')
-    expect(blocks[5]?.html).toContain('&lt;script&gt;')
+    expect(blocks[5]?.html).not.toContain('script')
+  })
+
+  it('keeps harmless html and drops what could run, restyle or submit', () => {
+    const html = toBlocks([
+      '<details><summary>More</summary><p>Press <kbd>Ctrl</kbd>+<kbd>K</kbd> <sub>1</sub></p></details>',
+      '',
+      '<img src="https://uncli.app/a.png" alt="A" onerror="alert(1)" style="position:fixed">',
+      '',
+      '<a href="javascript:alert(1)">bad</a> <a href="https://uncli.app" target="_top">good</a>',
+      '',
+      '<div id="side-panel" class="btn primary"><iframe src="https://x"></iframe><button>Go</button><input type="text"><style>*{display:none}</style><svg><script>x</script></svg>text</div>',
+    ].join('\n')).map(b => b.html).join('')
+    expect(html).toContain('<details><summary>More</summary>')
+    expect(html).toContain('<kbd>Ctrl</kbd>')
+    expect(html).toContain('<sub>1</sub>')
+    expect(html).toContain('<img src="https://uncli.app/a.png" alt="A">')
+    expect(html).toContain('<a rel="noopener noreferrer" data-external="">bad</a>')
+    expect(html).toContain('<a href="https://uncli.app" rel="noopener noreferrer" data-external="">good</a>')
+    for (const gone of ['onerror', 'style', 'javascript', 'target', 'id=', 'class=', 'btn', '<iframe', '<button', '<input', '<svg', '<script', 'display:none']) {
+      expect(html).not.toContain(gone)
+    }
+    expect(html).toContain('text</div>')
+  })
+
+  it('keeps markdown wrapped in html in one block', () => {
+    const src = '<details><summary>More</summary>\n\n- one\n- **two**\n\n</details>'
+    const blocks = toBlocks(`${src}\n\nAfter`)
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0]?.html).toMatch(/^<details><summary>More<\/summary>\s*<ul>[\s\S]*<strong>two<\/strong>[\s\S]*<\/ul>\s*<\/details>\s*$/)
+    expect(blocks[0]?.source).toBe(src)
+    expect(blocks[1]?.html).toContain('<p>After</p>')
+    // Never closed (still streaming, say): the rest stays inside.
+    expect(toBlocks('<div>\n\nText\n\nMore')).toHaveLength(1)
+  })
+
+  it('shows task lists as read-only checkboxes', () => {
+    const [list] = toBlocks('- [x] Done\n- [ ] To do\n- [] not a task\n- plain')
+    expect(list?.html).toContain('<li class="task"><input type="checkbox" class="task" disabled="" checked=""> Done</li>')
+    expect(list?.html).toContain('<li class="task"><input type="checkbox" class="task" disabled=""> To do</li>')
+    expect(list?.html).toContain('<li>[] not a task</li>')
+    expect(list?.html).toContain('<li>plain</li>')
+    const [code] = toBlocks('`- [ ] in code`')
+    expect(code?.html).not.toContain('checkbox')
   })
 
   it('marks links as external', () => {

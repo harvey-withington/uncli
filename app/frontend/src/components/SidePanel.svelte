@@ -39,6 +39,7 @@
     return artifactsAt(pages, index, app.artifactLive[sessionId] ?? null).length
   })
 
+  const TAB_ICON: Record<PanelTab, string> = { outline: 'table-of-contents', artifacts: 'layers', file: 'eye' }
   const label = (k: PanelTab) =>
     k === 'file' ? watching.slice(watching.lastIndexOf('/') + 1) || t('watch.title') : t(k === 'artifacts' ? 'artifacts.title' : 'outline.title')
   const count = (k: PanelTab) => (k === 'artifacts' ? artifacts : sections)
@@ -80,8 +81,8 @@
         class:on={tab === k}
         onclick={() => choose(k)}
       >
+        <Icon name={TAB_ICON[k]} size={13} />
         {#if k === 'file'}
-          <Icon name="eye" size={13} />
           <span class="name file" title={watching || undefined}>{label(k)}</span>
         {:else}
           <span class="name">{label(k)}</span>
