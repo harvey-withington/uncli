@@ -144,7 +144,7 @@ func TestRenderDirectives(t *testing.T) {
 		t.Errorf("efficiency = %q", got)
 	}
 	got = s.RenderDirectives("sonnet", nil, []string{"efficiency"})
-	if !strings.Contains(got, `"Efficiency Mode" instruction no longer applies`) {
+	if !strings.Contains(got, `The earlier instruction "Use the minimum tokens and turns needed. No preamble, no recap." no longer applies`) {
 		t.Errorf("switched off = %q", got)
 	}
 	if got := s.RenderDirectives("sonnet", nil, nil, "The user is away."); got != "<session_directives>\n- The user is away.\n</session_directives>" {

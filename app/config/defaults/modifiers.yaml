@@ -14,7 +14,7 @@ modifiers:
       default: "Delegate to subagents wherever work can be parallelised or isolated."
       "haiku*": "Use subagents for independent subtasks. Keep each delegation brief."
   - id: efficiency
-    label: Efficiency Mode
+    label: Efficient
     icon: gauge
     scope: turn
     group: verbosity

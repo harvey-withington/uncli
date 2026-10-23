@@ -39,7 +39,7 @@
   <ul class="mcp" aria-label={t('mcp.title')}>
     {#each needs as { sv, need } (sv.name)}
       <li class={need}>
-        <Icon name={ICON[need]} size={13} spin={need === 'signing'} />
+        <Icon name={ICON[need]} size={14} spin={need === 'signing'} />
         <span class="text">{t(`mcp.need.${need}`, { ...names, name: sv.name })}{#if sv.error}<span class="err"> {sv.error}</span>{/if}</span>
         <span class="acts">
           {#if need === 'sign-in'}
@@ -73,8 +73,8 @@
   .mcp {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    margin: var(--space-1) 0 0;
+    gap: 4px;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
@@ -83,7 +83,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 2px var(--space-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     color: var(--warning);
   }
   li.signing,
@@ -104,7 +104,7 @@
     display: flex;
     flex-basis: 100%;
     gap: var(--space-2);
-    padding-left: 21px;
+    padding-left: 22px;
   }
   .paste input {
     flex: 1;

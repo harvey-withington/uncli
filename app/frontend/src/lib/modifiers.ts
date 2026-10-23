@@ -31,14 +31,15 @@ export interface GroupChoice {
   label: string
   icon?: string
   tone?: '' | 'success' | 'warning' | 'accent'
+  hint?: string
 }
 
 // choicesOf orders a group's choices, Normal among them.
-export function choicesOf(members: Modifier[], normal: string): GroupChoice[] {
-  const of = (m: Modifier): GroupChoice => ({ id: m.id, label: m.label, icon: m.icon, tone: m.tone ?? '' })
+export function choicesOf(members: Modifier[], normal: string, hint = ''): GroupChoice[] {
+  const of = (m: Modifier): GroupChoice => ({ id: m.id, label: m.label, icon: m.icon, tone: m.tone ?? '', hint })
   return [
     ...members.filter(m => m.tone === 'success').map(of),
-    { id: '', label: normal, tone: '' },
+    { id: '', label: normal, icon: 'scale', tone: '', hint },
     ...members.filter(m => m.tone !== 'success').map(of),
   ]
 }

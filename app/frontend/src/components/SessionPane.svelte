@@ -31,6 +31,7 @@
   // A session in a container says which (decision 0011).
   const place = $derived(session.runtimeRef ? ` · ${t('session.inContainer', { label: app.containers?.containers.find(c => c.id === session.runtimeRef)?.label ?? session.runtimeRef })}` : '')
   const page = $derived(app.currentPage)
+  const failed = $derived(!!session.error && session.state === 'error')
   let scroller: HTMLElement | undefined = $state()
   // The approval cards fade out under the page controls only while there is
   // more of them below; a card that fits doesn't fade.
@@ -143,9 +144,6 @@
         <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
         <SharesNote {session} />
       </div>
-      <SessionStatus {session} />
-      <!-- Compact leaves these to the plug button's dot. -->
-      <McpStatus {session} />
     {/if}
     <!-- The toolbar, with the prompt level and Unattended at the right end
          of its last line (a line of their own, still at the right, when
@@ -164,10 +162,21 @@
         </button>
       {/snippet}
     </Toolbar>
-    {#if session.error && session.state === 'error'}
-      <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>
-    {/if}
   </header>
+  <!-- Status and warnings, in a strip of their own under the header, all
+       aligned on the left. Compact shows only an error there (the MCP ones
+       are left to the plug button's dot). -->
+  {#if !app.headerCompact || failed}
+    <div class="notes">
+      {#if !app.headerCompact}
+        <SessionStatus {session} />
+        <McpStatus {session} />
+      {/if}
+      {#if failed}
+        <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>
+      {/if}
+    </div>
+  {/if}
 
   <div class="middle">
     <!-- The answer column: the page, the page controls floating on the line
@@ -286,6 +295,14 @@
     flex: none;
     margin-left: calc(-1 * var(--space-2));
     color: var(--text-faint);
+  }
+  .notes {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: var(--space-2) var(--space-6);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
   }
   .where {
     display: flex;

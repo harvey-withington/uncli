@@ -594,6 +594,7 @@
   "cmd.file": "File",
   "cmd.watch": "Watch a file…",
   "modifier.normal": "Normal",
+  "modifier.hint.verbosity": "Asks {agent} to use fewer tokens in its answers (Efficient) or more, to check its work (Thorough).",
   "cycle.next": "Click for {next}; Shift+click for {prev}.",
   "cmd.mcp.signIn": "Sign in to {name}",
   "cmd.mcp.reconnect": "Reconnect {name}",

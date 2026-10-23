@@ -334,8 +334,13 @@ func (s *Set) RenderDirectives(model string, active, previous []string, extra ..
 		if slices.Contains(active, id) {
 			continue
 		}
+		// Quote what the model was told (its label it never saw).
 		if m, ok := s.Modifier(id); ok && m.Scope != "system" {
-			lines = append(lines, fmt.Sprintf("- The earlier %q instruction no longer applies; answer as you normally would.", m.Label))
+			said := strings.TrimSpace(textFor(m, model))
+			if said == "" {
+				said = m.Label
+			}
+			lines = append(lines, fmt.Sprintf("- The earlier instruction %q no longer applies; answer as you normally would.", said))
 		}
 	}
 	for _, t := range extra {

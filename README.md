@@ -7,7 +7,7 @@ Claude Code and the Antigravity CLI built in, and more through provider
 plugins. Run several sessions side by side (Chat, Co-work on a folder, or
 Code on a repository), read each answer as a page you can bookmark and copy
 from, approve what the agent does on cards that say what it means, and
-switch models or modifiers like Efficiency Mode with a click. It drives each
+switch models or modifiers like Efficient or Thorough with a click. It drives each
 provider's official CLI with your own subscription; sessions never call a
 model API directly.
 
@@ -83,7 +83,7 @@ apply changes.
   paragraph, code block or the question to copy it (paragraphs copy their
   original markdown).
 - The toolbar switches model mid-conversation, toggles modifiers (Use
-  Agents, Efficiency Mode, Thorough), runs `/compact` and `/context`, and
+  Agents, Efficient / Normal / Thorough), runs `/compact` and `/context`, and
   shows your subscription usage.
 - **Prompt me** (Always, When unsafe or Never) decides when the agent stops
   to ask before using a tool. A card shows what it wants to do, and "This is

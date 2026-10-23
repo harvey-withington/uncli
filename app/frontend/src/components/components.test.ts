@@ -162,14 +162,15 @@ describe('App', () => {
     render(App, { props: { backend } })
     await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
     const toolbar = screen.getByRole('toolbar', { name: 'Session tools' })
-    const group = (now: string) => within(toolbar).getByRole('button', { name: `Efficiency Mode / Normal / Thorough: ${now}` })
+    const group = (now: string) => within(toolbar).getByRole('button', { name: `Efficient / Normal / Thorough: ${now}` })
     // Thorough is on (warning); a click wraps round to the cheapest.
     expect(group('Thorough')).toHaveClass('warning')
+    expect(group('Thorough').title).toContain('Asks Claude to use fewer tokens in its answers (Efficient) or more, to check its work (Thorough).')
     await fireEvent.click(group('Thorough'))
-    await waitFor(() => expect(group('Efficiency Mode')).toHaveClass('success'))
+    await waitFor(() => expect(group('Efficient')).toHaveClass('success'))
     expect(toggle).toHaveBeenLastCalledWith('s-code', 'efficiency', true)
     // Normal: whichever was on goes off.
-    await fireEvent.click(group('Efficiency Mode'))
+    await fireEvent.click(group('Efficient'))
     await waitFor(() => expect(group('Normal')).not.toHaveClass('success'))
     expect(toggle).toHaveBeenLastCalledWith('s-code', 'efficiency', false)
     await fireEvent.click(group('Normal'))

@@ -47,7 +47,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    margin: 0 0 0 38px;
+    margin: 0;
     font-size: var(--text-xs);
   }
   .muted {

@@ -76,6 +76,7 @@
     font-size: var(--text-xs);
     font-weight: 560;
     white-space: nowrap;
+    user-select: none; /* Shift+click would select the text around it */
     cursor: pointer;
     transition: background var(--fast) var(--ease), color var(--fast) var(--ease), border-color var(--fast) var(--ease);
   }

@@ -45,6 +45,14 @@
     run(async () => app.upsertSession(await app.backend.toggleModifier(session.id, id, on)))
   }
 
+  // groupHint is what a group's choice does (modifier.hint.<group>), in the
+  // session's provider's words; '' when there's none.
+  function groupHint(group: string): string {
+    const key = `modifier.hint.${group}`
+    const hint = t(key, app.namesFor(session.adapter))
+    return hint === key ? '' : hint
+  }
+
   // choose picks one of a group (the backend turns the others off), or
   // Normal: whichever is on goes off.
   function choose(members: Modifier[], id: string) {
@@ -96,7 +104,7 @@
           </button>
         {:else}
           <CycleButton
-            choices={choicesOf(x.members, t('modifier.normal'))}
+            choices={choicesOf(x.members, t('modifier.normal'), groupHint(x.id))}
             value={chosenIn(x.members, session.modifiers)}
             label={choicesOf(x.members, t('modifier.normal')).map(c => c.label).join(' / ')}
             showLabel={false}

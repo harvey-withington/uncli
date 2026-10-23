@@ -449,7 +449,7 @@ func TestModifiersRenderAndEffortRespawns(t *testing.T) {
 	}
 	h.m.ToggleModifier(v.ID, "thorough", true) // replaces efficiency; needs --effort high
 	pages = h.send(v.ID, "two")
-	if !strings.Contains(pages[1].Directives, "Verify, check edge cases") || !strings.Contains(pages[1].Directives, `"Efficiency Mode" instruction no longer applies`) {
+	if !strings.Contains(pages[1].Directives, "Verify, check edge cases") || !strings.Contains(pages[1].Directives, `The earlier instruction "Use the minimum tokens and turns needed. No preamble, no recap." no longer applies`) {
 		t.Errorf("page 2 directives = %q", pages[1].Directives)
 	}
 	if len(h.rt.starts) != 2 {
