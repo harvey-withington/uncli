@@ -113,6 +113,14 @@ export function commands(app: AppStore): Command[] {
   add({ id: 'compactHeader', group: 'panel', label: t(app.headerCompact ? 'cmd.expandHeader' : 'cmd.compactHeader'), run: () => app.toggleHeaderCompact() })
   add({ id: 'compact', group: 'panel', label: t(app.questionCompact ? 'cmd.expandQuestion' : 'cmd.compactQuestion'), run: () => app.toggleQuestionCompact() })
 
+  // MCP servers (decision 0020).
+  for (const sv of session.mcp ?? []) {
+    if (sv.signing) continue
+    if (sv.status === 'needs-auth') add({ id: `mcp.signIn.${sv.name}`, group: 'session', label: t('cmd.mcp.signIn', { name: sv.name }), run: () => run(app.mcpSignIn(session.id, sv.name)) })
+    if (sv.status === 'failed' || sv.status === 'connected') add({ id: `mcp.reconnect.${sv.name}`, group: 'session', label: t('cmd.mcp.reconnect', { name: sv.name }), run: () => run(app.mcpReconnect(session.id, sv.name)) })
+    if (sv.status === 'connected') add({ id: `mcp.signOut.${sv.name}`, group: 'session', label: t('cmd.mcp.signOut', { name: sv.name }), run: () => run(app.mcpSignOut(session.id, sv.name)) })
+  }
+
   // When to prompt.
   const mode: SessionMode = session.mode || 'unsafe'
   for (const m of ['always', 'unsafe', 'never'] as const) {

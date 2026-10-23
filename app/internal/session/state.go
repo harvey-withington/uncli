@@ -37,6 +37,9 @@ type View struct {
 	// ShareSkills), and Shareable what it could have (shares.go).
 	Shares    []string `json:"shares"`
 	Shareable []string `json:"shareable"`
+	// MCP is its CLI's MCP servers as last reported, with any sign-in
+	// waiting and the last failure (mcp.go); empty until the CLI reports.
+	MCP []MCPServerView `json:"mcp"`
 }
 
 // Sink receives everything the UI needs. Implementations must not call

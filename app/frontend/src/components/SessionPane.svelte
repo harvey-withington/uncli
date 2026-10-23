@@ -10,6 +10,8 @@
   import ModeSwitch from './ModeSwitch.svelte'
   import ScrollKeeper from './ScrollKeeper.svelte'
   import SessionStatus from './SessionStatus.svelte'
+  import McpServers from './McpServers.svelte'
+  import McpStatus from './McpStatus.svelte'
   import SharesNote from './SharesNote.svelte'
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
@@ -117,6 +119,7 @@
       >
         <Icon name="coffee" size={15} />{t('unattended.label')}
       </button>
+      <McpServers {session} />
       <button
         class="btn ghost small icon"
         onclick={() => app.openSettings('safe')}
@@ -152,6 +155,8 @@
       </div>
       <SessionStatus {session} />
     {/if}
+    <!-- Shown in either header mode: a server waiting for the user is why tools are missing. -->
+    <McpStatus {session} />
     <Toolbar {session} />
     {#if session.error && session.state === 'error'}
       <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>

@@ -2,7 +2,7 @@
 // component tests). It behaves like the real one closely enough to
 // exercise streaming, states, bookmarks and errors, with canned content.
 import type {
-  ActivityState, Approval, Backend, Bootstrap, CLIStatus, Editor, Handlers, NewSessionChoices, Page, Preferences, Provider, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
+  ActivityState, Approval, Backend, Bootstrap, CLIStatus, Editor, Handlers, MCPServer, NewSessionChoices, Page, Preferences, Provider, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
 } from './types'
 import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type MockAsk, type Outcome } from './mock-access'
 import { SECTION_KINDS } from '../sections'
@@ -178,6 +178,15 @@ function page(sessionId: string, seq: number, question: string, answerMd: string
   }
 }
 
+// The mock's MCP servers (s-code): one to sign in to, one connected, a connector.
+function mockMCP(): MCPServer[] {
+  return [
+    { name: 'BRUV', status: 'needs-auth', tools: 0 },
+    { name: 'notes', status: 'connected', tools: 3 },
+    { name: 'Google Drive', status: 'needs-auth', tools: 0 },
+  ]
+}
+
 function session(id: string, profileId: string, title: string, state: ActivityState, extra: Partial<SessionView> = {}): SessionView {
   return {
     id, title, adapter: 'claude', runtime: 'local', profileId, workdir: `C:\\Users\\you\\${profileId}`,
@@ -213,7 +222,7 @@ const MOCK_PROVIDERS: Provider[] = [
     id: 'claude', label: 'Claude Code', name: 'Claude Code', agent: 'Claude', account: 'Claude', signIn: 'link',
     capabilities: {
       partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
-      images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true, sharedTools: true, sharedSkills: true,
+      images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true, sharedTools: true, sharedSkills: true, mcpSignIn: true,
     },
   },
   {
@@ -252,9 +261,9 @@ const MOCK_PLUGINS: Provider[] = [
   },
 ]
 
-export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; commandsLate?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
+export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; commandsLate?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; mcpSlow?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
-    session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode }),
+    session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode, mcp: mockMCP() }),
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2 }),
     session('s-cowork', 'cowork', 'Summarise the Q3 planning notes', 'idle', { modifiers: ['efficiency'], sortOrder: 1 }),
     session('s-old', 'chat', 'Compare three standing desks', 'idle', { sortOrder: 0, archived: true }),
@@ -440,7 +449,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
         sessions: sessions.map(s => ({ ...s })),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
-          images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true, sharedTools: true, sharedSkills: true,
+          images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true, sharedTools: true, sharedSkills: true, mcpSignIn: true,
         },
       }
     },
@@ -666,6 +675,51 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       else changed(s)
       approvalWaits.get(rid)?.(decision === 'deny' ? 'deny' : 'allow')
       if (decision === 'safe') rejudgeAll()
+    },
+    // MCP sign-in (decision 0020): BRUV signs in through the browser and
+    // connects a moment later; Google Drive is a connector, signed in on the
+    // provider's site, then reconnected.
+    async mcpSignIn(sid, server) {
+      const s = find(sid)
+      const sv = (s.mcp ?? []).find(x => x.name === server)
+      if (!sv) throw new Error(`Server not found: ${server}`)
+      if (server === 'Google Drive') return { url: 'https://example.com/settings/connectors', connector: true, done: false }
+      Object.assign(sv, { signing: true, error: undefined })
+      changed(s)
+      setTimeout(() => {
+        if (!sv.signing) return
+        Object.assign(sv, { signing: false, status: 'connected', tools: 12 })
+        changed(s)
+      }, opts.mcpSlow ? 60_000 : 1500)
+      return { url: 'https://auth.example.com/authorize?client_id=uncli', connector: false, done: false }
+    },
+    async mcpCallback(sid, server) {
+      const sv = (find(sid).mcp ?? []).find(x => x.name === server)
+      if (sv) Object.assign(sv, { signing: false, status: 'connected', tools: 12 })
+      changed(find(sid))
+    },
+    async mcpReconnect(sid, server) {
+      const s = find(sid)
+      const sv = (s.mcp ?? []).find(x => x.name === server)
+      if (!sv) throw new Error(`Server not found: ${server}`)
+      Object.assign(sv, { status: 'pending', error: undefined })
+      changed(s)
+      setTimeout(() => {
+        Object.assign(sv, { status: 'connected', tools: server === 'Google Drive' ? 5 : sv.tools || 3 })
+        changed(s)
+      }, 600)
+    },
+    async mcpSignOut(sid, server) {
+      const s = find(sid)
+      const sv = (s.mcp ?? []).find(x => x.name === server)
+      if (sv) Object.assign(sv, { status: 'needs-auth', tools: 0 })
+      changed(s)
+    },
+    async mcpCancel(sid, server) {
+      const s = find(sid)
+      const sv = (s.mcp ?? []).find(x => x.name === server)
+      if (sv) sv.signing = false
+      changed(s)
     },
     async commands(sid) {
       const s = find(sid)

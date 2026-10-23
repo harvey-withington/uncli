@@ -60,6 +60,11 @@ apply changes.
   a turn needs them, and each tool use is approved like any other. The
   chat profile's `mcp`, `connectors` and `skills` in your `profiles.yaml`
   set what a new chat starts with.
+- **MCP sign-in**: a server that needs signing in says so under the
+  session's folder. **Sign in** opens its page in your browser, and its
+  tools arrive without a restart, in your other sessions too. The plug
+  button in the header lists every server, to reconnect or sign out
+  (decision 0020).
 - **AI providers**: Claude Code, and the Antigravity CLI (Google). Settings
   → AI Providers installs each one's pinned CLI and says whether it's
   signed in. The Antigravity CLI uses the Google sign-in of the Antigravity

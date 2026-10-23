@@ -8,6 +8,7 @@ import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summa
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
 import { loadLastSession, saveLastSession } from '../lib/keep'
 import { loadWatched, pick, saveWatched, type Watched } from '../lib/watched'
+import { connectedNow } from '../lib/mcp'
 import { toBlocks } from '../lib/render/markdown'
 import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
@@ -63,6 +64,12 @@ export class AppStore {
   // The File tab's choices per session (lib/watched.ts), loaded as they're
   // first changed, and a request for its switcher (the File tab takes it).
   watched = $state<Record<string, Watched>>({})
+  // MCP sign-in: the servers the user signed in to or reconnected (by
+  // "session:server", for the toast when they connect), the last sign-in
+  // link of each, and connectors waiting to be reconnected.
+  mcpActed = new Set<string>()
+  mcpLinks = $state<Record<string, string>>({})
+  mcpConnector = $state<Record<string, boolean>>({})
   fileSwitcher = $state(false)
   sidebarWidth = $state(loadSidebarWidth())
   questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
@@ -234,6 +241,55 @@ export class AppStore {
     this.setTab('artifacts')
     if (!this.outline.open) this.togglePanel()
     else void this.refreshArtifacts(sessionId)
+  }
+
+  // MCP sign-in (decision 0020). mcpSignIn opens the server's sign-in in
+  // the browser; a connector of the provider's own is signed in on its
+  // site and then reconnected (mcpConnector marks those waiting for that).
+  // A server the user acted on gets a toast when it connects.
+  mcpSignIn = async (sessionId: string, server: string) => {
+    const key = `${sessionId}:${server}`
+    try {
+      this.mcpActed.add(key)
+      const r = await this.backend.mcpSignIn(sessionId, server)
+      if (r.url) {
+        this.mcpLinks[key] = r.url
+        if (r.connector) this.mcpConnector[key] = true
+        await this.backend.openURL(r.url)
+      }
+    } catch (e) {
+      this.mcpActed.delete(key)
+      showToast(String(e), 'error')
+    }
+  }
+
+  mcpReconnect = async (sessionId: string, server: string) => {
+    const key = `${sessionId}:${server}`
+    this.mcpActed.add(key)
+    delete this.mcpConnector[key]
+    await this.backend.mcpReconnect(sessionId, server).catch(e => showToast(String(e), 'error'))
+  }
+
+  mcpSignOut = async (sessionId: string, server: string) => {
+    await this.backend.mcpSignOut(sessionId, server).catch(e => showToast(String(e), 'error'))
+  }
+
+  mcpCancel = async (sessionId: string, server: string) => {
+    const key = `${sessionId}:${server}`
+    this.mcpActed.delete(key)
+    delete this.mcpConnector[key]
+    await this.backend.mcpCancel(sessionId, server).catch(e => showToast(String(e), 'error'))
+  }
+
+  // mcpPaste hands on the address the browser ended up on.
+  mcpPaste = async (sessionId: string, server: string, url: string): Promise<boolean> => {
+    try {
+      await this.backend.mcpCallback(sessionId, server, url.trim())
+      return true
+    } catch (e) {
+      showToast(String(e), 'error')
+      return false
+    }
   }
 
   // watchedFor is a session's File tab choices.
@@ -482,6 +538,11 @@ export class AppStore {
 
   upsertSession(v: SessionView) {
     const i = this.sessions.findIndex(s => s.id === v.id)
+    for (const sv of connectedNow(v.id, this.sessions[i]?.mcp, v.mcp, this.mcpActed)) {
+      this.mcpActed.delete(`${v.id}:${sv.name}`)
+      delete this.mcpConnector[`${v.id}:${sv.name}`]
+      showToast(t(sv.tools === 1 ? 'mcp.connectedOne' : 'mcp.connected', { name: sv.name, n: sv.tools }), 'success')
+    }
     if (i < 0) {
       this.sessions = sortSessions([v, ...this.sessions])
     } else if (this.sessions[i]?.sortOrder !== v.sortOrder) {

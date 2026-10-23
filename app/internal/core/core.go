@@ -111,6 +111,17 @@ const (
 	// CtlToolHints asks for the MCP tools' annotations; the answer comes
 	// back as EvToolHints (ToolHints).
 	CtlToolHints ControlKind = "tool_hints"
+	// MCP sign-in (MCPSignIn; decision 0020). CtlMCPSignIn starts signing
+	// in to Server (URL: where the browser should come back to, empty for
+	// the CLI's own listener); the answer is an EvMCPAuth. CtlMCPCallback
+	// hands the CLI the address the browser came back to (URL);
+	// CtlMCPReconnect connects Server again (after signing in elsewhere);
+	// CtlMCPSignOut forgets its sign-in. Server status comes with the
+	// answer to CtlToolHints, as EvMCPServers.
+	CtlMCPSignIn    ControlKind = "mcp_sign_in"
+	CtlMCPCallback  ControlKind = "mcp_callback"
+	CtlMCPReconnect ControlKind = "mcp_reconnect"
+	CtlMCPSignOut   ControlKind = "mcp_sign_out"
 )
 
 type Control struct {
@@ -121,6 +132,8 @@ type Control struct {
 	Allow        bool            // CtlApprove
 	Message      string          // CtlApprove deny reason
 	UpdatedInput json.RawMessage // CtlApprove allow
+	Server       string          // the CtlMCP* controls: the MCP server, by the name the CLI reports
+	URL          string          // CtlMCPSignIn: the redirect to use (optional); CtlMCPCallback: where the browser came back to
 }
 
 type AuthInfo struct {
@@ -144,7 +157,11 @@ type Capabilities struct {
 	// respawn (CtlSetPermissionMode).
 	LivePermissionMode bool `json:"livePermissionMode"`
 	// ToolHints: the CLI reports its MCP tools' annotations (CtlToolHints).
-	ToolHints        bool `json:"toolHints"`
+	ToolHints bool `json:"toolHints"`
+	// MCPSignIn: the CLI reports its MCP servers' status (EvMCPServers, with
+	// the CtlToolHints answer) and signs them in, reconnects and signs them
+	// out (the CtlMCP* controls, EvMCPAuth). Decision 0020.
+	MCPSignIn        bool `json:"mcpSignIn"`
 	Images           bool `json:"images"`
 	Documents        bool `json:"documents"` // PDF and text attachments
 	UsageReporting   bool `json:"usageReporting"`

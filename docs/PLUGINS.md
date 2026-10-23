@@ -137,6 +137,12 @@ What the CLI can do, as UNCLI's capability names: `partialStreaming`,
 switches, interrupts, attachments or slash commands; UNCLI stops the process
 to interrupt and starts it again for a new model.
 
+MCP sign-in (`mcpSignIn`, decision 0020) isn't open to manifests yet. A
+CLI that can report its MCP servers and sign them in would add it through
+its adapter or ACP driver: the `CtlMCPSignIn`, `CtlMCPCallback`,
+`CtlMCPReconnect` and `CtlMCPSignOut` controls in, and `EvMCPServers` and
+`EvMCPAuth` events out. Until then a plugin's sessions show no MCP servers.
+
 ### events
 
 Every output line is matched against every rule in order. A rule applies

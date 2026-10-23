@@ -322,9 +322,10 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 
 	case "control_response":
 		var resp struct {
-			Subtype  string `json:"subtype"`
-			Error    string `json:"error"`
-			Response *struct {
+			Subtype   string `json:"subtype"`
+			RequestID string `json:"request_id"`
+			Error     string `json:"error"`
+			Response  *struct {
 				Models  []initModel `json:"models"`
 				Account *struct {
 					SubscriptionType string `json:"subscriptionType"`
@@ -338,11 +339,17 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 			} `json:"response"`
 		}
 		_ = json.Unmarshal(l.Response, &resp)
+		if step, server, ok := mcpRequest(resp.RequestID); ok {
+			return []core.Event{ev(core.EvMCPAuth, mcpAuth(step, server, resp.Subtype, resp.Error, l.Response))}, nil
+		}
 		if resp.Subtype == "error" {
 			return []core.Event{ev(core.EvError, core.ErrorInfo{Message: resp.Error})}, nil
 		}
 		if resp.Response != nil && resp.Response.MCPServers != nil {
-			return []core.Event{ev(core.EvToolHints, toolHints(resp.Response.MCPServers))}, nil
+			return []core.Event{
+				ev(core.EvToolHints, toolHints(resp.Response.MCPServers)),
+				ev(core.EvMCPServers, mcpServers(resp.Response.MCPServers)),
+			}, nil
 		}
 		if resp.Response != nil && len(resp.Response.Models) > 0 {
 			a := core.Account{}
@@ -393,6 +400,7 @@ type initModel struct {
 // false ones.
 type mcpServer struct {
 	Name       string `json:"name"`
+	Status     string `json:"status"`
 	ServerInfo struct {
 		Version string `json:"version"`
 	} `json:"serverInfo"`
@@ -404,6 +412,52 @@ type mcpServer struct {
 			OpenWorld   bool `json:"openWorld"`
 		} `json:"annotations"`
 	} `json:"tools"`
+}
+
+// mcpServers is each server's status, in the CLI's words where they're
+// UNCLI's own (core.MCPConnected…); anything else counts as failed.
+func mcpServers(servers []mcpServer) core.MCPServers {
+	out := core.MCPServers{List: []core.MCPServer{}}
+	for _, s := range servers {
+		status := s.Status
+		switch status {
+		case core.MCPConnected, core.MCPNeedsAuth, core.MCPPending, core.MCPFailed, core.MCPDisabled:
+		default:
+			status = core.MCPFailed
+		}
+		out.List = append(out.List, core.MCPServer{Name: s.Name, Status: status, Tools: len(s.Tools)})
+	}
+	return out
+}
+
+// mcpAuth reads the answer to an MCP sign-in request (fixtures mcp-auth-*):
+// mcp_authenticate's {authUrl, requiresUserAction, callbackExpected,
+// redirectScheme, callbackPort}; the others answer only success or error.
+func mcpAuth(step, server, subtype, errText string, raw json.RawMessage) core.MCPAuth {
+	a := core.MCPAuth{Server: server, Step: step}
+	if subtype == "error" {
+		a.Error = errText
+		if a.Error == "" {
+			a.Error = "the CLI refused"
+		}
+		return a
+	}
+	if step != "sign_in" {
+		return a
+	}
+	var r struct {
+		Response struct {
+			AuthURL            string `json:"authUrl"`
+			RequiresUserAction bool   `json:"requiresUserAction"`
+			CallbackExpected   bool   `json:"callbackExpected"`
+			RedirectScheme     string `json:"redirectScheme"`
+			CallbackPort       int    `json:"callbackPort"`
+		} `json:"response"`
+	}
+	_ = json.Unmarshal(raw, &r)
+	a.URL, a.Callback, a.Custom, a.Port = r.Response.AuthURL, r.Response.CallbackExpected, r.Response.RedirectScheme == "custom", r.Response.CallbackPort
+	a.Done = !r.Response.RequiresUserAction && a.URL == ""
+	return a
 }
 
 // mcpUnsafe is what the CLI replaces in a server or tool name to build

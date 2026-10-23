@@ -38,6 +38,25 @@ export interface SessionView {
   background?: BackgroundTask[] // what runs in the background now (sub-agents, shells)
   shares?: Share[] // what it has of the user's own: their MCP servers and connectors, their skills
   shareable?: Share[] // what it could have (an isolated type, on this machine, a CLI that can)
+  mcp?: MCPServer[] // its CLI's MCP servers as last reported (decision 0020); empty until it reports
+}
+
+// An MCP server of a session's CLI (session.MCPServerView).
+export type MCPStatus = 'connected' | 'needs-auth' | 'pending' | 'failed' | 'disabled'
+export interface MCPServer {
+  name: string
+  status: MCPStatus
+  tools: number
+  signing?: boolean // a sign-in is waiting for the browser
+  error?: string // the last sign-in, reconnect or sign-out failed
+}
+
+// A sign-in under way (session.MCPSignIn): the link to open; a connector
+// of the provider's own is signed in on its site, then reconnected.
+export interface MCPSignInStart {
+  url: string
+  connector: boolean
+  done: boolean // signed in already
 }
 
 // What an isolated session can have of the user's own (decision 0016).
@@ -416,6 +435,7 @@ export interface Capabilities {
   import?: boolean // saved CLI conversations can be imported
   sharedTools?: boolean // an isolated session can be given the user's MCP servers and connectors
   sharedSkills?: boolean // and their skills
+  mcpSignIn?: boolean // its MCP servers can be signed in to, reconnected and signed out from UNCLI
 }
 
 // One model, chosen by the user, for every quick task (summaries now,
@@ -703,6 +723,11 @@ export interface Backend {
   // A question (allow, with answers by question) or a plan (allow; or deny with a note on what to change).
   answerAsk(sessionId: string, requestId: string, allow: boolean, answers: Record<string, string> | null, note: string): Promise<void>
   commands(sessionId: string): Promise<CommandInfo[]> // the slash commands its CLI takes (none for a CLI that takes none)
+  mcpSignIn(sessionId: string, server: string): Promise<MCPSignInStart> // starts its CLI if need be; open the link
+  mcpCallback(sessionId: string, server: string, url: string): Promise<void> // the address the browser ended up on, pasted
+  mcpReconnect(sessionId: string, server: string): Promise<void>
+  mcpSignOut(sessionId: string, server: string): Promise<void>
+  mcpCancel(sessionId: string, server: string): Promise<void> // stop waiting for a sign-in
   setUnattended(sessionId: string, on: boolean): Promise<SessionView>
   setMode(sessionId: string, mode: SessionMode): Promise<SessionView>
   safeList(sessionId: string): Promise<SafeEntry[]>

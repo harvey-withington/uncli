@@ -33,6 +33,8 @@ const (
 	EvExited     EventKind = "exited"      // exit code
 	EvUnknown    EventKind = "unknown"     // raw line kept, never dropped
 	EvCommands   EventKind = "commands"    // the slash commands the CLI takes, as it reports them
+	EvMCPServers EventKind = "mcp_servers" // each MCP server's status (MCPServers)
+	EvMCPAuth    EventKind = "mcp_auth"    // a sign-in started or failed (MCPAuth)
 )
 
 type Event struct {
@@ -245,6 +247,44 @@ type CommandInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Hint        string `json:"hint,omitempty"`
+}
+
+// MCPServers is the CLI's MCP servers, all of them each time.
+type MCPServers struct {
+	List []MCPServer `json:"list"`
+}
+
+// MCP server statuses: the CLI's words are mapped to these.
+const (
+	MCPConnected = "connected"
+	MCPNeedsAuth = "needs-auth" // needs signing in
+	MCPPending   = "pending"    // still connecting
+	MCPFailed    = "failed"
+	MCPDisabled  = "disabled"
+)
+
+type MCPServer struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Tools  int    `json:"tools"`
+}
+
+// MCPAuth answers CtlMCPSignIn: where to sign in, or why it can't. With
+// Callback, the browser comes back to the redirect asked for (or the CLI's
+// own listener, Port) and the CLI finishes by itself; without it (a
+// connector of the provider's own) the user signs in on the provider's
+// site, then reconnects. Done: signed in with nothing to do (a token it
+// already had). Error also reports a failed CtlMCPCallback, CtlMCPReconnect
+// or CtlMCPSignOut, by Step.
+type MCPAuth struct {
+	Server   string `json:"server"`
+	Step     string `json:"step"` // sign_in | callback | reconnect | sign_out
+	URL      string `json:"url,omitempty"`
+	Callback bool   `json:"callback,omitempty"`
+	Custom   bool   `json:"custom,omitempty"` // the redirect asked for was taken (else the CLI's own listener)
+	Port     int    `json:"port,omitempty"`
+	Done     bool   `json:"done,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
 // ErrAuthFailed is the TurnResult.ErrorCode of a turn the provider refused

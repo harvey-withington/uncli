@@ -300,6 +300,29 @@ func (a *App) Commands(sessionID string) ([]core.CommandInfo, error) {
 	return a.svc.Sessions.Commands(sessionID)
 }
 
+// MCPSignIn starts signing in to one of a session's MCP servers; the UI
+// opens the link it returns (decision 0020).
+func (a *App) MCPSignIn(sessionID, server string) (session.MCPSignIn, error) {
+	return a.svc.Sessions.MCPSignIn(a.ctx, sessionID, server)
+}
+
+// MCPCallback hands on the address the browser ended up on, pasted by the user.
+func (a *App) MCPCallback(sessionID, server, url string) error {
+	return a.svc.Sessions.MCPCallback(sessionID, server, url)
+}
+
+func (a *App) MCPReconnect(sessionID, server string) error {
+	return a.svc.Sessions.MCPReconnect(a.ctx, sessionID, server)
+}
+
+func (a *App) MCPSignOut(sessionID, server string) error {
+	return a.svc.Sessions.MCPSignOut(sessionID, server)
+}
+
+func (a *App) MCPCancel(sessionID, server string) error {
+	return a.svc.Sessions.MCPCancel(sessionID, server)
+}
+
 // AnswerAsk answers a question the model asked (allow, with answers by
 // question) or a plan (allow; or deny with a note on what to change).
 func (a *App) AnswerAsk(sessionID, requestID string, allow bool, answers map[string]string, note string) error {

@@ -15,6 +15,7 @@ import (
 
 	"uncli/internal/artifacts"
 	"uncli/internal/core"
+	"uncli/internal/oauthcatch"
 	"uncli/internal/profile"
 	"uncli/internal/store"
 )
@@ -44,6 +45,19 @@ type Session struct {
 	toldPlace, placeBrief string
 
 	commands []core.CommandInfo // the slash commands its CLI reported (slash.go); nil until it has
+
+	// MCP servers (mcp.go): what the CLI last said about them, sign-ins
+	// waiting for the browser, the last failure by server, answers being
+	// waited for, servers whose status is being watched (until when),
+	// redirects being caught, and reconnects whose failure isn't shown.
+	mcp        []core.MCPServer
+	mcpSigning map[string]bool
+	mcpErrors  map[string]string
+	mcpAnswers map[string]chan core.MCPAuth
+	mcpWatch   map[string]time.Time
+	mcpTicking bool
+	mcpCatch   map[string]*oauthcatch.Catcher
+	mcpQuiet   map[string]bool
 
 	page         *store.Page // the open page, nil when idle
 	closed       *store.Page // the page closed last
@@ -87,7 +101,9 @@ type Session struct {
 func (s *Session) ad() core.Adapter { return s.m.adapterOf(s.rec) }
 
 func newSession(m *Manager, rec store.Session) *Session {
-	s := &Session{m: m, rec: rec, state: Idle}
+	s := &Session{m: m, rec: rec, state: Idle,
+		mcpSigning: map[string]bool{}, mcpErrors: map[string]string{}, mcpAnswers: map[string]chan core.MCPAuth{},
+		mcpWatch: map[string]time.Time{}, mcpCatch: map[string]*oauthcatch.Catcher{}, mcpQuiet: map[string]bool{}}
 	s.toldLocked()
 	if pages, err := m.d.Store.ListPages(rec.ID); err == nil && len(pages) > 0 {
 		last := pages[len(pages)-1]
@@ -108,7 +124,7 @@ func (s *Session) View() View {
 func (s *Session) viewLocked() View {
 	return View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err,
 		Approvals: append([]Approval{}, s.pending...), Unattended: s.unattended, Background: append([]core.BackgroundTask{}, s.background...),
-		Shares: s.sharesLocked(), Shareable: s.m.shareable(s.rec, s.ad().Capabilities())}
+		Shares: s.sharesLocked(), Shareable: s.m.shareable(s.rec, s.ad().Capabilities()), MCP: s.mcpViewLocked()}
 }
 
 func (s *Session) changed() { s.m.d.Sink.SessionChanged(s.viewLocked()) }
@@ -692,6 +708,13 @@ func (s *Session) handle(gen int, ev core.Event) {
 		if len(a.Models) > 0 && s.ad() == s.m.d.Adapter {
 			go s.m.setModels(a.Models)
 		}
+		// The MCP servers connect as the CLI starts: watch until none is pending.
+		if s.ad().Capabilities().MCPSignIn && s.proc != nil {
+			if b, ok := s.encodeControl(core.Control{Kind: core.CtlToolHints}); ok {
+				_, _ = s.proc.Stdin().Write(b)
+				s.watchLocked("", mcpSettle)
+			}
+		}
 	case core.EvToolHints:
 		h, _ := core.Decode[core.ToolHints](ev)
 		s.hints = h.Tools
@@ -700,6 +723,12 @@ func (s *Session) handle(gen int, ev core.Event) {
 	case core.EvCommands:
 		c, _ := core.Decode[core.Commands](ev)
 		s.setCommandsLocked(c)
+	case core.EvMCPServers:
+		l, _ := core.Decode[core.MCPServers](ev)
+		s.mcpServersLocked(l.List)
+	case core.EvMCPAuth:
+		a, _ := core.Decode[core.MCPAuth](ev)
+		s.mcpAuthLocked(a)
 	case core.EvBackground:
 		b, _ := core.Decode[core.BackgroundTasks](ev)
 		s.background = b.Tasks

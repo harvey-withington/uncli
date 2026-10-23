@@ -64,7 +64,7 @@ func (a *Adapter) StatePaths() []string {
 func (a *Adapter) Capabilities() core.Capabilities {
 	return core.Capabilities{
 		PartialStreaming: true, Resume: true, LiveModelSwitch: true, Interrupt: true,
-		Approvals: true, LivePermissionMode: true, ToolHints: true,
+		Approvals: true, LivePermissionMode: true, ToolHints: true, MCPSignIn: true,
 		Images: true, Documents: true, UsageReporting: true, ThinkingEvents: true, SlashPassthrough: true,
 		Import: true, SharedTools: true, SharedSkills: true,
 	}
@@ -301,6 +301,25 @@ func (a *Adapter) EncodeControl(c core.Control) ([]byte, bool) {
 		req = map[string]any{"subtype": "set_permission_mode", "mode": c.Mode}
 	case core.CtlToolHints:
 		req = map[string]any{"subtype": "mcp_status"}
+	case core.CtlMCPSignIn, core.CtlMCPCallback, core.CtlMCPReconnect, core.CtlMCPSignOut:
+		if c.Server == "" {
+			return nil, false
+		}
+		step := mcpSteps[c.Kind]
+		req = map[string]any{"subtype": step.subtype, "serverName": c.Server}
+		switch {
+		case c.Kind == core.CtlMCPSignIn && c.URL != "":
+			req["redirectUri"] = c.URL
+		case c.Kind == core.CtlMCPCallback:
+			if c.URL == "" {
+				return nil, false
+			}
+			req["callbackUrl"] = c.URL
+		}
+		// The answer carries the request id back: it says which server and
+		// step it answers (mcpRequestID).
+		b, err := marshalLine(map[string]any{"type": "control_request", "request_id": mcpRequestID(step.name, c.Server), "request": req})
+		return b, err == nil
 	case core.CtlApprove:
 		resp := map[string]any{"behavior": "deny", "message": c.Message}
 		if c.Allow {
@@ -351,6 +370,30 @@ func marshalLine(v any) ([]byte, error) {
 		return nil, err
 	}
 	return append(b, '\n'), nil
+}
+
+// The MCP sign-in requests (CLI 2.1.285, fixtures mcp-auth-*), by control,
+// with the step name UNCLI reports them under (core.MCPAuth.Step).
+var mcpSteps = map[core.ControlKind]struct{ subtype, name string }{
+	core.CtlMCPSignIn:    {"mcp_authenticate", "sign_in"},
+	core.CtlMCPCallback:  {"mcp_oauth_callback_url", "callback"},
+	core.CtlMCPReconnect: {"mcp_reconnect", "reconnect"},
+	core.CtlMCPSignOut:   {"mcp_clear_auth", "sign_out"},
+}
+
+// mcpRequestID tags a request with its step and server ("mcp.<step>.<random>.<server>"),
+// so its answer, errors included, can be told apart from the others.
+func mcpRequestID(step, server string) string {
+	return "mcp." + step + "." + strings.TrimPrefix(newRequestID(), "uncli_") + "." + server
+}
+
+// mcpRequest reads a tag back: the step and server, or ok false.
+func mcpRequest(id string) (step, server string, ok bool) {
+	parts := strings.SplitN(id, ".", 4)
+	if len(parts) != 4 || parts[0] != "mcp" {
+		return "", "", false
+	}
+	return parts[1], parts[3], true
 }
 
 func newRequestID() string {
