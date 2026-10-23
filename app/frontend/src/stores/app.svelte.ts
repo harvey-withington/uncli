@@ -254,6 +254,13 @@ export class AppStore {
     if (!this.outline.open) this.togglePanel()
   }
 
+  // closeFile puts the File tab back as it starts (no file; the recent and
+  // starred ones stay) and shows On this page.
+  closeFile(sessionId: string) {
+    this.setWatched(sessionId, { ...this.watchedFor(sessionId), current: '' })
+    this.setTab('outline')
+  }
+
   // chooseFile opens the File tab with its switcher open.
   chooseFile() {
     this.setTab('file')

@@ -502,6 +502,7 @@
   "watch.binary": "{path} isn’t a text file.",
   "watch.tooBig": "{path} is over 1 MB, too big to show here. Open it instead.",
   "watch.copy": "Copy the file’s text",
+  "watch.close": "Close the file",
   "nav.togglePin": "Pin this page (P)",
   "pins.title": "Pinned",
   "pins.unpin": "Unpin “{q}”",

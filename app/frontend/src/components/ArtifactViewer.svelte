@@ -4,6 +4,7 @@
   import { useApp } from '../lib/context'
   import { canOpenDefault } from '../lib/files'
   import { t } from '../lib/i18n.svelte'
+  import { keepScroll } from '../lib/scrollmemory'
   import { showToast } from '../lib/toasts.svelte'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import CodeBlock from './CodeBlock.svelte'
@@ -94,7 +95,7 @@
     {/if}
     <button class="btn ghost small icon" onclick={reveal} aria-label={t('files.reveal')} title={t('files.reveal')}><Icon name="folder-search" size={14} /></button>
   </div>
-  <div class="body" class:framed={kind === 'html' || kind === 'svg' || kind === 'mermaid'}>
+  <div class="body" class:framed={kind === 'html' || kind === 'svg' || kind === 'mermaid'} use:keepScroll={{ key: `artifact:${sessionId}:${entry.path}` }}>
     {#if error}
       <p class="note err" role="alert"><Icon name="triangle-alert" size={14} />{error}</p>
     {:else if loading}

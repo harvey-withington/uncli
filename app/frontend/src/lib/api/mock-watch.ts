@@ -12,6 +12,10 @@ function seed(now: number): Record<string, { text: string; modified: number }> {
       text: '# TODO\n\n- [x] Find the flaky parser test\n- [ ] Fix the off-by-one in `scan()`\n- [ ] Add a test for empty input\n\n<details><summary>How to run it</summary>\n\nPress <kbd>Ctrl</kbd>+<kbd>C</kbd> to stop a run, then `go test -count=5 ./internal/...`.\n\n</details>\n',
       modified: now - 2 * MIN,
     },
+    'docs/PLAN.md': {
+      text: '# Plan\n\n' + Array.from({ length: 30 }, (_, i) => `## Step ${i + 1}\n\nWhat step ${i + 1} does, and why it comes here.\n`).join('\n'),
+      modified: now - 20 * MIN,
+    },
     'docs/TODO-later.md': { text: '# Later\n\n- Split the parser into a lexer and a parser\n', modified: now - 3 * 24 * 60 * MIN },
     'docs/notes.md': { text: '# Notes\n\nThe parser reads one token ahead.\n', modified: now - 40 * MIN },
     'src/parser.ts': { text: 'export function scan(input: string): string[] {\n  return input.split(/\\s+/).filter(Boolean)\n}\n', modified: now - 10 * MIN },

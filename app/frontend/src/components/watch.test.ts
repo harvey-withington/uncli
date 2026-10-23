@@ -27,7 +27,7 @@ describe('File tab', () => {
     render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
     await fireEvent.click(screen.getByRole('tab', { name: /File/ }))
     // No file yet: the switcher is the tab, the folder newest first.
-    await waitFor(() => expect(options()).toEqual(['TODO.md', 'parser.ts', 'notes.md', 'build.log', 'TODO-later.md']))
+    await waitFor(() => expect(options()).toEqual(['TODO.md', 'parser.ts', 'PLAN.md', 'notes.md', 'build.log', 'TODO-later.md']))
 
     // Typing TODO puts the latest TODO file at the top.
     await fireEvent.input(screen.getByRole('combobox', { name: 'File name or path' }), { target: { value: 'todo' } })
@@ -43,11 +43,19 @@ describe('File tab', () => {
     // It follows the file as it changes, and says when it goes.
     files.writeWatched('s-code', 'TODO.md', '# Done\n\nAll of it.\n')
     await waitFor(() => expect(within(side).getByRole('heading', { name: 'Done' })).toBeInTheDocument(), { timeout: 3000 })
+    // Gone for a moment (rewritten): the last text stays.
     files.writeWatched('s-code', 'TODO.md', null)
-    await waitFor(() => expect(within(side).getByText(/isn’t in the session folder/)).toBeInTheDocument(), { timeout: 3000 })
+    await new Promise(r => setTimeout(r, 1300))
+    expect(within(side).getByRole('heading', { name: 'Done' })).toBeInTheDocument()
+    expect(within(side).queryByText(/isn’t in the session folder/)).not.toBeInTheDocument()
+    files.writeWatched('s-code', 'TODO.md', '# Rewritten\n')
+    await waitFor(() => expect(within(side).getByRole('heading', { name: 'Rewritten' })).toBeInTheDocument(), { timeout: 3000 })
+    // Gone for good.
+    files.writeWatched('s-code', 'TODO.md', null)
+    await waitFor(() => expect(within(side).getByText(/isn’t in the session folder/)).toBeInTheDocument(), { timeout: 6000 })
     files.writeWatched('s-code', 'TODO.md', '# Back\n')
     await waitFor(() => expect(within(side).getByRole('heading', { name: 'Back' })).toBeInTheDocument(), { timeout: 3000 })
-  })
+  }, 20000)
 
   it('stars a file, lists it first, and shows code as code', async () => {
     const { s } = await code()
@@ -65,6 +73,12 @@ describe('File tab', () => {
     expect(within(screen.getByRole('listbox', { name: 'File name or path' })).getAllByRole('option')[0]).toContainElement(within(side).getByLabelText('Starred'))
     await fireEvent.keyDown(screen.getByRole('combobox', { name: 'File name or path' }), { key: 'Escape' })
     expect(screen.queryByRole('combobox', { name: 'File name or path' })).not.toBeInTheDocument()
+
+    // Close: no file, back on On this page; starred and recent stay.
+    await fireEvent.click(within(side).getByRole('button', { name: 'Close the file' }))
+    expect(screen.getByRole('tab', { name: /On this page/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /^File$/ })).toBeInTheDocument()
+    expect(loadWatched('s-code')).toEqual({ current: '', recent: ['src/parser.ts'], starred: ['src/parser.ts'] })
   })
 
   it('opens from the palette on its switcher, and from a page’s changed files', async () => {

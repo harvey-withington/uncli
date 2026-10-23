@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { tick, untrack } from 'svelte'
+  import { untrack } from 'svelte'
   import type { WatchFile } from '../lib/api'
   import { useApp } from '../lib/context'
   import { canOpenDefault, editorLabel, splitPath } from '../lib/files'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
-  import { atEnd } from '../lib/keep'
+  import { keepScroll } from '../lib/scrollmemory'
   import { showToast } from '../lib/toasts.svelte'
   import { forget, isMarkdown, langOf, pick, toggleStar } from '../lib/watched'
   import AnswerBlocks from './AnswerBlocks.svelte'
@@ -17,9 +17,12 @@
   // The File tab: one text file from the session folder, read again about
   // once a second while it shows, so it follows the agent's edits (a TODO
   // list, a plan, a log). Markdown is rendered; other text shows as code.
-  // The scroll position holds through updates, and a view at the end stays
-  // at the end (a growing log). Which file, the recent ones and the starred
-  // ones are kept per session (lib/watched.ts).
+  // Where the viewer is in each file holds through updates and restarts,
+  // and a view at the end stays at the end (a growing log; see
+  // lib/scrollmemory.ts). A file that goes missing or empty for a moment
+  // (an editor or agent rewriting it) keeps its last text until that has
+  // lasted GRACE_MS. Which file, the recent ones and the starred ones are
+  // kept per session (lib/watched.ts).
 
   interface Props {
     sessionId: string
@@ -28,6 +31,7 @@
   let { sessionId }: Props = $props()
   const app = useApp()
   const POLL_MS = 1000
+  const GRACE_MS = 2500
   const watched = $derived(app.watchedFor(sessionId))
   const current = $derived(watched.current)
   const parts = $derived(splitPath(current))
@@ -40,7 +44,6 @@
   let error = $state('')
   let switching = $state(false)
   let now = $state(Date.now())
-  let body: HTMLElement | undefined = $state()
 
   // The palette's "Watch a file…" asks for the switcher: over the file, or
   // with no file chosen (when it's the tab's content, and only takes the
@@ -63,6 +66,7 @@
     let stopped = false
     let busy = false
     let last: WatchFile | null = null
+    let gone = 0 // when the file went missing or empty, while its last text still shows
     const read = async () => {
       if (busy || (typeof document !== 'undefined' && document.hidden)) return
       busy = true
@@ -72,13 +76,17 @@
         if (stopped) return
         now = Date.now()
         error = ''
-        if (!next) return
-        const end = !!last && !!body && body.scrollTop > 0 && atEnd(body)
-        last = file = next
-        if (end) {
-          await tick()
-          if (body) body.scrollTop = body.scrollHeight
+        if (!next) {
+          gone = 0
+          return
         }
+        // Missing or emptied while it had text: likely mid-rewrite; give it a moment.
+        if (last?.text && (next.missing || (!next.text && !next.binary && !next.tooBig))) {
+          gone ||= Date.now()
+          if (Date.now() - gone < GRACE_MS) return
+        }
+        gone = 0
+        last = file = next
       } catch (e) {
         if (!stopped) error = String(e)
       } finally {
@@ -96,7 +104,6 @@
   function choose(path: string) {
     switching = false
     app.setWatched(sessionId, pick(watched, path))
-    if (body) body.scrollTop = 0
   }
 
   // abs is the file's full path, in the folder's own separators.
@@ -137,6 +144,8 @@
       {#if !file?.missing}
         <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(abs()))} aria-label={t('files.reveal')} title={t('files.reveal')}><Icon name="folder-search" size={14} /></button>
       {/if}
+      <span class="sep" aria-hidden="true"></span>
+      <button class="btn ghost small icon" onclick={() => app.closeFile(sessionId)} aria-label={t('watch.close')} title={t('watch.close')}><Icon name="x" size={14} /></button>
     </div>
     {#if file && !file.missing}
       <p class="when">{t('watch.updated', { when: relativeTime(file.modified, now) })}</p>
@@ -147,7 +156,7 @@
       </div>
     {/if}
   {/if}
-  <div class="body" bind:this={body}>
+  <div class="body" use:keepScroll={{ key: current ? `file:${sessionId}:${current}` : '' }}>
     {#if !current}
       <p class="intro">{t('watch.intro')}</p>
       <FileSwitcher {sessionId} focus={picks} onpick={choose} />
@@ -224,6 +233,12 @@
   }
   .gap {
     flex: 1;
+  }
+  .sep {
+    width: 1px;
+    height: 16px;
+    margin: 0 2px;
+    background: var(--border);
   }
   .on {
     color: var(--warning);
