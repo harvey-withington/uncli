@@ -7,7 +7,8 @@
   import { t } from '../lib/i18n.svelte'
   import { keepScroll } from '../lib/scrollmemory'
   import { showToast } from '../lib/toasts.svelte'
-  import { forget, isMarkdown, langOf, pick, toggleStar } from '../lib/watched'
+  import { sandboxDoc, svgDoc } from '../lib/artifacts'
+  import { forget, isMarkdown, langOf, pageKind, pick, toggleStar } from '../lib/watched'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import CodeBlock from './CodeBlock.svelte'
   import CopyButton from './CopyButton.svelte'
@@ -47,6 +48,16 @@
   let file = $state<WatchFile | null>(null)
   let error = $state('')
   let switching = $state(false)
+  // An HTML or SVG file shows as a page (sandboxed as artifacts are: no
+  // scripts reaching UNCLI, no network), or as its source when asked.
+  const kind = $derived(pageKind(current))
+  let source = $state(false)
+  $effect(() => {
+    void current
+    source = false
+  })
+  const asPage = $derived(!!kind && !source && !!file && !file.missing && !file.binary && !file.tooBig)
+  const pageDoc = $derived(!asPage || !file ? '' : kind === 'svg' ? svgDoc(file.text, '#ffffff') : sandboxDoc(file.text))
   let now = $state(Date.now())
 
   // The palette's "Watch a file…" asks for the switcher: over the file, or
@@ -141,6 +152,12 @@
         aria-label={t(starred ? 'watch.unstar' : 'watch.star')} title={t(starred ? 'watch.unstar' : 'watch.star')}>
         <Icon name="star" size={14} fill={starred} />
       </button>
+      {#if kind && file?.text}
+        <button class="btn ghost small icon" onclick={() => (source = !source)} aria-pressed={source}
+          aria-label={t(source ? 'watch.showPage' : 'watch.showSource')} title={t(source ? 'watch.showPage' : 'watch.showSource')}>
+          <Icon name={source ? 'eye' : 'code'} size={14} />
+        </button>
+      {/if}
       {#if file?.text}<CopyButton text={file.text} label={t('watch.copy')} />{/if}
       {#if openLabel && !file?.missing}
         <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, abs(), 0))} aria-label={openLabel} title={openLabel}><Icon name="external-link" size={14} /></button>
@@ -160,7 +177,7 @@
       </div>
     {/if}
   {/if}
-  <div class="body" use:keepScroll={{ key: current ? `file:${sessionId}:${current}` : '' }}>
+  <div class="body" class:framed={asPage} use:keepScroll={{ key: current ? `file:${sessionId}:${current}` : '' }}>
     {#if !current}
       <p class="intro">{t('watch.intro')}</p>
       <FileSwitcher {sessionId} focus={picks} onpick={choose} />
@@ -177,6 +194,9 @@
       <p class="note">{t('watch.binary', { path: current })}</p>
     {:else if file.tooBig}
       <p class="note">{t('watch.tooBig', { path: current })}</p>
+    {:else if asPage}
+      <!-- svg gets no scripts at all; html's run inside the frame only. -->
+      <iframe class="page" title={parts.name} sandbox={kind === 'svg' ? '' : 'allow-scripts'} srcdoc={pageDoc}></iframe>
     {:else if isMarkdown(current)}
       <div class="doc"><AnswerBlocks markdown={file.text} /></div>
     {:else}
@@ -278,6 +298,16 @@
   }
   .doc {
     padding: var(--space-3) var(--space-4);
+  }
+  .body.framed {
+    overflow: hidden;
+    background: #ffffff; /* pages are made for a page, as artifacts are */
+  }
+  .page {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    border: 0;
   }
   .doc :global(.code) {
     margin: 0;

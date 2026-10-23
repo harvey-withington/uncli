@@ -82,6 +82,13 @@ export function choices(query: string, entries: WatchEntry[], w: Watched): Choic
   return out
 }
 
+// pageKind: shown as a page (in a sandboxed frame) rather than as code,
+// unless the viewer asks for the source; '' for anything else.
+export function pageKind(path: string): 'html' | 'svg' | '' {
+  const m = /\.(html?|svg)$/i.exec(path)
+  return !m ? '' : m[1]?.toLowerCase() === 'svg' ? 'svg' : 'html'
+}
+
 // isMarkdown: shown rendered rather than as code.
 export function isMarkdown(path: string): boolean {
   return /\.(md|markdown|mdx)$/i.test(path)

@@ -12,8 +12,9 @@ the session folder, slash commands, and answers to the agent's questions.
 ### Sessions
 
 - **Watch a file.** The side panel's File tab (F) shows a file from the
-  session's folder and updates as it changes: Markdown rendered, anything
-  else as code. Find one by any part of its name, latest changed first
+  session's folder and updates as it changes: Markdown rendered, HTML and
+  SVG as a page (sandboxed, with a button for the source), anything else as
+  code. Find one by any part of its name, latest changed first
   ("todo" puts the newest TODO file on top); star the ones you come back
   to. Each page's changed files have a Watch button.
 - **Slash commands.** Type / for a menu of the CLI's commands, Tab or Enter

@@ -56,3 +56,14 @@ describe('watched files', () => {
     expect(langOf('build.log')).toBe('text')
   })
 })
+
+describe('pages', () => {
+  it('knows which files show as a page', async () => {
+    const { pageKind } = await import('./watched')
+    expect(pageKind('docs/report.HTML')).toBe('html')
+    expect(pageKind('index.htm')).toBe('html')
+    expect(pageKind('logo.svg')).toBe('svg')
+    expect(pageKind('notes.md')).toBe('')
+    expect(pageKind('page.html.bak')).toBe('')
+  })
+})

@@ -20,6 +20,7 @@ function seed(now: number): Record<string, { text: string; modified: number }> {
     'docs/notes.md': { text: '# Notes\n\nThe parser reads one token ahead.\n', modified: now - 40 * MIN },
     'src/parser.ts': { text: 'export function scan(input: string): string[] {\n  return input.split(/\\s+/).filter(Boolean)\n}\n', modified: now - 10 * MIN },
     'tests/setup/server/instance-01/log/ProcessError_20261023095109_95632424_Cube.GeneralLedger.Demo.LoadFromFile.log': { text: 'Error: no such cube\n', modified: now - 60 * MIN },
+    'docs/report.html': { text: '<!doctype html><html><head><style>body{font:15px system-ui;margin:24px;color:#222}h1{color:#c2410c}td{padding:4px 12px;border-bottom:1px solid #ddd}</style></head><body><h1>Test report</h1><p>All <b>42</b> tests passed.</p><table><tr><td>parser</td><td>18</td></tr><tr><td>session</td><td>24</td></tr></table><script>document.body.insertAdjacentHTML("beforeend", "<p id=js>Scripts run inside the page.</p>")</script></body></html>\n', modified: now - 30 * MIN },
     'build.log': { text: 'building…\nok\n', modified: now - 90 * MIN },
     'logo.bin': { text: '\0', modified: now - 5 * 24 * 60 * MIN },
   }

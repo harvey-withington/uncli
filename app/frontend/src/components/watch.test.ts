@@ -28,7 +28,7 @@ describe('File tab', () => {
     render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
     await fireEvent.click(screen.getByRole('tab', { name: /File/ }))
     // No file yet: the switcher is the tab, the folder newest first.
-    await waitFor(() => expect(options()).toEqual(['TODO.md', 'parser.ts', 'PLAN.md', 'notes.md', 'ProcessError_20261023095109_95632424_Cube.GeneralLedger.Demo.LoadFromFile.log', 'build.log', 'TODO-later.md']))
+    await waitFor(() => expect(options()).toEqual(['TODO.md', 'parser.ts', 'PLAN.md', 'report.html', 'notes.md', 'ProcessError_20261023095109_95632424_Cube.GeneralLedger.Demo.LoadFromFile.log', 'build.log', 'TODO-later.md']))
 
     // Typing TODO puts the latest TODO file at the top.
     await fireEvent.input(screen.getByRole('combobox', { name: 'File name or path' }), { target: { value: 'todo' } })
@@ -108,5 +108,27 @@ describe('File tab', () => {
       await fireEvent.click(screen.getByRole('button', { name: 'Watch it on the File tab: parser.go' }))
       expect(loadWatched('s-code').current).toBe('internal/adapter/claude/parser.go')
     })
+  })
+
+  it('shows an HTML file as a sandboxed page, or its source', async () => {
+    const { s } = await code()
+    s.watchFile('s-code', 'docs/report.html')
+    render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
+    const side = screen.getByRole('complementary')
+    const frame = await waitFor(() => {
+      const f = side.querySelector('iframe')
+      if (!f) throw new Error('no page yet')
+      return f
+    })
+    // As artifacts are: scripts only inside the frame (no same origin), no network.
+    expect(frame).toHaveAttribute('sandbox', 'allow-scripts')
+    expect(frame.getAttribute('srcdoc')).toContain("default-src 'none'")
+    expect(frame.getAttribute('srcdoc')).toContain('<h1>Test report</h1>')
+    expect(frame).toHaveAttribute('title', 'report.html')
+    await fireEvent.click(within(side).getByRole('button', { name: 'Show the source' }))
+    expect(side.querySelector('iframe')).toBeNull()
+    expect(side.querySelector('.code')).toHaveTextContent('<h1>Test report</h1>')
+    await fireEvent.click(within(side).getByRole('button', { name: /^Show the page/ }))
+    expect(side.querySelector('iframe')).not.toBeNull()
   })
 })

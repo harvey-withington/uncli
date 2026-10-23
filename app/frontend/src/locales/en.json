@@ -504,6 +504,8 @@
   "watch.tooBig": "{path} is over 1 MB, too big to show here. Open it instead.",
   "watch.copy": "Copy the file’s text",
   "watch.close": "Close the file",
+  "watch.showSource": "Show the source",
+  "watch.showPage": "Show the page (files it links to, such as stylesheets and images, don't load)",
   "nav.togglePin": "Pin this page (P)",
   "pins.title": "Pinned",
   "pins.unpin": "Unpin “{q}”",
