@@ -205,8 +205,8 @@
         </div>
       </footer>
     </div>
-    {#if page && app.outline.open}
-      <SidePanel {page} {scroller} />
+    {#if app.outline.open && (page || app.tabFor(session.id) === 'file')}
+      <SidePanel sessionId={session.id} page={page ?? null} {scroller} />
     {/if}
   </div>
 </section>

@@ -88,6 +88,9 @@ apply changes.
 - Chat and Co-work sessions keep their **artifacts** (HTML, SVG, Mermaid,
   Markdown, images) version by version. The side panel's Artifacts tab (or
   A) shows them as they were at the page you're on, beside On this page (O).
+- **Watch a file** from the session folder on the side panel's File tab (F):
+  a TODO list, a plan or a log, rendered and updated as it changes. Type part
+  of a name to find one, latest changed first; star the ones you come back to.
 - A **desktop notification** says when a session you aren't looking at
   finishes or needs approval (Settings → Notifications).
 - **Import** a conversation Claude Code saved (New session → Continue a

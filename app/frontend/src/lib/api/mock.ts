@@ -11,6 +11,7 @@ import { mockUsageReport } from './mock-usage'
 import { mockTheme } from './mock-theme'
 import { mockContainers } from './mock-containers'
 import { mockTranscriptPages, mockTranscripts } from './mock-import'
+import { mockWatch } from './mock-watch'
 
 const profiles: Bootstrap['profiles'] = [
   { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false, artifacts: true, isolated: true, shares: ['tools', 'skills'] },
@@ -880,6 +881,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     async openFile() {},
     async openPath() {},
     async revealFile() {},
+    ...mockWatch(),
     async usageReport(q) { return mockUsageReport(q) },
     async theme() { return mockTheme() },
     ...containers,

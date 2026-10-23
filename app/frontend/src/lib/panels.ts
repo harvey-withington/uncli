@@ -63,10 +63,10 @@ export function saveQuestionCompact(compact: boolean) {
   }
 }
 
-// The side panel's tabs, "On this page" and "Artifacts": which one is
-// showing. Whether the panel is open, and its width (one for both tabs),
+// The side panel's tabs, "On this page", "Artifacts" and "File" (a file
+// from the session folder, watched live): which one is showing. Whether the panel is open, and its width (one for both tabs),
 // are the outline layout's (lib/outline.ts).
-export type PanelTab = 'outline' | 'artifacts'
+export type PanelTab = 'outline' | 'artifacts' | 'file'
 
 const PANEL_KEY = 'uncli-panel'
 
@@ -77,7 +77,7 @@ export interface PanelLayout {
 export function loadPanelLayout(): PanelLayout {
   try {
     const v = JSON.parse(localStorage.getItem(PANEL_KEY) ?? 'null') as Partial<PanelLayout> | null
-    if (v) return { tab: v.tab === 'artifacts' ? 'artifacts' : 'outline' }
+    if (v) return { tab: v.tab === 'artifacts' || v.tab === 'file' ? v.tab : 'outline' }
   } catch {
     // fall through to the defaults
   }

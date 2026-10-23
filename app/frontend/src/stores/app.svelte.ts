@@ -7,6 +7,7 @@ import type {
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
 import { loadLastSession, saveLastSession } from '../lib/keep'
+import { loadWatched, pick, saveWatched, type Watched } from '../lib/watched'
 import { toBlocks } from '../lib/render/markdown'
 import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
@@ -54,11 +55,15 @@ export class AppStore {
   keysOpen = $state(false) // the keyboard map
   importOpen = $state(false) // the import picker (saved CLI conversations)
   outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
-  // The side panel's tab ("On this page" or "Artifacts"; its open state and
+  // The side panel's tab ("On this page", "Artifacts" or "File"; its open state and
   // width are outline's), the artifact each session shows there, and what is in each session's artifacts folder now.
   panel = $state(loadPanelLayout())
   artifactSel = $state<Record<string, string>>({})
   artifactLive = $state<Record<string, ArtifactFile[]>>({})
+  // The File tab's choices per session (lib/watched.ts), loaded as they're
+  // first changed, and a request for its switcher (the File tab takes it).
+  watched = $state<Record<string, Watched>>({})
+  fileSwitcher = $state(false)
   sidebarWidth = $state(loadSidebarWidth())
   questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
   headerCompact = $state(loadHeaderCompact()) // the session header collapsed to two lines
@@ -212,6 +217,7 @@ export class AppStore {
   // tabFor is the tab a session shows: Artifacts only for a session type
   // that keeps them.
   tabFor(sessionId: string | null): PanelTab {
+    if (this.panel.tab === 'file') return 'file'
     return this.panel.tab === 'artifacts' && this.hasArtifacts(sessionId) ? 'artifacts' : 'outline'
   }
 
@@ -228,6 +234,31 @@ export class AppStore {
     this.setTab('artifacts')
     if (!this.outline.open) this.togglePanel()
     else void this.refreshArtifacts(sessionId)
+  }
+
+  // watchedFor is a session's File tab choices.
+  watchedFor(sessionId: string): Watched {
+    return this.watched[sessionId] ?? loadWatched(sessionId)
+  }
+
+  setWatched(sessionId: string, w: Watched) {
+    this.watched[sessionId] = w
+    saveWatched(sessionId, w)
+  }
+
+  // watchFile shows a file from the session folder (relative to it) on the
+  // File tab, where it updates as it changes.
+  watchFile(sessionId: string, path: string) {
+    this.setWatched(sessionId, pick(this.watchedFor(sessionId), path))
+    this.setTab('file')
+    if (!this.outline.open) this.togglePanel()
+  }
+
+  // chooseFile opens the File tab with its switcher open.
+  chooseFile() {
+    this.setTab('file')
+    if (!this.outline.open) this.togglePanel()
+    this.fileSwitcher = true
   }
 
   // refreshArtifacts reads what is in a session's artifacts folder now.

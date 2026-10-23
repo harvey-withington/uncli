@@ -77,6 +77,6 @@ describe('Artifact pane', () => {
     const s = new AppStore(mockBackend())
     await s.init()
     render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
-    expect(screen.getAllByRole('tab').map(t => t.querySelector('.name')?.textContent)).toEqual(['On this page'])
+    expect(screen.getAllByRole('tab').map(t => t.querySelector('.name')?.textContent)).toEqual(['On this page', 'File'])
   })
 })

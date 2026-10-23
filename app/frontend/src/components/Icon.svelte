@@ -81,6 +81,7 @@
   import FileX from 'lucide-svelte/icons/file-x'
   import FileCode from 'lucide-svelte/icons/file-code'
   import History from 'lucide-svelte/icons/history'
+  import Star from 'lucide-svelte/icons/star'
 
   // Icon names as used in YAML config (Lucide's kebab-case), plus a few
   // the app uses itself. Unknown names fall back to a neutral glyph.
@@ -94,7 +95,7 @@
     sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
     eye: Eye, 'globe-lock': GlobeLock, hand: Hand, zap: Zap,
-    bell: Bell, 'file-pen': FilePen, 'file-plus': FilePlus, terminal: Terminal, 'external-link': ExternalLink, 'folder-search': FolderSearch, layers: Layers, 'file-x': FileX, 'file-code': FileCode, history: History,
+    bell: Bell, 'file-pen': FilePen, 'file-plus': FilePlus, terminal: Terminal, 'external-link': ExternalLink, 'folder-search': FolderSearch, layers: Layers, 'file-x': FileX, 'file-code': FileCode, history: History, star: Star,
     pin: Pin, 'pin-off': PinOff, archive: Archive, 'archive-restore': ArchiveRestore,
   } as const
 

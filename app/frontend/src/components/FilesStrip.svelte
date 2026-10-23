@@ -3,6 +3,7 @@
   import type { TouchedFile } from '../lib/api'
   import { useApp } from '../lib/context'
   import { artifactPathOf } from '../lib/artifacts'
+  import { watchPathOf } from '../lib/watched'
   import { canOpenDefault, editorLabel, HOW_ICON, relPath, splitPath } from '../lib/files'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
@@ -12,7 +13,8 @@
   // session folder, with how it changed (created, edited at a line, changed
   // or deleted by a command). A session that links to an IDE opens a file
   // in the user's editor at its line; others open documents with the
-  // default app. Every file that still exists can be shown in its folder.
+  // default app. Every file that still exists can be shown in its folder,
+  // and one in the session folder watched on the side panel's File tab.
 
   interface Props {
     files: TouchedFile[] | null | undefined
@@ -57,6 +59,7 @@
           {@const parts = splitPath(rel)}
           {@const label = f.how === 'deleted' ? '' : openLabel(f)}
           {@const artifact = artifacts && f.how !== 'deleted' ? artifactPathOf(session?.workdir ?? '', f.path) : null}
+          {@const watchable = f.how !== 'deleted' ? watchPathOf(session?.workdir ?? '', f.path) : null}
           <li class={f.how}>
             <span class="how" title={t(`files.how.${f.how}`)}><Icon name={HOW_ICON[f.how]} size={13} /></span>
             {#snippet path()}
@@ -82,6 +85,11 @@
                 {#if artifact}
                   <button class="btn ghost small icon" onclick={() => app.openArtifact(sessionId, artifact)} aria-label={`${t('files.view')}: ${parts.name}`} title={t('files.view')}>
                     <Icon name="layers" size={13} />
+                  </button>
+                {/if}
+                {#if watchable}
+                  <button class="btn ghost small icon" onclick={() => app.watchFile(sessionId, watchable)} aria-label={`${t('files.watch')}: ${parts.name}`} title={t('files.watch')}>
+                    <Icon name="eye" size={13} />
                   </button>
                 {/if}
                 {#if label}

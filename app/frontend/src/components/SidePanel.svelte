@@ -6,36 +6,41 @@
   import { OUTLINE_MAX, OUTLINE_MIN } from '../lib/outline'
   import type { PanelTab } from '../lib/panels'
   import ArtifactPane from './ArtifactPane.svelte'
+  import FilePane from './FilePane.svelte'
   import OutlinePanel from './OutlinePanel.svelte'
+  import Icon from './Icon.svelte'
   import ResizeHandle from './ResizeHandle.svelte'
 
-  // The side panel beside the answer: "On this page" and, for session
-  // types that keep artifacts, "Artifacts", as tabs. Each tab's badge says
-  // how many sections or artifacts the page has, and each tab keeps its
-  // own width (the artifact viewer wants more room than the outline). The
-  // left edge resizes the tab showing.
+  // The side panel beside the answer: "On this page", for session types
+  // that keep artifacts "Artifacts", and "File" (a file from the session
+  // folder, watched live), as tabs. The first two have a badge with how
+  // many sections or artifacts the page has; File is named for the file it
+  // shows. The left edge resizes the panel. A session with no page yet
+  // shows the panel only on its File tab.
 
   interface Props {
-    page: Page
+    sessionId: string
+    page: Page | null
     scroller: HTMLElement | undefined
   }
 
-  let { page, scroller }: Props = $props()
+  let { sessionId, page, scroller }: Props = $props()
   const app = useApp()
-  const sessionId = $derived(page.sessionId)
   const hasArtifacts = $derived(app.hasArtifacts(sessionId))
   const tab = $derived(app.tabFor(sessionId))
-  const tabs = $derived<PanelTab[]>(hasArtifacts ? ['outline', 'artifacts'] : ['outline'])
+  const tabs = $derived<PanelTab[]>(hasArtifacts ? ['outline', 'artifacts', 'file'] : ['outline', 'file'])
+  const watching = $derived(app.watchedFor(sessionId).current)
 
-  const sections = $derived(app.outlineFor(page).entries.length)
+  const sections = $derived(page ? app.outlineFor(page).entries.length : 0)
   const artifacts = $derived.by(() => {
-    if (!hasArtifacts) return 0
+    if (!hasArtifacts || !page) return 0
     const pages = app.pages[sessionId] ?? []
     const index = Math.max(0, pages.findIndex(p => p.id === page.id))
     return artifactsAt(pages, index, app.artifactLive[sessionId] ?? null).length
   })
 
-  const label = (k: PanelTab) => t(k === 'artifacts' ? 'artifacts.title' : 'outline.title')
+  const label = (k: PanelTab) =>
+    k === 'file' ? watching.slice(watching.lastIndexOf('/') + 1) || t('watch.title') : t(k === 'artifacts' ? 'artifacts.title' : 'outline.title')
   const count = (k: PanelTab) => (k === 'artifacts' ? artifacts : sections)
   const countLabel = (k: PanelTab) => {
     const key = k === 'artifacts' ? 'panel.artifactCount' : 'panel.sectionCount'
@@ -75,13 +80,22 @@
         class:on={tab === k}
         onclick={() => choose(k)}
       >
-        <span class="name">{label(k)}</span>
-        <span class="badge" aria-label={countLabel(k)} title={countLabel(k)}>{count(k)}</span>
+        {#if k === 'file'}
+          <Icon name="eye" size={13} />
+          <span class="name file" title={watching || undefined}>{label(k)}</span>
+        {:else}
+          <span class="name">{label(k)}</span>
+          {#if page}<span class="badge" aria-label={countLabel(k)} title={countLabel(k)}>{count(k)}</span>{/if}
+        {/if}
       </button>
     {/each}
   </div>
   <div class="body" id="side-panel" role="tabpanel" aria-labelledby="side-tab-{tab}">
-    {#if tab === 'artifacts'}
+    {#if tab === 'file'}
+      <FilePane {sessionId} />
+    {:else if !page}
+      <p class="none">{t('panel.noPage')}</p>
+    {:else if tab === 'artifacts'}
       <ArtifactPane {page} />
     {:else}
       <OutlinePanel {page} {scroller} />
@@ -126,6 +140,16 @@
   .tabs button.on {
     border-bottom-color: var(--accent);
     color: var(--text);
+  }
+  .name.file {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .none {
+    margin: var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
   }
   .badge {
     min-width: 18px;

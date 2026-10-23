@@ -382,6 +382,25 @@ export interface CommandInfo {
   hint?: string
 }
 
+// A text file in a session's folder (watch.Entry), by its path relative to
+// the folder, with slashes; modified is Unix milliseconds.
+export interface WatchEntry {
+  path: string
+  size: number
+  modified: number
+}
+
+// A watched file as read (watch.File): its text, or why there is none.
+export interface WatchFile {
+  path: string
+  text: string
+  size: number
+  modified: number
+  missing?: boolean // not there (deleted, or not yet written)
+  binary?: boolean
+  tooBig?: boolean // over 1 MB
+}
+
 export interface Capabilities {
   partialStreaming: boolean
   resume: boolean
@@ -731,6 +750,8 @@ export interface Backend {
   openFile(sessionId: string, path: string, line: number): Promise<void> // editor at line (IDE-linked sessions) or default app (documents)
   openPath(sessionId: string, path: string, line: number): Promise<void> // a link in an answer: a file as openFile, a folder shown
   revealFile(path: string): Promise<void> // shows it in its folder
+  watchFiles(sessionId: string, query: string): Promise<WatchEntry[]> // its folder's text files matching query, newest first (50 at most)
+  watchRead(sessionId: string, path: string, since: number): Promise<WatchFile | null> // null: unchanged since modified (-1: it was missing)
   editors(): Promise<Editor[]>
   transcripts(): Promise<TranscriptEntry[]> // conversations the CLI saved, newest first
   importTranscript(id: string, profileId: string): Promise<ImportedSession> // empty profile: guessed

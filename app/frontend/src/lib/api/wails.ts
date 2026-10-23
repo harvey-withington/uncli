@@ -126,6 +126,8 @@ export function wailsBackend(): Backend {
     openFile: (s, p, l) => call('OpenFile', s, p, l),
     openPath: (s, p, l) => call('OpenPath', s, p, l),
     revealFile: p => call('RevealFile', p),
+    watchFiles: (s, q) => call('WatchFiles', s, q),
+    watchRead: (s, p, since) => call('WatchRead', s, p, since),
     editors: () => call('Editors'),
     transcripts: () => call('Transcripts'),
     importTranscript: (id, p) => call('ImportTranscript', id, p),

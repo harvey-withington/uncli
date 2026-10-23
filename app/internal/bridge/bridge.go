@@ -24,6 +24,7 @@ import (
 	"uncli/internal/ide"
 	"uncli/internal/session"
 	"uncli/internal/store"
+	"uncli/internal/watch"
 )
 
 // App is bound to the frontend as window.go.bridge.App.
@@ -280,6 +281,17 @@ func (a *App) ExplainCommand(sessionID, command string) (session.Explanation, er
 // SessionAllowlist is the list of what a session's type counts as safe, as written.
 func (a *App) SessionAllowlist(sessionID string) ([]string, error) {
 	return a.svc.Sessions.SessionAllowlist(sessionID)
+}
+
+// WatchFiles lists the text files in a session's folder whose path contains
+// query, most recently changed first (the File tab's switcher).
+func (a *App) WatchFiles(sessionID, query string) ([]watch.Entry, error) {
+	return a.svc.WatchFiles(sessionID, query)
+}
+
+// WatchRead reads a file for the File tab; nil when unchanged since modified.
+func (a *App) WatchRead(sessionID, path string, since int64) (*watch.File, error) {
+	return a.svc.WatchRead(sessionID, path, since)
 }
 
 // Commands lists the slash commands a session's CLI takes, for the menu

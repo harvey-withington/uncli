@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"uncli/internal/ide"
+	watched "uncli/internal/watch"
 )
 
 // Opening the files a page lists: sessions whose type links to an IDE
@@ -70,3 +71,27 @@ func (s *Service) OpenPath(sessionID, path string, line int) error {
 
 // RevealFile shows a file in its folder.
 func (s *Service) RevealFile(path string) error { return ide.Reveal(path) }
+
+// WatchFiles lists the text files in a session's folder whose path contains
+// query, most recently changed first: the File tab's switcher.
+func (s *Service) WatchFiles(sessionID, query string) ([]watched.Entry, error) {
+	v, err := s.Sessions.View(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return watched.List(v.Workdir, query, 50)
+}
+
+// WatchRead reads a file in a session's folder for the File tab, or nil
+// when it hasn't changed since modified (-1: it was missing).
+func (s *Service) WatchRead(sessionID, path string, since int64) (*watched.File, error) {
+	v, err := s.Sessions.View(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	f, changed, err := watched.Read(v.Workdir, path, since)
+	if err != nil || !changed {
+		return nil, err
+	}
+	return &f, nil
+}

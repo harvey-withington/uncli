@@ -44,6 +44,7 @@ export const SHORTCUTS: { id: string; group: Group; label: string; keys: Key[] }
   { id: 'pin', group: 'page', label: 'keys.pin', keys: [{ key: 'p' }] },
   { id: 'outline', group: 'panel', label: 'cmd.outline', keys: [{ key: 'o' }] },
   { id: 'artifacts', group: 'panel', label: 'cmd.artifacts', keys: [{ key: 'a' }] },
+  { id: 'file', group: 'panel', label: 'cmd.file', keys: [{ key: 'f' }] },
 ]
 
 const keysOf = (id: string) => SHORTCUTS.find(x => x.id === id)?.keys
@@ -105,6 +106,8 @@ export function commands(app: AppStore): Command[] {
   // The side panel.
   add({ id: 'outline', group: 'panel', label: t('cmd.outline'), keys: keysOf('outline'), run: () => app.showTab('outline') })
   if (app.hasArtifacts(session.id)) add({ id: 'artifacts', group: 'panel', label: t('cmd.artifacts'), keys: keysOf('artifacts'), run: () => app.showTab('artifacts') })
+  add({ id: 'file', group: 'panel', label: t('cmd.file'), keys: keysOf('file'), run: () => app.showTab('file') })
+  add({ id: 'watch', group: 'panel', label: t('cmd.watch'), run: () => app.chooseFile() })
   add({ id: 'panel', group: 'panel', label: t('cmd.panel'), run: () => app.togglePanel() })
   add({ id: 'compactHeader', group: 'panel', label: t(app.headerCompact ? 'cmd.expandHeader' : 'cmd.compactHeader'), run: () => app.toggleHeaderCompact() })
   add({ id: 'compact', group: 'panel', label: t(app.questionCompact ? 'cmd.expandQuestion' : 'cmd.compactQuestion'), run: () => app.toggleQuestionCompact() })
