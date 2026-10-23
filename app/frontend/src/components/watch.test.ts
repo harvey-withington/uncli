@@ -28,7 +28,7 @@ describe('File tab', () => {
     render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
     await fireEvent.click(screen.getByRole('tab', { name: /File/ }))
     // No file yet: the switcher is the tab, the folder newest first.
-    await waitFor(() => expect(options()).toEqual(['TODO.md', 'parser.ts', 'PLAN.md', 'notes.md', 'build.log', 'TODO-later.md']))
+    await waitFor(() => expect(options()).toEqual(['TODO.md', 'parser.ts', 'PLAN.md', 'notes.md', 'ProcessError_20261023095109_95632424_Cube.GeneralLedger.Demo.LoadFromFile.log', 'build.log', 'TODO-later.md']))
 
     // Typing TODO puts the latest TODO file at the top.
     await fireEvent.input(screen.getByRole('combobox', { name: 'File name or path' }), { target: { value: 'todo' } })

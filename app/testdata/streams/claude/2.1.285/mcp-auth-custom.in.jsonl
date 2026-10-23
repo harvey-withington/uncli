@@ -1,0 +1,6 @@
+{"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":null}}
+{"type":"control_request","request_id":"req_2","request":{"subtype":"mcp_status"}}
+{"type":"control_request","request_id":"req_3","request":{"subtype":"mcp_authenticate","serverName":"locked","redirectUri":"http://127.0.0.1:47099/cb"}}
+{"type":"control_request","request_id":"req_4","request":{"subtype":"mcp_oauth_callback_url","serverName":"locked","callbackUrl":"http://127.0.0.1:47099/cb?code=code-abc&state=LoGN4a_Dx8Ov3bSe_VRs9M7oCX2Tvo6N_6xmldUoFoo"}}
+{"type":"control_request","request_id":"req_5","request":{"subtype":"mcp_reconnect","serverName":"locked"}}
+{"type":"control_request","request_id":"req_6","request":{"subtype":"mcp_status"}}

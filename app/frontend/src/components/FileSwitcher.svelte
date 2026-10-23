@@ -4,6 +4,7 @@
   import { splitPath } from '../lib/files'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
+  import { reveal } from '../lib/scrollmemory'
   import { choices } from '../lib/watched'
   import Icon from './Icon.svelte'
 
@@ -68,8 +69,14 @@
     void query
     active = 0
   })
+  // The list follows the highlighted row as the keys move it (not as the
+  // pointer does: that would scroll the list under the pointer).
+  let byKeys = false
   $effect(() => {
-    listEl?.querySelector(`#watch-opt-${active}`)?.scrollIntoView?.({ block: 'nearest' })
+    const row = listEl?.querySelector(`#watch-opt-${active}`)
+    if (!byKeys) return
+    byKeys = false
+    reveal(row)
   })
 
   function onkeydown(e: KeyboardEvent) {
@@ -79,9 +86,11 @@
       onclose()
     } else if (e.key === 'ArrowDown' && n) {
       e.preventDefault()
+      byKeys = true
       active = (active + 1) % n
     } else if (e.key === 'ArrowUp' && n) {
       e.preventDefault()
+      byKeys = true
       active = (active - 1 + n) % n
     } else if (e.key === 'Enter') {
       e.preventDefault()
@@ -146,6 +155,7 @@
   .switcher {
     display: flex;
     flex-direction: column;
+    min-width: 0; /* long names cut short; the list never grows past its box */
     min-height: 0;
   }
   .overlay {
@@ -211,8 +221,8 @@
     white-space: nowrap;
   }
   .name {
-    flex: none;
-    max-width: 100%;
+    flex: 0 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text);
@@ -223,6 +233,7 @@
     color: var(--accent);
   }
   .dir {
+    flex: 0 10 auto; /* the folder gives way before the name */
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

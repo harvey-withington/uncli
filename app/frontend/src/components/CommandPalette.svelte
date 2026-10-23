@@ -5,6 +5,7 @@
   import { commands, keyLabel, loadRecent, rank, saveRecent, type Command } from '../lib/commands'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { reveal } from '../lib/scrollmemory'
   import Icon from './Icon.svelte'
 
   // The command palette (Ctrl+Shift+P, F1): every action that can run now,
@@ -27,8 +28,14 @@
     void query
     active = 0
   })
+  // The list follows the highlighted row as the keys move it, never the
+  // pointer, and only the list scrolls (lib/scrollmemory.ts reveal).
+  let byKeys = false
   $effect(() => {
-    listEl?.querySelector(`#palette-opt-${active}`)?.scrollIntoView?.({ block: 'nearest' })
+    const row = listEl?.querySelector(`#palette-opt-${active}`)
+    if (!byKeys) return
+    byKeys = false
+    reveal(row)
   })
 
   function close() {
@@ -47,9 +54,11 @@
       close()
     } else if (e.key === 'ArrowDown' && n) {
       e.preventDefault()
+      byKeys = true
       active = (active + 1) % n
     } else if (e.key === 'ArrowUp' && n) {
       e.preventDefault()
+      byKeys = true
       active = (active - 1 + n) % n
     } else if (e.key === 'Enter') {
       e.preventDefault()

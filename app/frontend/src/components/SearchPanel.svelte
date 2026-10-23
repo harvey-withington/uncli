@@ -2,6 +2,7 @@
   import type { SearchHit, SearchQuery } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { reveal } from '../lib/scrollmemory'
   import { groupHits, RANGE_DAYS, snippetParts, type SearchRange } from '../lib/search'
   import { tintStyle } from '../lib/tint'
   import { showToast } from '../lib/toasts.svelte'
@@ -53,7 +54,7 @@
   }
 
   function scrollActive() {
-    queueMicrotask(() => document.querySelector('.search-results .hit.active')?.scrollIntoView?.({ block: 'nearest' }))
+    queueMicrotask(() => reveal(document.querySelector('.search-results .hit.active')))
   }
 
   function open(hit: SearchHit) {

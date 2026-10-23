@@ -19,6 +19,7 @@ function seed(now: number): Record<string, { text: string; modified: number }> {
     'docs/TODO-later.md': { text: '# Later\n\n- Split the parser into a lexer and a parser\n', modified: now - 3 * 24 * 60 * MIN },
     'docs/notes.md': { text: '# Notes\n\nThe parser reads one token ahead.\n', modified: now - 40 * MIN },
     'src/parser.ts': { text: 'export function scan(input: string): string[] {\n  return input.split(/\\s+/).filter(Boolean)\n}\n', modified: now - 10 * MIN },
+    'tests/setup/server/instance-01/log/ProcessError_20261023095109_95632424_Cube.GeneralLedger.Demo.LoadFromFile.log': { text: 'Error: no such cube\n', modified: now - 60 * MIN },
     'build.log': { text: 'building…\nok\n', modified: now - 90 * MIN },
     'logo.bin': { text: '\0', modified: now - 5 * 24 * 60 * MIN },
   }

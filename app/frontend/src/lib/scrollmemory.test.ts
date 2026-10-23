@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { forced, keepScroll, loadSpot, saveSpot, SPOTS_MAX, spotOf } from './scrollmemory'
+import { forced, keepScroll, loadSpot, reveal, saveSpot, SPOTS_MAX, spotOf } from './scrollmemory'
 
 // A scroller jsdom can measure: content height and viewport height are set
 // by hand, and scrollTop is clamped as a browser does.
@@ -99,5 +99,29 @@ describe('scroll memory', () => {
     await frames()
     expect(s.el.scrollTop).toBe(2600)
     keep.destroy()
+  })
+
+  it('reveals a row by scrolling its own list only, up or down', () => {
+    const outer = document.createElement('div')
+    outer.style.overflowY = 'auto'
+    const list = document.createElement('ul')
+    list.style.overflowY = 'auto'
+    const row = document.createElement('li')
+    list.append(row)
+    outer.append(list)
+    document.body.append(outer)
+    Object.defineProperty(list, 'clientHeight', { get: () => 100 })
+    Object.defineProperty(row, 'offsetHeight', { get: () => 20 })
+    list.getBoundingClientRect = () => ({ top: 50 }) as DOMRect
+    let rowTop = 200 // below the list's 100 px
+    row.getBoundingClientRect = () => ({ top: rowTop - list.scrollTop + 50 }) as DOMRect
+    reveal(row)
+    expect(list.scrollTop).toBe(120) // its bottom (220) at the list's bottom
+    expect(outer.scrollTop).toBe(0)
+    expect(outer.scrollLeft).toBe(0)
+    rowTop = 40 // above the view now
+    reveal(row)
+    expect(list.scrollTop).toBe(40)
+    reveal(null)
   })
 })

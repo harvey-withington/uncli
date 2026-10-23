@@ -82,6 +82,10 @@ func TestEveryFixtureParses(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			evs := parseFixture(t, name)
+			// The MCP sign-in recordings are control requests only: no turn.
+			if strings.HasPrefix(name, "mcp-auth-") {
+				return
+			}
 			if len(ofKind(evs, core.EvTurnResult)) == 0 {
 				t.Error("no turn result")
 			}

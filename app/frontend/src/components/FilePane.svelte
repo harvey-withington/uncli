@@ -247,13 +247,18 @@
   .on {
     color: var(--warning);
   }
+  /* The switcher over the file: anchored to the panel's right edge, the
+     panel's width or 560 px if that's wider (it then reaches left, over
+     the answer, never right, out of the window), and never wider than
+     the window. */
   .float {
     position: absolute;
     top: 38px;
-    left: var(--space-2);
     right: var(--space-2);
     z-index: 5;
     display: flex;
+    width: max(calc(100% - 2 * var(--space-2)), 560px);
+    max-width: calc(100vw - 2 * var(--space-4));
     max-height: min(420px, 70%);
   }
   .when {

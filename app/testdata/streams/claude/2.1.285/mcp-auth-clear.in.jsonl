@@ -1,0 +1,8 @@
+{"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":null}}
+{"type":"control_request","request_id":"req_2","request":{"subtype":"mcp_status"}}
+{"type":"control_request","request_id":"req_3","request":{"subtype":"mcp_authenticate","serverName":"locked"}}
+{"type":"control_request","request_id":"req_4","request":{"subtype":"mcp_status"}}
+{"type":"control_request","request_id":"req_5","request":{"subtype":"mcp_clear_auth","serverName":"locked"}}
+{"type":"control_request","request_id":"req_6","request":{"subtype":"mcp_status"}}
+{"type":"control_request","request_id":"req_7","request":{"subtype":"mcp_reconnect","serverName":"locked"}}
+{"type":"control_request","request_id":"req_8","request":{"subtype":"mcp_status"}}

@@ -152,3 +152,18 @@ export function keepScroll(el: HTMLElement, options: ScrollOptions) {
     },
   }
 }
+
+// reveal scrolls the nearest scrolling box around an item (a list's
+// highlighted row) just enough to show it, up or down only. Unlike
+// scrollIntoView it moves nothing else: not the boxes further out, and not
+// sideways, so a drop-down reaching past its panel can't shift the app.
+export function reveal(item: Element | null | undefined) {
+  if (!(item instanceof HTMLElement)) return
+  let box = item.parentElement
+  while (box && !/(auto|scroll)/.test(getComputedStyle(box).overflowY)) box = box.parentElement
+  if (!box) return
+  const top = item.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop
+  const bottom = top + item.offsetHeight
+  if (top < box.scrollTop) box.scrollTop = top
+  else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight
+}
