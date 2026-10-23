@@ -196,6 +196,11 @@ func (s *Service) RunTextTask(ctx context.Context, t core.TextTask) (core.TextRe
 	t.Model = ref.Model
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
+	// It stops when UNCLI closes, too, whoever asked for it.
+	if s.life != nil {
+		stop := context.AfterFunc(s.life, cancel)
+		defer stop()
+	}
 	// An empty folder of its own: from any other the CLI would read that
 	// folder's CLAUDE.md and memory into the task.
 	dir := filepath.Join(s.Paths.Cache, "quick-tasks")

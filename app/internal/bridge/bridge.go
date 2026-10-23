@@ -5,7 +5,11 @@ package bridge
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -94,7 +98,7 @@ func Run(assets fs.FS) error {
 		AssetServer:      &assetserver.Options{Assets: assets},
 		BackgroundColour: &options.RGBA{R: 250, G: 250, B: 249, A: 255},
 		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "app.uncli.desktop",
+			UniqueId: instanceID(os.Getenv("UNCLI_DATA_DIR")),
 			OnSecondInstanceLaunch: func(options.SecondInstanceData) {
 				if a.ctx != nil {
 					raise(a.ctx)
@@ -527,4 +531,16 @@ func (a *App) OpenURL(url string) {
 	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://") {
 		wruntime.BrowserOpenURL(a.ctx, url)
 	}
+}
+
+// instanceID is the single-instance lock's id: one UNCLI per data folder.
+// A copy run on a data folder of its own (UNCLI_DATA_DIR: tests, wails
+// dev) gets its own lock, so it starts alongside the user's app instead of
+// handing over to it and quitting.
+func instanceID(dataDir string) string {
+	if dataDir == "" {
+		return "app.uncli.desktop"
+	}
+	sum := sha256.Sum256([]byte(strings.ToLower(filepath.Clean(dataDir))))
+	return "app.uncli.desktop." + hex.EncodeToString(sum[:6])
 }

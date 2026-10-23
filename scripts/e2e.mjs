@@ -37,10 +37,14 @@ async function clipboard() {
   }
   return ''
 }
-function uncliCLIs() {
+// The CLIs UNCLI's own copies run (the test's, and the user's app if it's
+// open: those were running before the test and don't count).
+function allUncliCLIs() {
   const out = ps(`Get-Process claude -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '*\\uncli\\cli\\*' } | ForEach-Object { "$($_.Id) $($_.MainWindowHandle)" }`)
   return out ? out.split(/\r?\n/).map(l => { const [id, h] = l.trim().split(' '); return { id: +id, window: h !== '0' } }) : []
 }
+const before = new Set(allUncliCLIs().map(c => c.id))
+const uncliCLIs = () => allUncliCLIs().filter(c => !before.has(c.id))
 function visibleConsoles() {
   // Any visible top-level window belonging to UNCLI's CLIs or console hosts they spawned.
   return ps(`Get-Process conhost,cmd,claude,powershell -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 -and $_.StartTime -gt (Get-Date).AddMinutes(-15) } | ForEach-Object { "$($_.ProcessName) $($_.Id) $($_.MainWindowTitle)" }`)
@@ -159,20 +163,26 @@ let { proc, browser, page } = await launch()
 try {
   await waitText(page, 'Welcome to UNCLI', 30000)
   await shot(page, '01-welcome')
-  ok('app starts signed in with the pinned CLI', (await text(page)).includes('Claude CLI 2.1.285'))
+  ok('app starts signed in with the pinned CLI', (await text(page)).includes('Claude Code 2.1.285'))
 
   // Chat session through the dialog.
   await clickText(page, 'button', 'New session')
   await waitText(page, 'Start session')
-  await page.select('.dialog select', 'haiku')
+  // The model picker: the dialog's select that offers haiku.
+  await page.evaluate(() => {
+    const sel = [...document.querySelectorAll('.dialog select')].find(s => [...s.options].some(o => o.value === 'haiku'))
+    sel.value = 'haiku'
+    sel.dispatchEvent(new Event('change', { bubbles: true }))
+  })
   await shot(page, '02-new-session')
   await clickText(page, 'button', 'Start session')
   await waitText(page, 'Start a conversation')
 
   // Co-work and code sessions (the folder picker is a native dialog, so
   // these go through the same bridge call the dialog makes).
-  await bridge(page, 'CreateSession', 'cowork', docs, 'haiku')
-  await bridge(page, 'CreateSession', 'code', repo, 'haiku')
+  // (profile, folder, model, container, provider, shares: null for the type's defaults)
+  await bridge(page, 'CreateSession', 'cowork', docs, 'haiku', '', '', null)
+  await bridge(page, 'CreateSession', 'code', repo, 'haiku', '', '', null)
   await sleep(300)
   const sessions = await page.$$eval('.sidebar li', ls => ls.length)
   ok('three sessions listed', sessions === 3, `${sessions} in sidebar`)
@@ -255,25 +265,29 @@ try {
   await waitText(page, 'Page 2 of 2', 5000)
   ok('arrow keys page and B bookmarks', true)
 
-  // Efficiency mode in co-work.
+  // Efficient answers in co-work: the answer-length button cycles
+  // Efficient / Normal / Thorough; Shift+click from Normal goes back to Efficient.
   await openSession(page, 'cowork')
   await waitText(page, 'Page 1 of 1')
-  await clickText(page, '.toolbar button', 'Efficiency Mode')
-  await page.waitForSelector('.toolbar .toggle.on')
+  const length = '.toolbar button.cycle[aria-label^="Efficient / Normal / Thorough"]'
+  await page.keyboard.down('Shift')
+  await page.click(length)
+  await page.keyboard.up('Shift')
+  await page.waitForSelector('.toolbar button.cycle[aria-label$=": Efficient"]')
   await sendTurn(page, 'Explain what a hash map is.')
   await waitText(page, 'Page 2 of 2')
   await waitIdle(page)
   const lean = await page.$eval('.answer', a => a.innerText.length)
   const leanChips = await page.$$eval('.page .chip.mod', cs => cs.map(c => c.textContent.trim()))
-  await clickText(page, '.toolbar button', 'Efficiency Mode')
-  await sleep(300)
+  await page.click(length) // Efficient → Normal
+  await page.waitForSelector('.toolbar button.cycle[aria-label$=": Normal"]')
   await sendTurn(page, 'Explain what a hash map is.')
   await waitText(page, 'Page 3 of 3')
   await waitIdle(page)
   const full = await page.$eval('.answer', a => a.innerText.length)
   const fullChips = await page.$$eval('.page .chip.mod', cs => cs.map(c => c.textContent.trim()))
   await shot(page, '06-efficiency-off')
-  ok('Efficiency Mode changes the answer and chips; off is honoured', lean < full && leanChips.includes('Efficiency Mode') && !fullChips.includes('Efficiency Mode'), `on ${lean} chars ${leanChips}, off ${full} chars ${fullChips}`)
+  ok('Efficient changes the answer and chips; Normal is honoured', lean < full && leanChips.includes('Efficient') && !fullChips.includes('Efficient'), `on ${lean} chars ${leanChips}, off ${full} chars ${fullChips}`)
 
   // Interrupt a turn that streams into the answer.
   await openSession(page, 'code')
@@ -287,9 +301,10 @@ try {
 
   const pagesBefore = { chat: 2, co: 4 }
   const exit = await quit(proc, browser)
-  await sleep(1000)
+  // The CLIs (and helpers they start) stop with the app; give them a moment.
+  for (let i = 0; i < 20 && uncliCLIs().length; i++) await sleep(250)
   const left = uncliCLIs()
-  ok('quitting stops every CLI process', left.length === 0, `exit ${exit}, ${left.length} left`)
+  ok('quitting stops every CLI process', left.length === 0, `exit ${exit}, ${left.length} left${left.length ? ': ' + ps(`Get-CimInstance Win32_Process -Filter "ProcessId=${left[0].id}" | ForEach-Object { $_.CommandLine }`).slice(0, 300) : ''}`)
 
   ;({ proc, browser, page } = await launch())
   await page.waitForSelector('.sidebar li', { timeout: 30000 })
@@ -318,7 +333,9 @@ try {
 } finally {
   try { await quit(proc, browser) } catch {}
   await sleep(1000)
-  ok('no CLI processes left behind', uncliCLIs().length === 0)
+  // They stop with the app, which can take a moment after it closes.
+  for (let i = 0; i < 20 && uncliCLIs().length; i++) await sleep(250)
+  ok('no CLI processes left behind', uncliCLIs().length === 0, uncliCLIs().map(c => c.id).join(' '))
   fs.writeFileSync(path.join(HERE, 'results.json'), JSON.stringify(results, null, 2))
   const failed = results.filter(r => !r.pass).length
   console.log(`\n${results.length - failed} passed, ${failed} failed`)

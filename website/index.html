@@ -84,6 +84,18 @@
       <symbol id="i-bookmark" viewBox="0 0 24 24">
         <path d="M6.5 3.5h11v17L12 16.5l-5.5 4Z" />
       </symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24">
+        <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+        <circle cx="12" cy="12" r="3" />
+      </symbol>
+      <symbol id="i-key" viewBox="0 0 24 24">
+        <circle cx="8" cy="15" r="4" />
+        <path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2" />
+      </symbol>
+      <symbol id="i-slash" viewBox="0 0 24 24">
+        <rect x="3.5" y="4" width="17" height="16" rx="2" />
+        <path d="m10 16 4-8" />
+      </symbol>
       <symbol id="i-arrow" viewBox="0 0 24 24">
         <path d="M4 12h16m-6-6 6 6-6 6" />
       </symbol>
@@ -151,7 +163,7 @@
         <div class="shot-glow"></div>
         <figure class="shot shot-hero">
           <img src="images/shot-session.png"
-            alt="A Code session in UNCLI: the question as the page title, the answer with a code block, the model and modifiers in the toolbar, and the other sessions on the left."
+            alt="A Code session in UNCLI: the question as the page title, the answer with a code block, the model, answer length and prompt level in the toolbar, a TODO file watched live on the right, and the other sessions on the left."
             width="1440" height="900" loading="eager" decoding="async" />
         </figure>
       </div>
@@ -258,8 +270,8 @@
             <use href="#i-sliders" />
           </svg>
           <h3>Switch with a click</h3>
-          <p>Change model mid-conversation, turn on Efficiency Mode or Thorough, compact the context. No slash
-            commands to remember.</p>
+          <p>Change model mid-conversation, make answers Efficient or Thorough, compact the context. One click
+            each, coloured by what it costs.</p>
         </article>
         <article class="card reveal">
           <svg class="ico">
@@ -276,6 +288,30 @@
           <h3>Bring your old chats</h3>
           <p>Import a conversation you started in the terminal and carry on in UNCLI. Ctrl+Shift+P finds anything
             else; ? lists every shortcut.</p>
+        </article>
+        <article class="card reveal">
+          <svg class="ico">
+            <use href="#i-eye" />
+          </svg>
+          <h3>Watch a file</h3>
+          <p>Keep a file from the session's folder open beside the answer, say the TODO the agent is working
+            through, and watch it update as it changes. Type "todo" and the latest one is on top.</p>
+        </article>
+        <article class="card reveal">
+          <svg class="ico">
+            <use href="#i-key" />
+          </svg>
+          <h3>Sign in to your tools</h3>
+          <p>An MCP server that needs signing in says so. One click opens its sign-in in your browser, and its
+            tools arrive without a restart, in your other sessions too. Chats can use them as well.</p>
+        </article>
+        <article class="card reveal">
+          <svg class="ico">
+            <use href="#i-slash" />
+          </svg>
+          <h3>Questions get answers</h3>
+          <p>Type / for the CLI's commands. When the agent asks you something or shows a plan, you answer on a card,
+            with its options, your own words, or a note on what to change.</p>
         </article>
       </div>
     </section>
@@ -363,6 +399,18 @@
             alt="An approval card for git push in a Code session, with Allow once, This is safe and Deny." width="1440"
             height="900" loading="lazy" decoding="async" />
           <figcaption>An approval, mid-answer. The session in the sidebar says it needs you.</figcaption>
+        </figure>
+        <figure class="shot reveal">
+          <img src="images/shot-file.png"
+            alt="The File tab beside the answer, showing TODO.md with its checkboxes, and the file finder open with a search for todo."
+            width="1440" height="900" loading="lazy" decoding="async" />
+          <figcaption>Watching TODO.md beside the answer. Type part of a name: the latest changed comes first.</figcaption>
+        </figure>
+        <figure class="shot reveal">
+          <img src="images/shot-mcp.png"
+            alt="MCP servers that need signing in, listed under the header with Sign in buttons, and the servers list open with each one's status."
+            width="1440" height="900" loading="lazy" decoding="async" />
+          <figcaption>MCP servers that need you, and every server's status, a click from signed in.</figcaption>
         </figure>
         <figure class="shot reveal">
           <img src="images/shot-usage.png"

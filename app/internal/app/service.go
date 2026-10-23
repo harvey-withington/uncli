@@ -83,6 +83,11 @@ func DefaultPaths() (Paths, error) {
 }
 
 type Service struct {
+	// life ends when the service closes: work it started on its own (quick
+	// tasks: safety judgements, summaries) stops with it, not after.
+	life    context.Context
+	endLife context.CancelFunc
+
 	Paths     Paths
 	Store     *store.Store
 	Profiles  *profile.Set
@@ -133,6 +138,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	}
 	inst := claude.NewInstaller(filepath.Join(paths.Cache, "cli", "claude"))
 	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst).WithSkills(filepath.Join(paths.Cache, "skills", "claude")), emit: emit}
+	s.life, s.endLife = context.WithCancel(context.Background())
 	agyInst := antigravity.NewInstaller(filepath.Join(paths.Cache, "cli", "antigravity"))
 	agy := antigravity.New(agyInst, filepath.Join(paths.Config, "agy"), hookCommand())
 	s.clis = []*cliProvider{
@@ -177,6 +183,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 }
 
 func (s *Service) Close() {
+	s.endLife()
 	s.CancelSignIn()
 	s.signInMu.Lock()
 	for id := range s.devices {
