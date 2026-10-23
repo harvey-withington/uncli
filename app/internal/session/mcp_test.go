@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"uncli/internal/core"
 )
@@ -182,5 +183,65 @@ func TestMCPSignInFails(t *testing.T) {
 	}
 	if _, err := h.m.MCPSignIn(context.Background(), "nope", "BRUV"); err == nil {
 		t.Error("an unknown session")
+	}
+}
+
+// A connector of the provider's own: signed in on its site, which the CLI
+// never hears about, so the session reconnects it quietly until it
+// connects; refusals meanwhile aren't failures.
+func TestMCPConnectorSignIn(t *testing.T) {
+	h := newHarness(t, "single-turn")
+	v, _ := h.m.Create("chat", "", "haiku")
+	s, _ := h.m.get(v.ID)
+	_ = s.warm(context.Background())
+	answerAs(s, core.EvMCPServers, core.MCPServers{List: []core.MCPServer{{Name: "claude.ai Calendar", Status: core.MCPNeedsAuth}}})
+	done := make(chan MCPSignIn, 1)
+	go func() {
+		in, _ := h.m.MCPSignIn(context.Background(), v.ID, "claude.ai Calendar")
+		done <- in
+	}()
+	waitUntil(t, "the sign-in request", func() bool { return h.written(`"subtype":"mcp_authenticate"`) })
+	// As the CLI answers for a claude.ai connector: a link, no callback.
+	answerAs(s, core.EvMCPAuth, core.MCPAuth{Server: "claude.ai Calendar", Step: "sign_in", URL: "https://claude.ai/api/organizations/o/mcp/start-auth/x"})
+	if in := <-done; !in.Connector || in.URL == "" {
+		t.Fatalf("sign-in = %+v", in)
+	}
+	sv := mcpOf(t, h, v.ID)["claude.ai Calendar"]
+	if !sv.Site || sv.Signing {
+		t.Errorf("awaiting the site, not a callback: %+v", sv)
+	}
+	// Reconnects come by themselves; a refusal is "not done yet".
+	waitDeadline := time.Now().Add(8 * time.Second)
+	for !h.written(`"subtype":"mcp_reconnect"`, `"serverName":"claude.ai Calendar"`) && time.Now().Before(waitDeadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if !h.written(`"subtype":"mcp_reconnect"`) {
+		t.Fatal("no reconnect while the site sign-in is awaited")
+	}
+	answerAs(s, core.EvMCPAuth, core.MCPAuth{Server: "claude.ai Calendar", Step: "reconnect", Error: "Server status: needs-auth"})
+	if sv := mcpOf(t, h, v.ID)["claude.ai Calendar"]; sv.Error != "" || !sv.Site {
+		t.Errorf("a refusal while waiting: %+v", sv)
+	}
+	answerAs(s, core.EvMCPServers, core.MCPServers{List: []core.MCPServer{{Name: "claude.ai Calendar", Status: core.MCPConnected, Tools: 9}}})
+	if sv := mcpOf(t, h, v.ID)["claude.ai Calendar"]; sv.Site || sv.Status != core.MCPConnected {
+		t.Errorf("connected: %+v", sv)
+	}
+}
+
+// MCP status isn't logged: the CLI's reply carries each server's config,
+// request headers (tokens) included.
+func TestMCPStatusNotLogged(t *testing.T) {
+	h := newHarness(t, "single-turn")
+	v, _ := h.m.Create("chat", "", "haiku")
+	s, _ := h.m.get(v.ID)
+	_ = s.warm(context.Background())
+	s.mu.Lock()
+	gen := s.gen
+	s.mu.Unlock()
+	secret := []byte(`{"type":"control_response","response":{"response":{"mcpServers":[{"name":"x","config":{"headers":{"Authorization":"Bearer SECRET"}}}]}}}`)
+	s.handle(gen, core.NewEvent(core.EvMCPServers, core.MCPServers{List: []core.MCPServer{{Name: "x", Status: core.MCPConnected}}}, secret))
+	s.handle(gen, core.NewEvent(core.EvToolHints, core.ToolHints{}, secret))
+	if n, _ := h.db.CountEvents(v.ID); n != 0 {
+		t.Errorf("%d status events logged", n)
 	}
 }

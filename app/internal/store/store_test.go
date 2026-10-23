@@ -1,7 +1,9 @@
 package store
 
 import (
+	"bytes"
 	"database/sql"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -186,5 +188,34 @@ func TestSavePageKeepsMarks(t *testing.T) {
 	}
 	if err := s.SetPinned("missing", true); err == nil {
 		t.Error("pinned a missing page")
+	}
+}
+
+// Opening the store drops MCP status events an older UNCLI logged: they
+// carried each server's config, request headers (tokens) included.
+func TestOpenDropsLoggedMCPStatus(t *testing.T) {
+	s, path := open(t)
+	now := time.Now()
+	for i, kind := range []string{"tool_hints", "mcp_servers", "mcp_auth", "text_block"} {
+		if err := s.AppendEvent("s1", 1, i+1, kind, now, []byte(`{}`), []byte(`{"Authorization":"Bearer SECRET"}`)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.Close()
+	s2, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s2.Close()
+	if n, _ := s2.CountEvents("s1"); n != 1 {
+		t.Errorf("%d events left, want the text block only", n)
+	}
+	// Overwritten, not just unlinked: the file and its log hold no trace
+	// but the one event kept (a text block, also "Bearer SECRET" here).
+	for _, f := range []string{path, path + "-wal"} {
+		b, _ := os.ReadFile(f)
+		if n := bytes.Count(b, []byte("Bearer SECRET")); n > 1 {
+			t.Errorf("%s holds %d copies", filepath.Base(f), n)
+		}
 	}
 }

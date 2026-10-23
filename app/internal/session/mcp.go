@@ -21,11 +21,17 @@ import (
 // A CLI elsewhere (WSL, a container) is asked to send the browser back to
 // UNCLI instead (oauthcatch), which hands the address on and reconnects.
 // The user can always paste the address their browser ended up on.
+//
+// A connector of the provider's own (claude.ai's) is signed in on the
+// provider's site: the CLI never hears it finish, so while the user is
+// there the session reconnects it quietly every few seconds, and it
+// connects once they're done.
 
 // MCPServerView is a server as the UI shows it.
 type MCPServerView struct {
 	core.MCPServer
 	Signing bool   `json:"signing,omitempty"` // a sign-in is waiting for the browser
+	Site    bool   `json:"site,omitempty"`    // a sign-in on the provider's site is awaited (reconnected meanwhile)
 	Error   string `json:"error,omitempty"`   // the last sign-in, reconnect or sign-out failed
 }
 
@@ -41,6 +47,7 @@ const (
 	mcpSignInWait = 10 * time.Minute // how long a sign-in waits for the browser
 	mcpSettle     = 20 * time.Second // how long a reconnect or a starting CLI is watched
 	mcpAnswerWait = 30 * time.Second // how long the CLI has to answer a request
+	mcpSiteEvery  = 5                // seconds between reconnects while a site sign-in is awaited
 )
 
 // errNoMCP: the session's CLI can't sign in to MCP servers.
@@ -94,7 +101,11 @@ func (m *Manager) MCPSignIn(ctx context.Context, id, server string) (MCPSignIn, 
 	}
 	s.mu.Lock()
 	if ans.URL != "" {
-		s.mcpSigning[server] = true
+		if ans.Callback {
+			s.mcpSigning[server] = true
+		} else {
+			s.mcpSite[server] = true
+		}
 		s.mcpErrors[server] = ""
 		s.watchLocked(server, mcpSignInWait)
 	}
@@ -244,6 +255,7 @@ func (s *Session) mcpFailed(server, msg string) {
 
 func (s *Session) stopSigningLocked(server string) {
 	delete(s.mcpSigning, server)
+	delete(s.mcpSite, server)
 	if c := s.mcpCatch[server]; c != nil {
 		c.Close()
 		delete(s.mcpCatch, server)
@@ -266,13 +278,15 @@ func (s *Session) watchLocked(server string, d time.Duration) {
 func (s *Session) watchLoop() {
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
+	tick := 0
 	for range t.C {
+		tick++
 		s.mu.Lock()
 		now := time.Now()
 		for k, until := range s.mcpWatch {
 			if now.After(until) {
 				delete(s.mcpWatch, k)
-				if s.mcpSigning[k] {
+				if s.mcpSigning[k] || s.mcpSite[k] {
 					s.stopSigningLocked(k)
 					s.mcpErrors[k] = "The sign-in wasn't finished in time."
 					s.changed()
@@ -283,6 +297,16 @@ func (s *Session) watchLoop() {
 			s.mcpTicking = false
 			s.mu.Unlock()
 			return
+		}
+		// A sign-in on the provider's site: try connecting now and then.
+		if tick%mcpSiteEvery == 0 {
+			for k := range s.mcpSite {
+				if b, ok := s.encodeControl(core.Control{Kind: core.CtlMCPReconnect, Server: k}); ok {
+					if _, err := s.proc.Stdin().Write(b); err == nil {
+						s.mcpQuiet[k] = true
+					}
+				}
+			}
 		}
 		if b, ok := s.encodeControl(core.Control{Kind: core.CtlToolHints}); ok {
 			_, _ = s.proc.Stdin().Write(b)
@@ -302,7 +326,7 @@ func (s *Session) mcpServersLocked(list []core.MCPServer) {
 		case core.MCPConnected:
 			delete(s.mcpWatch, sv.Name)
 			s.mcpErrors[sv.Name] = ""
-			if s.mcpSigning[sv.Name] {
+			if s.mcpSigning[sv.Name] || s.mcpSite[sv.Name] {
 				s.stopSigningLocked(sv.Name)
 				go s.m.reconnectOthers(s, sv.Name)
 			}
@@ -326,7 +350,10 @@ func (s *Session) mcpAuthLocked(a core.MCPAuth) {
 		ch <- a
 		return
 	}
-	if a.Error != "" && !s.mcpQuiet[a.Server] {
+	// While a sign-in on the provider's site is awaited, a refused
+	// reconnect only means the user isn't done yet.
+	waiting := a.Step == "reconnect" && s.mcpSite[a.Server]
+	if a.Error != "" && !s.mcpQuiet[a.Server] && !waiting {
 		s.stopSigningLocked(a.Server)
 		s.mcpErrors[a.Server] = a.Error
 		s.changed()
@@ -338,7 +365,7 @@ func (s *Session) mcpAuthLocked(a core.MCPAuth) {
 func (s *Session) mcpViewLocked() []MCPServerView {
 	out := []MCPServerView{}
 	for _, sv := range s.mcp {
-		out = append(out, MCPServerView{MCPServer: sv, Signing: s.mcpSigning[sv.Name], Error: s.mcpErrors[sv.Name]})
+		out = append(out, MCPServerView{MCPServer: sv, Signing: s.mcpSigning[sv.Name], Site: s.mcpSite[sv.Name], Error: s.mcpErrors[sv.Name]})
 	}
 	return out
 }

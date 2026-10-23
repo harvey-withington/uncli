@@ -52,6 +52,7 @@ type Session struct {
 	// redirects being caught, and reconnects whose failure isn't shown.
 	mcp        []core.MCPServer
 	mcpSigning map[string]bool
+	mcpSite    map[string]bool
 	mcpErrors  map[string]string
 	mcpAnswers map[string]chan core.MCPAuth
 	mcpWatch   map[string]time.Time
@@ -97,12 +98,17 @@ type Session struct {
 	instructions string
 }
 
+// unlogged are events kept out of the event log: status, not the page's
+// content. The CLI's MCP status reply carries each server's config, request
+// headers (tokens) included, and comes every second while a sign-in waits.
+var unlogged = map[core.EventKind]bool{core.EvToolHints: true, core.EvMCPServers: true, core.EvMCPAuth: true}
+
 // ad is the adapter of the session's provider.
 func (s *Session) ad() core.Adapter { return s.m.adapterOf(s.rec) }
 
 func newSession(m *Manager, rec store.Session) *Session {
 	s := &Session{m: m, rec: rec, state: Idle,
-		mcpSigning: map[string]bool{}, mcpErrors: map[string]string{}, mcpAnswers: map[string]chan core.MCPAuth{},
+		mcpSigning: map[string]bool{}, mcpSite: map[string]bool{}, mcpErrors: map[string]string{}, mcpAnswers: map[string]chan core.MCPAuth{},
 		mcpWatch: map[string]time.Time{}, mcpCatch: map[string]*oauthcatch.Catcher{}, mcpQuiet: map[string]bool{}}
 	s.toldLocked()
 	if pages, err := m.d.Store.ListPages(rec.ID); err == nil && len(pages) > 0 {
@@ -682,8 +688,10 @@ func (s *Session) handle(gen int, ev core.Event) {
 	if turnOpen {
 		ev.TurnSeq = s.page.Seq
 	}
-	s.evN++
-	_ = s.m.d.Store.AppendEvent(s.rec.ID, ev.TurnSeq, s.evN, string(ev.Kind), ev.At, ev.Data, ev.Raw)
+	if !unlogged[ev.Kind] {
+		s.evN++
+		_ = s.m.d.Store.AppendEvent(s.rec.ID, ev.TurnSeq, s.evN, string(ev.Kind), ev.At, ev.Data, ev.Raw)
+	}
 
 	prev := s.state
 	switch ev.Kind {

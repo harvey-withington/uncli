@@ -8,10 +8,10 @@ import type { MCPServer } from './api'
 // reconnected, or a reconnect after it failed; null when nothing.
 export type MCPNeed = 'signing' | 'sign-in' | 'connector' | 'failed' | null
 
-export function needOf(sv: MCPServer, connectorWaiting = false): MCPNeed {
+export function needOf(sv: MCPServer): MCPNeed {
   if (sv.status === 'connected' || sv.status === 'disabled') return null
   if (sv.signing) return 'signing'
-  if (connectorWaiting) return 'connector'
+  if (sv.site) return 'connector'
   if (sv.status === 'needs-auth') return 'sign-in'
   if (sv.status === 'failed') return 'failed'
   return null
@@ -20,6 +20,7 @@ export function needOf(sv: MCPServer, connectorWaiting = false): MCPNeed {
 // The status as a short phrase key (mcp.status.*).
 export function statusKey(sv: MCPServer): string {
   if (sv.signing) return 'mcp.status.signing'
+  if (sv.site) return 'mcp.status.site'
   return `mcp.status.${sv.status}`
 }
 

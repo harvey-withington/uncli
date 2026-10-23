@@ -69,7 +69,6 @@ export class AppStore {
   // link of each, and connectors waiting to be reconnected.
   mcpActed = new Set<string>()
   mcpLinks = $state<Record<string, string>>({})
-  mcpConnector = $state<Record<string, boolean>>({})
   fileSwitcher = $state(false)
   sidebarWidth = $state(loadSidebarWidth())
   questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
@@ -245,7 +244,7 @@ export class AppStore {
 
   // MCP sign-in (decision 0020). mcpSignIn opens the server's sign-in in
   // the browser; a connector of the provider's own is signed in on its
-  // site and then reconnected (mcpConnector marks those waiting for that).
+  // site, and the backend reconnects it until it connects (MCPServer.site).
   // A server the user acted on gets a toast when it connects.
   mcpSignIn = async (sessionId: string, server: string) => {
     const key = `${sessionId}:${server}`
@@ -254,7 +253,6 @@ export class AppStore {
       const r = await this.backend.mcpSignIn(sessionId, server)
       if (r.url) {
         this.mcpLinks[key] = r.url
-        if (r.connector) this.mcpConnector[key] = true
         await this.backend.openURL(r.url)
       }
     } catch (e) {
@@ -266,7 +264,6 @@ export class AppStore {
   mcpReconnect = async (sessionId: string, server: string) => {
     const key = `${sessionId}:${server}`
     this.mcpActed.add(key)
-    delete this.mcpConnector[key]
     await this.backend.mcpReconnect(sessionId, server).catch(e => showToast(String(e), 'error'))
   }
 
@@ -277,7 +274,6 @@ export class AppStore {
   mcpCancel = async (sessionId: string, server: string) => {
     const key = `${sessionId}:${server}`
     this.mcpActed.delete(key)
-    delete this.mcpConnector[key]
     await this.backend.mcpCancel(sessionId, server).catch(e => showToast(String(e), 'error'))
   }
 
@@ -540,7 +536,6 @@ export class AppStore {
     const i = this.sessions.findIndex(s => s.id === v.id)
     for (const sv of connectedNow(v.id, this.sessions[i]?.mcp, v.mcp, this.mcpActed)) {
       this.mcpActed.delete(`${v.id}:${sv.name}`)
-      delete this.mcpConnector[`${v.id}:${sv.name}`]
       showToast(t(sv.tools === 1 ? 'mcp.connectedOne' : 'mcp.connected', { name: sv.name, n: sv.tools }), 'success')
     }
     if (i < 0) {

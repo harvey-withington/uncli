@@ -18,7 +18,7 @@
   let { session }: Props = $props()
   const app = useApp()
   const servers = $derived(session.mcp ?? [])
-  const attention = $derived(servers.some(sv => needOf(sv, !!app.mcpConnector[`${session.id}:${sv.name}`]) !== null))
+  const attention = $derived(servers.some(sv => needOf(sv) !== null))
   let open = $state(false)
 </script>
 
@@ -43,11 +43,16 @@
         <ul>
           {#each servers as sv (sv.name)}
             <li>
-              <span class="dotted {sv.signing ? 'signing' : sv.status}" aria-hidden="true"></span>
-              <span class="name" title={sv.name}>{sv.name}</span>
-              <span class="status">{t(statusKey(sv), { n: sv.tools })}</span>
+              <span class="dotted {sv.signing || sv.site ? 'signing' : sv.status}" aria-hidden="true"></span>
+              <span class="who">
+                <span class="name" title={sv.name}>{sv.name}</span>
+                <span class="status">{t(statusKey(sv), { n: sv.tools })}</span>
+              </span>
               <span class="acts">
                 {#if sv.signing}
+                  <button class="btn ghost small" onclick={() => app.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
+                {:else if sv.site}
+                  <button class="btn ghost small" onclick={() => app.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
                   <button class="btn ghost small" onclick={() => app.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
                 {:else if sv.status === 'needs-auth'}
                   <button class="btn small" onclick={() => app.mcpSignIn(session.id, sv.name)}>{t('mcp.signIn')}</button>
@@ -108,12 +113,14 @@
     padding: 0;
     list-style: none;
   }
+  /* A row: the status dot, the name over its status, the actions at the
+     right; a failure underneath. */
   li {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 8px minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--space-2);
-    padding: 6px 0;
+    gap: 2px var(--space-3);
+    padding: 7px 0;
     border-top: 1px solid var(--border);
     font-size: var(--text-sm);
   }
@@ -121,7 +128,6 @@
     border-top: 0;
   }
   .dotted {
-    flex: none;
     width: 8px;
     height: 8px;
     border-radius: 50%;
@@ -138,26 +144,28 @@
   .dotted.pending {
     background: var(--accent);
   }
-  .name {
+  .who {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
+  }
+  .name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: 600;
   }
   .status {
-    flex: 1;
     color: var(--text-muted);
     font-size: var(--text-xs);
-    white-space: nowrap;
   }
   .acts {
     display: inline-flex;
     gap: var(--space-1);
   }
   .err {
-    flex-basis: 100%;
-    margin: 0 0 0 16px;
+    grid-column: 2 / -1;
+    margin: 0;
     color: var(--danger);
     font-size: var(--text-xs);
   }

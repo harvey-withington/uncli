@@ -63,6 +63,10 @@ the session folder, slash commands, and answers to the agent's questions.
 - Clicking a notification, or launching UNCLI again, brings the window to the
   front without un-maximizing it.
 - A background sub-agent's tool request is shown, not refused.
+- UNCLI no longer keeps MCP servers' settings in its event log. The CLI's
+  status replies include them, request headers and any tokens in them too.
+  Those an earlier version kept are deleted when UNCLI starts; if one of your
+  MCP servers uses a token in its headers, consider replacing it.
 - Quitting UNCLI stops quick tasks in flight (safety judgements, page
   summaries) instead of leaving them running for a while after.
 

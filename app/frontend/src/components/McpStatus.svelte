@@ -20,13 +20,13 @@
   const key = (sv: MCPServer) => `${session.id}:${sv.name}`
   const needs = $derived(
     (session.mcp ?? [])
-      .map(sv => ({ sv, need: needOf(sv, !!app.mcpConnector[key(sv)]) }))
+      .map(sv => ({ sv, need: needOf(sv) }))
       .filter((x): x is { sv: MCPServer; need: Exclude<MCPNeed, null> } => x.need !== null),
   )
   let pasting = $state('') // the server whose address is being pasted
   let pasted = $state('')
 
-  const ICON: Record<Exclude<MCPNeed, null>, string> = { signing: 'loader', 'sign-in': 'key-round', connector: 'key-round', failed: 'unplug' }
+  const ICON: Record<Exclude<MCPNeed, null>, string> = { signing: 'loader', 'sign-in': 'key-round', connector: 'loader', failed: 'unplug' }
 
   async function usePasted(server: string) {
     if (await app.mcpPaste(session.id, server, pasted)) {
@@ -39,7 +39,7 @@
   <ul class="mcp" aria-label={t('mcp.title')}>
     {#each needs as { sv, need } (sv.name)}
       <li class={need}>
-        <Icon name={ICON[need]} size={14} spin={need === 'signing'} />
+        <Icon name={ICON[need]} size={14} spin={need === 'signing' || need === 'connector'} />
         <span class="text">{t(`mcp.need.${need}`, { ...names, name: sv.name })}{#if sv.error}<span class="err"> {sv.error}</span>{/if}</span>
         <span class="acts">
           {#if need === 'sign-in'}
@@ -50,10 +50,13 @@
             {/if}
             <button class="btn ghost small" onclick={() => (pasting = pasting === sv.name ? '' : sv.name)} aria-expanded={pasting === sv.name}>{t('mcp.paste')}</button>
             <button class="btn ghost small" onclick={() => app.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
-          {:else}
-            {#if need === 'connector' && app.mcpLinks[key(sv)]}
+          {:else if need === 'connector'}
+            {#if app.mcpLinks[key(sv)]}
               <button class="btn ghost small" onclick={() => app.backend.openURL(app.mcpLinks[key(sv)] ?? '')}>{t('mcp.openAgain')}</button>
             {/if}
+            <button class="btn ghost small" onclick={() => app.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
+            <button class="btn ghost small" onclick={() => app.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
+          {:else}
             <button class="btn small" onclick={() => app.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
           {/if}
         </span>

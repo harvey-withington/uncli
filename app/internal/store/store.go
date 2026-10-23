@@ -4,6 +4,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -125,6 +126,12 @@ func migrate(db *sql.DB) error {
 		if _, err := db.Exec("UPDATE sessions SET mode=? WHERE mode=?", level, old); err != nil {
 			return err
 		}
+	}
+	// MCP status replies carried each server's config, request headers
+	// (tokens) included, and were logged every second while watched; they
+	// aren't logged any more (session.unlogged), and old ones go.
+	if err := dropLoggedMCPStatus(db); err != nil {
+		return err
 	}
 	return migrateSafeList(db)
 }
@@ -687,4 +694,30 @@ func nullStr(s string) any {
 		return nil
 	}
 	return s
+}
+
+// dropLoggedMCPStatus deletes the MCP status events an older UNCLI logged,
+// with secure_delete on (one connection, so it applies), so the tokens
+// they held are overwritten in the file, not just unlinked.
+func dropLoggedMCPStatus(db *sql.DB) error {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	var n int
+	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM events WHERE kind IN ('tool_hints', 'mcp_servers', 'mcp_auth')`).Scan(&n); err != nil || n == 0 {
+		return err
+	}
+	if _, err := conn.ExecContext(ctx, `PRAGMA secure_delete = ON`); err != nil {
+		return err
+	}
+	defer conn.ExecContext(ctx, `PRAGMA secure_delete = OFF`) //nolint:errcheck
+	if _, err := conn.ExecContext(ctx, `DELETE FROM events WHERE kind IN ('tool_hints', 'mcp_servers', 'mcp_auth')`); err != nil {
+		return err
+	}
+	// Move the overwritten pages out of the write-ahead log too.
+	_, err = conn.ExecContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`)
+	return err
 }

@@ -55,6 +55,17 @@ Other CLIs will have their own ways, or none.
   reconnects. If the server refuses that redirect, the CLI falls back to
   its own listener, which WSL's localhost forwarding usually reaches. The
   user can always paste the address their browser ended up on.
+- **Connectors of the provider's own** (claude.ai's) answer with a link
+  and no callback: you sign in on the provider's site, and the CLI never
+  hears it finish. The session shows the server as awaiting that sign-in
+  and reconnects it quietly every 5 s (a refusal meanwhile only means you
+  aren't done), so it connects by itself; Reconnect and Cancel are there
+  too. (Seen with claude.ai Google Calendar, 2026-10-23: waiting for a
+  callback that never came left it stuck.)
+- **Not logged.** The status reply carries each server's config, request
+  headers (tokens) included, and comes every second while a sign-in
+  waits: status, tool hints and sign-in answers are kept out of the event
+  log, and those an earlier UNCLI logged are deleted when the store opens.
 - **Sharing.** When a sign-in connects, the server is reconnected in the
   other running sessions on the same CLI in the same place that were
   waiting for it. One that keeps sign-ins of its own (sandboxed, another

@@ -683,7 +683,17 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       const s = find(sid)
       const sv = (s.mcp ?? []).find(x => x.name === server)
       if (!sv) throw new Error(`Server not found: ${server}`)
-      if (server === 'Google Drive') return { url: 'https://example.com/settings/connectors', connector: true, done: false }
+      if (server === 'Google Drive') {
+        // A connector: signed in on the provider's site, reconnected meanwhile.
+        Object.assign(sv, { site: true, error: undefined })
+        changed(s)
+        setTimeout(() => {
+          if (!sv.site) return
+          Object.assign(sv, { site: false, status: 'connected', tools: 5 })
+          changed(s)
+        }, opts.mcpSlow ? 60_000 : 1500)
+        return { url: 'https://example.com/settings/connectors', connector: true, done: false }
+      }
       Object.assign(sv, { signing: true, error: undefined })
       changed(s)
       setTimeout(() => {
@@ -718,7 +728,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     async mcpCancel(sid, server) {
       const s = find(sid)
       const sv = (s.mcp ?? []).find(x => x.name === server)
-      if (sv) sv.signing = false
+      if (sv) Object.assign(sv, { signing: false, site: false })
       changed(s)
     },
     async commands(sid) {

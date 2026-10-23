@@ -27,7 +27,7 @@ describe('MCP logic', () => {
     expect(needOf(sv({ status: 'pending' }))).toBeNull()
     expect(needOf(sv({ status: 'needs-auth' }))).toBe('sign-in')
     expect(needOf(sv({ status: 'needs-auth', signing: true }))).toBe('signing')
-    expect(needOf(sv({ status: 'needs-auth' }), true)).toBe('connector')
+    expect(needOf(sv({ status: 'needs-auth', site: true }))).toBe('connector')
     expect(needOf(sv({ status: 'failed' }))).toBe('failed')
     expect(statusKey(sv({ status: 'needs-auth', signing: true }))).toBe('mcp.status.signing')
   })
@@ -78,14 +78,19 @@ describe('MCP sign-in', () => {
     expect(pasted).toHaveBeenCalledWith('s-code', 'BRUV', 'http://localhost:4567/callback?code=c&state=s')
   })
 
-  it('signs in to a connector on the provider’s site, then reconnects it', async () => {
+  it('signs in to a connector on the provider’s site, and it connects by itself', async () => {
     const s = await code()
+    const opened = vi.spyOn(s.backend, 'openURL')
     const { rerender } = render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
     await s.mcpSignIn('s-code', 'Google Drive')
+    expect(opened).toHaveBeenCalledWith('https://example.com/settings/connectors')
     await rerender({ session: s.current! })
     const lines = screen.getByRole('list', { name: 'MCP servers' })
-    const line = within(lines).getByText(/Sign in to Google Drive on the page that opened/).closest('li')!
-    await fireEvent.click(within(line as HTMLElement).getByRole('button', { name: 'Reconnect' }))
+    const line = within(lines).getByText(/Sign in to Google Drive on the page that opened. It connects by itself/).closest('li') as HTMLElement
+    // Reconnect (now) and Cancel are there; no Sign in, no paste box.
+    expect(within(line).getByRole('button', { name: 'Reconnect' })).toBeInTheDocument()
+    expect(within(line).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(within(line).queryByRole('button', { name: 'Paste the address' })).toBeNull()
     await waitFor(() => expect(s.current?.mcp?.find(x => x.name === 'Google Drive')?.status).toBe('connected'), { timeout: 3000 })
     expect(toasts.list.map(t => t.message)).toContain('Google Drive connected: 5 tools')
   })
