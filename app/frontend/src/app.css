@@ -25,6 +25,7 @@
   --danger-soft: color-mix(in srgb, var(--danger) 9%, transparent);
   --warning: var(--uncli-warning, #a16207);
   --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+  --success-soft: color-mix(in srgb, var(--success) 12%, transparent);
   --success: var(--uncli-success, #15803d);
   --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(29, 27, 24, 0.06));
   --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(29, 27, 24, 0.08), 0 1px 3px rgba(29, 27, 24, 0.06));
@@ -105,6 +106,7 @@
     --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
     --warning: var(--uncli-warning, #facc15);
     --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+    --success-soft: color-mix(in srgb, var(--success) 12%, transparent);
     --success: var(--uncli-success, #4ade80);
     --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.4));
     --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.35));
@@ -146,6 +148,7 @@
   --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
   --warning: var(--uncli-warning, #facc15);
   --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+  --success-soft: color-mix(in srgb, var(--success) 12%, transparent);
   --success: var(--uncli-success, #4ade80);
   --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.4));
   --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.35));

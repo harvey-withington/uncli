@@ -373,6 +373,7 @@ export interface Modifier {
   icon: string
   scope: 'turn' | 'system'
   group?: string
+  tone?: '' | 'success' | 'warning' | 'accent' // its colour in its group's toggle, by what it costs
   requiresTools?: string[]
   settings?: Record<string, string>
 }

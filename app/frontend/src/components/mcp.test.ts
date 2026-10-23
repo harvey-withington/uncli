@@ -102,4 +102,12 @@ describe('MCP sign-in', () => {
     const ids = commands(s).map(c => c.id)
     expect(ids).toEqual(expect.arrayContaining(['mcp.signIn.BRUV', 'mcp.reconnect.notes', 'mcp.signOut.notes', 'mcp.signIn.Google Drive']))
   })
+
+  it('leaves the lines to the plug button’s dot in compact mode', async () => {
+    const s = await code()
+    s.toggleHeaderCompact()
+    render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
+    expect(screen.queryByRole('list', { name: 'MCP servers' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'MCP servers: one needs you' })).toBeInTheDocument()
+  })
 })

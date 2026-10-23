@@ -21,8 +21,8 @@ const profiles: Bootstrap['profiles'] = [
 
 const modifiers: Bootstrap['modifiers'] = [
   { id: 'use-agents', label: 'Use Agents', icon: 'users', scope: 'turn', requiresTools: ['Task'] },
-  { id: 'efficiency', label: 'Efficiency Mode', icon: 'gauge', scope: 'turn', group: 'verbosity' },
-  { id: 'thorough', label: 'Thorough', icon: 'microscope', scope: 'turn', group: 'verbosity', settings: { effort: 'high' } },
+  { id: 'efficiency', label: 'Efficiency Mode', icon: 'gauge', scope: 'turn', group: 'verbosity', tone: 'success' },
+  { id: 'thorough', label: 'Thorough', icon: 'microscope', scope: 'turn', group: 'verbosity', tone: 'warning', settings: { effort: 'high' } },
 ]
 
 const toolbar: Bootstrap['toolbar'] = [

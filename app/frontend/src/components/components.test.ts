@@ -156,16 +156,26 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Download' })).toBeInTheDocument()
   })
 
-  it('toggles a modifier group exclusively', async () => {
-    render(App, { props: { backend: mockBackend() } })
+  it('shows a modifier group as one button that cycles cheapest first, through Normal', async () => {
+    const backend = mockBackend()
+    const toggle = vi.spyOn(backend, 'toggleModifier')
+    render(App, { props: { backend } })
     await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
     const toolbar = screen.getByRole('toolbar', { name: 'Session tools' })
-    const thorough = within(toolbar).getByRole('button', { name: /Thorough/ })
-    const efficiency = within(toolbar).getByRole('button', { name: /Efficiency Mode/ })
-    expect(thorough).toHaveAttribute('aria-pressed', 'true')
-    await fireEvent.click(efficiency)
-    await waitFor(() => expect(efficiency).toHaveAttribute('aria-pressed', 'true'))
-    expect(thorough).toHaveAttribute('aria-pressed', 'false')
+    const group = (now: string) => within(toolbar).getByRole('button', { name: `Efficiency Mode / Normal / Thorough: ${now}` })
+    // Thorough is on (warning); a click wraps round to the cheapest.
+    expect(group('Thorough')).toHaveClass('warning')
+    await fireEvent.click(group('Thorough'))
+    await waitFor(() => expect(group('Efficiency Mode')).toHaveClass('success'))
+    expect(toggle).toHaveBeenLastCalledWith('s-code', 'efficiency', true)
+    // Normal: whichever was on goes off.
+    await fireEvent.click(group('Efficiency Mode'))
+    await waitFor(() => expect(group('Normal')).not.toHaveClass('success'))
+    expect(toggle).toHaveBeenLastCalledWith('s-code', 'efficiency', false)
+    await fireEvent.click(group('Normal'))
+    await waitFor(() => expect(group('Thorough')).toBeInTheDocument())
+    // Use Agents, in no group, is still a toggle.
+    expect(within(toolbar).getByRole('button', { name: /Use Agents/ })).toHaveAttribute('aria-pressed')
   })
 })
 

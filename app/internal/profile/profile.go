@@ -46,11 +46,14 @@ type Profile struct {
 }
 
 type Modifier struct {
-	ID            string            `yaml:"id" json:"id"`
-	Label         string            `yaml:"label" json:"label"`
-	Icon          string            `yaml:"icon" json:"icon"`
-	Scope         string            `yaml:"scope" json:"scope"` // turn | system
-	Group         string            `yaml:"group" json:"group,omitempty"`
+	ID    string `yaml:"id" json:"id"`
+	Label string `yaml:"label" json:"label"`
+	Icon  string `yaml:"icon" json:"icon"`
+	Scope string `yaml:"scope" json:"scope"` // turn | system
+	Group string `yaml:"group" json:"group,omitempty"`
+	// Tone colours it in its group's toggle by what it costs: success
+	// (cheaper), warning (dearer), accent; empty is neutral.
+	Tone          string            `yaml:"tone" json:"tone,omitempty"`
 	RequiresTools []string          `yaml:"requires_tools" json:"requiresTools,omitempty"`
 	Settings      map[string]string `yaml:"settings" json:"settings,omitempty"`
 	Text          map[string]string `yaml:"text" json:"-"`
@@ -156,6 +159,11 @@ func (s *Set) validate() error {
 	for _, m := range s.Modifiers {
 		if m.ID == "" {
 			return errors.New("a modifier has no id")
+		}
+		switch m.Tone {
+		case "", "success", "warning", "accent":
+		default:
+			return fmt.Errorf("modifier %s: tone is success, warning or accent, not %q", m.ID, m.Tone)
 		}
 	}
 	return nil

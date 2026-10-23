@@ -81,11 +81,13 @@ describe('Keyboard map', () => {
     expect(within(map).getByText('Send / new line')).toBeInTheDocument()
   })
 
-  it('leaves arrows on a radio group to the group, not the pages', async () => {
+  it('leaves arrows on a tab strip to the strip, not the pages', async () => {
     await start()
-    const group = screen.getByRole('radiogroup', { name: /Prompt me/ })
+    if (!screen.queryByRole('tablist', { name: 'Side panel' })) await fireEvent.keyDown(window, { key: 'o' })
+    const strip = await screen.findByRole('tablist', { name: 'Side panel' })
     const before = screen.getByText(/^1/, { selector: '.pos span' }).textContent
-    await fireEvent.keyDown(within(group).getByRole('radio', { name: /When unsafe/ }), { key: 'ArrowLeft' })
+    await fireEvent.keyDown(within(strip).getByRole('tab', { name: /On this page/ }), { key: 'ArrowLeft' })
     expect(screen.getByText(/^1/, { selector: '.pos span' }).textContent).toBe(before)
+    expect(within(strip).getByRole('tab', { name: /File/ })).toHaveAttribute('aria-selected', 'true') // the strip took it
   })
 })

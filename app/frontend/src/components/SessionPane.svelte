@@ -109,16 +109,6 @@
         <SharesNote {session} compact />
       {/if}
       <span class="gap"></span>
-      <ModeSwitch {session} />
-      <button
-        class="btn ghost small away-btn"
-        class:on={session.unattended}
-        onclick={toggleUnattended}
-        aria-pressed={!!session.unattended}
-        title={t('unattended.hint', names)}
-      >
-        <Icon name="coffee" size={15} />{t('unattended.label')}
-      </button>
       <McpServers {session} />
       <button
         class="btn ghost small icon"
@@ -154,10 +144,26 @@
         <SharesNote {session} />
       </div>
       <SessionStatus {session} />
+      <!-- Compact leaves these to the plug button's dot. -->
+      <McpStatus {session} />
     {/if}
-    <!-- Shown in either header mode: a server waiting for the user is why tools are missing. -->
-    <McpStatus {session} />
-    <Toolbar {session} />
+    <!-- The toolbar, with the prompt level and Unattended at the right end
+         of its last line (a line of their own, still at the right, when
+         there's no room). -->
+    <Toolbar {session}>
+      {#snippet end()}
+        <ModeSwitch {session} />
+        <button
+          class="btn ghost small away-btn"
+          class:on={session.unattended}
+          onclick={toggleUnattended}
+          aria-pressed={!!session.unattended}
+          title={t('unattended.hint', names)}
+        >
+          <Icon name="coffee" size={15} />{t('unattended.label')}
+        </button>
+      {/snippet}
+    </Toolbar>
     {#if session.error && session.state === 'error'}
       <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>
     {/if}

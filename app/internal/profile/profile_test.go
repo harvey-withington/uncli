@@ -96,6 +96,27 @@ func TestSharingValues(t *testing.T) {
 	}
 }
 
+// A modifier's tone is one the toolbar knows; the built-ins colour the
+// verbosity group by cost.
+func TestModifierTones(t *testing.T) {
+	defaults, _ := fsSub()
+	s, err := Load(defaults, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, _ := s.Modifier("efficiency"); e.Tone != "success" {
+		t.Errorf("efficiency tone = %q", e.Tone)
+	}
+	if th, _ := s.Modifier("thorough"); th.Tone != "warning" {
+		t.Errorf("thorough tone = %q", th.Tone)
+	}
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "modifiers.yaml"), []byte("modifiers:\n  - id: loud\n    label: Loud\n    tone: red\n"), 0o644)
+	if _, err := Load(defaults, dir); err == nil || !strings.Contains(err.Error(), "tone is success, warning or accent") {
+		t.Errorf("err = %v", err)
+	}
+}
+
 func TestToggleGroups(t *testing.T) {
 	s := load(t, nil)
 	a := s.Toggle(nil, "efficiency", true)

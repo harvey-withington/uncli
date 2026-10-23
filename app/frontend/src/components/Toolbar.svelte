@@ -1,17 +1,21 @@
 <script lang="ts">
-  import type { SessionView, ToolbarItem } from '../lib/api'
+  import type { Snippet } from 'svelte'
+  import type { Modifier, SessionView, ToolbarItem } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { arrange, choicesOf, chosenIn } from '../lib/modifiers'
   import { modelOptions } from '../lib/models'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import CycleButton from './CycleButton.svelte'
   import UsagePopover from './UsagePopover.svelte'
 
   interface Props {
     session: SessionView
+    end?: Snippet // at the right end of the last line (the prompt level)
   }
 
-  let { session }: Props = $props()
+  let { session, end }: Props = $props()
   const app = useApp()
   const items = $derived(app.boot?.toolbar ?? [])
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
@@ -39,6 +43,17 @@
   function toggle(id: string) {
     const on = !session.modifiers.includes(id)
     run(async () => app.upsertSession(await app.backend.toggleModifier(session.id, id, on)))
+  }
+
+  // choose picks one of a group (the backend turns the others off), or
+  // Normal: whichever is on goes off.
+  function choose(members: Modifier[], id: string) {
+    const on = chosenIn(members, session.modifiers)
+    if (id) {
+      run(async () => app.upsertSession(await app.backend.toggleModifier(session.id, id, true)))
+    } else if (on) {
+      run(async () => app.upsertSession(await app.backend.toggleModifier(session.id, on, false)))
+    }
   }
 
   function slash(item: ToolbarItem) {
@@ -73,11 +88,21 @@
         </select>
       </label>
     {:else if item.kind === 'modifiers'}
-      {#each modifiers as m (m.id)}
-        {@const on = session.modifiers.includes(m.id)}
-        <button class="btn small toggle" class:on aria-pressed={on} onclick={() => toggle(m.id)} title={m.label}>
-          <Icon name={m.icon} size={13} />{m.label}
-        </button>
+      {#each arrange(modifiers) as x (x.kind === 'group' ? `group:${x.id}` : x.modifier.id)}
+        {#if x.kind === 'toggle'}
+          {@const on = session.modifiers.includes(x.modifier.id)}
+          <button class="btn small toggle" class:on aria-pressed={on} onclick={() => toggle(x.modifier.id)} title={x.modifier.label}>
+            <Icon name={x.modifier.icon} size={13} />{x.modifier.label}
+          </button>
+        {:else}
+          <CycleButton
+            choices={choicesOf(x.members, t('modifier.normal'))}
+            value={chosenIn(x.members, session.modifiers)}
+            label={choicesOf(x.members, t('modifier.normal')).map(c => c.label).join(' / ')}
+            showLabel={false}
+            onchoose={id => choose(x.members, id)}
+          />
+        {/if}
       {/each}
     {:else if item.kind === 'separator'}
       <span class="sep" aria-hidden="true"></span>
@@ -96,6 +121,7 @@
       </span>
     {/if}
   {/each}
+  {#if end}<div class="end">{@render end()}</div>{/if}
 </div>
 
 <style>
@@ -104,6 +130,13 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
+  }
+  .end {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+    padding-left: var(--space-3);
   }
   .model {
     display: inline-flex;

@@ -11,7 +11,7 @@ async function ask(text: string) {
   await fireEvent.click(await screen.findByRole('button', { name: 'Send' }, { timeout: 4000 }))
 }
 const card = () => screen.queryByRole('alertdialog')
-const modes = () => screen.getByRole('radiogroup', { name: 'Prompt me:' })
+const level = (name: string) => screen.getByRole('button', { name: `Prompt me: ${name}` })
 
 describe('Prompt me', () => {
   it('Never lets a waiting push run, and the next one runs without a card', async () => {
@@ -20,10 +20,10 @@ describe('Prompt me', () => {
     render(App, { props: { backend } })
     await ask('push')
     await screen.findByRole('alertdialog', { name: 'Run a command' }, { timeout: 2000 })
-    expect(within(modes()).getByRole('radio', { name: 'When unsafe' })).toHaveAttribute('aria-checked', 'true')
+    expect(level('When unsafe')).toBeInTheDocument()
     expect(screen.getByText('Claude prompts you before anything unsafe; reading and safe work just run.')).toBeInTheDocument()
 
-    await fireEvent.click(within(modes()).getByRole('radio', { name: 'Never' }))
+    await fireEvent.click(level('When unsafe')) // one click on: Never
     expect(setMode).toHaveBeenCalledWith('s-code', 'never')
     await waitFor(() => expect(card()).toBeNull())
     expect(screen.getByText(/Claude runs everything without prompting you/)).toBeInTheDocument()
@@ -33,16 +33,20 @@ describe('Prompt me', () => {
     expect(card()).toBeNull()
   }, 15000)
 
-  it('moves between levels with the arrow keys', async () => {
+  it('one button cycles through the levels, coloured by risk; Shift+click goes back', async () => {
     const backend = mockBackend()
     const setMode = vi.spyOn(backend, 'setMode')
     render(App, { props: { backend } })
-    const unsafe = await screen.findByRole('radio', { name: 'When unsafe' })
-    expect(unsafe).toHaveAttribute('tabindex', '0')
-    await fireEvent.keyDown(unsafe, { key: 'ArrowRight' })
-    await waitFor(() => expect(setMode).toHaveBeenLastCalledWith('s-code', 'never'))
-    await fireEvent.keyDown(modes(), { key: 'ArrowRight' }) // wraps round
-    await waitFor(() => expect(setMode).toHaveBeenLastCalledWith('s-code', 'always'))
+    await screen.findByRole('button', { name: 'Prompt me: When unsafe' })
+    expect(level('When unsafe').title).toContain('Click for Never; Shift+click for Always.')
+    await fireEvent.click(level('When unsafe'))
+    await waitFor(() => expect(level('Never')).toHaveClass('warning'))
+    expect(setMode).toHaveBeenLastCalledWith('s-code', 'never')
+    await fireEvent.click(level('Never')) // wraps round
+    await waitFor(() => expect(level('Always')).toHaveClass('success'))
+    await fireEvent.click(level('Always'), { shiftKey: true }) // back
+    await waitFor(() => expect(level('Never')).toBeInTheDocument())
+    expect(setMode).toHaveBeenLastCalledWith('s-code', 'never')
   })
 
   it('under Always a card says why, and offers no "This is safe"', async () => {

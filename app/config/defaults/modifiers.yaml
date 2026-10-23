@@ -1,6 +1,9 @@
 # Built-in modifiers. scope: turn = a directive block sent with each turn.
-# Modifiers in the same group are mutually exclusive. Per-model text is
-# matched by family glob (e.g. "haiku*"), falling back to default.
+# Modifiers in the same group are mutually exclusive, and the toolbar shows
+# a group as one toggle with a "Normal" choice (none of them). tone colours
+# a choice by what it costs: success (cheaper) sorts before Normal, warning
+# or accent after. Per-model text is matched by family glob (e.g.
+# "haiku*"), falling back to default.
 modifiers:
   - id: use-agents
     label: Use Agents
@@ -15,6 +18,7 @@ modifiers:
     icon: gauge
     scope: turn
     group: verbosity
+    tone: success
     text:
       default: "Use the minimum tokens and turns needed. No preamble, no recap."
   - id: thorough
@@ -22,6 +26,7 @@ modifiers:
     icon: microscope
     scope: turn
     group: verbosity
+    tone: warning
     settings: { effort: high } # launch flag: applied by respawn before the next turn
     text:
       default: "Verify, check edge cases, and explain trade-offs."
