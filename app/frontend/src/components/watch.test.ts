@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { tick } from 'svelte'
 import { mockBackend } from '../lib/api/mock'
 import { commands } from '../lib/commands'
 import { APP_CONTEXT } from '../lib/context'
@@ -60,9 +61,22 @@ describe('File tab', () => {
   it('stars a file, lists it first, and shows code as code', async () => {
     const { s } = await code()
     s.watchFile('s-code', 'src/parser.ts')
-    render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
+    const { rerender } = render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
     const side = screen.getByRole('complementary')
     await waitFor(() => expect(side.querySelector('.code')).toHaveTextContent('export function scan'))
+
+    // A turn running (the session replaced on each state change) doesn't
+    // reload or redraw an unchanged file.
+    const block = side.querySelector('.code')
+    const reads = vi.spyOn(s.backend, 'watchRead')
+    for (const state of ['thinking', 'running_tools', 'idle'] as const) {
+      s.upsertSession({ ...s.current!, state })
+      await rerender({ session: s.current! })
+      await tick()
+    }
+    expect(reads.mock.calls.filter(c => c[2] === 0)).toHaveLength(0)
+    expect(side.querySelector('.code')).toBe(block)
+    expect(within(side).queryByText('Loading…')).not.toBeInTheDocument()
     await fireEvent.click(within(side).getByRole('button', { name: 'Star this file' }))
     expect(loadWatched('s-code').starred).toEqual(['src/parser.ts'])
     expect(within(side).getByRole('button', { name: 'Unstar this file' })).toHaveAttribute('aria-pressed', 'true')

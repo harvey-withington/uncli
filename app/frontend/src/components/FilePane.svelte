@@ -28,7 +28,11 @@
     sessionId: string
   }
 
-  let { sessionId }: Props = $props()
+  let { sessionId: given }: Props = $props()
+  // The prop is read through the parent's session object, which is replaced
+  // on every state change; as a derived it only changes with the id, so the
+  // file isn't reloaded (and the tab doesn't flicker) as a turn runs.
+  const sessionId = $derived(given)
   const app = useApp()
   const POLL_MS = 1000
   const GRACE_MS = 2500

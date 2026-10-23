@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { tick } from 'svelte'
 import { mockBackend } from '../lib/api/mock'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
@@ -62,6 +63,17 @@ describe('Artifact pane', () => {
     await fireEvent.click(within(pane).getByText('notes.md'))
     expect(await within(pane).findByText('Comfortable shoes')).toBeInTheDocument()
     expect(within(pane).getByText('in the folder now')).toBeInTheDocument()
+    // Page and session updates (as a turn streams) don't reload or redraw it.
+    const shown = within(pane).getByText('Comfortable shoes')
+    const reads = vi.spyOn(s.backend, 'readArtifact')
+    for (const state of ['thinking', 'running_tools', 'idle'] as const) {
+      s.upsertSession({ ...s.current!, state })
+      s.pages['s-chat'] = (s.pages['s-chat'] ?? []).map(p => ({ ...p }))
+      await tick()
+    }
+    await new Promise(r => setTimeout(r, 50))
+    expect(reads).not.toHaveBeenCalled()
+    expect(shown.isConnected).toBe(true)
     // The On this page tab shares the panel, with its section count.
     const outlineTab = screen.getByRole('tab', { name: /^On this page/ })
     expect(within(outlineTab).getByLabelText('2 sections')).toHaveTextContent('2')

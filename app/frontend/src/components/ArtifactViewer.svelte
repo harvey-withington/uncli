@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import type { ArtifactEntry } from '../lib/artifacts'
   import { artifactKind, artifactLang, decodeText, imageType, sandboxDoc, svgDoc } from '../lib/artifacts'
   import { useApp } from '../lib/context'
@@ -33,8 +34,13 @@
   let loading = $state(false)
   let seq = 0
 
+  // The entry is rebuilt on every page update; it's loaded again only when
+  // it names another file or version (or the live file's size changed).
+  const version = $derived([entry.path, entry.hash ?? '', entry.size].join('\n'))
+
   $effect(() => {
-    const e = entry
+    void version
+    const e = untrack(() => entry)
     const k = kind
     const mine = ++seq
     data = null

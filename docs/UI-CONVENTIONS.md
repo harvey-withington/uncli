@@ -59,6 +59,11 @@ with the code.
   DOMPurify (no scripts, handlers, styles, forms, frames or ids; decision
   0019), and links open in the user's browser through the backend, never in
   the app window. Task lists show read-only checkboxes.
+- A panel that loads something in an effect keys the effect on derived
+  primitives (an id, a path, a version), never on an object prop: sessions
+  and page entries are replaced on every update, and an effect that reads
+  them reloads and redraws (flickers) each time. Read a prop such as
+  `sessionId` through `$derived`, which only changes with its value.
 - Motion is subtle (120–200 ms, `--ease`) and disappears under
   `prefers-reduced-motion`.
 
