@@ -42,6 +42,8 @@ export function wailsBackend(): Backend {
         rt.EventsOn('containers:changed', d => h.containersChanged?.(d as never)),
         rt.EventsOn('notify:open', d => h.notifyOpen?.(String(d ?? ''))),
         rt.EventsOn('remote:status', d => h.remoteStatus?.(d as never)),
+        rt.EventsOn('remote:pair', d => h.pairRequest?.(d as never)),
+        rt.EventsOn('remote:devices', d => h.devicesChanged?.(d as never)),
       ]
       return () => offs.forEach(off => off())
     },
@@ -111,6 +113,11 @@ export function wailsBackend(): Backend {
     testNotification: () => call('TestNotification'),
     remoteStatus: () => call('RemoteStatus'),
     setRemoteAccess: (on, port) => call('SetRemoteAccess', on, port),
+    startPairing: () => call('StartPairing'),
+    cancelPairing: () => call('CancelPairing'),
+    answerPairing: (id, allow) => call('AnswerPairing', id, allow),
+    pairedDevices: () => call('PairedDevices'),
+    revokeDevice: id => call('RevokeDevice', id),
     summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     usage: () => call('Usage'),
     usageReport: q => call('UsageReport', q),

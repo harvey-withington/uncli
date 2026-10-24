@@ -5,7 +5,9 @@
   import { remoteLine, validPort } from '../lib/remote'
   import { showToast } from '../lib/toasts.svelte'
   import CopyButton from './CopyButton.svelte'
+  import DeviceList from './DeviceList.svelte'
   import Icon from './Icon.svelte'
+  import PairDialog from './PairDialog.svelte'
 
   // Settings → Remote access (decision 0021): serve this PC's sessions to
   // paired devices over Tailscale. The switch, the port, and the state: the
@@ -15,6 +17,8 @@
   const line = $derived(status ? remoteLine(status) : null)
   let port = $state('')
   let busy = $state(false)
+  let pairing = $state(false)
+  const canPair = $derived(status?.state === 'on')
   const portNumber = $derived(validPort(port))
 
   onMount(async () => {
@@ -69,7 +73,13 @@
     {/if}
     {#if status.loopback}<p class="note">{t('remote.loopback', { loopback: status.loopback })}</p>{/if}
   {/if}
+  <div class="pair">
+    <button class="btn" onclick={() => (pairing = true)} disabled={!canPair}><Icon name="qr-code" size={14} />{t('pair.start')}</button>
+    {#if !canPair}<span class="note">{t('pair.needsOn')}</span>{/if}
+  </div>
+  <DeviceList />
 </section>
+{#if pairing}<PairDialog onclose={() => (pairing = false)} />{/if}
 
 <style>
   section {
@@ -138,6 +148,16 @@
     margin: var(--space-2) 0 0;
     font-size: var(--text-xs);
     color: var(--text-muted);
+  }
+  .pair {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+  }
+  .pair .note {
+    margin: 0;
   }
   .note.danger {
     color: var(--danger);

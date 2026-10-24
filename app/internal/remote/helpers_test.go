@@ -113,6 +113,13 @@ type rig struct {
 // on: loopback and the fake tailnet address, one paired device ("tok").
 func newRig(t *testing.T) *rig {
 	t.Helper()
+	return newRigWith(t, Config{Auth: fakeAuth{"tok": {ID: "dev1", Name: "Pixel 9"}}})
+}
+
+// newRigWith takes the Config's Auth and callbacks; nil Auth is the real
+// paired-device list.
+func newRigWith(t *testing.T, c Config) *rig {
+	t.Helper()
 	dir := t.TempDir()
 	hub := NewHub()
 	svc, err := app.New(app.Paths{Config: filepath.Join(dir, "c"), Cache: filepath.Join(dir, "k"), Scratch: filepath.Join(dir, "s")}, hub)
@@ -121,8 +128,8 @@ func newRig(t *testing.T) *rig {
 	}
 	t.Cleanup(svc.Close)
 	r := &rig{t: t, svc: svc, certs: newFakeCerts(t), port: freePort(t)}
-	r.srv = New(Config{API: app.NewAPI(svc, nil), Service: svc, Hub: hub, Store: svc.Store, Certs: r.certs,
-		Auth: fakeAuth{"tok": {ID: "dev1", Name: "Pixel 9"}}})
+	c.API, c.Service, c.Hub, c.Store, c.Certs = app.NewAPI(svc, nil), svc, hub, svc.Store, r.certs
+	r.srv = New(c)
 	t.Cleanup(r.srv.Close)
 	if st, err := r.srv.SetSettings(Settings{Enabled: true, Port: r.port}); err != nil || st.State != StateOn {
 		t.Fatalf("status = %+v, %v", st, err)

@@ -106,7 +106,15 @@ func Run(assets fs.FS, opts Options) error {
 		}
 	}
 	a.remote = remote.New(remote.Config{API: app.NewAPI(svc, nil), Service: svc, Hub: hub, Store: svc.Store,
-		Certs: &remote.Tailscale{}, OnStatus: func(st remote.Status) { a.Emit(EvtRemoteStatus, st) }})
+		Certs: &remote.Tailscale{}, OnStatus: func(st remote.Status) { a.Emit(EvtRemoteStatus, st) },
+		OnPairRequest: func(p remote.PairRequest) {
+			// Someone is at the server to approve: bring the window up.
+			if svc.ShowWindow != nil {
+				svc.ShowWindow()
+			}
+			a.Emit(EvtPairRequest, p)
+		},
+		OnDevices: func(d []remote.PairedDevice) { a.Emit(EvtDevices, d) }})
 	defer svc.Close()
 	defer a.remote.Close()
 	go a.remote.Start()
@@ -205,8 +213,12 @@ func (b both) Emit(name string, data any) {
 	b.hub.Emit(name, data)
 }
 
-// EvtRemoteStatus tells the window Remote access's state changed.
-const EvtRemoteStatus = "remote:status" // remote.Status
+// Remote access's events, for the window only.
+const (
+	EvtRemoteStatus = "remote:status"  // remote.Status
+	EvtPairRequest  = "remote:pair"    // remote.PairRequest: a device waits for Allow
+	EvtDevices      = "remote:devices" // []remote.PairedDevice
+)
 
 // RemoteStatus is Settings → Remote access's state: off, on (with the
 // address), or why not (decision 0021). Only the window can see or change
@@ -217,6 +229,21 @@ func (a *App) RemoteStatus() remote.Status { return a.remote.Status() }
 func (a *App) SetRemoteAccess(on bool, port int) (remote.Status, error) {
 	return a.remote.SetSettings(remote.Settings{Enabled: on, Port: port})
 }
+
+// StartPairing shows a pairing code (decision 0022): a QR code and a link
+// for the device to open.
+func (a *App) StartPairing() (remote.Pairing, error) { return a.remote.StartPairing() }
+
+func (a *App) CancelPairing() { a.remote.CancelPairing() }
+
+// AnswerPairing is "Allow <name>?" answered.
+func (a *App) AnswerPairing(id string, allow bool) error { return a.remote.AnswerPairing(id, allow) }
+
+// PairedDevices lists the devices paired with this UNCLI.
+func (a *App) PairedDevices() []remote.PairedDevice { return a.remote.Devices() }
+
+// RevokeDevice unpairs a device and closes its connections.
+func (a *App) RevokeDevice(id string) error { return a.remote.RevokeDevice(id) }
 
 // instanceID is the single-instance lock's id: one UNCLI per data folder.
 // A copy run on a data folder of its own (UNCLI_DATA_DIR: tests, wails

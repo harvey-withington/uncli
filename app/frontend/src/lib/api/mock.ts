@@ -347,7 +347,11 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
   }
   let h: Handlers | null = null
   const containers = mockContainers(c => h?.containersChanged?.(c))
-  const remote = mockRemote(s => h?.remoteStatus?.(s))
+  const remote = mockRemote({
+    status: s => h?.remoteStatus?.(s),
+    pair: r => h?.pairRequest?.(r),
+    devices: d => h?.devicesChanged?.(d),
+  })
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
   let decisionKey = ''
   let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }

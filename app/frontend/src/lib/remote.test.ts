@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { remoteLine, validPort } from './remote'
+import { countdown, remoteLine, validPort } from './remote'
 
 describe('remoteLine', () => {
   it('says off, on, or why not', () => {
@@ -19,5 +19,15 @@ describe('validPort', () => {
     expect(validPort('65536')).toBeNull()
     expect(validPort('98a')).toBeNull()
     expect(validPort('')).toBeNull()
+  })
+})
+
+describe('countdown', () => {
+  it('counts down to the expiry, then stops', () => {
+    const now = Date.parse('2026-10-24T12:00:00Z')
+    expect(countdown('2026-10-24T12:04:32Z', now)).toBe('4:32')
+    expect(countdown('2026-10-24T12:00:05Z', now)).toBe('0:05')
+    expect(countdown('2026-10-24T12:00:00Z', now)).toBeNull()
+    expect(countdown('not a date', now)).toBeNull()
   })
 })

@@ -315,7 +315,8 @@ const SHORT: Partial<Record<TraceReason['by'], string>> = {
 }
 
 // approvedLabel says who let a tool use run, on its trace row.
-export function approvedLabel(approved: Approver, why: TraceReason[] = []): string {
+export function approvedLabel(approved: Approver, why: TraceReason[] = [], device = ''): string {
+  if (approved === 'you' && device) return t('trace.allowed.youOn', { device })
   if (approved !== 'mixed') return t(`trace.allowed.${approved}`)
   const who = [...new Set(why.map(w => SHORT[w.by]).filter((k): k is string => !!k))].map(k => t(k))
   return t('trace.allowed.mixed', { who: who.join(', ') })

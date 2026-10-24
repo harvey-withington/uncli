@@ -92,6 +92,7 @@ export interface TraceItem {
   denied?: boolean
   output?: string
   approved?: Approver // who let it run, when the CLI asked first
+  device?: string // the paired device the user answered on (decision 0022); none for the server's window
   why?: TraceReason[] // when UNCLI answered without the user: the reason for each part of the command
 }
 
@@ -681,6 +682,27 @@ export interface Handlers {
   containersChanged?(c: ContainersInfo): void
   notifyOpen?(sessionId: string): void // the user clicked a notification ("" for the tray icon)
   remoteStatus?(s: RemoteStatus): void // Remote access changed state (the server's window only)
+  pairRequest?(r: PairRequest): void // a device waits for "Allow <name>?" (the server's window only)
+  devicesChanged?(d: PairedDevice[]): void // paired devices changed (the server's window only)
+}
+
+// Pairing a device (decision 0022): a one-use code that lasts a few
+// minutes, as a link and a QR code; the device asks, the window allows.
+export interface Pairing {
+  code: string
+  url: string // https://<machine>.<tailnet>.ts.net:<port>/m/#pair=<code>
+  qr: string // the link as a PNG data URL
+  expires: string
+}
+export interface PairRequest {
+  id: string
+  name: string
+}
+export interface PairedDevice {
+  id: string
+  name: string
+  paired: string
+  lastSeen: string
 }
 
 // Remote access (decision 0021): off, on at the machine's tailnet address,
@@ -774,6 +796,11 @@ export interface Backend {
   // Remote access: only the server's own window can see or change it.
   remoteStatus(): Promise<RemoteStatus>
   setRemoteAccess(on: boolean, port: number): Promise<RemoteStatus>
+  startPairing(): Promise<Pairing>
+  cancelPairing(): Promise<void>
+  answerPairing(id: string, allow: boolean): Promise<void>
+  pairedDevices(): Promise<PairedDevice[]>
+  revokeDevice(id: string): Promise<void>
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   usageReport(q: UsageQuery): Promise<UsageReport>

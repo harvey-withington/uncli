@@ -53,7 +53,9 @@
                   {approvedLabel(it.approved, it.why)}<Icon name="chevron-down" size={11} />
                 </button>
               {:else if it.approved}
-                <span class="who">{approvedLabel(it.approved)}</span>
+                <span class="who">{approvedLabel(it.approved, [], it.device)}</span>
+              {:else if it.denied && it.device}
+                <span class="who">{t('trace.deniedOn', { device: it.device })}</span>
               {:else if it.why?.length}
                 <button class="more" onclick={() => (reasons[it.id] = !reasons[it.id])} aria-expanded={!!reasons[it.id]}>{t('trace.whyShort')}</button>
               {/if}

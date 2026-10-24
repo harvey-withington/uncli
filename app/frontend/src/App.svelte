@@ -6,6 +6,7 @@
   import KeyboardMap from './components/KeyboardMap.svelte'
   import Icon from './components/Icon.svelte'
   import NewSessionDialog from './components/NewSessionDialog.svelte'
+  import PairRequestDialog from './components/PairRequestDialog.svelte'
   import SessionPane from './components/SessionPane.svelte'
   import SettingsDialog from './components/SettingsDialog.svelte'
   import UsageDashboard from './components/UsageDashboard.svelte'
@@ -105,6 +106,7 @@
 {#if app.paletteOpen}<CommandPalette />{/if}
 {#if app.keysOpen}<KeyboardMap />{/if}
 {#if app.importOpen}<ImportDialog />{/if}
+<PairRequestDialog />
 <ConfirmDialog />
 <Toasts />
 

@@ -10,6 +10,7 @@ package remote
 
 import (
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -46,9 +47,12 @@ type Config struct {
 	Auth    Authenticator
 	// PWA is the phone app, served at /m/ (nil: none).
 	PWA fs.FS
-	// OnStatus is told whenever the status changes (the bridge passes it
-	// on to the window).
-	OnStatus func(Status)
+	// OnStatus is told whenever the status changes, OnPairRequest when a
+	// device asks to pair, OnDevices when the paired devices change (the
+	// bridge passes them on to the window).
+	OnStatus      func(Status)
+	OnPairRequest func(PairRequest)
+	OnDevices     func([]PairedDevice)
 }
 
 // Server is the remote transport. Its zero state is off.
@@ -62,6 +66,9 @@ type Server struct {
 	links *links
 	pwa   fs.FS
 
+	devices *Devices
+	pair    *pairing
+
 	onStatus func(Status)
 
 	mu       sync.Mutex
@@ -73,6 +80,17 @@ type Server struct {
 func New(c Config) *Server {
 	s := &Server{api: c.API, svc: c.Service, hub: c.Hub, store: c.Store, certs: c.Certs, auth: c.Auth,
 		links: newLinks(), pwa: c.PWA, onStatus: c.OnStatus}
+	if c.Store != nil {
+		s.devices = NewDevices(c.Store)
+		if c.OnDevices != nil {
+			s.devices.changed = func() { c.OnDevices(s.devices.List()) }
+		}
+		if s.auth == nil {
+			s.auth = s.devices
+		}
+		s.pair = newPairing(s.devices)
+		s.pair.asked = c.OnPairRequest
+	}
 	s.settings = s.loadSettings()
 	s.status = Status{Enabled: false, Port: s.settings.Port, State: StateOff}
 	return s
@@ -91,6 +109,10 @@ func (s *Server) Handler(hosts func() []string) http.Handler {
 	mux.Handle("POST /upload", s.authed(s.serveUploadPost))
 	mux.HandleFunc("GET /l/artifact", s.serveArtifact)
 	mux.HandleFunc("GET /l/upload", s.serveUpload)
+	if s.pair != nil {
+		mux.HandleFunc("POST /pair/request", s.servePairRequest)
+		mux.HandleFunc("POST /pair/claim", s.servePairClaim)
+	}
 	if s.pwa != nil {
 		mux.Handle("GET /m/", http.StripPrefix("/m/", http.FileServerFS(s.pwa)))
 		mux.Handle("GET /{$}", http.RedirectHandler("/m/", http.StatusFound))
@@ -242,4 +264,31 @@ func (s *Server) serveUploadPost(w http.ResponseWriter, r *http.Request, _ Devic
 		return
 	}
 	_ = json.NewEncoder(w).Encode(up)
+}
+
+// StartPairing opens a pairing code for the window's QR code, replacing
+// any open one. Remote access must be on with Tailscale: that's the
+// address a device opens.
+func (s *Server) StartPairing() (Pairing, error) {
+	st := s.Status()
+	if st.State != StateOn || st.URL == "" {
+		return Pairing{}, errors.New("turn Remote access on, with Tailscale connected, to pair a device")
+	}
+	return s.pair.start(st.URL)
+}
+
+// CancelPairing closes the open code.
+func (s *Server) CancelPairing() { s.pair.cancel() }
+
+// AnswerPairing is the window's Allow or Deny for a device waiting to pair.
+func (s *Server) AnswerPairing(id string, allow bool) error { return s.pair.answer(id, allow) }
+
+// Devices lists the paired devices.
+func (s *Server) Devices() []PairedDevice { return s.devices.List() }
+
+// RevokeDevice unpairs a device and ends its open connections.
+func (s *Server) RevokeDevice(id string) error {
+	err := s.devices.Revoke(id)
+	s.hub.CloseDevice(id)
+	return err
 }

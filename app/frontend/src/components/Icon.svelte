@@ -38,6 +38,8 @@
   import MessageSquareText from 'lucide-svelte/icons/message-square-text'
   import Microscope from 'lucide-svelte/icons/microscope'
   import Monitor from 'lucide-svelte/icons/monitor'
+  import QrCode from 'lucide-svelte/icons/qr-code'
+  import Smartphone from 'lucide-svelte/icons/smartphone'
   import Moon from 'lucide-svelte/icons/moon'
   import PanelRightClose from 'lucide-svelte/icons/panel-right-close'
   import PanelRightOpen from 'lucide-svelte/icons/panel-right-open'
@@ -92,7 +94,7 @@
     briefcase: Briefcase, check: Check, 'chevron-down': ChevronDown, 'chevron-up': ChevronUp, 'chevron-left': ChevronLeft, 'chevron-right': ChevronRight,
     'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code, coffee: Coffee,
     copy: Copy, download: Download, file: File, 'file-text': FileText, image: ImageIcon, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,
-    'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,
+    'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, 'qr-code': QrCode, smartphone: Smartphone, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,
     plus: Plus, play: Play, rewind: Rewind, search: Search, plug: Plug, unplug: Unplug, 'key-round': KeyRound, 'list-checks': ListChecks, 'message-circle-question': MessageCircleQuestion, 'rotate-ccw': RotateCcw, shield: Shield, 'fast-forward': FastForward, settings: Settings, 'shield-check': ShieldCheck, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
     sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,

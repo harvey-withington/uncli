@@ -12,14 +12,18 @@ afterEach(() => {
 })
 
 // jsdom has no Web Animations API; Svelte transitions call element.animate.
+// Each one finishes at once (onfinish on the next tick), so an outro ends
+// and its element goes, as in a browser.
 if (typeof Element !== 'undefined' && !Element.prototype.animate) {
   Element.prototype.animate = function (): Animation {
-    return {
+    const a = {
       cancel() {}, finish() {}, play() {}, pause() {}, reverse() {},
       addEventListener() {}, removeEventListener() {},
-      onfinish: null, oncancel: null, onremove: null, playState: 'finished',
+      onfinish: null as (() => void) | null, oncancel: null, onremove: null, playState: 'finished',
       finished: Promise.resolve({} as Animation), ready: Promise.resolve({} as Animation),
-    } as unknown as Animation
+    }
+    setTimeout(() => a.onfinish?.(), 0)
+    return a as unknown as Animation
   }
 }
 

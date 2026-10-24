@@ -31,3 +31,10 @@ export function validPort(v: string): number | null {
   const n = Number(v)
   return n >= 1 && n <= 65535 ? n : null
 }
+
+// countdown is the time left until expires as m:ss, or null once it's past.
+export function countdown(expires: string, now = Date.now()): string | null {
+  const left = Math.floor((Date.parse(expires) - now) / 1000)
+  if (!Number.isFinite(left) || left <= 0) return null
+  return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
+}

@@ -117,6 +117,8 @@ describe('why a tool use ran', () => {
     ]
     expect(approvedLabel('mixed', why)).toBe('ran: project rule, session type')
     expect(approvedLabel('mixed', [{ part: 'ls', by: 'looks' }, { part: 'go vet', by: 'safe' }, { part: 'git push', by: 'listed' }])).toBe('ran: only reads, safe, your safe list')
+    expect(approvedLabel('you', [], 'Pixel 9')).toBe('allowed by you on Pixel 9')
+    expect(approvedLabel('you')).toBe('allowed by you')
     expect(approvedLabel('safe')).toBe('ran: safe')
     expect(approvedLabel('rule')).toBe('allowed by a project rule')
     expect(approvedLabel('profile')).toBe('allowed by the session type')
