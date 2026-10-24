@@ -107,6 +107,8 @@ type Service struct {
 
 	emit          Emitter
 	notifier      notify.Notifier
+	remoteMu      sync.Mutex
+	remoteNotes   NoteSink // notes for paired devices (SetRemoteNotes)
 	artifactStore *artifacts.Store
 	containers    containers
 	providers     []Provider               // names for the interface (providers.yaml)
@@ -171,6 +173,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		func(id string) bool { return s.Sessions != nil && s.Sessions.Focused(id) },
 		func() string { return s.Preferences().Notifications },
 		func(n notify.Note) { go s.showNote(n) })
+	sink.remote = s.remoteSink
 	s.Sessions, err = session.NewManager(session.Deps{
 		Store: db, Adapter: s.Adapter, Others: others, Hooks: s.hooks,
 		Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,

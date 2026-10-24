@@ -1,10 +1,12 @@
 package remote
 
 import (
+	"context"
 	"errors"
 	"sort"
 
 	"uncli/internal/app"
+	"uncli/internal/push"
 )
 
 // client is what one paired device's RPC calls run on: the app's API, with
@@ -46,6 +48,8 @@ var rpcMethods = []string{
 	// Files, artifacts and folders on the server, read only.
 	"WatchFiles", "WatchRead", "ArtifactFiles", "ReadArtifact", "ListFolder",
 	"ArtifactLink", "UploadLink",
+	// This device's notifications (push).
+	"PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "SetPushNotifications", "TestPush",
 }
 
 var rpcNames = func() map[string]bool {
@@ -98,6 +102,69 @@ func (c *client) ArtifactLink(sessionID string, ref app.ArtifactRef) (string, er
 		return "", err
 	}
 	return c.server.links.artifact(sessionID, ref), nil
+}
+
+// Push (decision 0021): each device subscribes its own browser and picks
+// what it's told; nothing here touches another device's.
+
+var errNoPush = errors.New("notifications aren't available on this server")
+
+func (c *client) pusher() (*push.Pusher, error) {
+	if c.server.push == nil {
+		return nil, errNoPush
+	}
+	return c.server.push, nil
+}
+
+// PushKey is the key the device's browser subscribes with.
+func (c *client) PushKey() (string, error) {
+	p, err := c.pusher()
+	if err != nil {
+		return "", err
+	}
+	return p.PublicKey(), nil
+}
+
+func (c *client) PushState() (push.State, error) {
+	p, err := c.pusher()
+	if err != nil {
+		return push.State{}, err
+	}
+	return p.StateOf(c.device.ID), nil
+}
+
+func (c *client) PushSubscribe(sub push.Subscription) error {
+	p, err := c.pusher()
+	if err != nil {
+		return err
+	}
+	return p.Subscribe(c.device.ID, sub)
+}
+
+func (c *client) PushUnsubscribe() error {
+	p, err := c.pusher()
+	if err != nil {
+		return err
+	}
+	return p.Forget(c.device.ID)
+}
+
+// SetPushNotifications sets what this device is told: all, approvals or off.
+func (c *client) SetPushNotifications(setting string) error {
+	p, err := c.pusher()
+	if err != nil {
+		return err
+	}
+	return p.SetSetting(c.device.ID, setting)
+}
+
+// TestPush sends this device a sample notification.
+func (c *client) TestPush(ctx context.Context) error {
+	p, err := c.pusher()
+	if err != nil {
+		return err
+	}
+	return p.Test(ctx, c.device.ID, push.Note{Title: "UNCLI", Body: "Notifications are on. You'll get one like this when a session needs you.", Tag: "test"})
 }
 
 // UploadLink is a signed link to a file the device uploaded.

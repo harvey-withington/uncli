@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"uncli/internal/app"
+	"uncli/internal/notify"
+	"uncli/internal/push"
 )
 
 // The phone app's files are served with the right types, caching and
@@ -73,6 +75,16 @@ func TestPWAPreview(t *testing.T) {
 		time.Sleep(1500 * time.Millisecond) // long enough to see "Waiting for Allow"
 		_ = r.srv.AnswerPairing(p.ID, true)
 	}})
+	// Push as the app has it: real push services only.
+	if p, err := push.New(r.svc.Store); err == nil {
+		r.srv.push = p
+		r.svc.SetRemoteNotes(func(n notify.Note, approval bool) {
+			go func() {
+				r.srv.Notify(n, approval)
+				t.Logf("pushed %q", n.Body)
+			}()
+		})
+	}
 	loop := fmt.Sprintf("http://localhost:%d", r.port)
 	p, _ := r.srv.pair.start(loop)
 	// A session to look at, waiting on an approval, made through the API.

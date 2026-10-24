@@ -133,3 +133,29 @@ func newTestService(t *testing.T) *Service {
 	t.Cleanup(svc.Close)
 	return svc
 }
+
+// Paired devices hear of every change worth a note, whatever the desktop
+// shows: the window may be focused on the session, or its notifications
+// off.
+func TestRemoteNotes(t *testing.T) {
+	a, shown := watch(true, NotifyOff)
+	type got struct {
+		n        notify.Note
+		approval bool
+	}
+	var remote []got
+	a.remote = func() NoteSink { return func(n notify.Note, approval bool) { remote = append(remote, got{n, approval}) } }
+	a.SessionChanged(view(session.RunningTools))
+	v := view(session.NeedsApproval)
+	v.Approvals = []session.Approval{{Tool: "Bash", Description: "Push the branch"}}
+	a.SessionChanged(v)
+	a.SessionChanged(view(session.Thinking))
+	a.PageChanged(store.Page{SessionID: "s1", Seq: 1, Status: "done", AnswerMD: "Pushed."})
+	a.SessionChanged(view(session.Unread))
+	if len(*shown) != 0 {
+		t.Errorf("the desktop showed %v", *shown)
+	}
+	if len(remote) != 2 || !remote[0].approval || remote[0].n.Body != "Needs your approval: Push the branch" || remote[1].approval || remote[1].n.Body != "Finished: Pushed." {
+		t.Errorf("remote = %+v", remote)
+	}
+}

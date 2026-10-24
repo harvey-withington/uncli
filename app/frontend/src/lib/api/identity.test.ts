@@ -19,6 +19,7 @@ const NOT_SESSION = [
   'signOutContainerAccount', 'theme', 'openFolder', 'revealFile', 'editors', 'transcripts', 'importTranscript',
   'openURL', 'copyText', 'remoteStatus', 'setRemoteAccess', 'startPairing', 'cancelPairing', 'answerPairing',
   'pairedDevices', 'revokeDevice', 'listFolder', 'upload', 'uploadLink',
+  'pushKey', 'pushState', 'pushSubscribe', 'pushUnsubscribe', 'setPushNotifications', 'testPush',
 ]
 
 describe('session identity', () => {

@@ -218,6 +218,12 @@ export function httpBackend(opts: HttpOptions): Backend {
       if (!res.ok) throw new RPCError(body.error ?? res.statusText, res.status)
       return body
     },
+    pushKey: () => call('PushKey'),
+    pushState: () => call('PushState'),
+    pushSubscribe: sub => call('PushSubscribe', sub),
+    pushUnsubscribe: () => call('PushUnsubscribe'),
+    setPushNotifications: setting => call('SetPushNotifications', setting),
+    testPush: () => call('TestPush'),
     artifactLink: async (s, r) => absolute(opts.base, await call<string>('ArtifactLink', s, r)),
     uploadLink: async up => absolute(opts.base, await call<string>('UploadLink', up)),
   }

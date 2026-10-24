@@ -9,6 +9,7 @@
 package remote
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -18,6 +19,8 @@ import (
 	"time"
 
 	"uncli/internal/app"
+	"uncli/internal/notify"
+	"uncli/internal/push"
 )
 
 // Device is a paired device.
@@ -47,6 +50,8 @@ type Config struct {
 	Auth    Authenticator
 	// PWA is the phone app, served at /m/ (nil: none).
 	PWA fs.FS
+	// Push sends notifications to paired devices' browsers (nil: none).
+	Push *push.Pusher
 	// OnStatus is told whenever the status changes, OnPairRequest when a
 	// device asks to pair, OnDevices when the paired devices change (the
 	// bridge passes them on to the window).
@@ -68,6 +73,7 @@ type Server struct {
 
 	devices *Devices
 	pair    *pairing
+	push    *push.Pusher
 
 	onStatus func(Status)
 
@@ -79,7 +85,7 @@ type Server struct {
 
 func New(c Config) *Server {
 	s := &Server{api: c.API, svc: c.Service, hub: c.Hub, store: c.Store, certs: c.Certs, auth: c.Auth,
-		links: newLinks(), pwa: c.PWA, onStatus: c.OnStatus}
+		links: newLinks(), pwa: c.PWA, push: c.Push, onStatus: c.OnStatus}
 	if c.Store != nil {
 		s.devices = NewDevices(c.Store)
 		if c.OnDevices != nil {
@@ -286,9 +292,25 @@ func (s *Server) AnswerPairing(id string, allow bool) error { return s.pair.answ
 // Devices lists the paired devices.
 func (s *Server) Devices() []PairedDevice { return s.devices.List() }
 
-// RevokeDevice unpairs a device and ends its open connections.
+// RevokeDevice unpairs a device, ends its open connections and stops its
+// notifications.
 func (s *Server) RevokeDevice(id string) error {
 	err := s.devices.Revoke(id)
 	s.hub.CloseDevice(id)
+	if s.push != nil {
+		_ = s.push.Forget(id)
+	}
 	return err
+}
+
+// Notify pushes a note about a session to the paired devices that want
+// it, while Remote access is on (a device couldn't open the session
+// otherwise). The app calls it for every change worth a note.
+func (s *Server) Notify(n notify.Note, approval bool) {
+	if s.push == nil || !s.Status().Enabled {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	s.push.Notify(ctx, push.Note{Title: n.Title, Body: n.Body, Session: n.Key, Tag: n.Key, Approval: approval})
 }

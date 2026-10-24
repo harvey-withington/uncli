@@ -40,6 +40,9 @@ type attention struct {
 	focused func(id string) bool
 	setting func() string
 	show    func(notify.Note)
+	// remote is told every note-worthy change, whatever the desktop's
+	// setting and focus: paired devices decide for themselves (push).
+	remote func() NoteSink
 
 	mu    sync.Mutex
 	state map[string]session.State
@@ -47,7 +50,7 @@ type attention struct {
 }
 
 func newAttention(next session.Sink, focused func(string) bool, setting func() string, show func(notify.Note)) *attention {
-	return &attention{next: next, focused: focused, setting: setting, show: show,
+	return &attention{next: next, focused: focused, setting: setting, show: show, remote: func() NoteSink { return nil },
 		state: map[string]session.State{}, page: map[string]store.Page{}}
 }
 
@@ -75,6 +78,29 @@ func (a *attention) SessionChanged(v session.View) {
 	if n, ok := noteFor(prev, v, page, a.setting()); ok && !a.focused(v.ID) {
 		a.show(n)
 	}
+	if sink := a.remote(); sink != nil {
+		if n, ok := noteFor(prev, v, page, NotifyAll); ok {
+			sink(n, v.State == session.NeedsApproval)
+		}
+	}
+}
+
+// NoteSink takes a note about a session for paired devices; approval says
+// it's a session waiting for approval.
+type NoteSink func(n notify.Note, approval bool)
+
+// SetRemoteNotes gives the notes to paired devices too (push, decision
+// 0021); nil stops them.
+func (s *Service) SetRemoteNotes(f NoteSink) {
+	s.remoteMu.Lock()
+	s.remoteNotes = f
+	s.remoteMu.Unlock()
+}
+
+func (s *Service) remoteSink() NoteSink {
+	s.remoteMu.Lock()
+	defer s.remoteMu.Unlock()
+	return s.remoteNotes
 }
 
 // busy states are those of a turn in flight.

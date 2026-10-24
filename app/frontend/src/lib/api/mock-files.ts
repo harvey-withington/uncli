@@ -1,6 +1,7 @@
-// The server's folders and uploads, for the browser mock: a small folder
-// tree under C:\Users\you, and uploads that remember only their name.
-import type { AttachmentKind, FolderListing, Upload } from './types'
+// The server's folders, uploads and push, for the browser mock: a small
+// folder tree under C:\Users\you, uploads that remember only their name,
+// and a push subscription that's only remembered.
+import type { AttachmentKind, FolderListing, NotifySetting, PushState, PushSubscriptionInfo, Upload } from './types'
 
 const TREE: Record<string, string[]> = {
   '': ['C:\\Users\\you', 'C:\\', 'D:\\'],
@@ -27,6 +28,7 @@ function kindOf(type: string, name: string): AttachmentKind {
 
 export function mockFiles() {
   let n = 0
+  const push: PushState = { subscribed: false, setting: 'all' }
   return {
     async listFolder(path: string): Promise<FolderListing> {
       const names = TREE[path] ?? []
@@ -39,6 +41,13 @@ export function mockFiles() {
         reason: kind === 'unsupported' ? 'only images, PDFs and text files can be attached' : undefined,
       }
     },
+    // Push: subscribing works, and is remembered for the session.
+    async pushKey(): Promise<string> { return 'BMockVapidPublicKeyForTheBrowserMockOnly' },
+    async pushState(): Promise<PushState> { return { ...push } },
+    async pushSubscribe(sub: PushSubscriptionInfo) { push.subscribed = !!sub.endpoint },
+    async pushUnsubscribe() { push.subscribed = false },
+    async setPushNotifications(setting: NotifySetting) { push.setting = setting },
+    async testPush() {},
     async artifactLink(): Promise<string> { return 'about:blank' },
     async uploadLink(): Promise<string> { return 'about:blank' },
   }

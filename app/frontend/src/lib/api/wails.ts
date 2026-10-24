@@ -123,6 +123,13 @@ export function wailsBackend(): Backend {
     upload: () => Promise.reject(new Error('uploads are for remote clients')),
     artifactLink: () => Promise.reject(new Error('links are for remote clients')),
     uploadLink: () => Promise.reject(new Error('links are for remote clients')),
+    // The window notifies through the desktop; push is for remote clients.
+    pushKey: () => Promise.reject(new Error('push is for remote clients')),
+    pushState: async () => ({ subscribed: false, setting: 'off' }),
+    pushSubscribe: () => Promise.reject(new Error('push is for remote clients')),
+    pushUnsubscribe: async () => {},
+    setPushNotifications: () => Promise.reject(new Error('push is for remote clients')),
+    testPush: () => Promise.reject(new Error('push is for remote clients')),
     summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     usage: () => call('Usage'),
     usageReport: q => call('UsageReport', q),

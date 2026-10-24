@@ -13,6 +13,7 @@
   import MobileHome from './MobileHome.svelte'
   import MobileSession from './MobileSession.svelte'
   import MobileSettings from './MobileSettings.svelte'
+  import PushSection from './PushSection.svelte'
   import { sessionFromHash } from './pairing'
   import { fetchVersion, mismatched, type ServerVersion } from './version'
 
@@ -108,7 +109,9 @@
 </div>
 {#if app.newSessionOpen}{#key app.newSessionSeq}<NewSessionDialog />{/key}{/if}
 {#if settingsOpen}
-  <MobileSettings {server} {deviceName} version={version?.app ?? ''} {onforget} onclose={() => (settingsOpen = false)} />
+  <MobileSettings {server} {deviceName} version={version?.app ?? ''} {onforget} onclose={() => (settingsOpen = false)}>
+    {#snippet notifications()}<PushSection />{/snippet}
+  </MobileSettings>
 {/if}
 <ConfirmDialog />
 <Toasts />

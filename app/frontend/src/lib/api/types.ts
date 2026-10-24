@@ -711,6 +711,18 @@ export interface PairedDevice {
   lastSeen: string
 }
 
+// Push on a remote client (decision 0021): its browser's subscription, as
+// PushSubscription.toJSON() gives it, and what this device is told.
+export interface PushSubscriptionInfo {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+}
+export interface PushState {
+  subscribed: boolean
+  setting: NotifySetting
+  lastFail?: string
+}
+
 // A remote client's link to its server: connecting, online, or offline
 // since a time, with when it was last online and why it isn't.
 export interface Connection {
@@ -836,6 +848,13 @@ export interface Backend {
   upload(file: Blob, name: string): Promise<Upload>
   artifactLink(sessionId: string, ref: ArtifactRef): Promise<string>
   uploadLink(id: string): Promise<string>
+  // This device's push notifications (http only).
+  pushKey(): Promise<string>
+  pushState(): Promise<PushState>
+  pushSubscribe(sub: PushSubscriptionInfo): Promise<void>
+  pushUnsubscribe(): Promise<void>
+  setPushNotifications(setting: NotifySetting): Promise<void>
+  testPush(): Promise<void>
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   usageReport(q: UsageQuery): Promise<UsageReport>

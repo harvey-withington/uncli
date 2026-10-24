@@ -22,6 +22,8 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"uncli/internal/app"
+	"uncli/internal/notify"
+	"uncli/internal/push"
 	"uncli/internal/remote"
 )
 
@@ -110,7 +112,13 @@ func Run(assets fs.FS, opts Options) error {
 	if err != nil {
 		return err
 	}
-	a.remote = remote.New(remote.Config{API: app.NewAPI(svc, nil), Service: svc, Hub: hub, Store: svc.Store, PWA: pwa,
+	// Push notifications for paired devices; without keys, devices are told
+	// notifications aren't available.
+	pusher, err := push.New(svc.Store)
+	if err != nil {
+		pusher = nil
+	}
+	a.remote = remote.New(remote.Config{API: app.NewAPI(svc, nil), Service: svc, Hub: hub, Store: svc.Store, PWA: pwa, Push: pusher,
 		Certs: &remote.Tailscale{}, OnStatus: func(st remote.Status) { a.Emit(EvtRemoteStatus, st) },
 		OnPairRequest: func(p remote.PairRequest) {
 			// Someone is at the server to approve: bring the window up.
@@ -120,6 +128,9 @@ func Run(assets fs.FS, opts Options) error {
 			a.Emit(EvtPairRequest, p)
 		},
 		OnDevices: func(d []remote.PairedDevice) { a.Emit(EvtDevices, d) }})
+	// Every change worth a note goes to the paired devices too, off the
+	// session's own goroutine.
+	svc.SetRemoteNotes(func(n notify.Note, approval bool) { go a.remote.Notify(n, approval) })
 	defer svc.Close()
 	defer a.remote.Close()
 	go a.remote.Start()
