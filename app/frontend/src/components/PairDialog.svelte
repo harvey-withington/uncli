@@ -63,6 +63,7 @@
       <code>{pairing.url}</code>
       <CopyButton text={pairing.url} label={t('pair.copyLink')} />
     </div>
+    <p class="code">{t('pair.orType')} <strong>{pairing.code.slice(0, 5)}-{pairing.code.slice(5)}</strong></p>
     <p class="expiry" role="status">
       {#if left}{t('pair.expiresIn', { time: left })}{:else}{t('pair.expired')}{/if}
     </p>
@@ -113,6 +114,16 @@
     overflow-wrap: anywhere;
     font-size: var(--text-xs);
     user-select: all;
+  }
+  .code {
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+  .code strong {
+    font-family: var(--mono);
+    color: var(--text);
+    letter-spacing: 0.05em;
   }
   .expiry {
     margin: var(--space-2) 0 0;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PairError, guessDeviceName, pair, pairCodeFromHash, sessionFromHash } from './pairing'
+import { PairError, guessDeviceName, normaliseCode, pair, pairCodeFromHash, sessionFromHash } from './pairing'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 
@@ -10,6 +10,12 @@ describe('pairing links', () => {
     expect(pairCodeFromHash('#pair=<script>')).toBe('')
     expect(pairCodeFromHash('')).toBe('')
     expect(sessionFromHash('#s=deviant.ts.net%3A9871~abc')).toBe('deviant.ts.net:9871~abc')
+  })
+
+  it('takes a typed code however it was written', () => {
+    expect(normaliseCode('bc3yj-64ac7')).toBe('BC3YJ64AC7')
+    expect(normaliseCode(' BC3Y J64A C7 ')).toBe('BC3YJ64AC7')
+    expect(normaliseCode('BC3YJ')).toBe('')
   })
 
   it('guesses a name from the browser', () => {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from '../components/Icon.svelte'
   import { t } from '../lib/i18n.svelte'
-  import { PairError, guessDeviceName, loadDeviceName, pair, saveDeviceName, type Paired } from './pairing'
+  import { PairError, guessDeviceName, loadDeviceName, normaliseCode, pair, saveDeviceName, type Paired } from './pairing'
 
   // Pairing on the phone (decision 0022). With a code from the server's QR
   // code: the device's name, then "Waiting for Allow on <server>…". With
@@ -13,9 +13,12 @@
     server: string
     revoked?: boolean
     onpaired: (p: Paired) => void
+    oncode: (code: string) => void // a code typed in (the link lost it, or it was read out)
   }
 
-  let { code, server, revoked = false, onpaired }: Props = $props()
+  let { code, server, revoked = false, onpaired, oncode }: Props = $props()
+  let typed = $state('')
+  const typedCode = $derived(normaliseCode(typed))
   let name = $state(loadDeviceName() || guessDeviceName(navigator.userAgent))
   let step = $state<'name' | 'waiting' | 'failed'>('name')
   let problem = $state('')
@@ -48,6 +51,13 @@
       <li>{t('mpair.step2')}</li>
       <li>{t('mpair.step3')}</li>
     </ol>
+    <form onsubmit={e => { e.preventDefault(); if (typedCode) oncode(typedCode) }}>
+      <label class="field">
+        <span>{t('mpair.typeCode')}</span>
+        <input class="input" bind:value={typed} autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE-FGHJK" />
+      </label>
+      <button class="btn big" type="submit" disabled={!typedCode}>{t('mpair.useCode')}</button>
+    </form>
   {:else if step === 'name'}
     <p>{t('mpair.nameBody', { server })}</p>
     <form onsubmit={submit}>

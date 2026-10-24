@@ -20,6 +20,16 @@
   const server = serverKey(location.origin)
   let token = $state(loadToken())
   let code = $state(pairCodeFromHash(location.hash))
+  // A pairing link opened in a tab already showing the app changes only
+  // the fragment: take its code too.
+  $effect(() => {
+    const onhash = () => {
+      const c = pairCodeFromHash(location.hash)
+      if (c) code = c
+    }
+    addEventListener('hashchange', onhash)
+    return () => removeEventListener('hashchange', onhash)
+  })
   let revoked = $state(false)
 
   function paired(p: Paired) {
@@ -48,5 +58,5 @@
     <MobileShell {backend} {server} deviceName={loadDeviceName()} onforget={() => forget(false)} />
   {/key}
 {:else}
-  <PairScreen {code} {server} {revoked} onpaired={paired} />
+  <PairScreen {code} {server} {revoked} onpaired={paired} oncode={c => (code = c)} />
 {/if}

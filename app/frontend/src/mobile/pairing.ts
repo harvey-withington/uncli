@@ -50,6 +50,13 @@ export function pairCodeFromHash(hash: string): string {
   return m?.[1]?.toUpperCase() ?? ''
 }
 
+// normaliseCode is a typed pairing code as the server knows it: letters
+// and digits only, upper case; '' until it's a whole code.
+export function normaliseCode(typed: string): string {
+  const c = typed.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return c.length === 10 ? c : ''
+}
+
 // sessionFromHash reads the session a link opens (#s=<id>), from a
 // notification.
 export function sessionFromHash(hash: string): string {

@@ -25,6 +25,20 @@ describe('the phone app', () => {
     expect(screen.getByText(/Click Pair a device, and scan the QR code/)).toBeInTheDocument()
   })
 
+  it('takes a code typed in when the link lost it', async () => {
+    render(MobileApp)
+    await fireEvent.input(screen.getByRole('textbox', { name: /type the code/ }), { target: { value: 'bc3yj-64ac7' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Use this code' }))
+    expect(await screen.findByRole('button', { name: 'Pair this device' })).toBeEnabled()
+  })
+
+  it('takes the code from a pairing link opened in a tab already showing the app', async () => {
+    render(MobileApp)
+    history.replaceState(null, '', '/m/#pair=K7QWM3XRP2')
+    dispatchEvent(new HashChangeEvent('hashchange'))
+    expect(await screen.findByRole('button', { name: 'Pair this device' })).toBeEnabled()
+  })
+
   it('asks for a name when opened from a pairing link', () => {
     history.replaceState(null, '', '/m/#pair=K7QWM3XRP2')
     render(MobileApp)
