@@ -1,4 +1,4 @@
-# 0017. Each UNCLI serves its own sessions over the tailnet
+# 0021. Each UNCLI serves its own sessions over the tailnet
 
 Status: accepted
 Date: 2026-10-24
@@ -69,7 +69,7 @@ localhost only. What constrains the design:
   - A session is identified by its server and its id.
   - The server's API covers everything the desktop app does with a session,
     so the phone and a remote desktop use the same calls.
-  - A desktop pairs exactly as a phone does (decision 0018).
+  - A desktop pairs exactly as a phone does (decision 0022).
 - **Remote access isn't part of the panel.** When UNCLI is embedded, the
   panel takes a `Backend` from its host and doesn't know whether it's local
   or remote. Serving is UNCLI's Go side; reaching a server is a client

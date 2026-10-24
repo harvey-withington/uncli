@@ -1,11 +1,11 @@
-# 0018. Devices pair with a token approved on the server
+# 0022. Devices pair with a token approved on the server
 
 Status: accepted
 Date: 2026-10-24
 
 ## Context
 
-With remote access on (decision 0017), any device on the tailnet can reach
+With remote access on (decision 0021), any device on the tailnet can reach
 UNCLI, and a paired device can make the user's CLIs run tools. Harvey's
 tailnet is private, but it may hold shared devices, and a stolen token would
 work from any of them.
