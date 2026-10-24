@@ -319,6 +319,9 @@ type TraceItem struct {
 	// "full" (Full mode) or "mixed" (a command whose parts were allowed for
 	// different reasons). Empty when it didn't ask.
 	Approved string `json:"approved,omitempty"`
+	// Device is the paired device the user answered on (decision 0022);
+	// empty for this machine's window.
+	Device string `json:"device,omitempty"`
 	// Why gives the reason for each part of a command (or the tool) when
 	// UNCLI answered without the user, allowed or denied.
 	Why []TraceReason `json:"why,omitempty"`

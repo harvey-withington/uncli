@@ -680,6 +680,22 @@ export interface Handlers {
   providerStatus?(s: CLIStatus): void // any provider's, its provider field says which
   containersChanged?(c: ContainersInfo): void
   notifyOpen?(sessionId: string): void // the user clicked a notification ("" for the tray icon)
+  remoteStatus?(s: RemoteStatus): void // Remote access changed state (the server's window only)
+}
+
+// Remote access (decision 0021): off, on at the machine's tailnet address,
+// on this PC only (reason says why not the tailnet), or not listening.
+export type RemoteState = 'off' | 'on' | 'loopback' | 'error'
+export type RemoteReason = 'no-tailscale' | 'stopped' | 'https-off' | 'cert-failed' | 'listen'
+export interface RemoteStatus {
+  enabled: boolean
+  port: number
+  state: RemoteState
+  url?: string // https://<machine>.<tailnet>.ts.net:<port>
+  loopback?: string // http://127.0.0.1:<port>
+  reason?: RemoteReason
+  detail?: string
+  certExpires?: string
 }
 
 // Backend is everything the UI can ask of UNCLI. The Wails bridge
@@ -755,6 +771,9 @@ export interface Backend {
   hasDecisionKey(): Promise<boolean>
   testDecisionModel(): Promise<DecisionTest> // a sample question to the decision model
   testNotification(): Promise<void> // shows a sample desktop notification
+  // Remote access: only the server's own window can see or change it.
+  remoteStatus(): Promise<RemoteStatus>
+  setRemoteAccess(on: boolean, port: number): Promise<RemoteStatus>
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   usageReport(q: UsageQuery): Promise<UsageReport>

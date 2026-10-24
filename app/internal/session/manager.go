@@ -293,21 +293,32 @@ func (m *Manager) Send(ctx context.Context, id, text string, files ...core.Attac
 
 // AnswerAsk answers a waiting question or plan (Session.AnswerAsk).
 func (m *Manager) AnswerAsk(id, requestID string, allow bool, answers map[string]string, note string) error {
+	return m.AnswerAskFrom(id, requestID, allow, answers, note, "")
+}
+
+// AnswerAskFrom is AnswerAsk given on a paired device (its name).
+func (m *Manager) AnswerAskFrom(id, requestID string, allow bool, answers map[string]string, note, device string) error {
 	s, err := m.get(id)
 	if err != nil {
 		return err
 	}
-	return s.AnswerAsk(requestID, allow, answers, note)
+	return s.AnswerAskFrom(requestID, allow, answers, note, device)
 }
 
 // Answer gives the user's decision on a waiting request: allow (once),
 // safe (and remember it, in scope "project" or "all") or deny.
 func (m *Manager) Answer(id, requestID, decision, scope string) error {
+	return m.AnswerFrom(id, requestID, decision, scope, "")
+}
+
+// AnswerFrom is Answer given on a paired device (its name), which the
+// page's trace records.
+func (m *Manager) AnswerFrom(id, requestID, decision, scope, device string) error {
 	s, err := m.get(id)
 	if err != nil {
 		return err
 	}
-	return s.Answer(requestID, decision, scope)
+	return s.AnswerFrom(requestID, decision, scope, device)
 }
 
 // MarkSafe toggles "This is safe" on a waiting card, then looks again at
@@ -427,6 +438,17 @@ func (m *Manager) Archive(id string, on bool) (View, error) {
 func (m *Manager) Focus(id string) {
 	m.mu.Lock()
 	m.focused = id
+	s := m.sessions[id]
+	m.mu.Unlock()
+	if s != nil {
+		s.markRead()
+	}
+}
+
+// MarkRead clears a session's Unread without making it the focused one:
+// a paired device looked at it, while the window may be showing another.
+func (m *Manager) MarkRead(id string) {
+	m.mu.Lock()
 	s := m.sessions[id]
 	m.mu.Unlock()
 	if s != nil {

@@ -10,6 +10,7 @@ import { MOCK_CHAT_ARTIFACTS, mockArtifactFiles, mockReadArtifact } from './mock
 import { mockUsageReport } from './mock-usage'
 import { mockTheme } from './mock-theme'
 import { mockContainers } from './mock-containers'
+import { mockRemote } from './mock-remote'
 import { mockTranscriptPages, mockTranscripts } from './mock-import'
 import { mockWatch } from './mock-watch'
 
@@ -346,6 +347,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
   }
   let h: Handlers | null = null
   const containers = mockContainers(c => h?.containersChanged?.(c))
+  const remote = mockRemote(s => h?.remoteStatus?.(s))
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
   let decisionKey = ''
   let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }
@@ -946,6 +948,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     async openPath() {},
     async revealFile() {},
     ...mockWatch(),
+    ...remote,
     async usageReport(q) { return mockUsageReport(q) },
     async theme() { return mockTheme() },
     ...containers,

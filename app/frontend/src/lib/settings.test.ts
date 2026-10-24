@@ -15,8 +15,8 @@ describe('settings tabs', () => {
   })
 
   it('shows Containers only on Windows', () => {
-    expect(tabsFor('windows')).toEqual(['general', 'approvals', 'providers', 'containers'])
-    expect(tabsFor('darwin')).toEqual(['general', 'approvals', 'providers'])
+    expect(tabsFor('windows')).toEqual(['general', 'approvals', 'providers', 'remote', 'containers'])
+    expect(tabsFor('darwin')).toEqual(['general', 'approvals', 'providers', 'remote'])
   })
 
   it('remembers the last tab, if it is shown', () => {

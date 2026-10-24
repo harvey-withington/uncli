@@ -305,6 +305,12 @@ func (s *Session) MarkSafe(requestID string, on bool, scope string) error {
 // each part that prompted as safe, in scope (ScopeProject or ScopeAll),
 // then allows it; every other waiting request is looked at again.
 func (s *Session) Answer(requestID, decision, scope string) error {
+	return s.AnswerFrom(requestID, decision, scope, "")
+}
+
+// AnswerFrom is Answer given on a paired device (its name; "" for this
+// machine's window), which the trace records (decision 0022).
+func (s *Session) AnswerFrom(requestID, decision, scope, device string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	i := -1
@@ -347,6 +353,7 @@ func (s *Session) Answer(requestID, decision, scope string) error {
 	} else {
 		s.markDeniedLocked(a.ToolUseID, nil)
 	}
+	s.markDeviceLocked(a.ToolUseID, device)
 	s.resumeLocked()
 	s.changed()
 	if decision == Safe {
@@ -496,6 +503,20 @@ func (s *Session) markApprovedLocked(toolUseID, by string, why []store.TraceReas
 	s.savePage()
 }
 
+// markDeviceLocked records the paired device the user answered on; nothing
+// for an answer in this machine's window.
+func (s *Session) markDeviceLocked(toolUseID, device string) {
+	if s.page == nil || toolUseID == "" || device == "" {
+		return
+	}
+	for k := range s.page.Trace {
+		if s.page.Trace[k].ID == toolUseID {
+			s.page.Trace[k].Device = device
+		}
+	}
+	s.savePage()
+}
+
 func (s *Session) markDeniedLocked(toolUseID string, why []store.TraceReason) {
 	if s.page == nil || toolUseID == "" {
 		return
@@ -545,6 +566,11 @@ const (
 // question) or a plan (allow to go ahead; deny to keep planning, with the
 // user's note as what to change).
 func (s *Session) AnswerAsk(requestID string, allow bool, answers map[string]string, note string) error {
+	return s.AnswerAskFrom(requestID, allow, answers, note, "")
+}
+
+// AnswerAskFrom is AnswerAsk given on a paired device (see AnswerFrom).
+func (s *Session) AnswerAskFrom(requestID string, allow bool, answers map[string]string, note, device string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	i := slices.IndexFunc(s.pending, func(a Approval) bool { return a.RequestID == requestID })
@@ -579,6 +605,7 @@ func (s *Session) AnswerAsk(requestID string, allow bool, answers map[string]str
 	} else {
 		s.markDeniedLocked(a.ToolUseID, nil)
 	}
+	s.markDeviceLocked(a.ToolUseID, device)
 	s.resumeLocked()
 	s.changed()
 	return nil

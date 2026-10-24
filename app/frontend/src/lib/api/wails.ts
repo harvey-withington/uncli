@@ -41,6 +41,7 @@ export function wailsBackend(): Backend {
         rt.EventsOn('provider:status', d => h.providerStatus?.(d as never)),
         rt.EventsOn('containers:changed', d => h.containersChanged?.(d as never)),
         rt.EventsOn('notify:open', d => h.notifyOpen?.(String(d ?? ''))),
+        rt.EventsOn('remote:status', d => h.remoteStatus?.(d as never)),
       ]
       return () => offs.forEach(off => off())
     },
@@ -108,6 +109,8 @@ export function wailsBackend(): Backend {
     hasDecisionKey: () => call('HasDecisionKey'),
     testDecisionModel: () => call('TestDecisionModel'),
     testNotification: () => call('TestNotification'),
+    remoteStatus: () => call('RemoteStatus'),
+    setRemoteAccess: (on, port) => call('SetRemoteAccess', on, port),
     summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     usage: () => call('Usage'),
     usageReport: q => call('UsageReport', q),

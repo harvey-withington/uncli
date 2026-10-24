@@ -2,9 +2,9 @@
 // palette commands and buttons elsewhere open Settings at; the section
 // decides the tab. The last tab is remembered per viewer.
 
-export type SettingsTab = 'general' | 'approvals' | 'providers' | 'containers'
+export type SettingsTab = 'general' | 'approvals' | 'providers' | 'remote' | 'containers'
 
-export const SETTINGS_TABS: SettingsTab[] = ['general', 'approvals', 'providers', 'containers']
+export const SETTINGS_TABS: SettingsTab[] = ['general', 'approvals', 'providers', 'remote', 'containers']
 
 // Which tab each section is on.
 const SECTION_TAB: Record<string, SettingsTab> = {
@@ -20,6 +20,7 @@ const SECTION_TAB: Record<string, SettingsTab> = {
   account: 'providers',
   'provider-containers': 'providers',
   cache: 'providers',
+  remote: 'remote',
   containers: 'containers',
 }
 

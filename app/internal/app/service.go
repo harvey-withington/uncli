@@ -166,6 +166,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	s.containers.building, s.containers.failed, s.containers.runtimes = map[string]string{}, map[string]string{}, map[string]*wsl.Runtime{}
 	s.containers.percent = map[string]int{}
 	s.artifactStore = artifacts.NewStore(filepath.Join(paths.Config, "artifact-store"))
+	go s.clearOldUploads()
 	sink := newAttention(newCoalescer(emit, 50*time.Millisecond),
 		func(id string) bool { return s.Sessions != nil && s.Sessions.Focused(id) },
 		func() string { return s.Preferences().Notifications },
@@ -580,9 +581,11 @@ func DescribePaths(paths []string) []DroppedPath {
 }
 
 // AttachmentRef is a file the UI wants sent with a turn: a path to read,
-// or pasted image data (base64) with no file behind it.
+// an upload from a remote client (uploads.go), or pasted image data
+// (base64) with no file behind it.
 type AttachmentRef struct {
 	Path      string `json:"path,omitempty"`
+	Upload    string `json:"upload,omitempty"`
 	Name      string `json:"name,omitempty"`
 	MediaType string `json:"mediaType,omitempty"`
 	Data      string `json:"data,omitempty"`
@@ -595,9 +598,15 @@ func (s *Service) Send(ctx context.Context, sessionID, text string, refs []Attac
 	for _, r := range refs {
 		var f core.Attachment
 		var err error
-		if r.Path != "" {
+		switch {
+		case r.Upload != "":
+			var path string
+			if path, err = s.UploadPath(r.Upload); err == nil {
+				f, err = attach.Load(path)
+			}
+		case r.Path != "":
 			f, err = attach.Load(r.Path)
-		} else {
+		default:
 			var data []byte
 			if data, err = base64.StdEncoding.DecodeString(r.Data); err == nil {
 				f, err = attach.FromData(r.Name, r.MediaType, data)

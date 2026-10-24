@@ -221,7 +221,7 @@ describe('Settings tabs', () => {
     await fireEvent.click(await screen.findByRole('button', { name: /Claude Code 2\./ }))
     const dialog = within(await screen.findByRole('dialog', { name: 'Settings' }))
     const tabs = dialog.getAllByRole('tab').map(t => t.textContent)
-    expect(tabs).toEqual(['General', 'Approvals', 'AI Providers', 'Containers'])
+    expect(tabs).toEqual(['General', 'Approvals', 'AI Providers', 'Remote access', 'Containers'])
     const general = dialog.getByRole('tab', { name: 'General' })
     await fireEvent.click(general)
     expect(dialog.getByRole('combobox', { name: 'Theme' })).toBeInTheDocument()

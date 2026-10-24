@@ -2,7 +2,7 @@
 // the live text of answers still streaming. All state is keyed by id.
 import type {
   ArtifactFile, AttachmentRef, Backend, ContainersInfo, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
-  CommandInfo, ModelInfo, Share, ThinkingData, UsageLimit,
+  CommandInfo, ModelInfo, RemoteStatus, Share, ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
@@ -35,6 +35,8 @@ export class AppStore {
   progress = $state<Progress | null>(null)
   // WSL and the container profiles (decision 0011); loaded on demand.
   containers = $state<ContainersInfo | null>(null)
+  // Remote access (decision 0021), for the server's own window.
+  remote = $state<RemoteStatus | null>(null)
   // What in Settings needs the user, per tab (lib/attention.ts).
   attention = $derived(settingsAttention(this.containers))
   sessions = $state<SessionView[]>([])
@@ -129,6 +131,7 @@ export class AppStore {
       providerStatus: s => { if (s.provider) this.providerStatus[s.provider] = s },
       containersChanged: c => { this.containers = c },
       notifyOpen: id => { void this.openFromNotification(id) },
+      remoteStatus: s => { this.remote = s },
     })
     const [boot, cli] = await Promise.all([this.backend.bootstrap(), this.backend.cliStatus(false)])
     this.boot = boot

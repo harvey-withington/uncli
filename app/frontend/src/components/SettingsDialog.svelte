@@ -12,6 +12,7 @@
   import NotifySection from './NotifySection.svelte'
   import ProviderSection from './ProviderSection.svelte'
   import QuickSection from './QuickSection.svelte'
+  import RemoteSection from './RemoteSection.svelte'
   import SafeSection from './SafeSection.svelte'
   import StartupSection from './StartupSection.svelte'
   import type { Preferences } from '../lib/api'
@@ -20,7 +21,7 @@
   // Settings, in tabs down the left (lib/settings.ts): General (appearance,
   // notifications, tray and startup, editor, quick tasks), Approvals (safe and unsafe, the
   // decision model), AI Providers (each CLI's version, account and
-  // container sign-in) and, on Windows, Containers. It opens on the last
+  // container sign-in), Remote access and, on Windows, Containers. It opens on the last
   // tab, or on a section's tab when opened at one (the header's shield,
   // palette commands).
   const app = useApp()
@@ -108,6 +109,8 @@
           <ProviderSection provider={p} />
         {/each}
         {#if prefs}<CacheSection {prefs} {savePrefs} />{/if}
+      {:else if tab === 'remote'}
+        <RemoteSection />
       {:else if tab === 'containers'}
         <ContainersSection />
       {/if}
