@@ -1,7 +1,8 @@
 <script lang="ts">
   import Icon from '../components/Icon.svelte'
   import { t } from '../lib/i18n.svelte'
-  import { PairError, guessDeviceName, loadDeviceName, normaliseCode, pair, saveDeviceName, type Paired } from './pairing'
+  import { onMount } from 'svelte'
+  import { PairError, claimPair, guessDeviceName, loadDeviceName, loadPending, normaliseCode, requestPair, saveDeviceName, type Paired } from './pairing'
 
   // Pairing on the phone (decision 0022). With a code from the server's QR
   // code: the device's name, then "Waiting for Allow on <server>…". With
@@ -23,6 +24,12 @@
   let step = $state<'name' | 'waiting' | 'failed'>('name')
   let problem = $state('')
 
+  function failed(err: unknown) {
+    step = 'failed'
+    const kind = err instanceof PairError ? err.kind : 'network'
+    problem = t(`mpair.failed.${kind}`, { detail: err instanceof Error ? err.message : String(err) })
+  }
+
   async function submit(e: SubmitEvent) {
     e.preventDefault()
     const n = name.trim()
@@ -30,20 +37,30 @@
     saveDeviceName(n)
     problem = ''
     try {
-      const p = await pair(fetch, '', code, n, () => (step = 'waiting'))
-      onpaired(p)
+      const p = await requestPair(fetch, '', code, n)
+      step = 'waiting'
+      onpaired(await claimPair(fetch, '', p))
     } catch (err) {
-      step = 'failed'
-      const kind = err instanceof PairError ? err.kind : 'network'
-      problem = t(`mpair.failed.${kind}`, { detail: err instanceof Error ? err.message : String(err) })
+      failed(err)
     }
   }
+
+  // A request still waiting for Allow (the page was reloaded or put away):
+  // carry on waiting for it.
+  onMount(() => {
+    const p = loadPending()
+    if (!p) return
+    step = 'waiting'
+    claimPair(fetch, '', p).then(onpaired, failed)
+  })
 </script>
 
 <main class="pair">
   <img class="mark" src="./icon-192.png" alt="" width="64" height="64" />
   <h1>{t('mpair.title')}</h1>
-  {#if !code}
+  {#if step === 'waiting'}
+    <p class="waiting" role="status"><Icon name="loader" spin size={18} />{t('mpair.waiting', { server })}</p>
+  {:else if !code && step === 'name'}
     {#if revoked}<p class="warn" role="alert"><Icon name="triangle-alert" size={16} />{t('mpair.revoked')}</p>{/if}
     <p>{t('mpair.howTo', { server })}</p>
     <ol>
@@ -67,11 +84,10 @@
       </label>
       <button class="btn primary big" type="submit" disabled={!name.trim()}>{t('mpair.pair')}</button>
     </form>
-  {:else if step === 'waiting'}
-    <p class="waiting" role="status"><Icon name="loader" spin size={18} />{t('mpair.waiting', { server })}</p>
   {:else}
     <p class="warn" role="alert"><Icon name="triangle-alert" size={16} />{problem}</p>
     <p>{t('mpair.again')}</p>
+    <button class="btn big" onclick={() => { step = 'name'; oncode('') }}>{t('mpair.newCode')}</button>
   {/if}
 </main>
 

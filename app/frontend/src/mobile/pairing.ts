@@ -84,26 +84,91 @@ export class PairError extends Error {
   }
 }
 
-// pair asks to pair with code under name, then waits for the server's
-// answer: the token when allowed, a PairError otherwise. waiting is told
-// once the server's window is asking.
-export async function pair(f: typeof fetch, base: string, code: string, name: string, waiting: () => void, signal?: AbortSignal): Promise<Paired> {
-  const post = async (path: string, body: unknown) => {
-    try {
-      return await f(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
-    } catch (e) {
-      throw new PairError(e instanceof Error ? e.message : String(e), 'network')
-    }
+// A request waiting for Allow is kept, so the phone carries on waiting
+// for it after the page was reloaded or put away (switching to another
+// app to tell someone at the PC, say). The server keeps it 5 minutes.
+const PENDING_KEY = 'uncli-pair-pending'
+const PENDING_LIFE = 5 * 60_000
+
+export interface PendingPair {
+  id: string
+  claim: string
+  at: number // ms
+}
+
+export function loadPending(now = Date.now()): PendingPair | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING_KEY) ?? 'null') as PendingPair | null
+    if (p && typeof p.id === 'string' && typeof p.claim === 'string' && now - p.at < PENDING_LIFE) return p
+  } catch {
+    // none kept
   }
-  const res = await post('/pair/request', { code, name })
+  clearPending()
+  return null
+}
+
+function savePending(p: PendingPair) {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(p))
+  } catch {
+    // not kept: a reload while waiting means pairing again
+  }
+}
+
+function clearPending() {
+  try {
+    localStorage.removeItem(PENDING_KEY)
+  } catch {
+    // nothing kept
+  }
+}
+
+async function post(f: typeof fetch, url: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  try {
+    return await f(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
+  } catch (e) {
+    throw new PairError(e instanceof Error ? e.message : String(e), 'network')
+  }
+}
+
+// requestPair asks to pair with code under name; the request is kept until
+// it's answered.
+export async function requestPair(f: typeof fetch, base: string, code: string, name: string, now = Date.now()): Promise<PendingPair> {
+  const res = await post(f, `${base}/pair/request`, { code, name })
   const req = (await res.json()) as { id?: string; claim?: string; error?: string }
   if (!res.ok || !req.id || !req.claim) throw new PairError(req.error ?? res.statusText, 'code')
-  waiting()
+  const p = { id: req.id, claim: req.claim, at: now }
+  savePending(p)
+  return p
+}
+
+// claimPair waits for the server's answer to a request: the token when
+// allowed, a PairError when refused or gone. A dropped connection is
+// retried while the request can still be answered.
+export async function claimPair(f: typeof fetch, base: string, p: PendingPair, opts: { signal?: AbortSignal; retryMs?: number } = {}): Promise<Paired> {
   for (;;) {
-    const r = await post('/pair/claim', { id: req.id, claim: req.claim })
+    let r: Response
+    try {
+      r = await post(f, `${base}/pair/claim`, { id: p.id, claim: p.claim }, opts.signal)
+    } catch (e) {
+      if (opts.signal?.aborted || Date.now() - p.at > PENDING_LIFE) {
+        clearPending()
+        throw e
+      }
+      await new Promise(res => setTimeout(res, opts.retryMs ?? 2000))
+      continue
+    }
     if (r.status === 202) continue
+    clearPending()
     const body = (await r.json()) as Paired & { error?: string }
     if (r.ok && body.token) return { token: body.token, device: body.device }
     throw new PairError(body.error ?? r.statusText, r.status === 403 ? 'denied' : 'gone')
   }
+}
+
+// pair asks and waits; waiting is told once the server's window is asking.
+export async function pair(f: typeof fetch, base: string, code: string, name: string, waiting: () => void, signal?: AbortSignal): Promise<Paired> {
+  const p = await requestPair(f, base, code, name)
+  waiting()
+  return claimPair(f, base, p, { signal })
 }

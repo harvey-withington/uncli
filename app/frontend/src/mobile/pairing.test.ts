@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PairError, guessDeviceName, normaliseCode, pair, pairCodeFromHash, sessionFromHash } from './pairing'
+import { PairError, claimPair, guessDeviceName, loadPending, normaliseCode, pair, pairCodeFromHash, requestPair, sessionFromHash } from './pairing'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 
@@ -35,6 +35,23 @@ describe('pair', () => {
     expect(waiting).toHaveBeenCalledOnce()
     const bodies = f.mock.calls.map(c => JSON.parse((c as unknown as [string, RequestInit])[1].body as string))
     expect(bodies).toEqual([{ code: 'CODE', name: 'Pixel 9' }, { id: 'r1', claim: 'c1' }, { id: 'r1', claim: 'c1' }])
+  })
+
+  it('keeps waiting through a dropped connection, and remembers the request', async () => {
+    const p = await requestPair((async () => json({ id: 'r1', claim: 'c1' })) as never, '', 'CODE', 'Pixel')
+    expect(loadPending()).toMatchObject({ id: 'r1', claim: 'c1' })
+    let n = 0
+    const f = vi.fn(async () => {
+      n++
+      if (n === 1) throw new TypeError('Failed to fetch') // the phone was put away
+      return json({ token: 't'.repeat(64), device: { id: 'd1', name: 'Pixel' } })
+    })
+    const got = await claimPair(f as never, '', p, { retryMs: 1 })
+    expect(got.device.name).toBe('Pixel')
+    expect(loadPending()).toBeNull()
+    // An old request isn't resumed.
+    localStorage.setItem('uncli-pair-pending', JSON.stringify({ id: 'x', claim: 'y', at: Date.now() - 6 * 60_000 }))
+    expect(loadPending()).toBeNull()
   })
 
   it('says why it failed', async () => {

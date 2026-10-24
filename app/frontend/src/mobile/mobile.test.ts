@@ -39,6 +39,15 @@ describe('the phone app', () => {
     expect(await screen.findByRole('button', { name: 'Pair this device' })).toBeEnabled()
   })
 
+  it('carries on waiting for Allow after a reload', async () => {
+    localStorage.setItem('uncli-pair-pending', JSON.stringify({ id: 'r1', claim: 'c1', at: Date.now() }))
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(() => {})) // the server is still waiting
+    render(MobileApp)
+    expect(await screen.findByText(/Waiting for you to allow it/)).toBeInTheDocument()
+    await waitFor(() => expect(f).toHaveBeenCalledWith('/pair/claim', expect.anything()))
+    f.mockRestore()
+  })
+
   it('asks for a name when opened from a pairing link', () => {
     history.replaceState(null, '', '/m/#pair=K7QWM3XRP2')
     render(MobileApp)

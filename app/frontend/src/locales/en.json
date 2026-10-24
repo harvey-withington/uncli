@@ -425,6 +425,7 @@
   "mpair.failed.network": "Couldn’t reach the PC ({detail}).",
   "mpair.typeCode": "Or type the code shown under the QR code",
   "mpair.useCode": "Use this code",
+  "mpair.newCode": "Enter a new code",
   "pair.orType": "Or open UNCLI on the device and type the code",
   "mpair.again": "Show a new code on the PC (Settings → Remote access → Pair a device) and scan it again.",
   "mobile.settings": "Settings",
