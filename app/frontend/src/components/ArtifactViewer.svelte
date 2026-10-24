@@ -5,6 +5,7 @@
   import { useApp } from '../lib/context'
   import { canOpenDefault } from '../lib/files'
   import { t } from '../lib/i18n.svelte'
+  import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { keepScroll } from '../lib/scrollmemory'
   import { showToast } from '../lib/toasts.svelte'
   import AnswerBlocks from './AnswerBlocks.svelte'
@@ -80,7 +81,17 @@
       return null
     }
   }
+  // At the server it opens with the default app; on a remote client, in
+  // the device's browser through a signed link.
   async function open() {
+    if (!atServer(app.backend)) {
+      try {
+        await app.backend.openURL(await app.backend.artifactLink(sessionId, entry.hash ? { hash: entry.hash } : { path: entry.path }))
+      } catch (e) {
+        showToast(String(e), 'error')
+      }
+      return
+    }
     const p = await onDisk()
     if (p) app.backend.openFile(sessionId, p, 0).catch(e => showToast(String(e), 'error'))
   }
@@ -99,7 +110,7 @@
     {#if canOpenDefault(entry.path)}
       <button class="btn ghost small icon" onclick={open} aria-label={t('artifacts.open')} title={t('artifacts.open')}><Icon name="external-link" size={14} /></button>
     {/if}
-    <button class="btn ghost small icon" onclick={reveal} aria-label={t('files.reveal')} title={t('files.reveal')}><Icon name="folder-search" size={14} /></button>
+    <button class="btn ghost small icon" onclick={reveal} disabled={!atServer(app.backend)} aria-label={t('files.reveal')} title={atServer(app.backend) ? t('files.reveal') : `${t('files.reveal')}: ${onlyAtServer()}`}><Icon name="folder-search" size={14} /></button>
   </div>
   <div class="body" class:framed={kind === 'html' || kind === 'svg' || kind === 'mermaid'} use:keepScroll={{ key: `artifact:${sessionId}:${entry.path}` }}>
     {#if error}

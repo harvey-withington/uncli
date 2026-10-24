@@ -8,7 +8,7 @@
     "predev": "npm run generate-icons",
     "dev": "vite",
     "prebuild": "npm run generate-icons",
-    "build": "vite build",
+    "build": "vite build && vite build --config vite.mobile.config.ts",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "vitest",

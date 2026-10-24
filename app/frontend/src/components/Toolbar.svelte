@@ -3,6 +3,7 @@
   import type { Modifier, SessionView, ToolbarItem } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { arrange, choicesOf, chosenIn } from '../lib/modifiers'
   import { modelOptions } from '../lib/models'
   import { showToast } from '../lib/toasts.svelte'
@@ -119,8 +120,9 @@
         <Icon name={item.icon ?? 'terminal'} size={13} />{item.label}
       </button>
     {:else if item.kind === 'native'}
+      {@const away = item.action === 'open_workdir' && !atServer(app.backend)}
       <span class="native">
-        <button class="btn small ghost" onclick={() => native(item)} aria-expanded={item.action === 'usage' ? usageOpen : undefined}>
+        <button class="btn small ghost" onclick={() => native(item)} disabled={away} title={away ? onlyAtServer() : undefined} aria-expanded={item.action === 'usage' ? usageOpen : undefined}>
           <Icon name={item.icon ?? 'sparkles'} size={13} />{item.label}
         </button>
         {#if item.action === 'usage' && usageOpen}

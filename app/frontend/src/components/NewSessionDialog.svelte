@@ -4,8 +4,10 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'
+  import FolderBrowser from './FolderBrowser.svelte'
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
+  import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { modelOptions } from '../lib/models'
   import { tintStyle } from '../lib/tint'
   import { providerOf } from '../lib/providers'
@@ -77,16 +79,26 @@
   })
 
   let startButton: HTMLButtonElement | undefined = $state()
+  // Away from the server there's no folder dialog: its folders are browsed.
+  let browsing = $state(false)
+  const pickTitle = $derived(profile?.folder === 'repo' ? t('newSession.pickRepo') : t('newSession.pickFolder'))
+
+  async function picked(dir: string) {
+    browsing = false
+    folder = dir
+    // Ready to go: the next Enter starts the session.
+    await tick()
+    startButton?.focus()
+  }
 
   async function pick() {
+    if (!atServer(app.backend)) {
+      browsing = true
+      return
+    }
     try {
-      const dir = await app.backend.pickFolder(profile?.folder === 'repo' ? t('newSession.pickRepo') : t('newSession.pickFolder'))
-      if (dir) {
-        folder = dir
-        // Ready to go: the next Enter starts the session.
-        await tick()
-        startButton?.focus()
-      }
+      const dir = await app.backend.pickFolder(pickTitle)
+      if (dir) await picked(dir)
     } catch (e) {
       showToast(String(e), 'error')
     }
@@ -158,7 +170,7 @@
       {#if !ready}
         <p class="hint setup">
           {t(status?.installed ? 'newSession.providerSignIn' : 'newSession.providerInstall', names)}
-          <button class="btn small" onclick={() => { app.newSessionOpen = false; app.openSettings(`provider-${provider}`) }}>{t('newSession.setUp')}</button>
+          <button class="btn small" onclick={() => { app.newSessionOpen = false; app.openSettings(`provider-${provider}`) }} disabled={!atServer(app.backend)} title={atServer(app.backend) ? undefined : onlyAtServer()}>{t('newSession.setUp')}</button>
         </p>
       {/if}
     {/if}
@@ -215,6 +227,10 @@
   {/snippet}
 </Modal>
 
+{#if browsing}
+  <FolderBrowser title={pickTitle} start={folder} onpick={picked} onclose={() => (browsing = false)} />
+{/if}
+
 <style>
   .profiles {
     display: grid;
@@ -223,6 +239,11 @@
     border: 0;
     margin: 0 0 var(--space-4);
     padding: 0;
+  }
+  @media (max-width: 600px) {
+    .profiles {
+      grid-template-columns: 1fr;
+    }
   }
   .profile {
     display: flex;

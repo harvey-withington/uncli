@@ -249,6 +249,10 @@ func next(t *testing.T, ch <-chan sseEvent, what string, ok func(sseEvent) bool)
 // ask to push; the push waits for UNCLI's answer, then the turn ends.
 func TestMain(m *testing.M) {
 	if os.Getenv("UNCLI_FAKE_CLI") == "1" {
+		if len(os.Args) > 2 && os.Args[1] == "auth" && os.Args[2] == "status" {
+			fmt.Println(`{"loggedIn":true,"authMethod":"claude.ai","email":"you@example.com","subscriptionType":"max"}`)
+			os.Exit(0)
+		}
 		fakeCLI()
 		os.Exit(0)
 	}

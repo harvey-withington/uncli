@@ -6,6 +6,7 @@
   import { watchPathOf } from '../lib/watched'
   import { canOpenDefault, editorLabel, HOW_ICON, relPath, splitPath } from '../lib/files'
   import { t } from '../lib/i18n.svelte'
+  import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
 
@@ -23,6 +24,8 @@
 
   let { files: raw, sessionId }: Props = $props()
   const app = useApp()
+  // Opening a file or its folder happens on the server's screen.
+  const here = $derived(atServer(app.backend))
   const files = $derived(raw ?? [])
   const session = $derived(app.sessions.find(s => s.id === sessionId))
   const ideLinks = $derived(!!app.boot?.profiles.find(p => p.id === session?.profileId)?.ideLinks)
@@ -69,7 +72,7 @@
                  artifact in the Artifacts tab, else in the editor or app. -->
             {#if artifact}
               <button class="path open" title={`${t('files.view')}: ${f.path}`} onclick={() => app.openArtifact(sessionId, artifact)}>{@render path()}</button>
-            {:else if label}
+            {:else if label && here}
               <button class="path open" title={`${label}: ${f.path}`} onclick={() => run(app.backend.openFile(sessionId, f.path, f.line ?? 0))}>{@render path()}</button>
             {:else}
               <span class="path" title={f.path}>{@render path()}</span>
@@ -93,11 +96,11 @@
                   </button>
                 {/if}
                 {#if label}
-                  <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, f.path, f.line ?? 0))} aria-label={`${label}: ${parts.name}`} title={label}>
+                  <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, f.path, f.line ?? 0))} disabled={!here} aria-label={`${label}: ${parts.name}`} title={here ? label : `${label}: ${onlyAtServer()}`}>
                     <Icon name="external-link" size={13} />
                   </button>
                 {/if}
-                <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(f.path))} aria-label={`${t('files.reveal')}: ${parts.name}`} title={t('files.reveal')}>
+                <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(f.path))} disabled={!here} aria-label={`${t('files.reveal')}: ${parts.name}`} title={here ? t('files.reveal') : `${t('files.reveal')}: ${onlyAtServer()}`}>
                   <Icon name="folder-search" size={13} />
                 </button>
               </span>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
+  import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { setTheme, theme, type Theme } from '../lib/theme.svelte'
   import Icon from './Icon.svelte'
 
@@ -8,6 +9,8 @@
   // the same setting) and the theme file, which restyles UNCLI (decision
   // 0010), with where UNCLI looks for it and a reload.
   const app = useApp()
+  // The theme file is the server's; a remote client keeps its own look.
+  const here = $derived(atServer(app.backend))
   const themes: Theme[] = ['system', 'light', 'dark']
   let file = $state<{ path: string; found: boolean } | null>(null)
   let reloading = $state(false)
@@ -45,9 +48,9 @@
     <span>{t('settings.themeFile')}</span>
     <div class="file">
       <span class="path" title={file?.path}>
-        {#if file?.found}{t('settings.themeFileFound', { path: file.path })}{:else if file}{t('settings.themeFileNone', { path: file.path })}{/if}
+        {#if !here}{onlyAtServer()}{:else if file?.found}{t('settings.themeFileFound', { path: file.path })}{:else if file}{t('settings.themeFileNone', { path: file.path })}{/if}
       </span>
-      <button class="btn small" onclick={reload} disabled={reloading}>
+      <button class="btn small" onclick={reload} disabled={reloading || !here}>
         {#if reloading}<Icon name="loader" spin size={13} />{/if}{t('settings.themeFileReload')}
       </button>
     </div>

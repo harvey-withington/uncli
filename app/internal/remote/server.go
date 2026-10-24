@@ -114,7 +114,7 @@ func (s *Server) Handler(hosts func() []string) http.Handler {
 		mux.HandleFunc("POST /pair/claim", s.servePairClaim)
 	}
 	if s.pwa != nil {
-		mux.Handle("GET /m/", http.StripPrefix("/m/", http.FileServerFS(s.pwa)))
+		mux.Handle("GET /m/", servePWA(s.pwa))
 		mux.Handle("GET /{$}", http.RedirectHandler("/m/", http.StatusFound))
 	}
 	return guard(hosts, mux)

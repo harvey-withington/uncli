@@ -98,8 +98,13 @@ export class AppStore {
   private autoSummarised = new Set<string>() // tried once, so a failure isn't retried in a loop
   private off: (() => void) | null = null
 
-  constructor(backend: Backend) {
+  // openLast: start on the session open last time (the window); the phone
+  // starts on its session list instead.
+  private openLast: boolean
+
+  constructor(backend: Backend, opts: { openLast?: boolean } = {}) {
     this.backend = backend
+    this.openLast = opts.openLast ?? true
   }
 
   // The session list shows active sessions; archived ones are listed apart.
@@ -153,6 +158,7 @@ export class AppStore {
     void this.loadProviders()
     this.ready = true
     // The session open last time, else the first.
+    if (!this.openLast) return
     const last = loadLastSession()
     const first = this.activeSessions.find(s => s.id === last) ?? this.activeSessions[0]
     if (first) await this.select(first.id)

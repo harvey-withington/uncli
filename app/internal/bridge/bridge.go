@@ -105,7 +105,12 @@ func Run(assets fs.FS, opts Options) error {
 			wruntime.Quit(ctx)
 		}
 	}
-	a.remote = remote.New(remote.Config{API: app.NewAPI(svc, nil), Service: svc, Hub: hub, Store: svc.Store,
+	// The phone app is the frontend's dist/m, served at /m/.
+	pwa, err := fs.Sub(assets, "m")
+	if err != nil {
+		return err
+	}
+	a.remote = remote.New(remote.Config{API: app.NewAPI(svc, nil), Service: svc, Hub: hub, Store: svc.Store, PWA: pwa,
 		Certs: &remote.Tailscale{}, OnStatus: func(st remote.Status) { a.Emit(EvtRemoteStatus, st) },
 		OnPairRequest: func(p remote.PairRequest) {
 			// Someone is at the server to approve: bring the window up.

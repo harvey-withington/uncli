@@ -199,6 +199,12 @@
     opacity: 0;
     transition: opacity var(--fast) var(--ease);
   }
+  /* Touch screens can't hover: the actions are always there. */
+  @media (hover: none) {
+    .actions {
+      opacity: 1;
+    }
+  }
   .item.active .actions {
     background: linear-gradient(to right, transparent, var(--surface) 12px);
   }

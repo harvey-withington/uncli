@@ -3,9 +3,10 @@
   import type { SessionView } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { attachmentIcon, formatSize, pendingKey, readImage, toRefs, type Pending } from '../lib/attachments'
+  import { attachmentIcon, formatSize, pendingKey, readImage, shrinkPhoto, toRefs, type Pending } from '../lib/attachments'
   import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/drops'
   import { loadDraft, saveDraft } from '../lib/keep'
+  import { atServer } from '../lib/remoteonly'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import SlashMenu from './SlashMenu.svelte'
@@ -21,6 +22,11 @@
   let input: HTMLTextAreaElement | undefined = $state()
   let menu: SlashMenu | undefined = $state() // the slash-command menu, which sees keys first
   let attachments = $state<Pending[]>([]) // files going with the next turn
+  // A remote client picks files (a photo, from the camera or gallery) and
+  // sends each to the server first; the turn names them by upload id.
+  const remote = $derived(!atServer(app.backend))
+  let picker: HTMLInputElement | undefined = $state()
+  let uploading = $state(0)
 
   // Drafts are per session. The text is kept on every change, so it
   // survives switching sessions and restarting UNCLI (lib/keep.ts);
@@ -41,7 +47,7 @@
     if (shownFor) saveDraft(shownFor, text)
   })
 
-  const canSend = $derived((text.trim() !== '' || attachments.length > 0) && !sending)
+  const canSend = $derived((text.trim() !== '' || attachments.length > 0) && !sending && uploading === 0)
 
   async function send() {
     const q = text.trim()
@@ -89,6 +95,28 @@
       const r = rest[0]
       if (r) showToast(t(rest.length === 1 ? 'composer.notAttached' : 'composer.notAttachedMany', { name: r.name, reason: r.reason ?? '', n: rest.length }), 'info')
     }
+  }
+
+  async function upload(files: FileList | null) {
+    for (const file of Array.from(files ?? [])) {
+      uploading++
+      try {
+        const body = await shrinkPhoto(file)
+        const name = body === file ? file.name : file.name.replace(/\.\w+$/, '') + '.jpg'
+        const up = await app.backend.upload(body, name)
+        if (up.kind === 'folder' || up.kind === 'unsupported') {
+          showToast(t('composer.notAttached', { name: up.name, reason: up.reason ?? '' }), 'info')
+          continue
+        }
+        const preview = up.kind === 'image' ? URL.createObjectURL(body) : undefined
+        attachments = [...attachments, { key: pendingKey(), name: up.name, size: up.size, kind: up.kind, upload: up.id, mediaType: up.mediaType, preview }]
+      } catch (e) {
+        showToast(String(e), 'error')
+      } finally {
+        uploading--
+      }
+    }
+    if (picker) picker.value = ''
   }
 
   function detach(key: string) {
@@ -196,6 +224,12 @@
       {onpaste}
     ></textarea>
   </div>
+  {#if remote}
+    <input bind:this={picker} type="file" multiple accept="image/*,application/pdf,text/*,.md,.json,.txt" class="visually-hidden" tabindex="-1" aria-hidden="true" onchange={e => upload(e.currentTarget.files)} />
+    <button class="btn ghost icon attach" onclick={() => picker?.click()} disabled={uploading > 0} aria-label={t('composer.attach')} title={t('composer.attach')}>
+      {#if uploading > 0}<Icon name="loader" spin />{:else}<Icon name="paperclip" />{/if}
+    </button>
+  {/if}
   {#if session.busy}
     <button class="btn stop" onclick={stop} title={t('composer.stop')}>
       <Icon name="square" size={13} />{t('composer.stop')}

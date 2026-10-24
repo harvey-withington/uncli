@@ -218,9 +218,14 @@ export function httpBackend(opts: HttpOptions): Backend {
       if (!res.ok) throw new RPCError(body.error ?? res.statusText, res.status)
       return body
     },
-    artifactLink: async (s, r) => opts.base + (await call<string>('ArtifactLink', s, r)),
-    uploadLink: async up => opts.base + (await call<string>('UploadLink', up)),
+    artifactLink: async (s, r) => absolute(opts.base, await call<string>('ArtifactLink', s, r)),
+    uploadLink: async up => absolute(opts.base, await call<string>('UploadLink', up)),
   }
+}
+
+// absolute is a server path as a full URL, to open in the browser.
+function absolute(base: string, path: string): string {
+  return new URL(path, base || globalThis.location?.origin).href
 }
 
 // stream keeps the event stream open: it reconnects with backoff, resumes

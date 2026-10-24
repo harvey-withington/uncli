@@ -59,6 +59,7 @@
   }
   .dialog {
     max-width: 100%;
+    min-width: 0;
     max-height: calc(100vh - 64px);
     display: flex;
     flex-direction: column;
@@ -83,6 +84,25 @@
   .body {
     padding: var(--space-2) var(--space-5) var(--space-5);
     overflow: auto;
+  }
+  /* A phone: dialogs are sheets along the bottom, the screen's width. */
+  @media (max-width: 600px) {
+    .scrim {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: end;
+      padding: var(--space-2) var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom));
+    }
+    .dialog {
+      width: 100% !important;
+      max-height: calc(100dvh - 48px);
+    }
+    .body {
+      padding: var(--space-2) var(--space-4) var(--space-4);
+    }
+    footer {
+      flex-wrap: wrap;
+      padding: var(--space-3) var(--space-4);
+    }
   }
   footer {
     display: flex;

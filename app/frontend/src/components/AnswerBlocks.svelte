@@ -2,6 +2,7 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { linkTarget } from '../lib/links'
+  import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { showToast } from '../lib/toasts.svelte'
   import type { OutlineEntry } from '../lib/outline'
   import { toBlocks } from '../lib/render/markdown'
@@ -31,7 +32,9 @@
     const target = linkTarget(a.getAttribute('href') ?? '', session?.workdir ?? '')
     if (target?.kind === 'web') void app.backend.openURL(target.url)
     else if (target?.kind === 'file' && session) {
-      app.backend.openPath(session.id, target.path, target.line).catch(err => showToast(String(err), 'error'))
+      // Files open on the server's screen; a remote client says so.
+      if (!atServer(app.backend)) showToast(`${target.path}: ${onlyAtServer()}`, 'info')
+      else app.backend.openPath(session.id, target.path, target.line).catch(err => showToast(String(err), 'error'))
     }
   }
 </script>

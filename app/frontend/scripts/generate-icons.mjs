@@ -1,6 +1,6 @@
 // Generates every icon from the one mark (assets/svg/uncli-mark.svg): the
 // app's favicon and PNG, the Windows .ico and the 1024 px app icon Wails
-// builds from, and the website's icon. Skips work when nothing changed.
+// builds from, the phone app's icons (m/public) and the website's icon. Skips work when nothing changed.
 // Adapted from BRUV's frontend/scripts/generate-icons.mjs.
 import { copyFileSync, mkdirSync, statSync, writeFileSync } from 'fs'
 import { dirname, resolve } from 'path'
@@ -23,6 +23,9 @@ const targets = [
   { path: resolve(root, 'public/icon.ico'), type: 'ico', sizes: ICO_SIZES },
   { path: resolve(appRoot, 'build/appicon.png'), type: 'png', size: 1024 },
   { path: resolve(appRoot, 'build/windows/icon.ico'), type: 'ico', sizes: ICO_SIZES },
+  { path: resolve(root, 'm/public/icon-192.png'), type: 'png', size: 192 },
+  { path: resolve(root, 'm/public/icon-512.png'), type: 'png', size: 512 },
+  { path: resolve(root, 'm/public/icon-maskable-512.png'), type: 'maskable', size: 512 },
   { path: resolve(repoRoot, 'website/icon.svg'), type: 'copy' },
   { path: resolve(repoRoot, 'website/icon-512.png'), type: 'png', size: 512 },
 ]
@@ -59,6 +62,21 @@ async function generatePng(svgPath, outPath, size) {
   await (await render(svgPath, size)).toFile(outPath)
 }
 
+// A maskable icon (Android's adaptive icons crop it to a circle or
+// squircle): the mark inside the middle 60%, on the phone app's
+// background (its manifest's background_color).
+const MASK_BACKGROUND = { r: 0x18, g: 0x18, b: 0x1b, alpha: 1 }
+
+async function generateMaskable(svgPath, outPath, size) {
+  mkdirSync(dirname(outPath), { recursive: true })
+  const inner = Math.round(size * 0.6)
+  const mark = await (await render(svgPath, inner)).toBuffer()
+  await sharp({ create: { width: size, height: size, channels: 4, background: MASK_BACKGROUND } })
+    .composite([{ input: mark, gravity: 'center' }])
+    .png()
+    .toFile(outPath)
+}
+
 async function generateIco(svgPath, outPath, sizes) {
   mkdirSync(dirname(outPath), { recursive: true })
   const pngBuffers = await Promise.all(sizes.map(async size => (await render(svgPath, size)).toBuffer()))
@@ -83,6 +101,10 @@ async function main() {
       case 'png':
         await generatePng(source, target.path, target.size)
         console.log(`  PNG ${target.size}×${target.size} → ${target.path}`)
+        break
+      case 'maskable':
+        await generateMaskable(source, target.path, target.size)
+        console.log(`  Maskable ${target.size}×${target.size} → ${target.path}`)
         break
       case 'ico':
         await generateIco(source, target.path, target.sizes)
