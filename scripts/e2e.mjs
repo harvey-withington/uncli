@@ -106,10 +106,16 @@ function appPid() {
 
 async function quit(proc, browser) {
   try { await browser.close() } catch {}
-  // WM_CLOSE to the app window, like clicking its close button, so the
-  // app's own shutdown runs; then stop the dev tooling.
+  // Closing the window only hides it (UNCLI stays in the tray), so the app
+  // is asked to quit as its tray menu's Quit does (--quit, on the same
+  // data folder), and its own shutdown runs; then stop the dev tooling.
   const pid = appPid()
-  if (pid) { try { execFileSync('taskkill', ['/PID', pid]) } catch {} }
+  if (pid) {
+    try {
+      const exe = ps(`(Get-Process -Id ${pid}).Path`)
+      execFileSync(exe, ['--quit'], { env: { ...process.env, UNCLI_DATA_DIR: DATA }, timeout: 15000 })
+    } catch {}
+  }
   for (let i = 0; i < 40 && appPid(); i++) await sleep(250)
   const exited = !appPid()
   try { execFileSync('taskkill', ['/PID', String(proc.pid), '/T', '/F']) } catch {}

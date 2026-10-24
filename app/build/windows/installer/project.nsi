@@ -79,12 +79,23 @@ Function .onInit
    !insertmacro wails.checkArchitecture
 FunctionEnd
 
+# UNCLI keeps running in the tray when its window closes, so a running copy
+# is asked to quit (as its tray menu's Quit does) before its files are
+# replaced or removed.
+!macro uncli.quitRunning
+    IfFileExists "$INSTDIR\${PRODUCT_EXECUTABLE}" 0 +3
+        ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --quit'
+        Sleep 2000
+!macroend
+
 Section
     !insertmacro wails.setShellContext
 
     !insertmacro wails.webview2runtime
 
     SetOutPath $INSTDIR
+
+    !insertmacro uncli.quitRunning
 
     !insertmacro wails.files
 
@@ -99,6 +110,10 @@ SectionEnd
 
 Section "uninstall"
     !insertmacro wails.setShellContext
+
+    !insertmacro uncli.quitRunning
+    # Start with Windows (Settings, General) leaves an entry in the user's Run key.
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UNCLI"
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 

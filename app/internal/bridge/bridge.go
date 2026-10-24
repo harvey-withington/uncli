@@ -73,6 +73,7 @@ func raise(ctx context.Context) {
 // Options are how the app was started.
 type Options struct {
 	Minimised bool // straight to the tray, no window (started with Windows)
+	Quit      bool // tell the running UNCLI to quit; quit at once if none is
 }
 
 // Run starts the desktop app with the embedded frontend. Closing the window
@@ -133,7 +134,9 @@ func Run(assets fs.FS, opts Options) error {
 	svc.SetRemoteNotes(func(n notify.Note, approval bool) { go a.remote.Notify(n, approval) })
 	defer svc.Close()
 	defer a.remote.Close()
-	go a.remote.Start()
+	if !opts.Quit {
+		go a.remote.Start()
+	}
 
 	return wails.Run(&options.App{
 		Title:            "UNCLI",
@@ -143,12 +146,18 @@ func Run(assets fs.FS, opts Options) error {
 		MinHeight:        560,
 		AssetServer:      &assetserver.Options{Assets: assets},
 		BackgroundColour: &options.RGBA{R: 250, G: 250, B: 249, A: 255},
-		StartHidden:      opts.Minimised,
+		StartHidden:      opts.Minimised || opts.Quit,
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: instanceID(os.Getenv("UNCLI_DATA_DIR")),
 			OnSecondInstanceLaunch: func(d options.SecondInstanceData) {
-				if ctx := a.context(); ctx != nil && !slices.Contains(d.Args, app.MinimisedArg) {
-					raise(ctx)
+				switch {
+				case slices.Contains(d.Args, app.QuitArg):
+					svc.Quit()
+				case slices.Contains(d.Args, app.MinimisedArg):
+				default:
+					if ctx := a.context(); ctx != nil {
+						raise(ctx)
+					}
 				}
 			},
 		},
@@ -166,6 +175,11 @@ func Run(assets fs.FS, opts Options) error {
 			a.mu.Unlock()
 			for _, f := range pending {
 				f(ctx)
+			}
+			if opts.Quit { // asked to quit a UNCLI that wasn't running
+				a.quitting.Store(true)
+				wruntime.Quit(ctx)
+				return
 			}
 			if err := svc.KeepInTray(); err != nil {
 				// Without a tray icon there'd be no way back to a hidden

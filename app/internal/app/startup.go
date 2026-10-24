@@ -15,6 +15,12 @@ import (
 // straight to the tray, no window.
 const MinimisedArg = "--minimised"
 
+// QuitArg asks a running UNCLI (on the same data folder) to quit, as its
+// tray menu's Quit does; with none running, it does nothing. The
+// installer uses it before replacing UNCLI's files, since closing the
+// window no longer ends the app.
+const QuitArg = "--quit"
+
 // startupEntry writes or removes the Run entry. Test binaries get one that
 // touches nothing, and tests that check it replace it.
 var startupEntry = func() func(on bool, command string) error {

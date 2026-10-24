@@ -24,7 +24,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	opts := bridge.Options{Minimised: slices.Contains(os.Args[1:], app.MinimisedArg)}
+	opts := bridge.Options{
+		Minimised: slices.Contains(os.Args[1:], app.MinimisedArg),
+		Quit:      slices.Contains(os.Args[1:], app.QuitArg),
+	}
 	if err := bridge.Run(dist, opts); err != nil {
 		log.Fatal(err)
 	}
