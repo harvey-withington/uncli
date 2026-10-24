@@ -10,6 +10,7 @@ export const SETTINGS_TABS: SettingsTab[] = ['general', 'approvals', 'providers'
 const SECTION_TAB: Record<string, SettingsTab> = {
   appearance: 'general',
   notify: 'general',
+  startup: 'general',
   editor: 'general',
   quick: 'general',
   safe: 'approvals',

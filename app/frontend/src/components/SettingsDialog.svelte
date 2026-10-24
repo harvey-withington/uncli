@@ -13,11 +13,12 @@
   import ProviderSection from './ProviderSection.svelte'
   import QuickSection from './QuickSection.svelte'
   import SafeSection from './SafeSection.svelte'
+  import StartupSection from './StartupSection.svelte'
   import type { Preferences } from '../lib/api'
   import { loadSettingsTab, nextTab, saveSettingsTab, tabOf, tabsFor, type SettingsTab } from '../lib/settings'
 
   // Settings, in tabs down the left (lib/settings.ts): General (appearance,
-  // notifications, editor, quick tasks), Approvals (safe and unsafe, the
+  // notifications, tray and startup, editor, quick tasks), Approvals (safe and unsafe, the
   // decision model), AI Providers (each CLI's version, account and
   // container sign-in) and, on Windows, Containers. It opens on the last
   // tab, or on a section's tab when opened at one (the header's shield,
@@ -95,6 +96,7 @@
         <AppearanceSection />
         {#if prefs}
           <NotifySection {prefs} {savePrefs} />
+          <StartupSection {prefs} {savePrefs} />
           <EditorSection {prefs} {savePrefs} />
           <QuickSection {prefs} {savePrefs} />
         {/if}

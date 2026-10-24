@@ -26,6 +26,20 @@ describe('Notifications', () => {
     expect(within(dialog).getByRole('button', { name: 'Show a test' })).toBeDisabled()
   })
 
+  it('Settings saves starting with Windows', async () => {
+    const backend = mockBackend()
+    const save = vi.spyOn(backend, 'setPreferences')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: /Claude Code 2./ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+    await fireEvent.click(within(dialog).getByRole('tab', { name: 'General' }))
+    expect(within(dialog).getByText(/keeps UNCLI running in the tray/)).toBeInTheDocument()
+    const box = within(dialog).getByRole('checkbox', { name: 'Start with Windows, minimised to the tray' })
+    expect(box).not.toBeChecked()
+    await fireEvent.click(box)
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ startWithWindows: true })))
+  })
+
   it('a clicked notification opens its session on the latest page', async () => {
     const backend = mockBackend()
     let handlers: Handlers | null = null

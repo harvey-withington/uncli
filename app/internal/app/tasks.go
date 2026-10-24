@@ -48,6 +48,9 @@ type Preferences struct {
 	// its last message: auto (the CLI decides), 5m or 1h. The hour costs
 	// more to write on an API key (2x input price instead of 1.25x).
 	PromptCache string `json:"promptCache"`
+	// StartWithWindows starts UNCLI, minimised to the tray, when the user
+	// signs in to Windows (startup.go).
+	StartWithWindows bool `json:"startWithWindows"`
 }
 
 // Conversation cache lifetimes. Auto leaves it to the CLI: Claude Code
@@ -164,6 +167,14 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 	}
 	if !validCache(p.PromptCache) {
 		return s.Preferences(), fmt.Errorf("unknown conversation cache setting %q", p.PromptCache)
+	}
+	if p.StartWithWindows != s.Preferences().StartWithWindows {
+		if p.StartWithWindows && !StartupSupported {
+			return s.Preferences(), errors.New("starting with the system is only on Windows for now")
+		}
+		if err := applyStartup(p.StartWithWindows); err != nil {
+			return s.Preferences(), fmt.Errorf("couldn't change starting with Windows: %w", err)
+		}
 	}
 	b, err := json.Marshal(p)
 	if err != nil {

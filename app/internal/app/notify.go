@@ -157,13 +157,25 @@ func plainStart(md string) string {
 
 func oneLine(s string) string { return clip(strings.Join(strings.Fields(s), " "), 200) }
 
-// newNotifier is the platform's notifier, except in test binaries, where a
-// finished fake session mustn't pop up on the developer's desktop.
-func newNotifier(onClick func(string)) notify.Notifier {
+// newNotifier is the platform's notifier and tray icon, except in test
+// binaries, where a finished fake session mustn't pop up on the
+// developer's desktop. The tray menu is in English, like the notes.
+func newNotifier(h notify.Handlers) notify.Notifier {
 	if testing.Testing() {
 		return notify.None{}
 	}
-	return notify.New("UNCLI", onClick)
+	return notify.New("UNCLI", notify.Menu{Open: "Open UNCLI", Quit: "Quit UNCLI"}, h)
+}
+
+// KeepInTray puts UNCLI's icon in the tray for good: the window can close
+// and UNCLI keeps running, serving its sessions (decision 0021). The
+// icon's Open shows the window and Quit calls Quit.
+func (s *Service) KeepInTray() error { return s.notifier.Keep() }
+
+func (s *Service) quitClicked() {
+	if s.Quit != nil {
+		s.Quit()
+	}
 }
 
 // notifyClicked shows the session a notification was about.

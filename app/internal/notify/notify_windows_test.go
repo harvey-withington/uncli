@@ -39,7 +39,7 @@ func TestShowForReal(t *testing.T) {
 	if os.Getenv("UNCLI_NOTIFY_LIVE") != "1" {
 		t.Skip("set UNCLI_NOTIFY_LIVE=1 to show a real notification")
 	}
-	n := New("UNCLI test", func(key string) { t.Logf("clicked %q", key) })
+	n := New("UNCLI test", Menu{Open: "Open", Quit: "Quit"}, Handlers{Click: func(key string) { t.Logf("clicked %q", key) }})
 	defer n.Close()
 	if err := n.Show(Note{Key: "s1", Title: "UNCLI test", Body: "Finished: this is a test notification."}); err != nil {
 		t.Fatal(err)

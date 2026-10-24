@@ -14,11 +14,14 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Windows: a tray icon owned by a hidden message-only window, and its
-// balloons, which Windows 10 and 11 show as toasts (and keep in the
-// notification centre) under the app's name. The icon is added with the
-// first note and stays until Close, so the toast and a click on it keep
-// working; clicking the toast or the icon calls onClick.
+// Windows: a tray icon owned by a hidden window, and its balloons, which
+// Windows 10 and 11 show as toasts (and keep in the notification centre)
+// under the app's name. The icon is added with the first note, or at once
+// by Keep, and stays until Close, so the toast and a click on it keep
+// working; clicking the toast or the icon calls Click. Right-clicking the
+// icon opens its menu: Open and Quit. The window is an ordinary hidden one,
+// not message-only, because a popup menu needs a window that can take the
+// foreground to close when the user clicks elsewhere.
 
 var (
 	user32   = windows.NewLazySystemDLL("user32.dll")
@@ -35,6 +38,13 @@ var (
 	pDestroyWindow     = user32.NewProc("DestroyWindow")
 	pPostQuitMessage   = user32.NewProc("PostQuitMessage")
 	pLoadIconW         = user32.NewProc("LoadIconW")
+	pCreatePopupMenu   = user32.NewProc("CreatePopupMenu")
+	pAppendMenuW       = user32.NewProc("AppendMenuW")
+	pTrackPopupMenu    = user32.NewProc("TrackPopupMenu")
+	pDestroyMenu       = user32.NewProc("DestroyMenu")
+	pSetForeground     = user32.NewProc("SetForegroundWindow")
+	pGetCursorPos      = user32.NewProc("GetCursorPos")
+	pRegisterWindowMsg = user32.NewProc("RegisterWindowMessageW")
 	pShellNotifyIconW  = shell32.NewProc("Shell_NotifyIconW")
 	pExtractIconExW    = shell32.NewProc("ExtractIconExW")
 	pGetModuleHandleW  = kernel32.NewProc("GetModuleHandleW")
@@ -66,6 +76,9 @@ const (
 	wmDestroy           = 0x0002
 	wmClose             = 0x0010
 	wmLButtonUp         = 0x0202
+	wmRButtonUp         = 0x0205
+	wmContextMenu       = 0x007B
+	wmNull              = 0x0000
 	wmUser              = 0x0400
 	wmApp               = 0x8000
 	wmTray              = wmApp + 1 // the icon's callback message
@@ -74,9 +87,20 @@ const (
 
 	idiApplication = 32512
 	iconID         = 1
+
+	mfString       = 0x0000
+	mfSeparator    = 0x0800
+	tpmRightAlign  = 0x0008
+	tpmBottomAlign = 0x0020
+	tpmReturnCmd   = 0x0100
+	tpmNoNotify    = 0x0080
+	menuOpen       = 1
+	menuQuit       = 2
 )
 
-var hwndMessage = ^uintptr(2) // HWND_MESSAGE, (HWND)-3
+// wmTaskbarCreated is broadcast when Explorer (re)starts: a kept icon is
+// added again.
+var wmTaskbarCreated uintptr
 
 // notifyIconData is NOTIFYICONDATAW (Vista and later layout).
 type notifyIconData struct {
@@ -123,22 +147,24 @@ type msg struct {
 }
 
 type trayNotifier struct {
-	app     string
-	onClick func(string)
+	app  string
+	menu Menu
+	h    Handlers
 
 	mu         sync.Mutex
 	hwnd       uintptr
 	small      uintptr // the tray icon
 	large      uintptr // the toast's icon
 	added      bool
+	kept       bool // Keep was called: the icon stays, and comes back after Explorer restarts
 	lastKey    string
 	startErr   error
 	startOnce  sync.Once
 	windowDone chan struct{}
 }
 
-func newPlatform(app string, onClick func(string)) Notifier {
-	t := &trayNotifier{app: app, onClick: onClick, windowDone: make(chan struct{})}
+func newPlatform(app string, menu Menu, h Handlers) Notifier {
+	t := &trayNotifier{app: app, menu: menu, h: h, windowDone: make(chan struct{})}
 	currentMu.Lock()
 	current = t
 	currentMu.Unlock()
@@ -164,7 +190,10 @@ func (t *trayNotifier) loop(ready chan<- error) {
 	wc := wndClassEx{LpfnWndProc: wndProcCallback, HInstance: inst, LpszClassName: class}
 	wc.CbSize = uint32(unsafe.Sizeof(wc))
 	_, _, _ = pRegisterClassExW.Call(uintptr(unsafe.Pointer(&wc))) // fails harmlessly if already registered
-	hwnd, _, err := pCreateWindowExW.Call(0, uintptr(unsafe.Pointer(class)), 0, 0, 0, 0, 0, 0, hwndMessage, 0, inst, 0)
+	if name, err := windows.UTF16PtrFromString("TaskbarCreated"); err == nil {
+		wmTaskbarCreated, _, _ = pRegisterWindowMsg.Call(uintptr(unsafe.Pointer(name)))
+	}
+	hwnd, _, err := pCreateWindowExW.Call(0, uintptr(unsafe.Pointer(class)), 0, 0, 0, 0, 0, 0, 0, 0, inst, 0)
 	if hwnd == 0 {
 		ready <- errors.Join(errNoWindow, err)
 		return
@@ -257,6 +286,19 @@ func (t *trayNotifier) Show(n Note) error {
 	return nil
 }
 
+func (t *trayNotifier) Keep() error {
+	if err := t.start(); err != nil {
+		return err
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.kept = true
+	if t.added {
+		return nil
+	}
+	return t.addLocked()
+}
+
 func (t *trayNotifier) Close() {
 	t.mu.Lock()
 	hwnd := t.hwnd
@@ -280,8 +322,57 @@ func (t *trayNotifier) clicked(onNote bool) {
 		key = t.lastKey
 	}
 	t.mu.Unlock()
-	if t.onClick != nil {
-		go t.onClick(key)
+	if t.h.Click != nil {
+		go t.h.Click(key)
+	}
+}
+
+// showMenu opens the icon's menu at the pointer and acts on the choice.
+// The window takes the foreground first, so the menu closes when the user
+// clicks elsewhere.
+func (t *trayNotifier) showMenu() {
+	t.mu.Lock()
+	hwnd, menu := t.hwnd, t.menu
+	t.mu.Unlock()
+	m, _, _ := pCreatePopupMenu.Call()
+	if m == 0 {
+		return
+	}
+	defer pDestroyMenu.Call(m)
+	for _, item := range []struct {
+		id    uintptr
+		label string
+	}{{menuOpen, menu.Open}, {0, ""}, {menuQuit, menu.Quit}} {
+		if item.id == 0 {
+			_, _, _ = pAppendMenuW.Call(m, mfSeparator, 0, 0)
+			continue
+		}
+		label, _ := windows.UTF16PtrFromString(item.label)
+		_, _, _ = pAppendMenuW.Call(m, mfString, item.id, uintptr(unsafe.Pointer(label)))
+	}
+	var pt struct{ X, Y int32 }
+	_, _, _ = pGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
+	_, _, _ = pSetForeground.Call(hwnd)
+	cmd, _, _ := pTrackPopupMenu.Call(m, tpmRightAlign|tpmBottomAlign|tpmReturnCmd|tpmNoNotify,
+		uintptr(pt.X), uintptr(pt.Y), 0, hwnd, 0)
+	_, _, _ = pPostMessageW.Call(hwnd, wmNull, 0, 0) // lets the menu close properly next time
+	switch cmd {
+	case menuOpen:
+		t.clicked(false)
+	case menuQuit:
+		if t.h.Quit != nil {
+			go t.h.Quit()
+		}
+	}
+}
+
+// readd puts a kept icon back after Explorer restarted.
+func (t *trayNotifier) readd() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.kept || t.added {
+		t.added = false
+		_ = t.addLocked()
 	}
 }
 
@@ -297,6 +388,18 @@ func wndProc(hwnd, message, wParam, lParam uintptr) uintptr {
 				t.clicked(true)
 			case ninSelect, wmLButtonUp:
 				t.clicked(false)
+			case wmContextMenu, wmRButtonUp:
+				t.showMenu()
+			}
+		}
+		return 0
+	case wmTaskbarCreated:
+		if message != 0 {
+			currentMu.Lock()
+			t := current
+			currentMu.Unlock()
+			if t != nil {
+				t.readd()
 			}
 		}
 		return 0

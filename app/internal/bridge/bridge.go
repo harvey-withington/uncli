@@ -10,8 +10,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v2"
@@ -36,8 +38,9 @@ type App struct {
 	ctx context.Context
 	svc *app.Service
 
-	mu      sync.Mutex
-	pending []func(context.Context) // events emitted before the window exists
+	mu       sync.Mutex
+	pending  []func(context.Context) // events emitted before the window exists
+	quitting atomic.Bool             // Quit was chosen: closing the window ends the app
 }
 
 func (a *App) Emit(name string, data any) {
@@ -70,8 +73,15 @@ func raise(ctx context.Context) {
 	wruntime.Show(ctx)
 }
 
-// Run starts the desktop app with the embedded frontend.
-func Run(assets fs.FS) error {
+// Options are how the app was started.
+type Options struct {
+	Minimised bool // straight to the tray, no window (started with Windows)
+}
+
+// Run starts the desktop app with the embedded frontend. Closing the window
+// hides it: UNCLI keeps running in the tray (decision 0021) until the tray
+// menu's Quit.
+func Run(assets fs.FS, opts Options) error {
 	paths, err := app.DefaultPaths()
 	if err != nil {
 		return err
@@ -87,6 +97,12 @@ func Run(assets fs.FS) error {
 			raise(ctx)
 		}
 	}
+	svc.Quit = func() {
+		if ctx := a.context(); ctx != nil {
+			a.quitting.Store(true)
+			wruntime.Quit(ctx)
+		}
+	}
 	defer svc.Close()
 
 	return wails.Run(&options.App{
@@ -97,11 +113,12 @@ func Run(assets fs.FS) error {
 		MinHeight:        560,
 		AssetServer:      &assetserver.Options{Assets: assets},
 		BackgroundColour: &options.RGBA{R: 250, G: 250, B: 249, A: 255},
+		StartHidden:      opts.Minimised,
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId: instanceID(os.Getenv("UNCLI_DATA_DIR")),
-			OnSecondInstanceLaunch: func(options.SecondInstanceData) {
-				if a.ctx != nil {
-					raise(a.ctx)
+			OnSecondInstanceLaunch: func(d options.SecondInstanceData) {
+				if ctx := a.context(); ctx != nil && !slices.Contains(d.Args, app.MinimisedArg) {
+					raise(ctx)
 				}
 			},
 		},
@@ -120,6 +137,18 @@ func Run(assets fs.FS) error {
 			for _, f := range pending {
 				f(ctx)
 			}
+			if err := svc.KeepInTray(); err != nil {
+				// Without a tray icon there'd be no way back to a hidden
+				// window, so closing it quits instead.
+				a.quitting.Store(true)
+			}
+		},
+		OnBeforeClose: func(ctx context.Context) bool {
+			if a.quitting.Load() {
+				return false
+			}
+			wruntime.WindowHide(ctx)
+			return true
 		},
 		OnShutdown: func(context.Context) { svc.Sessions.Close() },
 		Bind:       []any{a},

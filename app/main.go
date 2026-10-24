@@ -5,7 +5,9 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"slices"
 
+	"uncli/internal/app"
 	"uncli/internal/bridge"
 	"uncli/internal/hook"
 )
@@ -22,7 +24,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := bridge.Run(dist); err != nil {
+	opts := bridge.Options{Minimised: slices.Contains(os.Args[1:], app.MinimisedArg)}
+	if err := bridge.Run(dist, opts); err != nil {
 		log.Fatal(err)
 	}
 }

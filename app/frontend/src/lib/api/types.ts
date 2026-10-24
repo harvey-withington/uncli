@@ -459,6 +459,7 @@ export interface Preferences {
   editor?: string // opens files in sessions that link to an IDE: a preset id, auto or custom
   editorCommand?: string // custom: a template with {file}, {line}, {folder}
   promptCache?: PromptCache // how long a session's conversation stays cached (default auto)
+  startWithWindows?: boolean // start at sign-in, minimised to the tray (Windows only)
 }
 
 // How long a session's conversation stays cached after its last message:

@@ -99,9 +99,11 @@ type Service struct {
 	plugins []*plugin      // provider plugins, loaded or not (plugins.go)
 	hooks   *hook.Server   // where CLIs' hooks ask about tool calls
 
-	// ShowWindow brings UNCLI's window to the front (set by the bridge);
-	// clicking a notification uses it.
+	// ShowWindow brings UNCLI's window to the front and Quit ends the app
+	// (both set by the bridge); clicking a notification or the tray icon
+	// uses the first, the tray menu's Quit the second.
 	ShowWindow func()
+	Quit       func()
 
 	emit          Emitter
 	notifier      notify.Notifier
@@ -155,7 +157,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		db.Close()
 		return nil, err
 	}
-	s.notifier = newNotifier(s.notifyClicked)
+	s.notifier = newNotifier(notify.Handlers{Click: s.notifyClicked, Quit: s.quitClicked})
 	s.containers.cfg, s.containers.err = loadContainers(defaults, paths.Config)
 	if s.providers, err = loadProviders(defaults); err != nil {
 		db.Close()

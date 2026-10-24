@@ -14,7 +14,7 @@ import (
 
 type execNotifier struct{ app string }
 
-func newPlatform(app string, _ func(string)) Notifier {
+func newPlatform(app string, _ Menu, _ Handlers) Notifier {
 	switch runtime.GOOS {
 	case "darwin":
 		return execNotifier{app: app}
@@ -42,7 +42,8 @@ func (e execNotifier) Show(n Note) error {
 	return nil
 }
 
-func (execNotifier) Close() {}
+func (execNotifier) Keep() error { return nil } // no tray here yet
+func (execNotifier) Close()      {}
 
 // appleString quotes s as an AppleScript string literal.
 func appleString(s string) string {
