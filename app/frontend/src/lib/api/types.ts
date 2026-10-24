@@ -349,6 +349,7 @@ export interface AttachmentInfo {
 // A file to send with a turn: a path the app reads, or pasted image data.
 export interface AttachmentRef {
   path?: string
+  upload?: string // an upload's id (a remote client's file, sent to the server first)
   name?: string
   mediaType?: string
   data?: string // base64
@@ -682,6 +683,11 @@ export interface Handlers {
   containersChanged?(c: ContainersInfo): void
   notifyOpen?(sessionId: string): void // the user clicked a notification ("" for the tray icon)
   remoteStatus?(s: RemoteStatus): void // Remote access changed state (the server's window only)
+  // A remote client's connection to its server (decision 0021): resync
+  // means events were missed that the server no longer holds, so state
+  // must be fetched afresh; connection says whether it's connected.
+  resync?(): void
+  connection?(c: Connection): void
   pairRequest?(r: PairRequest): void // a device waits for "Allow <name>?" (the server's window only)
   devicesChanged?(d: PairedDevice[]): void // paired devices changed (the server's window only)
 }
@@ -705,6 +711,28 @@ export interface PairedDevice {
   lastSeen: string
 }
 
+// A remote client's link to its server: connecting, online, or offline
+// since a time, with when it was last online and why it isn't.
+export interface Connection {
+  state: 'connecting' | 'online' | 'offline'
+  lastOnline: number | null // ms
+  error?: string
+}
+
+// A file sent to the server to attach (a remote client's photo): its id
+// and what it would attach as.
+export interface Upload extends AttachmentInfo {
+  id: string
+}
+
+// A folder on the server and its subfolders, for picking a session's
+// folder from a remote client. Path '' is the top (home and drives).
+export interface FolderListing {
+  path: string
+  parent: string
+  folders: { name: string; path: string }[]
+}
+
 // Remote access (decision 0021): off, on at the machine's tailnet address,
 // on this PC only (reason says why not the tailnet), or not listening.
 export type RemoteState = 'off' | 'on' | 'loopback' | 'error'
@@ -723,7 +751,7 @@ export interface RemoteStatus {
 // Backend is everything the UI can ask of UNCLI. The Wails bridge
 // implements it in the app; a mock implements it in a plain browser.
 export interface Backend {
-  readonly kind: 'wails' | 'mock'
+  readonly kind: 'wails' | 'mock' | 'http'
   subscribe(h: Handlers): () => void
   bootstrap(): Promise<Bootstrap>
   cliStatus(fresh: boolean): Promise<CLIStatus>
@@ -801,6 +829,13 @@ export interface Backend {
   answerPairing(id: string, allow: boolean): Promise<void>
   pairedDevices(): Promise<PairedDevice[]>
   revokeDevice(id: string): Promise<void>
+  // For remote clients: the server's folders (any backend), files sent to
+  // the server to attach, and links that open an artifact or an upload in
+  // the browser (http only).
+  listFolder(path: string): Promise<FolderListing>
+  upload(file: Blob, name: string): Promise<Upload>
+  artifactLink(sessionId: string, ref: ArtifactRef): Promise<string>
+  uploadLink(id: string): Promise<string>
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
   usageReport(q: UsageQuery): Promise<UsageReport>

@@ -2,7 +2,7 @@
 // the live text of answers still streaming. All state is keyed by id.
 import type {
   ArtifactFile, AttachmentRef, Backend, ContainersInfo, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
-  CommandInfo, ModelInfo, PairRequest, PairedDevice, RemoteStatus, Share, ThinkingData, UsageLimit,
+  CommandInfo, Connection, ModelInfo, PairRequest, PairedDevice, RemoteStatus, Share, ThinkingData, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
@@ -39,6 +39,8 @@ export class AppStore {
   remote = $state<RemoteStatus | null>(null)
   devices = $state<PairedDevice[]>([]) // paired devices, loaded with Settings → Remote access
   pairRequest = $state<PairRequest | null>(null) // a device waiting for "Allow <name>?"
+  // A remote client's link to its server (null for the window, always connected).
+  connection = $state<Connection | null>(null)
   // What in Settings needs the user, per tab (lib/attention.ts).
   attention = $derived(settingsAttention(this.containers))
   sessions = $state<SessionView[]>([])
@@ -136,6 +138,8 @@ export class AppStore {
       remoteStatus: s => { this.remote = s },
       pairRequest: r => { this.pairRequest = r },
       devicesChanged: d => { this.devices = d },
+      resync: () => { void this.resync() },
+      connection: c => { this.connection = c },
     })
     const [boot, cli] = await Promise.all([this.backend.bootstrap(), this.backend.cliStatus(false)])
     this.boot = boot
@@ -156,6 +160,33 @@ export class AppStore {
 
   destroy() {
     this.off?.()
+  }
+
+  // resync fetches state afresh: a remote client missed events its server
+  // no longer holds (decision 0021). The sessions, the pages already
+  // loaded and the pins come back as they are now; text that was streaming
+  // shows again from its page.
+  async resync() {
+    if (!this.ready) return
+    try {
+      const boot = await this.backend.bootstrap()
+      this.boot = boot
+      this.sessions = sortSessions(boot.sessions)
+      this.live = {}
+      const loaded = Object.keys(this.pages).filter(id => boot.sessions.some(s => s.id === id))
+      const fresh = await Promise.all(loaded.map(id => this.backend.pages(id)))
+      const pages: Record<string, Page[]> = {}
+      loaded.forEach((id, i) => {
+        const list = fresh[i] ?? []
+        pages[id] = list
+        this.index[id] = Math.min(this.index[id] ?? list.length - 1, Math.max(0, list.length - 1))
+      })
+      this.pages = pages
+      if (this.currentId && !boot.sessions.some(s => s.id === this.currentId)) this.currentId = null
+      void this.refreshPins()
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
   }
 
   async select(id: string) {

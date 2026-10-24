@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
 import { mockBackend } from '../lib/api/mock'
 import type { Handlers } from '../lib/api'
+import { AppStore } from '../stores/app.svelte'
+import { atServer } from '../lib/remoteonly'
 
 async function openRemote(backend = mockBackend()) {
   render(App, { props: { backend } })
@@ -75,5 +77,32 @@ describe('Settings → Remote access', () => {
     await fireEvent.click(within(sure).getByRole('button', { name: 'Revoke' }))
     await waitFor(() => expect(revoke).toHaveBeenCalledWith('d1'))
     expect(await within(dialog).findByText('No devices yet. Pair one to reach your sessions from it.')).toBeInTheDocument()
+  })
+})
+
+describe('a remote client', () => {
+  it('fetches state afresh when the server says events were lost', async () => {
+    const backend = mockBackend()
+    let handlers: Handlers | null = null
+    const subscribe = backend.subscribe.bind(backend)
+    backend.subscribe = h => { handlers = h; return subscribe(h) }
+    const s = new AppStore(backend)
+    await s.init()
+    const id = s.currentId!
+    s.live[id] = { seq: 1, text: 'half an answ', thinkingTokens: 0 }
+    const boot = vi.spyOn(backend, 'bootstrap')
+    const pages = vi.spyOn(backend, 'pages')
+    handlers!.resync?.()
+    await waitFor(() => expect(pages).toHaveBeenCalledWith(id))
+    expect(boot).toHaveBeenCalledTimes(1)
+    expect(s.live[id]).toBeUndefined()
+    expect(s.pages[id]?.length).toBeGreaterThan(0)
+    handlers!.connection?.({ state: 'offline', lastOnline: 1, error: 'gone' })
+    expect(s.connection).toEqual({ state: 'offline', lastOnline: 1, error: 'gone' })
+  })
+
+  it('knows what only works at the server', () => {
+    expect(atServer({ kind: 'wails' })).toBe(true)
+    expect(atServer({ kind: 'http' })).toBe(false)
   })
 })

@@ -46,7 +46,19 @@ with the code.
   only signal.
 - The UI never parses provider JSON. It sees only UNCLI's events and pages
   through `lib/api` (the `Backend` interface), implemented by the Wails
-  bridge in the app and by a mock in a plain browser.
+  bridge in the app, by `httpBackend` for a UNCLI on another machine (its
+  remote access server, decision 0021) and by a mock in a plain browser.
+  Components never know which: they take what they need from the backend.
+- **A session id is opaque, and means server plus id.** This PC's sessions
+  have bare ids; another server's come through `withServer`
+  (`lib/api/identity.ts`) as `<host:port>~<id>`, so every store map,
+  persisted key (drafts, scroll spots, watched files) and link keys on both
+  without knowing it. Never build anything from the parts of a session id.
+- **Remote clients see everything, disabled where it can't apply.** What
+  only works at the server's own screen or machine (opening files, folders
+  and editors, CLI installs and sign-in, containers, the theme file,
+  Remote access itself) checks `atServer(app.backend)` (`lib/remoteonly.ts`)
+  and shows disabled with "Only on the PC that runs this session".
 - **UNCLI names no CLI.** It is a harness for any AI CLI, so its own text never
   names one (or a provider's maker): strings say `{agent}` (who acts in a
   session), `{cli}` (the product) or `{account}` (what it signs in with), and

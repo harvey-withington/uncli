@@ -402,6 +402,7 @@
   "settings.notify.approvals": "Only when a session needs approval",
   "settings.notify.off": "Off",
   "settings.notifyTest": "Show a test",
+  "remote.onlyAtServer": "Only on the PC that runs this session",
   "remote.title": "Remote access",
   "remote.body": "Reach this PC’s sessions from your phone, or another PC, over Tailscale. UNCLI listens only on this PC and its Tailscale address, never your local network, and only devices you’ve paired get in.",
   "remote.enable": "Serve sessions to paired devices",

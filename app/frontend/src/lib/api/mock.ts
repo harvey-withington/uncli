@@ -10,6 +10,7 @@ import { MOCK_CHAT_ARTIFACTS, mockArtifactFiles, mockReadArtifact } from './mock
 import { mockUsageReport } from './mock-usage'
 import { mockTheme } from './mock-theme'
 import { mockContainers } from './mock-containers'
+import { mockFiles } from './mock-files'
 import { mockRemote } from './mock-remote'
 import { mockTranscriptPages, mockTranscripts } from './mock-import'
 import { mockWatch } from './mock-watch'
@@ -953,6 +954,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     async revealFile() {},
     ...mockWatch(),
     ...remote,
+    ...mockFiles(),
     async usageReport(q) { return mockUsageReport(q) },
     async theme() { return mockTheme() },
     ...containers,

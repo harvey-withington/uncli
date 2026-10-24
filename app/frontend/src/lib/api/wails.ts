@@ -118,6 +118,11 @@ export function wailsBackend(): Backend {
     answerPairing: (id, allow) => call('AnswerPairing', id, allow),
     pairedDevices: () => call('PairedDevices'),
     revokeDevice: id => call('RevokeDevice', id),
+    listFolder: p => call('ListFolder', p),
+    // Only remote clients send files or open links to them.
+    upload: () => Promise.reject(new Error('uploads are for remote clients')),
+    artifactLink: () => Promise.reject(new Error('links are for remote clients')),
+    uploadLink: () => Promise.reject(new Error('links are for remote clients')),
     summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     usage: () => call('Usage'),
     usageReport: q => call('UsageReport', q),
