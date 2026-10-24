@@ -38,7 +38,10 @@ UNCLI has no account, telemetry or update check of its own. It connects to:
 
 - each provider's download host, to install the pinned CLI you chose;
 - the Alpine Linux mirror, when you build a container;
-- a decision model's endpoint, only if you set one up in Settings.
+- a decision model's endpoint, only if you set one up in Settings;
+- with Remote access on, the Tailscale app on this PC (for its address and
+  HTTPS certificate) and, for paired devices that turned notifications on,
+  their browsers' push services (end-to-end encrypted).
 
 Everything else is the provider's CLI talking to its own service, under
 your account with that provider.
@@ -124,6 +127,29 @@ apply changes.
   containers or replaces the built-in ones by `id`. Settings says when a
   container no longer matches its config and needs a Rebuild; conversations
   survive rebuilds.
+
+### Your sessions from your phone
+
+UNCLI can serve its sessions to your phone, or another PC, over
+[Tailscale](https://tailscale.com) (decisions 0021 and 0022):
+
+1. On the PC: Tailscale running, with HTTPS certificates on in your tailnet
+   (admin console, DNS). Settings → Remote access → **Serve sessions to
+   paired devices**. It shows the address, such as
+   `https://<pc>.<tailnet>.ts.net:9871`, or why there isn't one.
+2. **Pair a device** shows a QR code. Scan it with the phone, name the phone,
+   and click **Allow** on the PC. Settings lists paired devices; Revoke shuts
+   one out at once.
+3. On the phone, add the page to the home screen and turn on notifications
+   in its Settings (all, approvals only, or off, per phone).
+
+The phone sees the PC's sessions live, sends messages and photos, answers
+approvals (the trace says it was answered there), and starts sessions in a
+folder it browses on the PC. UNCLI listens only on this PC and its
+Tailscale address, never your local network, and only while Remote access
+is on. Closing the window keeps UNCLI running in the tray (Open and Quit on
+its icon); Settings → General → Start with Windows brings it back after a
+reboot. `uncli.exe --quit` quits a running UNCLI.
 
 ## Building
 
