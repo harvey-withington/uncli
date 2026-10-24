@@ -108,7 +108,7 @@
     font-size: var(--text-sm);
   }
   .port .input {
-    width: 7ch;
+    width: 10ch; /* five digits and the field's padding */
   }
   .state {
     display: flex;
