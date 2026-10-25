@@ -58,6 +58,14 @@ describe('httpBackend', () => {
     expect(unauthorized).toHaveBeenCalled()
   })
 
+  it('says what came back when a reply isn’t the server’s JSON', async () => {
+    const page = new Response('<html>Bad gateway</html>', { status: 502, statusText: 'Bad Gateway', headers: { 'Content-Type': 'text/html' } })
+    const b = httpBackend({ base: '', token: () => 'tok', fetch: vi.fn(async () => page) as never })
+    const err = await b.pages('x').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RPCError)
+    expect((err as RPCError).message).toBe('The server sent something UNCLI didn’t expect (502 Bad Gateway). Try again in a moment.')
+  })
+
   it('refuses what only works at the server', async () => {
     const b = httpBackend({ base: '', token: () => 'tok', fetch: vi.fn() as never })
     await expect(b.openFolder('C:\\')).rejects.toBeInstanceOf(RemoteOnlyError)

@@ -41,10 +41,14 @@
   let open = $state(false)
 
   // show opens a session: a key from the list, or the server's own id from
-  // a notification's link.
-  function show(ref: string) {
+  // a notification's link. One the phone doesn't know yet (made while it
+  // slept) is looked for again after fetching the list afresh.
+  async function show(ref: string) {
     const id = parseRef(ref).server === LOCAL ? qualify(server, ref) : ref
-    if (!app.sessions.some(s => s.id === id)) return
+    if (!app.sessions.some(s => s.id === id)) {
+      await app.resync()
+      if (!app.sessions.some(s => s.id === id)) return
+    }
     void app.select(id)
     if (!open) history.pushState({ session: id }, '', `#s=${encodeURIComponent(id)}`)
     open = true
@@ -65,13 +69,13 @@
   let shown = ''
   $effect(() => {
     const id = app.currentId
-    if (id && id !== shown && !open) show(id)
+    if (id && id !== shown && !open) void show(id)
     shown = id ?? ''
   })
 
   const onpop = () => {
     const id = sessionFromHash(location.hash)
-    if (id) show(id)
+    if (id) void show(id)
     else close()
   }
 
@@ -82,7 +86,7 @@
         const id = sessionFromHash(location.hash)
         if (id) {
           history.replaceState(null, '', location.pathname)
-          show(id)
+          void show(id)
         }
       })
       .catch(e => (failed = String(e)))

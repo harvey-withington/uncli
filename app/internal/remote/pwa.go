@@ -24,6 +24,11 @@ func servePWA(files fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		name := strings.TrimPrefix(r.URL.Path, "/m/")
+		// No folder listings: a folder other than the app's own is not found.
+		if name != "" && strings.HasSuffix(name, "/") {
+			http.NotFound(w, r)
+			return
+		}
 		switch {
 		case name == "" || name == "index.html":
 			h.Set("Cache-Control", "no-cache")

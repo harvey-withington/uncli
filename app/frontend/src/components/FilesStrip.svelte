@@ -6,7 +6,7 @@
   import { watchPathOf } from '../lib/watched'
   import { canOpenDefault, editorLabel, HOW_ICON, relPath, splitPath } from '../lib/files'
   import { t } from '../lib/i18n.svelte'
-  import { atServer, onlyAtServer } from '../lib/remoteonly'
+  import { atServer, serverTitle } from '../lib/remoteonly'
   import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
 
@@ -96,11 +96,11 @@
                   </button>
                 {/if}
                 {#if label}
-                  <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, f.path, f.line ?? 0))} disabled={!here} aria-label={`${label}: ${parts.name}`} title={here ? label : `${label}: ${onlyAtServer()}`}>
+                  <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, f.path, f.line ?? 0))} disabled={!here} aria-label={`${label}: ${parts.name}`} title={serverTitle(app.backend, label)}>
                     <Icon name="external-link" size={13} />
                   </button>
                 {/if}
-                <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(f.path))} disabled={!here} aria-label={`${t('files.reveal')}: ${parts.name}`} title={here ? t('files.reveal') : `${t('files.reveal')}: ${onlyAtServer()}`}>
+                <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(f.path))} disabled={!here} aria-label={`${t('files.reveal')}: ${parts.name}`} title={serverTitle(app.backend, t('files.reveal'))}>
                   <Icon name="folder-search" size={13} />
                 </button>
               </span>

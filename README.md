@@ -138,8 +138,8 @@ UNCLI can serve its sessions to your phone, or another PC, over
    paired devices**. It shows the address, such as
    `https://<pc>.<tailnet>.ts.net:9871`, or why there isn't one.
 2. **Pair a device** shows a QR code. Scan it with the phone, name the phone,
-   and click **Allow** on the PC. Settings lists paired devices; Revoke shuts
-   one out at once.
+   and click **Allow** on the PC once it names the machine on your tailnet
+   you expect. Settings lists paired devices; Revoke shuts one out at once.
 3. On the phone, add the page to the home screen and turn on notifications
    in its Settings (all, approvals only, or off, per phone).
 

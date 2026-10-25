@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/netip"
@@ -62,6 +63,10 @@ var (
 	refreshEvery = 12 * time.Hour
 )
 
+// idleTimeout closes a kept-alive connection that has sent nothing for a
+// while. There's no overall read timeout: it would cut the event stream.
+const idleTimeout = 2 * time.Minute
+
 // network is the listeners while Remote access is on.
 type network struct {
 	port     int
@@ -108,10 +113,13 @@ func (s *Server) setStatus(st Status) {
 
 // Start applies the saved settings (UNCLI starting).
 func (s *Server) Start() Status {
+	s.applying.Lock()
+	defer s.applying.Unlock()
 	s.mu.Lock()
 	st := s.settings
+	running := s.net != nil
 	s.mu.Unlock()
-	if st.Enabled {
+	if st.Enabled && !running {
 		s.on(st.Port)
 	}
 	return s.Status()
@@ -122,6 +130,8 @@ func (s *Server) SetSettings(st Settings) (Status, error) {
 	if st.Port <= 0 || st.Port > 65535 {
 		return s.Status(), fmt.Errorf("choose a port from 1 to 65535")
 	}
+	s.applying.Lock()
+	defer s.applying.Unlock()
 	b, _ := json.Marshal(st)
 	if s.store != nil {
 		if err := s.store.SetSetting(settingKey, string(b)); err != nil {
@@ -141,8 +151,15 @@ func (s *Server) SetSettings(st Settings) (Status, error) {
 }
 
 // Close turns the listeners off without changing the settings (UNCLI quitting).
-func (s *Server) Close() { s.off() }
+func (s *Server) Close() {
+	s.applying.Lock()
+	defer s.applying.Unlock()
+	s.off()
+}
 
+// off closes the listeners. The event streams end first: they never
+// finish by themselves, so Shutdown would otherwise wait them out; and
+// whatever is still open when Shutdown gives up is closed outright.
 func (s *Server) off() {
 	s.mu.Lock()
 	n := s.net
@@ -153,22 +170,24 @@ func (s *Server) off() {
 	}
 	n.stop()
 	<-n.done
+	s.hub.CloseAll()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_ = n.loopback.Shutdown(ctx)
 	n.mu.Lock()
-	for _, srv := range n.tailnet {
-		_ = srv.Shutdown(ctx)
-	}
+	servers := append([]*http.Server{n.loopback}, slices.Collect(maps.Values(n.tailnet))...)
 	n.mu.Unlock()
-	s.hub.CloseAll()
+	for _, srv := range servers {
+		if srv.Shutdown(ctx) != nil {
+			_ = srv.Close()
+		}
+	}
 }
 
 func (s *Server) on(port int) {
 	n := &network{port: port, tailnet: map[netip.Addr]*http.Server{}, done: make(chan struct{})}
 	n.hosts.Store(&[]string{})
 	handler := s.Handler(func() []string { return *n.hosts.Load() })
-	n.loopback = &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
+	n.loopback = &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: idleTimeout}
 	ln, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
 		close(n.done)
@@ -263,6 +282,7 @@ func (s *Server) listenTailnet(n *network, want []netip.Addr) []error {
 		srv := &http.Server{
 			Handler:           s.Handler(func() []string { return *n.hosts.Load() }),
 			ReadHeaderTimeout: 10 * time.Second,
+			IdleTimeout:       idleTimeout,
 			TLSConfig: &tls.Config{
 				MinVersion: tls.VersionTLS12,
 				GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {

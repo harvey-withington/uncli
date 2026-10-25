@@ -700,9 +700,15 @@ export interface Pairing {
   qr: string // the link as a PNG data URL
   expires: string
 }
+// PairRequest: name is what the device calls itself; where it calls from
+// is what Tailscale says (machine, user), this PC (local), or unknown.
 export interface PairRequest {
   id: string
   name: string
+  machine?: string
+  user?: string
+  local?: boolean
+  expires: string
 }
 export interface PairedDevice {
   id: string

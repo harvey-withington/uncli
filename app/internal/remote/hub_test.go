@@ -30,7 +30,9 @@ func TestHubResumes(t *testing.T) {
 	if c.Reload || len(c.Missed) != 2 || c.Missed[0].Name != "page:changed" || c.Missed[1].Seq != 3 {
 		t.Fatalf("catch-up = %+v", c)
 	}
-	if c.Cursor != h.epoch+":3" {
+	// The cursor stays the client's own until it has read the missed events
+	// (each carries its own), so a drop partway through them loses none.
+	if c.Cursor != h.epoch+":1" {
 		t.Errorf("cursor = %q", c.Cursor)
 	}
 	h.Emit("cli:status", map[string]bool{"ok": true})
@@ -40,8 +42,12 @@ func TestHubResumes(t *testing.T) {
 	h.Unsubscribe(sub)
 
 	// Up to date: nothing missed, no reload.
-	if _, c := h.Subscribe("d1", h.epoch+":4"); c.Reload || len(c.Missed) != 0 {
+	if _, c := h.Subscribe("d1", h.epoch+":4"); c.Reload || len(c.Missed) != 0 || c.Cursor != h.epoch+":4" {
 		t.Errorf("up to date = %+v", c)
+	}
+	// Reloading: it resumes from the latest, its state fetched afresh.
+	if _, c := h.Subscribe("d1", ""); !c.Reload || c.Cursor != h.epoch+":4" {
+		t.Errorf("reload = %+v", c)
 	}
 	// Another run of UNCLI, or a number from the future: reload.
 	for _, cur := range []string{"other:2", h.epoch + ":99", "garbage"} {

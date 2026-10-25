@@ -33,4 +33,18 @@ func TestUploads(t *testing.T) {
 	if len(entries) != 1 {
 		t.Errorf("%d uploads kept", len(entries))
 	}
+	// All uploads together at their limit: the next is refused.
+	full := filepath.Join(s.uploadsDir(), "full", "big.bin")
+	_ = os.MkdirAll(filepath.Dir(full), 0o700)
+	f, err := os.Create(full)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate(MaxUploads); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	if _, err := s.SaveUpload("one-more.txt", strings.NewReader("x")); err == nil || !strings.Contains(err.Error(), "limit") {
+		t.Errorf("over the total = %v", err)
+	}
 }

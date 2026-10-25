@@ -13,11 +13,17 @@ export interface Pending {
   upload?: string // an upload's id, on the server
   mediaType?: string
   data?: string // base64, pasted images only
-  preview?: string // a data: URL for an image thumbnail
+  preview?: string // a data: or blob: URL for an image thumbnail
 }
 
 let n = 0
 export const pendingKey = () => `att-${++n}`
+
+// releasePreviews frees the blob: URLs of thumbnails no longer shown (an
+// uploaded photo's); data: URLs need nothing.
+export function releasePreviews(list: readonly Pending[]) {
+  for (const a of list) if (a.preview?.startsWith('blob:')) URL.revokeObjectURL(a.preview)
+}
 
 export function toRefs(list: readonly Pending[]): AttachmentRef[] {
   return list.map(a => (a.upload ? { upload: a.upload } : a.path ? { path: a.path } : { name: a.name, mediaType: a.mediaType, data: a.data }))

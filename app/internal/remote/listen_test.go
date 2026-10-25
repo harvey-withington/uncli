@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -63,6 +64,52 @@ func TestListening(t *testing.T) {
 	again := New(Config{Service: r.svc, Hub: NewHub(), Store: r.svc.Store, Certs: r.certs})
 	if st := again.Start(); st.State != StateOff || st.Port != r.port {
 		t.Errorf("after a restart = %+v", st)
+	}
+}
+
+// Two changes at once, each moving to another port, can't leave one's
+// listeners running where turning off no longer reaches them.
+func TestSettingsChangesAtOnce(t *testing.T) {
+	r := newRig(t)
+	ports := []int{freePort(t), freePort(t)}
+	var wg sync.WaitGroup
+	for range 5 {
+		for _, p := range ports {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_, _ = r.srv.SetSettings(Settings{Enabled: true, Port: p})
+			}()
+		}
+	}
+	wg.Add(1)
+	go func() { defer wg.Done(); r.srv.Start() }()
+	wg.Wait()
+	if _, err := r.srv.SetSettings(Settings{Enabled: false, Port: r.port}); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range append(ports, r.port) {
+		if dials(fmt.Sprintf("127.0.0.1:%d", p)) || dials(fmt.Sprintf("127.0.0.2:%d", p)) {
+			t.Errorf("port %d still answers after turning off", p)
+		}
+	}
+}
+
+// Turning off doesn't wait for open event streams to end by themselves.
+func TestOffWithAStreamOpen(t *testing.T) {
+	r := newRig(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := r.stream(ctx, "")
+	next(t, ch, "hello", func(ev sseEvent) bool { return ev.Name == "hello" })
+	start := time.Now()
+	if _, err := r.srv.SetSettings(Settings{Enabled: false, Port: r.port}); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("turning off took %v with a stream open", d)
+	}
+	for range ch { // the stream ends
 	}
 }
 

@@ -2,6 +2,7 @@
 // link's fragment (#pair=CODE), the phone asks with its name and waits for
 // Allow on the server, then keeps its own token. The token stays in this
 // origin's storage and only ever goes in an Authorization header.
+import { t } from '../lib/i18n.svelte'
 
 const TOKEN_KEY = 'uncli-device-token'
 const NAME_KEY = 'uncli-device-name'
@@ -69,12 +70,12 @@ export function guessDeviceName(ua: string): string {
   const android = /Android[^;)]*;\s*([^;)]+?)(?:\s+Build\/[^;)]*)?\)/.exec(ua)
   const model = android?.[1]?.trim()
   if (model && model !== 'K') return model
-  if (/Android/.test(ua)) return 'Android phone'
-  if (/iPhone/.test(ua)) return 'iPhone'
-  if (/iPad/.test(ua)) return 'iPad'
-  if (/Windows/.test(ua)) return 'Windows PC'
-  if (/Mac OS X/.test(ua)) return 'Mac'
-  return 'Phone'
+  if (/Android/.test(ua)) return t('pair.guess.android')
+  if (/iPhone/.test(ua)) return t('pair.guess.iphone')
+  if (/iPad/.test(ua)) return t('pair.guess.ipad')
+  if (/Windows/.test(ua)) return t('pair.guess.windows')
+  if (/Mac OS X/.test(ua)) return t('pair.guess.mac')
+  return t('pair.guess.phone')
 }
 
 export class PairError extends Error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 
 	"uncli/internal/app"
 	"uncli/internal/push"
@@ -95,13 +96,36 @@ func (c *client) Send(sessionID, text string, attachments []app.AttachmentRef) e
 	return c.API.Send(sessionID, text, attachments)
 }
 
+// A device browses and starts sessions in folders on the server's own
+// drives, never on a network path: reaching one makes Windows connect out
+// and offer the user's credentials to whatever answers.
+var errNetworkPath = errors.New("choose a folder on this PC's own drives, not a network path")
+
+func networkPath(p string) bool {
+	return strings.HasPrefix(p, `\\`) || strings.HasPrefix(p, "//")
+}
+
+func (c *client) ListFolder(path string) (app.FolderListing, error) {
+	if networkPath(path) {
+		return app.FolderListing{}, errNetworkPath
+	}
+	return c.API.ListFolder(path)
+}
+
+func (c *client) CreateSession(profileID, workdir, model, container, provider string, shares []string) (app.CreatedSession, error) {
+	if networkPath(workdir) {
+		return app.CreatedSession{}, errNetworkPath
+	}
+	return c.API.CreateSession(profileID, workdir, model, container, provider, shares)
+}
+
 // ArtifactLink is a signed link to an artifact, to open it in the
 // device's browser.
 func (c *client) ArtifactLink(sessionID string, ref app.ArtifactRef) (string, error) {
 	if _, err := c.svc.ReadArtifact(sessionID, ref); err != nil {
 		return "", err
 	}
-	return c.server.links.artifact(sessionID, ref), nil
+	return c.server.links.artifact(c.device.ID, sessionID, ref), nil
 }
 
 // Push (decision 0021): each device subscribes its own browser and picks
@@ -133,12 +157,22 @@ func (c *client) PushState() (push.State, error) {
 	return p.StateOf(c.device.ID), nil
 }
 
+// PushSubscribe subscribes this device's browser. A call that was already
+// on its way when the device was revoked doesn't bring the subscription
+// back: revoking marks the device before it forgets its subscription.
 func (c *client) PushSubscribe(sub push.Subscription) error {
 	p, err := c.pusher()
 	if err != nil {
 		return err
 	}
-	return p.Subscribe(c.device.ID, sub)
+	if err := p.Subscribe(c.device.ID, sub); err != nil {
+		return err
+	}
+	if c.server.links.isRevoked(c.device.ID) {
+		_ = p.Forget(c.device.ID)
+		return errors.New("this device is no longer paired")
+	}
+	return nil
 }
 
 func (c *client) PushUnsubscribe() error {
@@ -172,5 +206,5 @@ func (c *client) UploadLink(id string) (string, error) {
 	if _, err := c.svc.UploadPath(id); err != nil {
 		return "", err
 	}
-	return c.server.links.upload(id), nil
+	return c.server.links.upload(c.device.ID, id), nil
 }

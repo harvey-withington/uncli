@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,10 @@ import (
 // MaxUpload is the most an upload may be: the largest attachment (a PDF).
 const MaxUpload = attach.MaxPDF
 
+// MaxUploads is the most all uploads together may take, so a device can't
+// fill the disk before the week is up.
+const MaxUploads = 1 << 30
+
 const uploadLife = 7 * 24 * time.Hour
 
 // Upload is a stored upload: its id and what it would attach as.
@@ -36,6 +41,9 @@ func (s *Service) uploadsDir() string { return filepath.Join(s.Paths.Config, "up
 // MaxUpload is refused and nothing is kept.
 func (s *Service) SaveUpload(name string, body io.Reader) (Upload, error) {
 	name = cleanUploadName(name)
+	if s.uploadsSize() >= MaxUploads {
+		return Upload{}, fmt.Errorf("uploads on this PC have reached their %d GB limit; they're cleared a week after they're sent", MaxUploads>>30)
+	}
 	var b [12]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return Upload{}, err
@@ -76,6 +84,20 @@ func (s *Service) UploadPath(id string) (string, error) {
 		return "", errors.New("no such upload")
 	}
 	return filepath.Join(dir, entries[0].Name()), nil
+}
+
+// uploadsSize is the bytes all uploads take.
+func (s *Service) uploadsSize() int64 {
+	var total int64
+	_ = filepath.WalkDir(s.uploadsDir(), func(_ string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if info, err := d.Info(); err == nil {
+				total += info.Size()
+			}
+		}
+		return nil
+	})
+	return total
 }
 
 // clearOldUploads deletes uploads older than uploadLife.

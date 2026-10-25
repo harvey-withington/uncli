@@ -17,5 +17,6 @@ export default mount(MobileApp, { target, props: { backend: mock ? withServer(mo
 // The service worker keeps the app's shell for when the server can't be
 // reached, and shows push notifications (decision 0021).
 if ('serviceWorker' in navigator && !mock) {
-  void navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {})
+  const build = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev'
+  void navigator.serviceWorker.register(`./sw.js?v=${build}`, { scope: './' }).catch(() => {})
 }

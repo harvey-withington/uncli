@@ -148,6 +148,15 @@ func TestRefusals(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "uploading") {
 		t.Errorf("path attachment = %v", err)
 	}
+	// Nor is a network path a folder it can browse or start a session in.
+	for _, p := range []string{`\\attacker\share`, "//attacker/share"} {
+		if err := r.call(nil, "ListFolder", p); err == nil || !strings.Contains(err.Error(), "network path") {
+			t.Errorf("ListFolder(%s) = %v", p, err)
+		}
+		if err := r.call(nil, "CreateSession", "code", p, "haiku", "", "", []string{}); err == nil || !strings.Contains(err.Error(), "network path") {
+			t.Errorf("CreateSession(%s) = %v", p, err)
+		}
+	}
 }
 
 func TestVersion(t *testing.T) {
@@ -202,6 +211,15 @@ func TestUploadsAndLinks(t *testing.T) {
 	if code, _ := get(strings.Replace(link, "e=", "e=1", 1)); code != http.StatusForbidden {
 		t.Errorf("a changed expiry = %d", code)
 	}
+	if code, _ := get(strings.Replace(link, "d=dev1", "d=dev2", 1)); code != http.StatusForbidden {
+		t.Errorf("the link for another device = %d", code)
+	}
+	// Revoking the device ends its links at once.
+	_ = r.srv.RevokeDevice("dev1")
+	if code, _ := get(link); code != http.StatusForbidden {
+		t.Errorf("a revoked device's link = %d", code)
+	}
+	r.srv.links.revoked = map[string]bool{}
 	r.srv.links.now = func() time.Time { return time.Now().Add(linkLife + time.Minute) }
 	if code, _ := get(link); code != http.StatusForbidden {
 		t.Errorf("an expired link = %d", code)

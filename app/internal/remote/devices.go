@@ -3,6 +3,7 @@ package remote
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -78,7 +79,7 @@ func (d *Devices) Authenticate(token string) (Device, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	for i := range d.list {
-		if d.list[i].TokenHash == h {
+		if subtle.ConstantTimeCompare([]byte(d.list[i].TokenHash), []byte(h)) == 1 {
 			r := &d.list[i]
 			if now := d.now(); now.Sub(r.LastSeen) > seenEvery {
 				r.LastSeen = now
@@ -116,6 +117,13 @@ func (d *Devices) List() []PairedDevice {
 	}
 	slices.SortFunc(out, func(a, b PairedDevice) int { return b.LastSeen.Compare(a.LastSeen) })
 	return out
+}
+
+// Has says whether a device is paired.
+func (d *Devices) Has(id string) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return slices.ContainsFunc(d.list, func(r deviceRecord) bool { return r.ID == id })
 }
 
 // Revoke forgets a device: its token stops working at once.

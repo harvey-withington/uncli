@@ -5,7 +5,7 @@
   import { canOpenDefault, editorLabel, splitPath } from '../lib/files'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
-  import { atServer, onlyAtServer } from '../lib/remoteonly'
+  import { atServer, serverTitle } from '../lib/remoteonly'
   import { keepScroll } from '../lib/scrollmemory'
   import { showToast } from '../lib/toasts.svelte'
   import { sandboxDoc, svgDoc } from '../lib/artifacts'
@@ -161,10 +161,10 @@
       {/if}
       {#if file?.text}<CopyButton text={file.text} label={t('watch.copy')} />{/if}
       {#if openLabel && !file?.missing}
-        <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, abs(), 0))} disabled={!atServer(app.backend)} aria-label={openLabel} title={atServer(app.backend) ? openLabel : `${openLabel}: ${onlyAtServer()}`}><Icon name="external-link" size={14} /></button>
+        <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, abs(), 0))} disabled={!atServer(app.backend)} aria-label={openLabel} title={serverTitle(app.backend, openLabel)}><Icon name="external-link" size={14} /></button>
       {/if}
       {#if !file?.missing}
-        <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(abs()))} disabled={!atServer(app.backend)} aria-label={t('files.reveal')} title={atServer(app.backend) ? t('files.reveal') : `${t('files.reveal')}: ${onlyAtServer()}`}><Icon name="folder-search" size={14} /></button>
+        <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(abs()))} disabled={!atServer(app.backend)} aria-label={t('files.reveal')} title={serverTitle(app.backend, t('files.reveal'))}><Icon name="folder-search" size={14} /></button>
       {/if}
       <span class="sep" aria-hidden="true"></span>
       <button class="btn ghost small icon" onclick={() => app.closeFile(sessionId)} aria-label={t('watch.close')} title={t('watch.close')}><Icon name="x" size={14} /></button>

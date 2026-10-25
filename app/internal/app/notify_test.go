@@ -144,7 +144,9 @@ func TestRemoteNotes(t *testing.T) {
 		approval bool
 	}
 	var remote []got
-	a.remote = func() NoteSink { return func(n notify.Note, approval bool) { remote = append(remote, got{n, approval}) } }
+	a.remote = func() NoteSink {
+		return func(n notify.Note, approval bool) { remote = append(remote, got{n, approval}) }
+	}
 	a.SessionChanged(view(session.RunningTools))
 	v := view(session.NeedsApproval)
 	v.Approvals = []session.Approval{{Tool: "Bash", Description: "Push the branch"}}

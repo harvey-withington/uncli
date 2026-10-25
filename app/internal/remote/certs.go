@@ -29,6 +29,20 @@ type CertSource interface {
 	Cert(ctx context.Context, name string) (*tls.Certificate, error)
 }
 
+// Peer is the tailnet machine and user behind an address, as Tailscale
+// knows them; the Allow dialog shows it, since a device's own name is
+// only what the device says.
+type Peer struct {
+	Machine string
+	User    string
+}
+
+// PeerSource names the machine behind a remote address. The Tailscale
+// CertSource is one.
+type PeerSource interface {
+	WhoIs(ctx context.Context, addr string) (Peer, error)
+}
+
 // Why there's no tailnet address or certificate, as Settings explains it.
 const (
 	ReasonNoTailscale = "no-tailscale" // the Tailscale app isn't installed or running
@@ -67,6 +81,21 @@ func (t *Tailscale) Lookup(ctx context.Context) (Tailnet, error) {
 		return Tailnet{}, &Problem{Reason: ReasonHTTPSOff}
 	}
 	return Tailnet{Name: name, IPs: st.Self.TailscaleIPs}, nil
+}
+
+func (t *Tailscale) WhoIs(ctx context.Context, addr string) (Peer, error) {
+	r, err := t.lc.WhoIs(ctx, addr)
+	if err != nil {
+		return Peer{}, err
+	}
+	var p Peer
+	if r.Node != nil {
+		p.Machine = r.Node.DisplayName(false)
+	}
+	if r.UserProfile != nil {
+		p.User = r.UserProfile.LoginName
+	}
+	return p, nil
 }
 
 func (t *Tailscale) Cert(ctx context.Context, name string) (*tls.Certificate, error) {

@@ -3,7 +3,7 @@
   import type { SessionView } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { attachmentIcon, formatSize, pendingKey, readImage, shrinkPhoto, toRefs, type Pending } from '../lib/attachments'
+  import { attachmentIcon, formatSize, pendingKey, readImage, releasePreviews, shrinkPhoto, toRefs, type Pending } from '../lib/attachments'
   import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/drops'
   import { loadDraft, saveDraft } from '../lib/keep'
   import { atServer } from '../lib/remoteonly'
@@ -47,6 +47,14 @@
     if (shownFor) saveDraft(shownFor, text)
   })
 
+  // attach adds files to a session's draft: the one shown, or, when the
+  // user moved on while they were on their way (an upload), the one they
+  // were added from.
+  function attach(id: string, items: Pending[]) {
+    if (id === shownFor) attachments = [...attachments, ...items]
+    else drafts.set(id, [...(drafts.get(id) ?? []), ...items])
+  }
+
   const canSend = $derived((text.trim() !== '' || attachments.length > 0) && !sending && uploading === 0)
 
   async function send() {
@@ -56,6 +64,7 @@
     try {
       await app.send(q, toRefs(attachments))
       text = ''
+      releasePreviews(attachments)
       attachments = []
       drafts.delete(session.id)
       saveDraft(session.id, '')
@@ -79,6 +88,7 @@
   // Folders, and files that can't be attached, go in as their paths, with a
   // note saying why.
   async function attachPaths(paths: string[]) {
+    const id = session.id
     let infos
     try {
       infos = await app.backend.describeAttachments(paths)
@@ -86,9 +96,9 @@
       showToast(String(e), 'error')
       return
     }
-    const known = new Set(attachments.map(a => a.path))
+    const known = new Set((id === shownFor ? attachments : drafts.get(id) ?? []).map(a => a.path))
     const fresh = infos.filter(i => i.kind !== 'folder' && i.kind !== 'unsupported' && !known.has(i.path))
-    attachments = [...attachments, ...fresh.map(i => ({ key: pendingKey(), name: i.name, size: i.size, kind: i.kind, path: i.path, mediaType: i.mediaType }))]
+    attach(id, fresh.map(i => ({ key: pendingKey(), name: i.name, size: i.size, kind: i.kind, path: i.path, mediaType: i.mediaType })))
     const rest = infos.filter(i => i.kind === 'folder' || i.kind === 'unsupported')
     if (rest.length > 0) {
       input?.dispatchEvent(new CustomEvent(INSERT_EVENT, { detail: rest.map(i => quotePath(i.path)).join(' ') }))
@@ -98,6 +108,7 @@
   }
 
   async function upload(files: FileList | null) {
+    const id = session.id
     for (const file of Array.from(files ?? [])) {
       uploading++
       try {
@@ -109,7 +120,7 @@
           continue
         }
         const preview = up.kind === 'image' ? URL.createObjectURL(body) : undefined
-        attachments = [...attachments, { key: pendingKey(), name: up.name, size: up.size, kind: up.kind, upload: up.id, mediaType: up.mediaType, preview }]
+        attach(id, [{ key: pendingKey(), name: up.name, size: up.size, kind: up.kind, upload: up.id, mediaType: up.mediaType, preview }])
       } catch (e) {
         showToast(String(e), 'error')
       } finally {
@@ -120,9 +131,16 @@
   }
 
   function detach(key: string) {
+    releasePreviews(attachments.filter(a => a.key === key))
     attachments = attachments.filter(a => a.key !== key)
     input?.focus()
   }
+
+  // Previews of uploaded photos hold their bytes until released.
+  $effect(() => () => {
+    releasePreviews(attachments)
+    for (const list of drafts.values()) releasePreviews(list)
+  })
 
   $effect(() => {
     const el = input

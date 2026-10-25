@@ -7,7 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
+	"net/netip"
 	"slices"
 	"strings"
 	"sync"
@@ -45,10 +47,17 @@ type Pairing struct {
 	Expires time.Time `json:"expires"` // when the code stops working
 }
 
-// PairRequest is a device asking to pair, waiting for Allow.
+// PairRequest is a device asking to pair, waiting for Allow. Name is what
+// the device calls itself; where it's calling from is what Tailscale says
+// (Machine, User), or this machine (Local), or unknown (all empty).
 type PairRequest struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Machine string `json:"machine,omitempty"`
+	User    string `json:"user,omitempty"`
+	Local   bool   `json:"local,omitempty"`
+	// Expires is when the request stops waiting for an answer.
+	Expires time.Time `json:"expires"`
 }
 
 type pending struct {
@@ -72,11 +81,13 @@ type pairing struct {
 	code    string
 	expires time.Time
 	waiting map[string]*pending
-	bad     []time.Time
+	// bad is each caller's wrong codes in the last minute, by address: one
+	// caller's guessing can't keep another (the real phone) out.
+	bad map[string][]time.Time
 }
 
 func newPairing(d *Devices) *pairing {
-	return &pairing{devices: d, now: time.Now, waiting: map[string]*pending{}}
+	return &pairing{devices: d, now: time.Now, waiting: map[string]*pending{}, bad: map[string][]time.Time{}}
 }
 
 // newCode is codeLength letters from codeAlphabet, uniformly (bytes that
@@ -127,9 +138,11 @@ var (
 	errNoRequest = errors.New("no such pairing request")
 )
 
-// request is a device asking to pair with code under a name. The code is
-// spent whatever the answer.
-func (p *pairing) request(code, name string) (id, claim string, err error) {
+// request is a device, calling from an address, asking to pair with code
+// under a name. The code is spent whatever the answer. Wrong codes count
+// against the caller only while a code is open: with none open there's
+// nothing to guess.
+func (p *pairing) request(from, code, name string, who PairRequest) (id, claim string, err error) {
 	name = cleanName(name)
 	if name == "" {
 		return "", "", errors.New("give this device a name")
@@ -137,24 +150,48 @@ func (p *pairing) request(code, name string) (id, claim string, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := p.now()
-	p.bad = slices.DeleteFunc(p.bad, func(t time.Time) bool { return now.Sub(t) >= time.Minute })
-	if len(p.bad) >= maxBadTry {
+	p.forgetLocked(now)
+	if len(p.bad[from]) >= maxBadTry {
 		return "", "", errTooMany
 	}
-	ok := p.code != "" && now.Before(p.expires) &&
-		subtle.ConstantTimeCompare([]byte(strings.ToUpper(strings.TrimSpace(code))), []byte(p.code)) == 1
-	if !ok {
-		p.bad = append(p.bad, now)
+	open := p.code != "" && now.Before(p.expires)
+	if !open || subtle.ConstantTimeCompare([]byte(strings.ToUpper(strings.TrimSpace(code))), []byte(p.code)) != 1 {
+		if open {
+			p.bad[from] = append(p.bad[from], now)
+		}
 		return "", "", errBadCode
 	}
 	p.code = "" // one use
-	r := &pending{PairRequest: PairRequest{ID: randomHex(8), Name: name}, claim: randomHex(32),
-		expires: now.Add(answerLife), answer: make(chan bool)}
+	who.ID, who.Name, who.Expires = randomHex(8), name, now.Add(answerLife)
+	r := &pending{PairRequest: who, claim: randomHex(32), expires: who.Expires, answer: make(chan bool)}
 	p.waiting[r.ID] = r
 	if p.asked != nil {
 		go p.asked(r.PairRequest)
 	}
 	return r.ID, r.claim, nil
+}
+
+// forgetLocked drops wrong codes over a minute old, and requests past
+// their time. A device allowed but never collected (the phone gave up
+// waiting) is revoked, so the list holds no device nobody has the token
+// of.
+func (p *pairing) forgetLocked(now time.Time) {
+	for from, times := range p.bad {
+		if times = slices.DeleteFunc(times, func(t time.Time) bool { return now.Sub(t) >= time.Minute }); len(times) == 0 {
+			delete(p.bad, from)
+		} else {
+			p.bad[from] = times
+		}
+	}
+	for id, r := range p.waiting {
+		if now.Before(r.expires.Add(claimWait)) {
+			continue
+		}
+		delete(p.waiting, id)
+		if r.allowed {
+			_ = p.devices.Revoke(r.device.ID)
+		}
+	}
 }
 
 // answer is the window's Allow or Deny.
@@ -239,7 +276,8 @@ func (s *Server) servePairRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
 		return
 	}
-	id, claim, err := s.pair.request(in.Code, in.Name)
+	from, _, _ := net.SplitHostPort(r.RemoteAddr)
+	id, claim, err := s.pair.request(from, in.Code, in.Name, s.whoIs(r.Context(), r.RemoteAddr))
 	switch {
 	case errors.Is(err, errTooMany):
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": err.Error()})
@@ -248,6 +286,26 @@ func (s *Server) servePairRequest(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusOK, map[string]string{"id": id, "claim": claim})
 	}
+}
+
+// whoIs is where a pairing request comes from: this machine, or the
+// tailnet machine and user Tailscale puts behind the address (empty when
+// it can't say).
+func (s *Server) whoIs(ctx context.Context, remoteAddr string) PairRequest {
+	if ap, err := netip.ParseAddrPort(remoteAddr); err == nil && ap.Addr().IsLoopback() {
+		return PairRequest{Local: true}
+	}
+	ps, ok := s.certs.(PeerSource)
+	if !ok {
+		return PairRequest{}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	p, err := ps.WhoIs(ctx, remoteAddr)
+	if err != nil {
+		return PairRequest{}
+	}
+	return PairRequest{Machine: p.Machine, User: p.User}
 }
 
 // POST /pair/claim {id, claim} → 200 {device, token}, 202 still waiting,

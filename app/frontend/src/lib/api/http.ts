@@ -6,6 +6,7 @@
 // connection from the last one seen. What only works at the server's own
 // screen is refused here, and the UI shows it disabled with the reason
 // (lib/remoteonly.ts).
+import { t } from '../i18n.svelte'
 import type { Backend, Connection, Handlers, Upload } from './types'
 
 export interface HttpOptions {
@@ -18,8 +19,8 @@ export interface HttpOptions {
 
 // RemoteOnlyError is a call that only the server's own window can make.
 export class RemoteOnlyError extends Error {
-  constructor(method: string) {
-    super(`${method} only works at the server`)
+  constructor(readonly method: string) {
+    super(t('remote.onlyAtServer'))
     this.name = 'RemoteOnlyError'
   }
 }
@@ -70,13 +71,32 @@ export function parseSSE(text: string): { frames: SSEFrame[]; rest: string } {
   return { frames, rest }
 }
 
+// replyOf reads a JSON reply. Anything else (a proxy's error page, a
+// server cut off mid-reply) is an RPCError saying what came back, not a
+// parser's message.
+async function replyOf<T>(res: Response): Promise<T> {
+  if (!(res.headers.get('Content-Type') ?? '').includes('application/json')) {
+    throw new RPCError(t('remote.badReply', { status: `${res.status} ${res.statusText}`.trim() }), res.status)
+  }
+  try {
+    return (await res.json()) as T
+  } catch {
+    throw new RPCError(t('remote.badReply', { status: `${res.status} ${res.statusText}`.trim() }), res.status)
+  }
+}
+
 export function httpBackend(opts: HttpOptions): Backend {
   const f = opts.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a))
   const auth = (): Record<string, string> => {
-    const t = opts.token()
-    return t ? { Authorization: `Bearer ${t}` } : {}
+    const token = opts.token()
+    return token ? { Authorization: `Bearer ${token}` } : {}
   }
   let id = 0
+
+  const unpaired = (): never => {
+    opts.unauthorized?.()
+    throw new RPCError(t('remote.unpaired'), 401)
+  }
 
   async function call<T>(method: string, ...params: unknown[]): Promise<T> {
     const res = await f(`${opts.base}/rpc`, {
@@ -84,11 +104,8 @@ export function httpBackend(opts: HttpOptions): Backend {
       headers: { 'Content-Type': 'application/json', ...auth() },
       body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }),
     })
-    if (res.status === 401) {
-      opts.unauthorized?.()
-      throw new RPCError('This device is no longer paired.', 401)
-    }
-    const body = (await res.json()) as { result?: T; error?: { code: number; message: string } }
+    if (res.status === 401) unpaired()
+    const body = await replyOf<{ result?: T; error?: { code: number; message: string } }>(res)
     if (body.error) throw new RPCError(body.error.message, body.error.code)
     return body.result as T
   }
@@ -210,11 +227,8 @@ export function httpBackend(opts: HttpOptions): Backend {
     listFolder: p => call('ListFolder', p),
     async upload(file: Blob, name: string): Promise<Upload> {
       const res = await f(`${opts.base}/upload?name=${encodeURIComponent(name)}`, { method: 'POST', headers: auth(), body: file })
-      if (res.status === 401) {
-        opts.unauthorized?.()
-        throw new RPCError('This device is no longer paired.', 401)
-      }
-      const body = (await res.json()) as Upload & { error?: string }
+      if (res.status === 401) unpaired()
+      const body = await replyOf<Upload & { error?: string }>(res)
       if (!res.ok) throw new RPCError(body.error ?? res.statusText, res.status)
       return body
     },
@@ -309,7 +323,7 @@ function stream(opts: HttpOptions, f: typeof fetch, auth: () => Record<string, s
         buf = rest
         frames.forEach(dispatch)
       }
-      throw new Error('the server closed the connection')
+      throw new Error(t('remote.closed'))
     } catch (e) {
       if (stopped) return 'stop'
       report({ state: 'offline', lastOnline, error: e instanceof Error ? e.message : String(e) })

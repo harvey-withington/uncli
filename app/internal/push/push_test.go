@@ -194,6 +194,39 @@ func TestGoneSubscriptionsAreForgotten(t *testing.T) {
 	}
 }
 
+// The push service saying an old subscription is gone doesn't drop the
+// one the device made meanwhile.
+func TestGoneKeepsANewerSubscription(t *testing.T) {
+	svc := &service{status: http.StatusGone}
+	srv := httptest.NewTLSServer(svc)
+	defer srv.Close()
+	p := newPusher(t, srv)
+	b := newBrowser(t)
+	_ = p.Subscribe("phone", b.sub(srv.URL+"/old"))
+	p.mu.Lock()
+	old := p.records[0]
+	p.mu.Unlock()
+	_ = p.Subscribe("phone", b.sub(srv.URL+"/new"))
+	_ = p.deliver(context.Background(), old, Note{Title: "x"})
+	if !p.StateOf("phone").Subscribed {
+		t.Error("the newer subscription went with the old one")
+	}
+}
+
+func TestRetain(t *testing.T) {
+	srv := httptest.NewTLSServer(&service{})
+	defer srv.Close()
+	p := newPusher(t, srv)
+	_ = p.Subscribe("phone", newBrowser(t).sub(srv.URL+"/a"))
+	_ = p.Subscribe("revoked", newBrowser(t).sub(srv.URL+"/b"))
+	if err := p.Retain(func(d string) bool { return d == "phone" }); err != nil {
+		t.Fatal(err)
+	}
+	if !p.StateOf("phone").Subscribed || p.StateOf("revoked").Subscribed {
+		t.Errorf("phone %+v, revoked %+v", p.StateOf("phone"), p.StateOf("revoked"))
+	}
+}
+
 func TestKeysAndEndpoints(t *testing.T) {
 	st := memStore{}
 	p1, _ := New(st)

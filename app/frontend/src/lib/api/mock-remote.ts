@@ -43,7 +43,10 @@ export function mockRemote(on: RemoteEvents) {
       if (status.state !== 'on' || !status.url) throw new Error('turn Remote access on, with Tailscale connected, to pair a device')
       const code = 'K7QWM3XRP2'
       if (params.get('pair') === 'ask') {
-        setTimeout(() => { waiting.set('r1', 'Harvey’s Pixel'); on.pair({ id: 'r1', name: 'Harvey’s Pixel' }) }, 800)
+        setTimeout(() => {
+          waiting.set('r1', 'Harvey’s Pixel')
+          on.pair({ id: 'r1', name: 'Harvey’s Pixel', machine: 'pixel-9', user: 'harvey@example.com', expires: new Date(Date.now() + 5 * 60_000).toISOString() })
+        }, 800)
       }
       return { code, url: `${status.url}/m/#pair=${code}`, qr: SAMPLE_QR, expires: new Date(Date.now() + 5 * 60_000).toISOString() }
     },

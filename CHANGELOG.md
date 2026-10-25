@@ -4,6 +4,44 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.3.0-alpha
+
+Your sessions from your phone: UNCLI keeps running in the tray and, when
+you switch Remote access on, serves them to the devices you pair, over
+Tailscale only.
+
+### Remote access
+
+- **Settings → Remote access** serves this PC's sessions to paired
+  devices. It's off until you switch it on, and then listens only on this
+  PC and its Tailscale address, never your local network, with HTTPS from
+  the machine's own tailnet certificate (decision 0021).
+- **The phone app.** Open the address on a paired phone and add it to the
+  home screen: the session list, each session's pages, approval cards and
+  the message box, new sessions in any folder on the PC, and photos or
+  files attached by sending them to the PC first. It reconnects by itself
+  after the phone sleeps or the network drops, and catches up on what it
+  missed. What only works at the PC (opening files and editors, setting up
+  a CLI, containers) shows disabled, with why.
+- **Pairing.** Pair a device shows a QR code with a code that lasts five
+  minutes and works once. The device gives its name and waits; the PC asks
+  "Allow <name>?" and says which machine on your tailnet is asking, and
+  who's signed in there. Each device gets its own token, which never goes
+  in a link, and Revoke shuts it out at once (decision 0022).
+- **Notifications on the phone**, even with the app closed, when a
+  session needs approval, finishes or fails. Each device picks all,
+  approvals only or none, and tapping one opens its session.
+- Approvals answered on a device say which device answered.
+
+### The tray
+
+- Closing the window keeps UNCLI running in the tray (Open UNCLI and Quit
+  UNCLI on its menu). Settings → General can start it with Windows,
+  minimised to the tray.
+- `uncli.exe --quit` quits a running UNCLI as the tray's Quit does. The
+  installer and uninstaller use it, so neither has to wait for you to
+  close the app.
+
 ## 0.2.0-alpha
 
 Signing in to MCP servers without leaving UNCLI, a live view of any file in

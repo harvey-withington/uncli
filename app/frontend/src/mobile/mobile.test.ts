@@ -76,6 +76,19 @@ describe('the phone app', () => {
     expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument()
   })
 
+  it('opens a session a notification links to that the phone hasn\u2019t heard of yet', async () => {
+    const b = phoneBackend()
+    const boot = await b.bootstrap()
+    const late = boot.sessions[1]!
+    // The phone's list was fetched before the session was made.
+    vi.spyOn(b, 'bootstrap').mockResolvedValueOnce({ ...boot, sessions: boot.sessions.filter(s => s.id !== late.id) })
+    render(MobileApp, { props: { backend: b } })
+    await screen.findByRole('list', { name: 'Sessions' })
+    history.pushState(null, '', `/m/#s=${encodeURIComponent(late.id.split('~')[1]!)}`)
+    dispatchEvent(new PopStateEvent('popstate'))
+    expect(await screen.findByRole('heading', { name: late.title })).toBeInTheDocument()
+  })
+
   it('says when the server can\u2019t be reached', async () => {
     const b = phoneBackend()
     let h: Handlers | null = null

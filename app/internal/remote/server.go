@@ -77,6 +77,10 @@ type Server struct {
 
 	onStatus func(Status)
 
+	// applying is held while the listeners are turned on or off, so two
+	// changes at once can't leave one's listeners running unseen.
+	applying sync.Mutex
+
 	mu       sync.Mutex
 	settings Settings
 	status   Status
@@ -96,6 +100,10 @@ func New(c Config) *Server {
 		}
 		s.pair = newPairing(s.devices)
 		s.pair.asked = c.OnPairRequest
+		// Subscriptions of devices no longer paired go.
+		if s.push != nil && s.auth == Authenticator(s.devices) {
+			_ = s.push.Retain(s.devices.Has)
+		}
 	}
 	s.settings = s.loadSettings()
 	s.status = Status{Enabled: false, Port: s.settings.Port, State: StateOff}
@@ -259,9 +267,15 @@ func writeSSE(w http.ResponseWriter, id, name string, data []byte) bool {
 	return err == nil
 }
 
+// uploadTime is the longest an upload may take: 32 MB at well under
+// 100 KB/s, a poor mobile connection.
+const uploadTime = 10 * time.Minute
+
 // serveUploadPost stores a file sent as the request body (POST
 // /upload?name=photo.jpg) and returns what it would attach as.
 func (s *Server) serveUploadPost(w http.ResponseWriter, r *http.Request, _ Device) {
+	// A body sent slower than this is cut off, not waited on for ever.
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadTime))
 	up, err := s.svc.SaveUpload(r.URL.Query().Get("name"), r.Body)
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
@@ -296,6 +310,7 @@ func (s *Server) Devices() []PairedDevice { return s.devices.List() }
 // notifications.
 func (s *Server) RevokeDevice(id string) error {
 	err := s.devices.Revoke(id)
+	s.links.revoke(id)
 	s.hub.CloseDevice(id)
 	if s.push != nil {
 		_ = s.push.Forget(id)

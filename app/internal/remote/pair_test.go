@@ -2,7 +2,9 @@ package remote
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -171,18 +173,27 @@ func TestPairingCodes(t *testing.T) {
 	p.now = func() time.Time { return now }
 	pr, _ := p.start("")
 	now = now.Add(pairLife + time.Second)
-	if _, _, err := p.request(pr.Code, "Late"); err != errBadCode {
+	if _, _, err := p.request("a", pr.Code, "Late", PairRequest{}); err != errBadCode {
 		t.Errorf("expired code = %v", err)
+	}
+	// Guesses with no code open count for nothing.
+	for i := 0; i < maxBadTry; i++ {
+		_, _, _ = p.request("a", "NOPE", "x", PairRequest{})
 	}
 	pr, _ = p.start("")
 	for i := 0; i < maxBadTry; i++ {
-		_, _, _ = p.request("NOPE", "x")
+		_, _, _ = p.request("a", "NOPE", "x", PairRequest{})
 	}
-	if _, _, err := p.request(pr.Code, "Right"); err != errTooMany {
+	if _, _, err := p.request("a", pr.Code, "Right", PairRequest{}); err != errTooMany {
 		t.Errorf("after many wrong codes = %v", err)
 	}
+	// Another caller's guessing doesn't keep the real device out.
+	if _, _, err := p.request("phone", pr.Code, "Right", PairRequest{}); err != nil {
+		t.Errorf("the real device = %v", err)
+	}
+	pr, _ = p.start("")
 	now = now.Add(time.Minute)
-	if _, _, err := p.request(pr.Code, "Right"); err != nil {
+	if _, _, err := p.request("a", pr.Code, "Right", PairRequest{}); err != nil {
 		t.Errorf("a minute later = %v", err)
 	}
 	for i := 0; i < 50; i++ {
@@ -193,6 +204,60 @@ func TestPairingCodes(t *testing.T) {
 	}
 	if got := cleanName(strings.Repeat("é", 60)); len([]rune(got)) != maxNameLen {
 		t.Errorf("long name = %q", got)
+	}
+}
+
+// A device allowed but never collected is revoked once its request is
+// past its time, and expired requests don't pile up.
+func TestPairingUncollected(t *testing.T) {
+	d := NewDevices(memStore{})
+	p := newPairing(d)
+	now := time.Now()
+	p.now = func() time.Time { return now }
+	pr, _ := p.start("")
+	id, _, err := p.request("phone", pr.Code, "Gave up", PairRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.answer(id, true); err != nil || len(d.List()) != 1 {
+		t.Fatalf("allow = %v, %d devices", err, len(d.List()))
+	}
+	now = now.Add(answerLife + claimWait + time.Second)
+	pr, _ = p.start("")
+	_, _, _ = p.request("x", "NOPE", "x", PairRequest{})
+	if len(d.List()) != 0 {
+		t.Error("a device nobody collected stayed paired")
+	}
+	if len(p.waiting) != 0 {
+		t.Errorf("%d expired requests kept", len(p.waiting))
+	}
+}
+
+type fakePeers struct{ CertSource }
+
+func (fakePeers) WhoIs(_ context.Context, addr string) (Peer, error) {
+	if addr == "100.64.0.5:4000" {
+		return Peer{Machine: "pixel-9", User: "harvey@example.com"}, nil
+	}
+	return Peer{}, errors.New("no such peer")
+}
+
+// The Allow dialog says where a request comes from, not only the name
+// the device gave itself.
+func TestPairingSaysWhere(t *testing.T) {
+	s := &Server{certs: fakePeers{}}
+	ctx := context.Background()
+	if got := s.whoIs(ctx, "100.64.0.5:4000"); got.Machine != "pixel-9" || got.User != "harvey@example.com" || got.Local {
+		t.Errorf("tailnet peer = %+v", got)
+	}
+	if got := s.whoIs(ctx, "127.0.0.1:5000"); !got.Local {
+		t.Errorf("loopback = %+v", got)
+	}
+	if got := s.whoIs(ctx, "100.64.0.9:4000"); got != (PairRequest{}) {
+		t.Errorf("unknown = %+v", got)
+	}
+	if got := (&Server{certs: newFakeCerts(t)}).whoIs(ctx, "100.64.0.5:4000"); got != (PairRequest{}) {
+		t.Errorf("no peer source = %+v", got)
 	}
 }
 

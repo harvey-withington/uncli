@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"uncli/internal/app"
@@ -21,61 +22,82 @@ import (
 // directly (a new tab, a download), where it can't send the Authorization
 // header. Each link names one file, expires after linkLife, and its
 // signature covers its route, so it opens that file and nothing else
-// (decision 0022). The key is made when UNCLI starts; a restart ends every
-// link.
+// (decision 0022). A link names the device it was made for, and stops
+// working when that device is revoked. The key is made when UNCLI starts;
+// a restart ends every link.
 
 const linkLife = 15 * time.Minute
 
 type links struct {
 	key []byte
 	now func() time.Time
+
+	mu      sync.Mutex
+	revoked map[string]bool // devices revoked since UNCLI started: their links stop
 }
 
 func newLinks() *links {
 	k := make([]byte, 32)
 	_, _ = rand.Read(k)
-	return &links{key: k, now: time.Now}
+	return &links{key: k, now: time.Now, revoked: map[string]bool{}}
 }
 
+// sign signs the parts, each prefixed with its length, so no two lists of
+// parts sign alike.
 func (l *links) sign(parts ...string) string {
 	m := hmac.New(sha256.New, l.key)
-	m.Write([]byte(strings.Join(parts, "\n")))
+	for _, p := range parts {
+		m.Write([]byte(strconv.Itoa(len(p)) + ":" + p))
+	}
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil))
+}
+
+// revoke ends the links made for a device.
+func (l *links) revoke(device string) {
+	l.mu.Lock()
+	l.revoked[device] = true
+	l.mu.Unlock()
+}
+
+func (l *links) isRevoked(device string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.revoked[device]
 }
 
 func (l *links) expiry() string { return strconv.FormatInt(l.now().Add(linkLife).Unix(), 10) }
 
 // artifact is the link to an artifact: a version by hash or a file in the
 // session's artifacts folder by path.
-func (l *links) artifact(sessionID string, ref app.ArtifactRef) string {
+func (l *links) artifact(device, sessionID string, ref app.ArtifactRef) string {
 	e := l.expiry()
-	q := url.Values{"s": {sessionID}, "h": {ref.Hash}, "p": {ref.Path}, "e": {e}}
-	q.Set("sig", l.sign("artifact", sessionID, ref.Hash, ref.Path, e))
+	q := url.Values{"d": {device}, "s": {sessionID}, "h": {ref.Hash}, "p": {ref.Path}, "e": {e}}
+	q.Set("sig", l.sign("artifact", device, sessionID, ref.Hash, ref.Path, e))
 	return "/l/artifact?" + q.Encode()
 }
 
-func (l *links) upload(id string) string {
+func (l *links) upload(device, id string) string {
 	e := l.expiry()
-	q := url.Values{"id": {id}, "e": {e}}
-	q.Set("sig", l.sign("upload", id, e))
+	q := url.Values{"d": {device}, "id": {id}, "e": {e}}
+	q.Set("sig", l.sign("upload", device, id, e))
 	return "/l/upload?" + q.Encode()
 }
 
-// valid checks a link's expiry and signature over parts (which end with
-// the expiry).
+// valid checks a link's expiry, its device (parts[1]) and its signature
+// over parts (which end with the expiry).
 func (l *links) valid(sig string, parts ...string) bool {
 	e, err := strconv.ParseInt(parts[len(parts)-1], 10, 64)
 	if err != nil || l.now().Unix() > e {
 		return false
 	}
-	return hmac.Equal([]byte(sig), []byte(l.sign(parts...)))
+	return !l.isRevoked(parts[1]) && hmac.Equal([]byte(sig), []byte(l.sign(parts...)))
 }
 
 // serveArtifact serves GET /l/artifact.
 func (s *Server) serveArtifact(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	sess, hash, rel, e := q.Get("s"), q.Get("h"), q.Get("p"), q.Get("e")
-	if !s.links.valid(q.Get("sig"), "artifact", sess, hash, rel, e) {
+	if !s.links.valid(q.Get("sig"), "artifact", q.Get("d"), sess, hash, rel, e) {
 		http.Error(w, "This link has expired. Open it again from UNCLI.", http.StatusForbidden)
 		return
 	}
@@ -100,7 +122,7 @@ func (s *Server) serveArtifact(w http.ResponseWriter, r *http.Request) {
 func (s *Server) serveUpload(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id, e := q.Get("id"), q.Get("e")
-	if !s.links.valid(q.Get("sig"), "upload", id, e) {
+	if !s.links.valid(q.Get("sig"), "upload", q.Get("d"), id, e) {
 		http.Error(w, "This link has expired. Open it again from UNCLI.", http.StatusForbidden)
 		return
 	}

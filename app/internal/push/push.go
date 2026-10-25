@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -196,6 +197,19 @@ func (p *Pusher) Forget(device string) error {
 	return p.saveLocked()
 }
 
+// Retain keeps only the subscriptions of devices keep says are still
+// paired (one revoked while UNCLI wasn't looking leaves none behind).
+func (p *Pusher) Retain(keep func(device string) bool) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	n := len(p.records)
+	p.records = slices.DeleteFunc(p.records, func(r record) bool { return !keep(r.Device) })
+	if len(p.records) == n {
+		return nil
+	}
+	return p.saveLocked()
+}
+
 // SetSetting sets what a subscribed device is told.
 func (p *Pusher) SetSetting(device, setting string) error {
 	if !ValidSetting(setting) {
@@ -266,8 +280,8 @@ func (p *Pusher) deliver(ctx context.Context, r record, n Note) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	i := p.find(r.Device)
-	if i < 0 {
-		return err
+	if i < 0 || p.records[i].Sub.Endpoint != r.Sub.Endpoint {
+		return err // gone, or subscribed afresh meanwhile: the answer was about the old one
 	}
 	switch {
 	case errors.Is(err, errGone):

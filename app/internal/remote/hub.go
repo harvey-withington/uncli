@@ -97,8 +97,10 @@ func (h *Hub) cursorLocked(seq uint64) string { return h.epoch + ":" + strconv.F
 
 // Catchup is what a client gets on (re)connecting: the events it missed,
 // or Reload when it must fetch state afresh (a new client, an unknown
-// epoch, or missed events the hub no longer holds); and the cursor of
-// the latest event, which it resumes from if no event follows.
+// epoch, or missed events the hub no longer holds); and the cursor to
+// resume from if no event follows. That is the client's own cursor while
+// it still has missed events to read, so a connection that drops partway
+// through them resumes where it stopped; after a reload, the latest.
 type Catchup struct {
 	Missed []Event
 	Reload bool
@@ -122,6 +124,7 @@ func (h *Hub) Subscribe(device, cursor string) (*Subscription, Catchup) {
 		c.Reload = true
 	default:
 		c.Missed = append([]Event(nil), h.ring[after+1-h.ring[0].Seq:]...)
+		c.Cursor = h.cursorLocked(after)
 	}
 	return sub, c
 }

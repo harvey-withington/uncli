@@ -2,7 +2,7 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { linkTarget } from '../lib/links'
-  import { atServer, onlyAtServer } from '../lib/remoteonly'
+  import { atServer } from '../lib/remoteonly'
   import { showToast } from '../lib/toasts.svelte'
   import type { OutlineEntry } from '../lib/outline'
   import { toBlocks } from '../lib/render/markdown'
@@ -33,7 +33,7 @@
     if (target?.kind === 'web') void app.backend.openURL(target.url)
     else if (target?.kind === 'file' && session) {
       // Files open on the server's screen; a remote client says so.
-      if (!atServer(app.backend)) showToast(`${target.path}: ${onlyAtServer()}`, 'info')
+      if (!atServer(app.backend)) showToast(t('remote.onlyAtServerFor', { what: target.path }), 'info')
       else app.backend.openPath(session.id, target.path, target.line).catch(err => showToast(String(err), 'error'))
     }
   }

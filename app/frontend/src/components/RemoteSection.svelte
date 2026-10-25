@@ -30,11 +30,14 @@
     }
   })
 
+  // apply turns serving on or off. Turning on needs a valid port; turning
+  // off never waits on one, keeping the port it had.
   async function apply(on: boolean) {
-    if (!portNumber) return
+    const p = on ? portNumber : (portNumber ?? status?.port)
+    if (!p) return
     busy = true
     try {
-      app.remote = await app.backend.setRemoteAccess(on, portNumber)
+      app.remote = await app.backend.setRemoteAccess(on, p)
     } catch (e) {
       showToast(String(e), 'error')
     } finally {
@@ -48,7 +51,7 @@
   <p class="muted">{t('remote.body')}</p>
   <div class="row">
     <label class="check">
-      <input type="checkbox" checked={!!status?.enabled} disabled={!status || busy || !portNumber} onchange={e => apply(e.currentTarget.checked)} />
+      <input type="checkbox" checked={!!status?.enabled} disabled={!status || busy || (!portNumber && !status.enabled)} onchange={e => apply(e.currentTarget.checked)} />
       {t('remote.enable')}
     </label>
     <label class="port">

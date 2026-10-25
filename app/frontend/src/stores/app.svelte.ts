@@ -97,6 +97,8 @@ export class AppStore {
   preferHeadings = $state<Record<string, boolean>>({}) // page id → show its headings, not its summary
   private autoSummarised = new Set<string>() // tried once, so a failure isn't retried in a loop
   private off: (() => void) | null = null
+  private held: (() => void)[] | null = null // changes arriving during a resync
+  private resyncAgain = false
 
   // openLast: start on the session open last time (the window); the phone
   // starts on its session list instead.
@@ -133,8 +135,8 @@ export class AppStore {
   async init() {
     this.off = this.backend.subscribe({
       sessionEvent: m => this.onEvent(m),
-      sessionChanged: v => this.upsertSession(v),
-      pageChanged: p => this.upsertPage(p),
+      sessionChanged: v => this.later(() => this.upsertSession(v)),
+      pageChanged: p => this.later(() => this.upsertPage(p)),
       cliProgress: p => { this.progress = p },
       cliStatus: s => { this.cli = s },
       providerStatus: s => { if (s.provider) this.providerStatus[s.provider] = s },
@@ -168,12 +170,27 @@ export class AppStore {
     this.off?.()
   }
 
+  // later applies a session or page change now, or, while a resync is
+  // fetching state, after it: the snapshot would otherwise replace a
+  // change that arrived while it was on its way. Replayed in order, the
+  // newest wins either way.
+  private later(apply: () => void) {
+    if (this.held) this.held.push(apply)
+    else apply()
+  }
+
   // resync fetches state afresh: a remote client missed events its server
   // no longer holds (decision 0021). The sessions, the pages already
   // loaded and the pins come back as they are now; text that was streaming
-  // shows again from its page.
+  // shows again from its page. Changes arriving meanwhile are applied
+  // after the snapshot.
   async resync() {
     if (!this.ready) return
+    if (this.held) {
+      this.resyncAgain = true // asked again while fetching: fetch once more after
+      return
+    }
+    this.held = []
     try {
       const boot = await this.backend.bootstrap()
       this.boot = boot
@@ -192,6 +209,14 @@ export class AppStore {
       void this.refreshPins()
     } catch (e) {
       showToast(String(e), 'error')
+    } finally {
+      const held = this.held
+      this.held = null
+      held.forEach(apply => apply())
+      if (this.resyncAgain) {
+        this.resyncAgain = false
+        void this.resync()
+      }
     }
   }
 

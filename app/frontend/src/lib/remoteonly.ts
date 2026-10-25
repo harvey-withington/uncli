@@ -14,3 +14,9 @@ export function atServer(backend: Pick<Backend, 'kind'>): boolean {
 export function onlyAtServer(): string {
   return t('remote.onlyAtServer')
 }
+
+// serverTitle is the tooltip of a control that works only at the server:
+// its label there, and the label with the reason on a remote client.
+export function serverTitle(backend: Pick<Backend, 'kind'>, label: string): string {
+  return atServer(backend) ? label : t('remote.onlyAtServerFor', { what: label })
+}

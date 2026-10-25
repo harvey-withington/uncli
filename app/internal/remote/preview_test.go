@@ -47,6 +47,9 @@ func TestPWAServing(t *testing.T) {
 	if cc := get("/m/assets/app-1a2b.js").Header.Get("Cache-Control"); !strings.Contains(cc, "immutable") {
 		t.Errorf("asset caching = %q", cc)
 	}
+	if code := get("/m/assets/").StatusCode; code != http.StatusNotFound {
+		t.Errorf("folder listing = %d", code)
+	}
 	resp, err := (&http.Client{Transport: r.https.Transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Get(r.base() + "/")
 	if err != nil || resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "/m/" {
 		t.Errorf("root = %v, %v", resp, err)
