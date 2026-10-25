@@ -10,6 +10,7 @@
   },
   "//": [
     "The root scripts are the one command surface for every stack: VS Code tasks, CI and Claude all call npm run dev | build | check | test.",
+    "build:installer builds the app and its Windows installer (app/build/bin/uncli-amd64-installer.exe); it needs NSIS (makensis) on PATH.",
     "test:integration drives the real Claude CLI (it downloads the pinned version and uses your sign-in); it is not part of npm test.",
     "test:e2e drives the real app and CLI on Windows (wails dev + headless Edge); it is not part of npm test.",
     "publish-build builds the installer and copies it, stamped with the date and a build number, to the test server named by UNCLI_BUILD_HOST and UNCLI_BUILD_USER, keeping the last 6.",
@@ -20,6 +21,7 @@
     "website": "node scripts/serve-website.mjs",
     "dev": "cd app && wails dev",
     "build": "cd app && wails build -clean",
+    "build:installer": "cd app && wails build -clean -nsis",
     "check": "cd app && go vet ./... && npm --prefix frontend run check",
     "test": "cd app && go test ./... && npm --prefix frontend run test:run",
     "test:integration": "cd app && go test -tags integration -count=1 -timeout 20m ./internal/integration/",

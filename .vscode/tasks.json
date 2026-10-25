@@ -22,6 +22,15 @@
       "presentation": { "panel": "dedicated", "clear": true }
     },
     {
+      "label": "app: build installer",
+      "detail": "npm run build:installer: the app and its Windows installer, in app/build/bin",
+      "type": "shell",
+      "command": "npm run build:installer",
+      "group": "build",
+      "problemMatcher": ["$go", "$tsc"],
+      "presentation": { "panel": "dedicated", "clear": true }
+    },
+    {
       "label": "check",
       "detail": "npm run check: type checks and linters",
       "type": "shell",

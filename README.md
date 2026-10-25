@@ -158,6 +158,7 @@ Requirements: Node 24, Go 1.26 and the [Wails CLI](https://wails.io) v2.10.1.
 ```powershell
 npm run dev               # run the app with hot reload
 npm run build             # build it (app\build\bin\uncli.exe)
+npm run build:installer   # and its installer (app\build\bin\uncli-amd64-installer.exe; needs NSIS)
 npm run check             # go vet and svelte-check
 npm test                  # Go tests (parser over recorded CLI streams) and frontend tests
 npm run test:integration  # real CLI: downloads the pinned version, uses your sign-in
