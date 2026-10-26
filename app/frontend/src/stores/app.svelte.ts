@@ -15,6 +15,7 @@ import type { SearchRange } from '../lib/search'
 import { setNames, t } from '../lib/i18n.svelte'
 import { namesOf, providerOf, type ProviderNames } from '../lib/providers'
 import { showToast } from '../lib/toasts.svelte'
+import { confirm } from '../lib/confirm.svelte'
 import { applyThemeFile } from '../lib/hosttheme'
 import { settingsAttention } from '../lib/attention'
 
@@ -591,6 +592,23 @@ export class AppStore {
     this.index[r.session.id] = Math.max(0, (this.pages[r.session.id]?.length ?? 1) - 1)
     showToast(t(r.folderGone ? 'import.doneGone' : 'import.done', { n: r.pagesLoaded }), r.folderGone ? 'info' : 'success')
     return r
+  }
+
+  // restart stops a session's CLI and starts it again on its conversation
+  // (a frozen CLI, a container's changed mounts). An answer in progress
+  // would be cut short, so that asks first.
+  async restart(id: string) {
+    const s = this.sessions.find(x => x.id === id)
+    if (!s || s.archived) return
+    const names = this.namesFor(s.adapter)
+    if (s.busy && !(await confirm({ title: t('restart.title'), message: t('restart.busy', names), confirmLabel: t('restart.label'), danger: true }))) return
+    try {
+      delete this.live[id]
+      this.upsertSession(await this.backend.restart(id))
+      showToast(t('restart.done', names), 'success')
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
   }
 
   // archive archives a session (stopping its CLI) or restores it.

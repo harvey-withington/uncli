@@ -35,7 +35,7 @@ var rpcMethods = []string{
 	"Bootstrap", "CLIStatus", "ProviderStatus", "CLIChannels", "ProviderChannels",
 	"Containers", "Editors", "HasDecisionKey", "Usage", "UsageReport",
 	// Sessions.
-	"CreateSession", "Pages", "Send", "Interrupt", "Focus", "Rename", "Delete",
+	"CreateSession", "Pages", "Send", "Interrupt", "Restart", "Focus", "Rename", "Delete",
 	"Archive", "SetSortOrder", "SetModel", "ToggleModifier", "SetShares",
 	"SetMode", "SetUnattended", "Search", "SummarisePage",
 	"SetBookmark", "SetPinned", "Pinned", "Commands",

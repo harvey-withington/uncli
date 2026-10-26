@@ -39,7 +39,7 @@ export function serverKey(origin: string): string {
 
 // The methods whose first argument is a session id.
 export const SESSION_FIRST = [
-  'setShares', 'pages', 'send', 'interrupt', 'setModel', 'toggleModifier', 'rename', 'setSortOrder',
+  'setShares', 'pages', 'send', 'interrupt', 'restart', 'setModel', 'toggleModifier', 'rename', 'setSortOrder',
   'answerApproval', 'answerAsk', 'commands', 'mcpSignIn', 'mcpCallback', 'mcpReconnect', 'mcpSignOut', 'mcpCancel',
   'setUnattended', 'setMode', 'safeList', 'setSafeEntry', 'deleteSafeEntry', 'moveSafeEntry', 'setSafeLabel',
   'markSafe', 'teach', 'previewClasses', 'knownTools', 'explainCommand', 'sessionAllowlist', 'remove',
@@ -58,7 +58,7 @@ const RESULTS: Partial<Record<keyof Backend, (v: never, q: Q) => unknown>> = {
   createSession: (c: CreatedSession, q: Q) => ({ ...c, session: view(c.session, q) }),
   importTranscript: (c: ImportedSession, q: Q) => ({ ...c, session: view(c.session, q) }),
   transcripts: (ts: TranscriptEntry[], q: Q) => ts.map(t => (t.sessionId ? { ...t, sessionId: q(t.sessionId) } : t)),
-  setShares: view, toggleModifier: view, rename: view, setSortOrder: view, setUnattended: view, setMode: view, archive: view,
+  setShares: view, toggleModifier: view, rename: view, setSortOrder: view, setUnattended: view, setMode: view, archive: view, restart: view,
   pages: (ps: Page[], q: Q) => ps.map(p => page(p, q)),
   setBookmark: page, setPinned: page, summarisePage: page,
   pinned: (ps: PinnedPage[], q: Q) => ps.map(p => ({ ...p, sessionId: q(p.sessionId) })),

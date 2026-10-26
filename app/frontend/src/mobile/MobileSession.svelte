@@ -77,6 +77,12 @@
             </button>
           {/snippet}
         </Toolbar>
+        {#if !session.archived}
+          <p class="restart">
+            <button class="btn ghost small away" onclick={() => app.restart(session.id)}><Icon name="rotate-ccw" size={15} />{t('restart.label')}</button>
+            <span>{t('restart.hintShort', names)}</span>
+          </p>
+        {/if}
       </div>
     {/if}
     <!-- With the question compact, only an error (as the desktop's compact header). -->
@@ -187,6 +193,17 @@
     background: var(--warning-soft);
     color: var(--warning);
   }
+  .restart {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+  .restart .btn {
+    flex: none;
+  }
   .notes {
     display: flex;
     flex-direction: column;
@@ -229,14 +246,15 @@
     background: linear-gradient(to bottom, transparent, var(--bg) 85%);
     pointer-events: none;
   }
+  /* The left padding is the desktop's: the outline's markers sit in it. */
   .scroll :global(.page) {
-    padding: 0 var(--space-4) var(--space-7);
+    padding: 0 var(--space-4) var(--space-7) var(--space-6);
   }
   /* The question bar carries the header's panel down, solid and edge to edge. */
   .scroll :global(.page .question) {
-    margin-left: calc(-1 * var(--space-4));
+    margin-left: calc(-1 * var(--space-6));
     margin-right: calc(-1 * var(--space-4));
-    padding-left: var(--space-4);
+    padding-left: var(--space-6);
     padding-right: var(--space-4);
     background: var(--surface);
     backdrop-filter: none;

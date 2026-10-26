@@ -799,6 +799,7 @@ export interface Backend {
   pages(sessionId: string): Promise<Page[]>
   send(sessionId: string, text: string, attachments?: AttachmentRef[]): Promise<void>
   interrupt(sessionId: string): Promise<void>
+  restart(sessionId: string): Promise<SessionView> // stops its CLI and starts it again on the conversation
   setModel(sessionId: string, model: string): Promise<void>
   toggleModifier(sessionId: string, modifierId: string, on: boolean): Promise<SessionView>
   rename(sessionId: string, title: string): Promise<SessionView>

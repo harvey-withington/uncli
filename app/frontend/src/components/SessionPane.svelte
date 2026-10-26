@@ -111,6 +111,16 @@
       {/if}
       <span class="gap"></span>
       <McpServers {session} />
+      {#if !session.archived}
+        <button
+          class="btn ghost small icon"
+          onclick={() => app.restart(session.id)}
+          aria-label={t('restart.label')}
+          title={t('restart.hint', names)}
+        >
+          <Icon name="rotate-ccw" />
+        </button>
+      {/if}
       <button
         class="btn ghost small icon"
         onclick={() => app.openSettings('safe')}

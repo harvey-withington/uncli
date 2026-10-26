@@ -71,6 +71,7 @@ export function wailsBackend(): Backend {
     pages: id => call('Pages', id),
     send: (id, text, attachments = []) => call('Send', id, text, attachments),
     interrupt: id => call('Interrupt', id),
+    restart: id => call('Restart', id),
     setModel: (id, m) => call('SetModel', id, m),
     toggleModifier: (id, mod, on) => call('ToggleModifier', id, mod, on),
     rename: (id, t) => call('Rename', id, t),

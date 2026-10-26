@@ -86,6 +86,7 @@ export function commands(app: AppStore): Command[] {
 
   add({ id: session.archived ? 'restore' : 'archive', group: 'session', label: t(session.archived ? 'cmd.restore' : 'cmd.archive'), run: () => run(app.archive(session.id, !session.archived)) })
   if (session.busy) add({ id: 'stop', group: 'session', label: t('cmd.stop'), run: () => run(app.backend.interrupt(session.id)) })
+  if (!session.archived) add({ id: 'restart', group: 'session', label: t('cmd.restart', app.namesFor(session.adapter)), run: () => run(app.restart(session.id)) })
 
   // Pages.
   if (pages.length) {

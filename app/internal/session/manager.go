@@ -352,6 +352,15 @@ func (m *Manager) Interrupt(id string) error {
 	return s.Interrupt()
 }
 
+// Restart stops a session's CLI and starts it again on its conversation.
+func (m *Manager) Restart(ctx context.Context, id string) (View, error) {
+	s, err := m.get(id)
+	if err != nil {
+		return View{}, err
+	}
+	return s.Restart(ctx)
+}
+
 func (m *Manager) SetModel(id, model string) error {
 	s, err := m.get(id)
 	if err != nil {

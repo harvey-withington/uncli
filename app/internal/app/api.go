@@ -102,6 +102,12 @@ func (a *API) Send(sessionID, text string, attachments []AttachmentRef) error {
 
 func (a *API) Interrupt(sessionID string) error { return a.svc.Sessions.Interrupt(sessionID) }
 
+// Restart stops a session's CLI and starts it again on its conversation:
+// for a frozen CLI, or to pick up a container's changed mounts.
+func (a *API) Restart(sessionID string) (session.View, error) {
+	return a.svc.Sessions.Restart(context.Background(), sessionID)
+}
+
 // AnswerApproval gives the user's decision on a waiting tool use: allow
 // (once), safe (and remember it as safe, in scope "project" or "all") or deny.
 func (a *API) AnswerApproval(sessionID, requestID, decision, scope string) error {

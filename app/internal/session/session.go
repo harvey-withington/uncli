@@ -460,6 +460,36 @@ func (s *Session) Interrupt() error {
 	return nil
 }
 
+// Restart stops the session's CLI and starts it again on the same
+// conversation: for a CLI that froze, or to pick up what's only read at
+// start (a container's mounts). A turn in progress ends as interrupted and
+// a tool use waiting for approval is denied. The CLI is asked to end as
+// Interrupt and StopIn do (a container's gets a grace period before it's
+// killed). An archived session can't be restarted.
+func (s *Session) Restart(ctx context.Context) (View, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.rec.Archived {
+		return View{}, errors.New("this session is archived; restore it first")
+	}
+	if s.page != nil {
+		s.denyPendingLocked("The user restarted the session.")
+		s.closePage("interrupted", "")
+	}
+	s.stopLocked()
+	s.err = ""
+	spec, err := s.launchSpecLocked()
+	if err == nil {
+		err = s.spawn(ctx, spec)
+	}
+	if err != nil {
+		s.state = Exited
+		s.changed()
+		return s.viewLocked(), err
+	}
+	return s.viewLocked(), nil
+}
+
 // SetModel switches model live when the adapter can, otherwise on the
 // next spawn. Mid-turn switches wait for the turn to end.
 func (s *Session) SetModel(model string) error {

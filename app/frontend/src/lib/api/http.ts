@@ -141,6 +141,7 @@ export function httpBackend(opts: HttpOptions): Backend {
     pages: s => call('Pages', s),
     send: (s, text, attachments = []) => call('Send', s, text, attachments),
     interrupt: s => call('Interrupt', s),
+    restart: s => call('Restart', s),
     setModel: (s, m) => call('SetModel', s, m),
     toggleModifier: (s, mod, on) => call('ToggleModifier', s, mod, on),
     rename: (s, title) => call('Rename', s, title),

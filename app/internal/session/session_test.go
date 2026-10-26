@@ -355,6 +355,39 @@ func TestInterruptSendsControlAndFallsBackToKill(t *testing.T) {
 	}
 }
 
+// Restart ends a frozen turn and starts a new CLI at once; an archived
+// session isn't restarted.
+func TestRestart(t *testing.T) {
+	h := newHarness(t, "single-turn")
+	h.rt.turns = nil // the CLI never answers
+	v, _ := h.m.Create("chat", "", "haiku")
+	if err := h.m.Send(context.Background(), v.ID, "hello"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := h.m.Restart(context.Background(), v.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Running || len(h.rt.starts) != 2 {
+		t.Errorf("running = %v, starts = %d", got.Running, len(h.rt.starts))
+	}
+	pages, _ := h.m.Pages(v.ID)
+	if len(pages) != 1 || pages[0].Status != "interrupted" {
+		t.Errorf("pages = %+v", pages)
+	}
+	select {
+	case <-h.rt.procs[0].done:
+	default:
+		t.Error("the frozen CLI is still running")
+	}
+	if _, err := h.m.Archive(v.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.m.Restart(context.Background(), v.ID); err == nil || len(h.rt.starts) != 2 {
+		t.Errorf("archived: err = %v, starts = %d", err, len(h.rt.starts))
+	}
+}
+
 func TestErrorTurn(t *testing.T) {
 	h := newHarness(t, "error-not-logged-in")
 	v, _ := h.m.Create("chat", "", "haiku")

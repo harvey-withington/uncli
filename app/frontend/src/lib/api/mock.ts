@@ -658,6 +658,22 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       s.busy = false
       setState(s, 'idle')
     },
+    async restart(id) {
+      const s = find(id)
+      if (s.archived) throw new Error('this session is archived; restore it first')
+      timers.get(id)?.forEach(t => clearTimeout(t))
+      const p = pages[id]?.at(-1)
+      if (p && p.status === 'open') {
+        p.status = 'interrupted'
+        h?.pageChanged({ ...p })
+      }
+      s.busy = false
+      setState(s, 'idle')
+      s.running = true
+      s.error = ''
+      changed(s)
+      return { ...s }
+    },
     async setModel(id, m) { const s = find(id); s.model = m; changed(s) },
     async toggleModifier(id, mod, on) {
       const s = find(id)
