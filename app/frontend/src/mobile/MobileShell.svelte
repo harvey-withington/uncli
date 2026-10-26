@@ -2,6 +2,7 @@
   import { onDestroy, onMount, untrack } from 'svelte'
   import ConfirmDialog from '../components/ConfirmDialog.svelte'
   import Icon from '../components/Icon.svelte'
+  import ImportDialog from '../components/ImportDialog.svelte'
   import NewSessionDialog from '../components/NewSessionDialog.svelte'
   import Toasts from '../components/Toasts.svelte'
   import type { Backend } from '../lib/api'
@@ -112,6 +113,7 @@
   {/if}
 </div>
 {#if app.newSessionOpen}{#key app.newSessionSeq}<NewSessionDialog />{/key}{/if}
+{#if app.importOpen}<ImportDialog />{/if}
 {#if settingsOpen}
   <MobileSettings {server} {deviceName} version={version?.app ?? ''} {onforget} onclose={() => (settingsOpen = false)}>
     {#snippet notifications()}<PushSection />{/snippet}

@@ -5,8 +5,10 @@ import { mockBackend } from '../lib/api/mock'
 
 async function app() {
   localStorage.clear()
-  render(App, { props: { backend: mockBackend() } })
+  const backend = mockBackend()
+  render(App, { props: { backend } })
   await screen.findByRole('list', { name: 'Pinned' })
+  return backend
 }
 
 describe('Pins', () => {
@@ -35,6 +37,19 @@ describe('Pins', () => {
     await app()
     await fireEvent.click(screen.getByRole('button', { name: /^Unpin “Compare these three/ }))
     await waitFor(() => expect(within(screen.getByRole('list', { name: 'Pinned' })).getAllByRole('listitem')).toHaveLength(1))
+  })
+
+  it('follows pins and renames made from another client', async () => {
+    const backend = await app()
+    const pinned = () => within(screen.getByRole('list', { name: 'Pinned' })).getAllByRole('listitem')
+    const pin = (await backend.pinned())[0]!
+    // Not through the store: as a phone would, only the events reach it.
+    await backend.setPinned(pin.sessionId, pin.pageId, false)
+    await waitFor(() => expect(pinned()).toHaveLength(1))
+    await backend.setPinned(pin.sessionId, pin.pageId, true)
+    await waitFor(() => expect(pinned()).toHaveLength(2))
+    await backend.rename(pin.sessionId, 'Renamed on the phone')
+    await waitFor(() => expect(pinned()[0]?.querySelector('.where')?.textContent).toContain('Renamed on the phone'))
   })
 })
 

@@ -68,6 +68,15 @@ describe('the phone app', () => {
     await waitFor(() => expect(screen.getByRole('list', { name: 'Sessions' })).toBeInTheDocument())
   })
 
+  it('leaves the prompt level line out while the question is compact', async () => {
+    render(MobileApp, { props: { backend: phoneBackend() } })
+    const list = await screen.findByRole('list', { name: 'Sessions' })
+    await fireEvent.click(within(list).getAllByRole('button', { name: /Fix the flaky parser test/ })[0]!)
+    expect(await screen.findByText(/prompts you before anything unsafe/)).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Compact question: one line' }))
+    await waitFor(() => expect(screen.queryByText(/prompts you before anything unsafe/)).not.toBeInTheDocument())
+  })
+
   it('opens the session a notification links to', async () => {
     const b = phoneBackend()
     const id = (await b.bootstrap()).sessions[1]!.id
@@ -98,6 +107,17 @@ describe('the phone app', () => {
     await screen.findByRole('list', { name: 'Sessions' })
     h!.connection?.({ state: 'offline', lastOnline: Date.now() - 5 * 60_000, error: 'Failed to fetch' })
     await waitFor(() => expect(document.querySelector('.banner')?.textContent).toMatch(/Can’t reach .*\(Failed to fetch\).*Last connected 5 min ago\..*Trying again/s))
+  })
+
+  it('imports a saved conversation from New session and opens it', async () => {
+    render(MobileApp, { props: { backend: phoneBackend() } })
+    await fireEvent.click(await screen.findByRole('button', { name: 'New session' }))
+    await fireEvent.click(await screen.findByRole('button', { name: /Continue a conversation from the terminal/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Import a conversation' })
+    const row = (await within(dialog).findByText(/invoices round to the wrong cent/)).closest('li') as HTMLElement
+    await fireEvent.click(within(row).getByRole('button', { name: /Import/ }))
+    expect(await screen.findByRole('heading', { name: /invoices round to the wrong cent/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
   })
 
   it('picks a session folder by browsing the server', async () => {

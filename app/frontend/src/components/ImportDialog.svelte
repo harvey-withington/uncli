@@ -207,4 +207,17 @@
   .err {
     color: var(--danger);
   }
+  /* A phone: the type and Import go under the question, which keeps the width. */
+  @media (max-width: 600px) {
+    .tools,
+    li {
+      flex-wrap: wrap;
+    }
+    .text {
+      flex-basis: calc(100% - 26px - var(--space-3));
+    }
+    li > :nth-child(3) {
+      margin-left: calc(26px + var(--space-3));
+    }
+  }
 </style>

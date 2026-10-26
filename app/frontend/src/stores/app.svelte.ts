@@ -135,8 +135,8 @@ export class AppStore {
   async init() {
     this.off = this.backend.subscribe({
       sessionEvent: m => this.onEvent(m),
-      sessionChanged: v => this.later(() => this.upsertSession(v)),
-      pageChanged: p => this.later(() => this.upsertPage(p)),
+      sessionChanged: v => this.later(() => { this.pinsFollowSession(v); this.upsertSession(v) }),
+      pageChanged: p => this.later(() => { this.pinsFollowPage(p); this.upsertPage(p) }),
       cliProgress: p => { this.progress = p },
       cliStatus: s => { this.cli = s },
       providerStatus: s => { if (s.provider) this.providerStatus[s.provider] = s },
@@ -558,6 +558,18 @@ export class AppStore {
     } catch (e) {
       showToast(String(e), 'error')
     }
+  }
+
+  // pinsFollowPage and pinsFollowSession keep the Pinned group current when
+  // a page is pinned, or a pinned page's session renamed or archived, from
+  // another client (a phone, decision 0021) or another part of the app.
+  private pinsFollowPage(p: Page) {
+    if (p.pinned !== this.pins.some(x => x.pageId === p.id)) void this.refreshPins()
+  }
+
+  private pinsFollowSession(v: SessionView) {
+    const pin = this.pins.find(x => x.sessionId === v.id)
+    if (pin && (pin.sessionTitle !== v.title || pin.archived !== v.archived)) void this.refreshPins()
   }
 
   // openPin shows a pinned page in its session.

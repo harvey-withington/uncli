@@ -55,39 +55,47 @@
 </script>
 
 <section class="session">
-  <header class="bar">
-    <button class="btn ghost icon touch" onclick={onback} aria-label={t('mobile.back')} title={t('mobile.back')}><Icon name="arrow-left" /></button>
-    <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
-    <div class="title">
-      <h1>{session.title || t('session.untitled')}</h1>
-      <ActivityBadge state={session.state} />
-    </div>
-    <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="settings" /></button>
-    <button class="btn ghost icon touch" onclick={() => app.togglePanel()} aria-pressed={app.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name="table-of-contents" /></button>
-  </header>
-  {#if options}
-    <div class="options">
-      <Toolbar {session}>
-        {#snippet end()}
-          <ModeSwitch {session} />
-          <button class="btn ghost small away" class:on={session.unattended} onclick={toggleUnattended} aria-pressed={!!session.unattended} title={t('unattended.hint', names)}>
-            <Icon name="coffee" size={15} />{t('unattended.label')}
-          </button>
-        {/snippet}
-      </Toolbar>
-    </div>
-  {/if}
-  <div class="notes">
-    <SessionStatus {session} />
-    {#if failed}<p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>{/if}
+  <!-- One panel down to the page's question bar, which sits flush under it. -->
+  <div class="head">
+    <header class="bar">
+      <button class="btn ghost icon touch" onclick={onback} aria-label={t('mobile.back')} title={t('mobile.back')}><Icon name="arrow-left" /></button>
+      <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
+      <div class="title">
+        <h1>{session.title || t('session.untitled')}</h1>
+        <ActivityBadge state={session.state} />
+      </div>
+      <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="settings" /></button>
+      <button class="btn ghost icon touch" onclick={() => app.togglePanel()} aria-pressed={app.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name="table-of-contents" /></button>
+    </header>
+    {#if options}
+      <div class="options">
+        <Toolbar {session}>
+          {#snippet end()}
+            <ModeSwitch {session} />
+            <button class="btn ghost small away" class:on={session.unattended} onclick={toggleUnattended} aria-pressed={!!session.unattended} title={t('unattended.hint', names)}>
+              <Icon name="coffee" size={15} />{t('unattended.label')}
+            </button>
+          {/snippet}
+        </Toolbar>
+      </div>
+    {/if}
+    <!-- With the question compact, only an error (as the desktop's compact header). -->
+    {#if !app.questionCompact || failed}
+      <div class="notes">
+        {#if !app.questionCompact}<SessionStatus {session} />{/if}
+        {#if failed}<p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>{/if}
+      </div>
+    {/if}
   </div>
 
   <div class="scroll" bind:this={scroller}>
-    {#if page}
-      <PageView {page} />
-    {:else}
-      <p class="empty">{t(`profile.${session.profileId}.desc`)}</p>
-    {/if}
+    <div class="content">
+      {#if page}
+        <PageView {page} />
+      {:else}
+        <p class="empty">{t(`profile.${session.profileId}.desc`)}</p>
+      {/if}
+    </div>
   </div>
 
   {#if cards.length || checking}
@@ -127,13 +135,14 @@
     min-height: 0;
     background: var(--bg);
   }
+  .head {
+    background: var(--surface);
+  }
   .bar {
     display: flex;
     align-items: center;
     gap: var(--space-1);
     padding: var(--space-1) var(--space-1);
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
   }
   .touch {
     width: 44px;
@@ -168,8 +177,7 @@
   }
   .options {
     padding: var(--space-2) var(--space-3);
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
   }
   .away {
     gap: 6px;
@@ -180,7 +188,10 @@
     color: var(--warning);
   }
   .notes {
-    padding: 0 var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 var(--space-3) var(--space-2);
   }
   .notes:empty {
     display: none;
@@ -192,12 +203,43 @@
     font-size: var(--text-sm);
     color: var(--danger);
   }
+  /* No padding: the question bar sticks at the very top, under the header,
+     with nothing showing above or beside it. */
   .scroll {
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: var(--space-3) var(--space-3) var(--space-5);
     overscroll-behavior: contain;
+  }
+  /* At least the scroller's height, so the fade sits at the bottom of the
+     panel, never over the end of short content (as on the desktop). */
+  .content {
+    display: flow-root;
+    min-height: 100%;
+  }
+  .scroll::after {
+    content: "";
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: block;
+    height: 48px;
+    margin-top: -48px;
+    background: linear-gradient(to bottom, transparent, var(--bg) 85%);
+    pointer-events: none;
+  }
+  .scroll :global(.page) {
+    padding: 0 var(--space-4) var(--space-7);
+  }
+  /* The question bar carries the header's panel down, solid and edge to edge. */
+  .scroll :global(.page .question) {
+    margin-left: calc(-1 * var(--space-4));
+    margin-right: calc(-1 * var(--space-4));
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+    background: var(--surface);
+    backdrop-filter: none;
   }
   .empty {
     margin: 20vh var(--space-4) 0;
