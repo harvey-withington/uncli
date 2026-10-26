@@ -81,11 +81,32 @@ FunctionEnd
 
 # UNCLI keeps running in the tray when its window closes, so a running copy
 # is asked to quit (as its tray menu's Quit does) before its files are
-# replaced or removed.
-!macro uncli.quitRunning
-    IfFileExists "$INSTDIR\${PRODUCT_EXECUTABLE}" 0 +3
-        ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --quit'
-        Sleep 2000
+# replaced or removed. EXE is the copy that asks: the installer brings its
+# own, since a copy installed before --quit (0.3.0) opens instead of
+# quitting. A copy that doesn't quit (an older one only brings its window
+# up) is waited for, then the user is asked to close it.
+!macro uncli.quitRunning EXE
+    ${If} ${FileExists} "$INSTDIR\${PRODUCT_EXECUTABLE}"
+        ExecWait '"${EXE}" --quit'
+        StrCpy $R9 0
+        ${Do}
+            # A running exe can't be opened for writing.
+            ClearErrors
+            FileOpen $R8 "$INSTDIR\${PRODUCT_EXECUTABLE}" a
+            ${IfNot} ${Errors}
+                FileClose $R8
+                ${Break}
+            ${EndIf}
+            IntOp $R9 $R9 + 1
+            ${If} $R9 > 20
+                MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "UNCLI is still running. Quit it (Quit UNCLI on its tray menu, or close its window), then click Retry." /SD IDCANCEL IDRETRY +2
+                Abort
+                StrCpy $R9 0
+            ${Else}
+                Sleep 500
+            ${EndIf}
+        ${Loop}
+    ${EndIf}
 !macroend
 
 Section
@@ -93,9 +114,12 @@ Section
 
     !insertmacro wails.webview2runtime
 
-    SetOutPath $INSTDIR
+    InitPluginsDir
+    SetOutPath $PLUGINSDIR
+    !insertmacro wails.files
+    !insertmacro uncli.quitRunning "$PLUGINSDIR\${PRODUCT_EXECUTABLE}"
 
-    !insertmacro uncli.quitRunning
+    SetOutPath $INSTDIR
 
     !insertmacro wails.files
 
@@ -111,7 +135,8 @@ SectionEnd
 Section "uninstall"
     !insertmacro wails.setShellContext
 
-    !insertmacro uncli.quitRunning
+    # The installed copy came with this uninstaller, so it knows --quit.
+    !insertmacro uncli.quitRunning "$INSTDIR\${PRODUCT_EXECUTABLE}"
     # Start with Windows (Settings, General) leaves an entry in the user's Run key.
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "UNCLI"
 
