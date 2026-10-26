@@ -4,11 +4,13 @@ import { serverKey, withServer } from '../lib/api/identity'
 import { mockBackend } from '../lib/api/mock'
 import { applyTheme } from '../lib/theme.svelte'
 import MobileApp from './MobileApp.svelte'
+import { followViewport } from './viewport'
 
 applyTheme()
 
 const target = document.getElementById('app')
 if (!target) throw new Error('#app missing')
+followViewport(target)
 
 // ?mock runs the phone app on the browser mock (screenshots, vite dev).
 const mock = new URLSearchParams(location.search).has('mock')
