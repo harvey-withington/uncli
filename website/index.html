@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>UNCLI — AI CLIs if you're not a CLI guy.</title>
   <meta name="description"
-    content="UNCLI is a desktop app for AI coding CLIs like Claude Code: sessions side by side, every answer a page you can read, and approvals in plain words. Free, open source, for Windows." />
+    content="UNCLI is a desktop app for AI coding CLIs like Claude Code: sessions side by side, every answer a page you can read, and approvals in plain words, on your phone too. Free, open source, for Windows." />
   <meta name="theme-color" content="#0b0806" />
 
   <link rel="canonical" href="https://uncli.app/" />
@@ -96,6 +96,10 @@
         <rect x="3.5" y="4" width="17" height="16" rx="2" />
         <path d="m10 16 4-8" />
       </symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24">
+        <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+        <path d="M10.5 18.5h3" />
+      </symbol>
       <symbol id="i-arrow" viewBox="0 0 24 24">
         <path d="M4 12h16m-6-6 6 6-6 6" />
       </symbol>
@@ -124,6 +128,7 @@
       <a href="#features">What it does</a>
       <a href="#approvals">Approvals</a>
       <a href="#providers">Providers</a>
+      <a href="#phone">On your phone</a>
       <a href="#closer-look">A closer look</a>
       <a class="nav-cta" href="https://github.com/harvey-withington/uncli"><svg class="gh-ico" aria-hidden="true">
           <use href="#i-github" />
@@ -142,7 +147,7 @@
         <p class="lede">
           The best AI coding agents live in a terminal, which is lovely if you love terminals. UNCLI puts Claude
           Code and friends in a proper window: sessions side by side, every answer a page you can actually read,
-          and approvals in plain words.</p>
+          and approvals in plain words. Step away from the desk and they follow you to your phone.</p>
         <p class="lede">
           It drives each provider's official CLI with your own subscription, and it never switches the
           approvals off to look clever.</p>
@@ -386,6 +391,39 @@
       </div>
     </section>
 
+    <!-- ───────────────── Phone spotlight ───────────────── -->
+    <section id="phone" class="section spotlight">
+      <div class="spotlight-grid flip">
+        <div class="spotlight-copy reveal">
+          <span class="eyebrow">On your phone</span>
+          <h2>Leave the desk, <span class="grad">keep the session.</span></h2>
+          <p>An agent that stops for approval while you're making a coffee just sits there. Switch on Remote access and
+            your sessions follow you to your phone, served by the PC they run on.</p>
+          <ul class="ticks">
+            <li><strong>Carry on from anywhere.</strong> Approve, answer the agent's questions, send the next message
+              or start a new session. A notification says when one needs you, even with the app closed.</li>
+            <li><strong>Over Tailscale, and only Tailscale.</strong> Never your local network, never the internet at
+              large, with HTTPS from your PC's own certificate.</li>
+            <li><strong>Pair, then allow.</strong> Scan a code, then allow the phone on the PC. Revoke it and it's out
+              at once.</li>
+            <li><strong>It keeps running.</strong> Closing the window leaves UNCLI in the tray, so sessions carry on,
+              and it can start with Windows.</li>
+            <li><strong>Setup stays at the desk.</strong> Containers, providers and anything that installs are for
+              the PC, not the phone.</li>
+          </ul>
+        </div>
+        <div class="spotlight-art reveal">
+          <figure class="phone">
+            <img src="images/shot-phone.png"
+              alt="UNCLI on a phone: a Code session that needs approval, with the card for git push origin main and Allow once, This is safe and Deny."
+              width="780" height="1688" loading="lazy" decoding="async" />
+          </figure>
+        </div>
+      </div>
+      <p class="platform-note reveal">Needs Tailscale on the PC and the phone (free for personal use). Tested on
+        Android; iPhone not yet.</p>
+    </section>
+
     <!-- ───────────────── Gallery ───────────────── -->
     <section id="closer-look" class="section">
       <div class="section-head reveal">
@@ -444,7 +482,7 @@
         <article class="card reveal">
           <h3>Windows only, for now</h3>
           <p>Containers lean on WSL, and the rest has only been tested on Windows 10 and 11. Mac and Linux would be
-            nice. Would.</p>
+            nice. Would. (The phone app is the exception: Android works, iPhone is untested.)</p>
         </article>
         <article class="card reveal">
           <h3>Not an IDE</h3>
