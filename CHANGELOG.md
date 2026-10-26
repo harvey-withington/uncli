@@ -42,6 +42,19 @@ Tailscale only.
   installer and uninstaller use it, so neither has to wait for you to
   close the app.
 
+### Sessions
+
+- **Restart** stops a session's CLI and starts it again on the same
+  conversation: for a CLI that's stuck, or to pick up a container's
+  changed folders. It's in the session header and the command palette,
+  and in Options on the phone, and asks first if an answer is in progress.
+
+### Known issues
+
+- The phone app has been tested on Android. It hasn't been tested on an
+  iPhone yet, where the keyboard may still push the session's header off
+  the screen.
+
 ## 0.2.0-alpha
 
 Signing in to MCP servers without leaving UNCLI, a live view of any file in

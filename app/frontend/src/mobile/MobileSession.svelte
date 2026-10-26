@@ -185,6 +185,12 @@
     padding: var(--space-2) var(--space-3);
     border-top: 1px solid var(--border);
   }
+  /* On a phone the prompt level and Unattended start their line, like
+     everything else in Options, rather than sitting at the right end of it. */
+  .options :global(.end) {
+    margin-left: 0;
+    padding-left: 0;
+  }
   .away {
     gap: 6px;
     color: var(--text-muted);

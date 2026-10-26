@@ -611,9 +611,9 @@ func TestSessionModes(t *testing.T) {
 			"Call all three even if one is refused. Then reply with one word per tool: OK or REFUSED.", turn)
 	}
 
-	// run sends q in a mode and answers cards (touch allowed, delete denied);
+	// once sends q in a mode and answers cards (touch allowed, delete denied);
 	// it returns the tools that came to the user, and the page.
-	run := func(mode string) ([]string, store.Page) {
+	once := func(mode string) ([]string, store.Page) {
 		t.Helper()
 		if _, err := svc.Sessions.SetMode(v.ID, mode); err != nil {
 			t.Fatal(err)
@@ -641,6 +641,26 @@ func TestSessionModes(t *testing.T) {
 		}
 		t.Fatalf("%s turn never finished", mode)
 		return nil, store.Page{}
+	}
+	// run is once, asked again (up to three times in all) when the model
+	// skipped one of the tools: Haiku sometimes stops early, and this test
+	// is about what UNCLI does with each call, not whether the model makes it.
+	run := func(mode string) ([]string, store.Page) {
+		t.Helper()
+		var asked []string
+		var p store.Page
+		for try := 0; try < 3; try++ {
+			asked, p = once(mode)
+			called := map[string]bool{}
+			for _, it := range p.Trace {
+				called[strings.TrimPrefix(it.Name, "mcp__notes__")] = true
+			}
+			if called["read_note"] && called["touch_note"] && called["delete_note"] {
+				break
+			}
+			t.Logf("%s: the model skipped a tool (trace %+v); asking again", mode, p.Trace)
+		}
+		return asked, p
 	}
 	ran := func(p store.Page) map[string]string {
 		out := map[string]string{}
