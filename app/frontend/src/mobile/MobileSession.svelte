@@ -191,6 +191,10 @@
     margin-left: 0;
     padding-left: 0;
   }
+  /* The toolbar wraps here, so a divider between groups would end a line. */
+  .options :global(.sep) {
+    display: none;
+  }
   .away {
     gap: 6px;
     color: var(--text-muted);
