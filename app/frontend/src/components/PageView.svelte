@@ -106,7 +106,7 @@
         <p class="banner err" role="alert"><Icon name="triangle-alert" size={14} />{page.error || t('page.failed')}</p>
       {/if}
 
-      <FilesStrip files={page.touchedFiles} sessionId={page.sessionId} />
+      <FilesStrip files={page.touchedFiles} sessionId={page.sessionId} move={page.headMove} />
       <TraceStrip items={page.trace} sessionId={page.sessionId} />
     </div>
   </article>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Editor } from './api'
-import { canOpenDefault, editorLabel, relPath, splitPath } from './files'
+import { canOpenDefault, editorLabel, moveLabel, relPath, splitByMove, splitPath } from './files'
 
 describe('relPath', () => {
   it('shows files inside the session folder relative to it', () => {
@@ -44,5 +44,29 @@ describe('canOpenDefault', () => {
     expect(canOpenDefault('setup.exe')).toBe(false)
     expect(canOpenDefault('run.cmd')).toBe(false)
     expect(canOpenDefault('.bashrc')).toBe(false)
+  })
+})
+
+describe('a HEAD move', () => {
+  const files = [
+    { path: '/r/a.go', how: 'edit' as const, line: 3 },
+    { path: '/r/b.go', how: 'command' as const },
+    { path: '/r/c.go', how: 'deleted' as const },
+  ]
+  const head = (branch: string | undefined, commit: string) => ({ branch, commit })
+
+  it('folds what commands changed, keeping the tools’ own edits listed', () => {
+    expect(splitByMove(files, undefined)).toEqual({ own: files, moved: [] })
+    const { own, moved } = splitByMove(files, { from: head('main', 'a'.repeat(40)), to: head('x', 'b'.repeat(40)) })
+    expect(own.map(f => f.path)).toEqual(['/r/a.go'])
+    expect(moved.map(f => f.path)).toEqual(['/r/b.go', '/r/c.go'])
+  })
+
+  it('says where HEAD went', () => {
+    const a = '1a2b3c4d5e', b = '5d6e7f8a9b'
+    expect(moveLabel({ from: head('main', a), to: head('server-mode', b) }, 312)).toBe('Switched from main to server-mode: 312 files differ')
+    expect(moveLabel({ from: head('main', a), to: head('main', b) }, 1)).toBe('main moved from 1a2b3c4 to 5d6e7f8: 1 file differs')
+    expect(moveLabel({ from: head(undefined, a), to: head('main', b) }, 2)).toBe('Switched to main: 2 files differ')
+    expect(moveLabel({ from: head('main', a), to: head(undefined, b) }, 2)).toBe('Checked out 5d6e7f8: 2 files differ')
   })
 })

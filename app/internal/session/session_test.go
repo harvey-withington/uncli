@@ -294,6 +294,27 @@ func TestUnreadWhenNotFocused(t *testing.T) {
 	}
 }
 
+// A turn that ends while a paired device shows the session stays read,
+// without the window's focus (its notifications follow the window only).
+func TestReadWhileADeviceShowsIt(t *testing.T) {
+	h := newHarness(t, "multi-turn-partial")
+	v, _ := h.m.Create("chat", "", "")
+	h.m.Showing("phone", v.ID)
+	h.send(v.ID, "Remember 42")
+	s, _ := h.m.get(v.ID)
+	if st := s.View().State; st != Idle {
+		t.Errorf("state = %s, want idle while the phone shows it", st)
+	}
+	if h.m.Focused(v.ID) {
+		t.Error("a device showing a session took the window's focus")
+	}
+	h.m.Showing("phone", "")
+	h.send(v.ID, "What was it?")
+	if st := s.View().State; st != Unread {
+		t.Errorf("state = %s, want unread once the phone left it", st)
+	}
+}
+
 func TestRestartResumes(t *testing.T) {
 	dir := t.TempDir()
 	h := openHarness(t, dir, "multi-turn-partial")

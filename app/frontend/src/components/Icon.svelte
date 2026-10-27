@@ -9,6 +9,7 @@
   import ChevronDown from 'lucide-svelte/icons/chevron-down'
   import ChevronLeft from 'lucide-svelte/icons/chevron-left'
   import ChevronRight from 'lucide-svelte/icons/chevron-right'
+  import GitBranch from 'lucide-svelte/icons/git-branch'
   import ChevronUp from 'lucide-svelte/icons/chevron-up'
   import ChevronsLeft from 'lucide-svelte/icons/chevrons-left'
   import ChevronsRight from 'lucide-svelte/icons/chevrons-right'
@@ -103,7 +104,7 @@
     sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
     eye: Eye, 'globe-lock': GlobeLock, hand: Hand, zap: Zap,
-    bell: Bell, 'file-pen': FilePen, 'file-plus': FilePlus, terminal: Terminal, 'external-link': ExternalLink, 'folder-search': FolderSearch, layers: Layers, 'file-x': FileX, 'file-code': FileCode, history: History, star: Star, scale: Scale, 'table-of-contents': TableOfContents,
+    bell: Bell, 'file-pen': FilePen, 'git-branch': GitBranch, 'file-plus': FilePlus, terminal: Terminal, 'external-link': ExternalLink, 'folder-search': FolderSearch, layers: Layers, 'file-x': FileX, 'file-code': FileCode, history: History, star: Star, scale: Scale, 'table-of-contents': TableOfContents,
     pin: Pin, 'pin-off': PinOff, archive: Archive, 'archive-restore': ArchiveRestore,
   } as const
 

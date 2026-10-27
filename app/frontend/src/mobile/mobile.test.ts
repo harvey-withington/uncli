@@ -68,6 +68,25 @@ describe('the phone app', () => {
     await waitFor(() => expect(screen.getByRole('list', { name: 'Sessions' })).toBeInTheDocument())
   })
 
+  it('tells the server which session it shows, and none once it leaves or goes to the background', async () => {
+    const backend = phoneBackend()
+    const focus = vi.spyOn(backend, 'focus')
+    render(MobileApp, { props: { backend } })
+    const list = await screen.findByRole('list', { name: 'Sessions' })
+    await fireEvent.click(within(list).getAllByRole('button', { name: /Fix the flaky parser test/ })[0]!)
+    const id = `${SERVER}~s-code`
+    await waitFor(() => expect(focus).toHaveBeenLastCalledWith(id))
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(focus).toHaveBeenLastCalledWith(''))
+    hidden.mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(focus).toHaveBeenLastCalledWith(id))
+    hidden.mockRestore()
+    await fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(focus).toHaveBeenLastCalledWith(''))
+  })
+
   it('leaves the prompt level line out while the question is compact', async () => {
     render(MobileApp, { props: { backend: phoneBackend() } })
     const list = await screen.findByRole('list', { name: 'Sessions' })

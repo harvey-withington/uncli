@@ -63,8 +63,26 @@
   function close() {
     open = false
     app.currentId = null
+    void showing()
     if (location.hash) history.replaceState(null, '', location.pathname)
   }
+
+  // showing tells the server which session the phone shows, if any: a turn
+  // ending there is read, not Unread. None while the app is in the
+  // background; again when it's back, and after a reconnect (the server
+  // forgets when the phone's connection drops).
+  async function showing() {
+    const id = open && document.visibilityState === 'visible' ? app.currentId ?? '' : ''
+    try {
+      await app.backend.focus(id)
+    } catch {
+      // Offline: the reconnect says it again.
+    }
+  }
+  const onvisible = () => void showing()
+  $effect(() => {
+    if (app.connection?.state === 'online') untrack(() => void showing())
+  })
 
   // Tapping a session in the list selects it: show it.
   let shown = ''
@@ -93,9 +111,11 @@
       .catch(e => (failed = String(e)))
     void fetchVersion(fetch).then(v => (version = v))
     addEventListener('popstate', onpop)
+    document.addEventListener('visibilitychange', onvisible)
   })
   onDestroy(() => {
     removeEventListener('popstate', onpop)
+    document.removeEventListener('visibilitychange', onvisible)
     app.destroy()
   })
 </script>

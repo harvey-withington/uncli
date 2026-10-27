@@ -68,6 +68,10 @@ func TestSessionOverHTTP(t *testing.T) {
 	if err := json.Unmarshal([]byte(waiting.Data), &v); err != nil || len(v.Approvals) != 1 {
 		t.Fatalf("waiting view = %s (%v)", waiting.Data, err)
 	}
+	// Back, the phone says again which session it shows.
+	if err := r.call(nil, "Focus", id); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := r.call(nil, "AnswerApproval", id, v.Approvals[0].RequestID, "allow", ""); err != nil {
 		t.Fatal(err)
@@ -75,6 +79,8 @@ func TestSessionOverHTTP(t *testing.T) {
 	next(t, events, "the finished page", func(e sseEvent) bool {
 		return e.Name == "page:changed" && strings.Contains(e.Data, `"status":"done"`)
 	})
+	// It ended while the phone showed it: read, not Unread.
+	waitState(t, r, id, session.Idle)
 	var pages []store.Page
 	if err := r.call(&pages, "Pages", id); err != nil || len(pages) != 1 {
 		t.Fatalf("pages = %v, %v", pages, err)
@@ -87,6 +93,41 @@ func TestSessionOverHTTP(t *testing.T) {
 	// The same session is the window's too: the app sees what the device did.
 	if got, _ := r.svc.Sessions.View(id); got.State == session.NeedsApproval {
 		t.Errorf("still waiting: %+v", got)
+	}
+
+	// The phone is put away: with its stream gone it shows nothing, so the
+	// next turn to end there is Unread.
+	cancel2()
+	deadline := time.Now().Add(10 * time.Second)
+	for r.srv.openStreams("dev1") > 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the closed stream is still counted")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err := r.call(nil, "Send", id, "Push it again", []app.AttachmentRef{}); err != nil {
+		t.Fatal(err)
+	}
+	asked := waitState(t, r, id, session.NeedsApproval)
+	if err := r.call(nil, "AnswerApproval", id, asked.Approvals[0].RequestID, "allow", ""); err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, r, id, session.Unread)
+}
+
+// waitState waits for a session to reach a state and returns its view.
+func waitState(t *testing.T, r *rig, id string, want session.State) session.View {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		v, _ := r.svc.Sessions.View(id)
+		if v.State == want {
+			return v
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("state = %s, want %s", v.State, want)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 

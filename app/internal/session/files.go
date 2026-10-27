@@ -43,12 +43,23 @@ func startTurnFiles(root, artifactsRoot string) *turnFiles {
 // and tells the UI. It runs on its own goroutine after the page closed.
 func (s *Session) finishFiles(t *turnFiles, p *store.Page) {
 	<-t.done
-	changes := snapshot.Diff(t.before, snapshot.Take(context.Background(), t.before.Root))
+	after := snapshot.Take(context.Background(), t.before.Root)
+	changes := snapshot.Diff(t.before, after)
 	versions := s.keepArtifacts(t.artifacts)
 	if len(changes) == 0 && len(versions) == 0 {
 		return
 	}
+	// HEAD moved (a checkout, pull…): the UI folds what commands changed
+	// into one line saying so, rather than listing it as the agent's work.
+	var head *store.HeadMove
+	if len(changes) > 0 && snapshot.Moved(t.before.Head, after.Head) {
+		head = &store.HeadMove{
+			From: store.GitHead{Branch: t.before.Head.Branch, Commit: t.before.Head.Commit},
+			To:   store.GitHead{Branch: after.Head.Branch, Commit: after.Head.Commit},
+		}
+	}
 	s.mu.Lock()
+	p.HeadMove = head
 	for _, c := range changes {
 		how := HowCommand
 		if c.Kind == snapshot.Deleted {
@@ -63,7 +74,7 @@ func (s *Session) finishFiles(t *turnFiles, p *store.Page) {
 	artifacts := append([]store.ArtifactVersion{}, p.Artifacts...)
 	s.mu.Unlock()
 	st := s.m.d.Store
-	if err := st.SetPageFiles(p.ID, touched, artifacts); err != nil {
+	if err := st.SetPageFiles(p.ID, touched, artifacts, head); err != nil {
 		return
 	}
 	if fresh, err := st.Page(p.ID); err == nil {

@@ -621,7 +621,7 @@ func (s *Session) closePage(status, errText string) {
 	case status == "error":
 		s.err = errText
 		s.state = Errored
-	case s.m.isFocused(s.rec.ID):
+	case s.m.seen(s.rec.ID):
 		s.state = Idle
 	default:
 		s.state = Unread

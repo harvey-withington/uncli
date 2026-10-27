@@ -117,6 +117,7 @@ type Manager struct {
 	mu       sync.Mutex
 	sessions map[string]*Session
 	focused  string
+	viewing  map[string]string // paired device id → the session it shows
 	models   []core.ModelInfo
 	usage    *core.UsageLimit
 	judge    judging
@@ -129,7 +130,7 @@ type Manager struct {
 const modelsSetting = "claude.models"
 
 func NewManager(d Deps) (*Manager, error) {
-	m := &Manager{d: d, sessions: map[string]*Session{}, InterruptGrace: 5 * time.Second,
+	m := &Manager{d: d, sessions: map[string]*Session{}, viewing: map[string]string{}, InterruptGrace: 5 * time.Second,
 		judge: judging{inFlight: map[string]bool{}, failed: map[string]bool{}}}
 	if err := d.Store.MarkOpenPages("interrupted"); err != nil {
 		return nil, err
@@ -454,10 +455,16 @@ func (m *Manager) Focus(id string) {
 	}
 }
 
-// MarkRead clears a session's Unread without making it the focused one:
-// a paired device looked at it, while the window may be showing another.
-func (m *Manager) MarkRead(id string) {
+// Showing marks the session a paired device is showing ("" for none): its
+// Unread clears, and a turn that ends while it's shown there stays read.
+// The window's focus, and so its notifications, are left alone.
+func (m *Manager) Showing(device, id string) {
 	m.mu.Lock()
+	if id == "" {
+		delete(m.viewing, device)
+	} else {
+		m.viewing[device] = id
+	}
 	s := m.sessions[id]
 	m.mu.Unlock()
 	if s != nil {
@@ -465,14 +472,28 @@ func (m *Manager) MarkRead(id string) {
 	}
 }
 
-// Focused says whether the user is looking at a session: it is the one
-// shown and UNCLI's window has focus.
-func (m *Manager) Focused(id string) bool { return m.isFocused(id) }
-
-func (m *Manager) isFocused(id string) bool {
+// Focused says whether the user is looking at a session in the window: it
+// is the one shown and UNCLI's window has focus.
+func (m *Manager) Focused(id string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.focused == id
+}
+
+// seen says whether the user is looking at a session anywhere: in the
+// window or on a paired device.
+func (m *Manager) seen(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.focused == id {
+		return true
+	}
+	for _, v := range m.viewing {
+		if v == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Manager) Delete(id string) error {

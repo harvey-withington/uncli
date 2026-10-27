@@ -90,6 +90,25 @@ func TestMarkOpenPagesAndErrors(t *testing.T) {
 	}
 }
 
+func TestPageFilesKeepTheHeadMove(t *testing.T) {
+	s, _ := open(t)
+	s.CreateSession(&Session{ID: "s", Adapter: "claude", Runtime: "local", ProfileID: "code", Workdir: "/", Model: "m"})
+	s.SavePage(&Page{ID: "p", SessionID: "s", Seq: 1, Question: "q", Model: "m", Status: "done"})
+	move := &HeadMove{From: GitHead{Branch: "main", Commit: "aaa"}, To: GitHead{Commit: "bbb"}}
+	if err := s.SetPageFiles("p", []TouchedFile{{Path: "/a.go", How: "command"}}, nil, move); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := s.Page("p")
+	if p.HeadMove == nil || *p.HeadMove != *move || len(p.TouchedFiles) != 1 {
+		t.Errorf("page = %+v, head %+v", p, p.HeadMove)
+	}
+	// Saved again as the turn goes, the move stays.
+	s.SavePage(&p)
+	if p, _ = s.Page("p"); p.HeadMove == nil {
+		t.Error("SavePage dropped the head move")
+	}
+}
+
 func TestEventCapPrunesOldestPages(t *testing.T) {
 	s, _ := open(t)
 	s.EventCap = 10

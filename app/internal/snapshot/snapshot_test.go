@@ -94,6 +94,45 @@ func TestGitRepoHonoursIgnore(t *testing.T) {
 	}
 }
 
+// A snapshot of a repo records its HEAD, so a turn can tell a checkout
+// from the agent's own changes.
+func TestGitHeadAcrossACheckout(t *testing.T) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("no git")
+	}
+	root := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command(git, append([]string{"-C", root, "-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	if h := Take(context.Background(), root).Head; h != (Head{}) {
+		t.Errorf("no commit yet: head = %+v", h)
+	}
+	write(t, filepath.Join(root, "a.txt"), "on main")
+	run("add", ".")
+	run("commit", "-q", "-m", "one")
+	before := Take(context.Background(), root)
+	if before.Head.Branch != "main" || len(before.Head.Commit) != 40 {
+		t.Fatalf("head = %+v", before.Head)
+	}
+	if Moved(before.Head, Take(context.Background(), root).Head) {
+		t.Error("moved without a checkout")
+	}
+	run("switch", "-q", "-c", "feature")
+	write(t, filepath.Join(root, "a.txt"), "on the feature branch")
+	run("commit", "-q", "-am", "two")
+	run("checkout", "-q", "--detach", "HEAD")
+	after := Take(context.Background(), root)
+	if after.Head.Branch != "" || after.Head.Commit == before.Head.Commit || !Moved(before.Head, after.Head) {
+		t.Errorf("detached head = %+v, before %+v", after.Head, before.Head)
+	}
+}
+
 func TestIncompleteFindsNothing(t *testing.T) {
 	root := t.TempDir()
 	a := Take(context.Background(), root)

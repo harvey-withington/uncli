@@ -80,7 +80,8 @@ export function withServer(backend: Backend, server: string): Backend {
     if (typeof fn !== 'function' || name === 'subscribe') continue
     const map = RESULTS[name as keyof Backend] as ((v: unknown, q: Q) => unknown) | undefined
     out[name] = async (...args: unknown[]) => {
-      if (first.has(name) && typeof args[0] === 'string') args[0] = own(args[0])
+      // "" is no session (focus('') when none is shown), on any server.
+      if (first.has(name) && typeof args[0] === 'string' && args[0]) args[0] = own(args[0])
       if (name === 'search' && (args[0] as SearchQuery)?.sessionId) args[0] = { ...(args[0] as SearchQuery), sessionId: own((args[0] as SearchQuery).sessionId!) }
       const res = await (fn as (...a: unknown[]) => Promise<unknown>).apply(backend, args)
       return map && res != null ? map(res, q) : res

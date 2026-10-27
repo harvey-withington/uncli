@@ -6,6 +6,7 @@ import { commands } from '../lib/commands'
 import { APP_CONTEXT } from '../lib/context'
 import { loadWatched } from '../lib/watched'
 import { AppStore } from '../stores/app.svelte'
+import FilesStrip from './FilesStrip.svelte'
 import SessionPane from './SessionPane.svelte'
 
 type Writer = { writeWatched(sid: string, path: string, text: string | null): void }
@@ -108,6 +109,33 @@ describe('File tab', () => {
       await fireEvent.click(screen.getByRole('button', { name: 'Watch it on the File tab: parser.go' }))
       expect(loadWatched('s-code').current).toBe('internal/adapter/claude/parser.go')
     })
+  })
+
+  it('folds a branch switch’s files into one line, keeping the agent’s own edits listed', async () => {
+    const { s } = await code()
+    const dir = s.current!.workdir
+    const files = [
+      { path: `${dir}\\parser.go`, how: 'edit' as const, line: 4, added: 2 },
+      ...Array.from({ length: 40 }, (_, i) => ({ path: `${dir}\\pkg\\f${i}.go`, how: 'command' as const })),
+    ]
+    const move = { from: { branch: 'main', commit: 'a'.repeat(40) }, to: { branch: 'server-mode', commit: 'b'.repeat(40) } }
+    render(FilesStrip, { props: { files, sessionId: 's-code', move }, context: ctx(s) })
+    // Two rows, so the list starts open, with the switch folded.
+    expect(screen.getByText('parser.go')).toBeInTheDocument()
+    const fold = screen.getByRole('button', { name: 'Switched from main to server-mode: 40 files differ' })
+    expect(fold).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('f0.go')).toBeNull()
+    await fireEvent.click(fold)
+    expect(screen.getByText('f0.go')).toBeInTheDocument()
+  })
+
+  it('shows Watch off, saying why, for a changed file outside the session folder', async () => {
+    const { s } = await code()
+    const outside = 'C:\\Users\\you\\.claude\\notes.md'
+    render(FilesStrip, { props: { files: [{ path: outside, how: 'write' }], sessionId: 's-code' }, context: ctx(s) })
+    const watch = screen.getByRole('button', { name: 'Watch it on the File tab: notes.md' })
+    expect(watch).toBeDisabled()
+    expect(watch).toHaveAttribute('title', "Only files in the session's folder can be watched")
   })
 
   it('shows an HTML file as a sandboxed page, or its source', async () => {

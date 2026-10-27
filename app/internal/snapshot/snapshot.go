@@ -34,7 +34,20 @@ type entry struct {
 type Snapshot struct {
 	Root     string
 	Complete bool // every file was recorded; an incomplete snapshot finds no changes
+	Head     Head // the repo's HEAD; zero outside a repo
 	files    map[string]entry
+}
+
+// Head is where a repo's HEAD was: its branch ("" when detached) and commit.
+type Head struct {
+	Branch string
+	Commit string
+}
+
+// Moved says HEAD went somewhere else between two snapshots of a repo: a
+// checkout, switch, pull, merge, rebase or reset (or a commit).
+func Moved(before, after Head) bool {
+	return before.Commit != "" && after.Commit != "" && before != after
 }
 
 // Change is a file that was added, changed or deleted.
@@ -55,8 +68,35 @@ func Take(ctx context.Context, root string) Snapshot {
 	names, ok := gitFiles(ctx, root)
 	if !ok {
 		names, ok = walk(root, true)
+		return record(root, names, ok)
 	}
-	return record(root, names, ok)
+	s := record(root, names, ok)
+	s.Head = gitHead(ctx, root)
+	return s
+}
+
+// gitHead reads a repo's HEAD: its branch and commit.
+func gitHead(ctx context.Context, root string) Head {
+	git, err := lookGit()
+	if err != nil {
+		return Head{}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	// The commit, then (--abbrev-ref applying to what follows) the branch.
+	out, err := local.Run(ctx, core.Command{Path: git, Args: []string{"-C", root, "rev-parse", "HEAD", "--abbrev-ref", "HEAD"}})
+	if err != nil {
+		return Head{} // no commit yet
+	}
+	lines := strings.Fields(string(out))
+	if len(lines) != 2 {
+		return Head{}
+	}
+	h := Head{Commit: lines[0], Branch: lines[1]}
+	if h.Branch == "HEAD" {
+		h.Branch = "" // detached
+	}
+	return h
 }
 
 // TakeFolder records every file under root, git or not, skipping nothing

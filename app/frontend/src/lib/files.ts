@@ -1,6 +1,7 @@
 // The files a page's turn changed, as the page lists them: paths shown
 // relative to the session folder, and what opening one does.
-import type { Editor, Preferences, TouchedFile } from './api'
+import type { Editor, GitHead, HeadMove, Preferences, TouchedFile } from './api'
+import { t } from './i18n.svelte'
 
 // How a file was touched, as the row's icon.
 export const HOW_ICON: Record<TouchedFile['how'], string> = {
@@ -21,6 +22,29 @@ export function relPath(workdir: string, path: string): string {
   const same = (a: string, b: string) => (windows ? a.toLowerCase() === b.toLowerCase() : a === b)
   if (w.length === 0 || p.length <= w.length || !w.every((part, i) => same(part, p[i] ?? ''))) return path
   return p.slice(w.length).join('/')
+}
+
+// splitByMove separates a turn's files when the repo's HEAD moved: what the
+// agent's tools wrote or edited stays listed, and what commands changed
+// (mostly the checkout's, pull's or rebase's) is folded into one line.
+export function splitByMove(files: TouchedFile[], move: HeadMove | undefined): { own: TouchedFile[]; moved: TouchedFile[] } {
+  if (!move) return { own: files, moved: [] }
+  const byCommand = (f: TouchedFile) => f.how === 'command' || f.how === 'deleted'
+  return { own: files.filter(f => !byCommand(f)), moved: files.filter(byCommand) }
+}
+
+const short = (h: GitHead) => h.commit.slice(0, 7)
+
+// moveLabel says where HEAD went: "Switched from main to server-mode",
+// "main moved from 1a2b3c4 to 5d6e7f8" (a pull, merge, rebase or reset),
+// or "Checked out 5d6e7f8" (detached). n is how many files it folds.
+export function moveLabel(move: HeadMove, n: number): string {
+  const { from, to } = move
+  const files = n === 1 ? t('files.move.filesOne') : t('files.move.files', { n })
+  if (to.branch && from.branch && to.branch !== from.branch) return t('files.move.switched', { from: from.branch, to: to.branch, files })
+  if (to.branch && to.branch === from.branch) return t('files.move.moved', { branch: to.branch, from: short(from), to: short(to), files })
+  if (to.branch) return t('files.move.switchedTo', { to: to.branch, files })
+  return t('files.move.detached', { to: short(to), files })
 }
 
 // splitPath gives the folder part (with its trailing slash) and the name.

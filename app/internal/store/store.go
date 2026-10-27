@@ -110,7 +110,7 @@ func migrate(db *sql.DB) error {
 		return false
 	}
 	for _, c := range []struct{ table, col, def string }{
-		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"}, {"pages", "origin", "TEXT"},
+		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"}, {"pages", "origin", "TEXT"}, {"pages", "head_move", "TEXT"},
 		{"sessions", "mode", "TEXT"}, {"sessions", "shares", "TEXT"},
 		{"risk_judgements", "decider", "TEXT"}, {"risk_judgements", "confidence", "REAL"},
 		{"safe_list", "label", "TEXT NOT NULL DEFAULT ''"},
@@ -403,6 +403,22 @@ type Page struct {
 	// Origin is who started the turn: empty for the user; "cli" when the CLI
 	// carried on by itself (a background task finished), with no question.
 	Origin string `json:"origin,omitempty"`
+	// HeadMove is where the repo's HEAD went during the turn (a checkout,
+	// pull, merge, rebase or reset): the files commands changed are then
+	// mostly the move's, not the agent's own work.
+	HeadMove *HeadMove `json:"headMove,omitempty"`
+}
+
+// HeadMove is a repo's HEAD at the start and end of a turn.
+type HeadMove struct {
+	From GitHead `json:"from"`
+	To   GitHead `json:"to"`
+}
+
+// GitHead is a branch ("" when detached) and commit.
+type GitHead struct {
+	Branch string `json:"branch,omitempty"`
+	Commit string `json:"commit"`
 }
 
 // PageAttachment records a file sent with a page's question.
@@ -495,12 +511,17 @@ func nonNil[T any](v []T) []T {
 }
 
 // SetPageFiles stores what a page's turn changed, found after it closed:
-// its touched files and artifact versions. Only those columns change, so
-// a bookmark set meanwhile is kept.
-func (s *Store) SetPageFiles(pageID string, touched []TouchedFile, artifacts []ArtifactVersion) error {
+// its touched files, artifact versions and where the repo's HEAD went (nil:
+// nowhere). Only those columns change, so a bookmark set meanwhile is kept.
+func (s *Store) SetPageFiles(pageID string, touched []TouchedFile, artifacts []ArtifactVersion, head *HeadMove) error {
 	t, _ := json.Marshal(nonNil(touched))
 	a, _ := json.Marshal(nonNil(artifacts))
-	res, err := s.db.Exec(`UPDATE pages SET touched_files=?, artifacts=? WHERE id=?`, string(t), string(a), pageID)
+	var h any
+	if head != nil {
+		b, _ := json.Marshal(head)
+		h = string(b)
+	}
+	res, err := s.db.Exec(`UPDATE pages SET touched_files=?, artifacts=?, head_move=? WHERE id=?`, string(t), string(a), h, pageID)
 	if err != nil {
 		return err
 	}
@@ -512,7 +533,7 @@ func (s *Store) SetPageFiles(pageID string, touched []TouchedFile, artifacts []A
 
 const pageColumns = `id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
 		touched_files, status, bookmarked, pinned, input_tokens, output_tokens, cache_read, cache_write, cost_usd,
-		duration_ms, started_at, finished_at, outline, attachments, artifacts, origin`
+		duration_ms, started_at, finished_at, outline, attachments, artifacts, origin, head_move`
 
 // Page reads one page.
 func (s *Store) Page(pageID string) (Page, error) {
@@ -547,12 +568,18 @@ func scanPages(rows *sql.Rows) ([]Page, error) {
 		var bm, pin sql.NullBool
 		var in, outT, cr, cw, dur, st, fin sql.NullInt64
 		var cost sql.NullFloat64
-		var outline, attached, artifacts, origin sql.NullString
+		var outline, attached, artifacts, origin, head sql.NullString
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Seq, &p.Question, &directives, &p.Model, &mods, &answer, &trace,
-			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached, &artifacts, &origin); err != nil {
+			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached, &artifacts, &origin, &head); err != nil {
 			return nil, err
 		}
 		p.Origin = origin.String
+		if head.Valid && head.String != "" {
+			var h HeadMove
+			if json.Unmarshal([]byte(head.String), &h) == nil {
+				p.HeadMove = &h
+			}
+		}
 		_ = json.Unmarshal([]byte(artifacts.String), &p.Artifacts)
 		p.Artifacts = nonNil(p.Artifacts)
 		_ = json.Unmarshal([]byte(attached.String), &p.Attachments)

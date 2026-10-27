@@ -84,12 +84,13 @@ type Server struct {
 	mu       sync.Mutex
 	settings Settings
 	status   Status
-	net      *network // the listeners while on
+	net      *network       // the listeners while on
+	streams  map[string]int // device id → its open event streams
 }
 
 func New(c Config) *Server {
 	s := &Server{api: c.API, svc: c.Service, hub: c.Hub, store: c.Store, certs: c.Certs, auth: c.Auth,
-		links: newLinks(), pwa: c.PWA, push: c.Push, onStatus: c.OnStatus}
+		links: newLinks(), pwa: c.PWA, push: c.Push, onStatus: c.OnStatus, streams: map[string]int{}}
 	if c.Store != nil {
 		s.devices = NewDevices(c.Store)
 		if c.OnDevices != nil {
@@ -223,6 +224,8 @@ func (s *Server) serveEvents(w http.ResponseWriter, r *http.Request, d Device) {
 	}
 	sub, c := s.hub.Subscribe(d.ID, r.Header.Get("Last-Event-ID"))
 	defer s.hub.Unsubscribe(sub)
+	s.streamOpened(d.ID)
+	defer s.streamClosed(d.ID)
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-store")
@@ -260,6 +263,36 @@ func (s *Server) serveEvents(w http.ResponseWriter, r *http.Request, d Device) {
 			fl.Flush()
 		}
 	}
+}
+
+// streamOpened and streamClosed count each device's open event streams.
+// When its last one closes (the phone slept, lost its network or closed
+// the app) it no longer shows any session, so a turn ending there counts
+// as unseen. A stream that dies after its replacement opened leaves the
+// device's session alone.
+func (s *Server) streamOpened(device string) {
+	s.mu.Lock()
+	s.streams[device]++
+	s.mu.Unlock()
+}
+
+func (s *Server) streamClosed(device string) {
+	s.mu.Lock()
+	s.streams[device]--
+	last := s.streams[device] <= 0
+	if last {
+		delete(s.streams, device)
+	}
+	s.mu.Unlock()
+	if last && s.svc != nil && s.svc.Sessions != nil {
+		s.svc.Sessions.Showing(device, "")
+	}
+}
+
+func (s *Server) openStreams(device string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.streams[device]
 }
 
 func writeSSE(w http.ResponseWriter, id, name string, data []byte) bool {

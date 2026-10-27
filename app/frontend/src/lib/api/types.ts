@@ -195,6 +195,18 @@ export interface Page {
   outline?: PageOutline
   attachments?: PageAttachment[] // files sent with the question
   origin?: 'cli' // the CLI started this turn by itself (a background task finished): no question
+  headMove?: HeadMove // the repo's HEAD moved during the turn (a checkout, pull, merge, rebase or reset)
+}
+
+// Where a repo's HEAD was at the start and end of a turn.
+export interface HeadMove {
+  from: GitHead
+  to: GitHead
+}
+
+export interface GitHead {
+  branch?: string // absent when detached
+  commit: string
 }
 
 // A conversation the CLI saved, as the import picker lists it.

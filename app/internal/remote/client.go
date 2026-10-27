@@ -77,12 +77,12 @@ func (c *client) AnswerAsk(sessionID, requestID string, allow bool, answers map[
 	return c.svc.Sessions.AnswerAskFrom(sessionID, requestID, allow, answers, note, c.device.Name)
 }
 
-// Focus marks a session read without taking the window's focus: the
-// window's notifications still follow what's shown there.
+// Focus is the session the device shows ("" for none): it is read, and a
+// turn ending there stays read, without taking the window's focus (the
+// window's notifications still follow what's shown there). It's forgotten
+// when the device's last event stream closes.
 func (c *client) Focus(sessionID string) {
-	if sessionID != "" {
-		c.svc.Sessions.MarkRead(sessionID)
-	}
+	c.svc.Sessions.Showing(c.device.ID, sessionID)
 }
 
 // Send takes attachments uploaded to the server or pasted images, never a

@@ -47,6 +47,12 @@ Two more findings on 2026-10-06:
     --exclude-standard` lists, so `.gitignore` decides.
   - Elsewhere a walk skips hidden and generated folders.
   - Past 20,000 files nothing is compared.
+  - In a repo, each snapshot also records HEAD (its branch and commit).
+    If HEAD moved during the turn (a checkout, pull, merge, rebase or
+    reset) and commands changed files, the page records the move
+    (`headMove`). The page then folds the command-made changes into one
+    line saying where HEAD went, since they are mostly the move's, not the
+    agent's own work. Added 2026-10-28 from dogfooding.
 - One row per file on the page: a tool's word beats the snapshot's (it
   knows the line), creating beats editing, and a delete is final.
 
