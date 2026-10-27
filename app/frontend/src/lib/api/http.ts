@@ -86,7 +86,17 @@ async function replyOf<T>(res: Response): Promise<T> {
 }
 
 export function httpBackend(opts: HttpOptions): Backend {
-  const f = opts.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a))
+  const raw = opts.fetch ?? ((...a: Parameters<typeof fetch>) => fetch(...a))
+  // A request that never reached the server (the network not back yet on
+  // a phone just woken) says so, not the browser's "Failed to fetch".
+  const f = async (...a: Parameters<typeof fetch>): Promise<Response> => {
+    try {
+      return await raw(...a)
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') throw e
+      throw new RPCError(t('remote.unreachable'), 0)
+    }
+  }
   const auth = (): Record<string, string> => {
     const token = opts.token()
     return token ? { Authorization: `Bearer ${token}` } : {}
@@ -115,7 +125,7 @@ export function httpBackend(opts: HttpOptions): Backend {
   return {
     kind: 'http',
     subscribe(h: Handlers) {
-      return stream(opts, f, auth, h)
+      return stream(opts, raw, auth, h) // its banner says it can't reach the server itself
     },
     bootstrap: () => call('Bootstrap'),
     cliStatus: fresh => call('CLIStatus', fresh),

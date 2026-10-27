@@ -25,6 +25,9 @@ export interface Live {
   thinkingTokens: number
 }
 
+// How long to wait before fetching state afresh again, by failed attempt.
+const RESYNC_RETRY_MS = [1000, 3000, 8000]
+
 export class AppStore {
   backend: Backend
   ready = $state(false)
@@ -100,6 +103,9 @@ export class AppStore {
   private off: (() => void) | null = null
   private held: (() => void)[] | null = null // changes arriving during a resync
   private resyncAgain = false
+  private resyncTries = 0 // failed in a row, retried after a pause
+  private resyncTimer: ReturnType<typeof setTimeout> | undefined
+  private stale = false // a resync gave up: try again when the connection is back
 
   // openLast: start on the session open last time (the window); the phone
   // starts on its session list instead.
@@ -147,7 +153,10 @@ export class AppStore {
       pairRequest: r => { this.pairRequest = r },
       devicesChanged: d => { this.devices = d },
       resync: () => { void this.resync() },
-      connection: c => { this.connection = c },
+      connection: c => {
+        this.connection = c
+        if (c.state === 'online' && this.stale) void this.resync()
+      },
     })
     const [boot, cli] = await Promise.all([this.backend.bootstrap(), this.backend.cliStatus(false)])
     this.boot = boot
@@ -169,6 +178,7 @@ export class AppStore {
 
   destroy() {
     this.off?.()
+    clearTimeout(this.resyncTimer)
   }
 
   // later applies a session or page change now, or, while a resync is
@@ -184,13 +194,16 @@ export class AppStore {
   // no longer holds (decision 0021). The sessions, the pages already
   // loaded and the pins come back as they are now; text that was streaming
   // shows again from its page. Changes arriving meanwhile are applied
-  // after the snapshot.
+  // after the snapshot. One that fails (a phone's network not back yet as
+  // it wakes) is tried again after a pause, then when the connection is.
   async resync() {
     if (!this.ready) return
     if (this.held) {
       this.resyncAgain = true // asked again while fetching: fetch once more after
       return
     }
+    clearTimeout(this.resyncTimer)
+    this.stale = false
     this.held = []
     try {
       const boot = await this.backend.bootstrap()
@@ -208,8 +221,15 @@ export class AppStore {
       this.pages = pages
       if (this.currentId && !boot.sessions.some(s => s.id === this.currentId)) this.currentId = null
       void this.refreshPins()
+      this.resyncTries = 0
     } catch (e) {
-      showToast(String(e), 'error')
+      if (this.resyncTries < RESYNC_RETRY_MS.length) {
+        this.resyncTimer = setTimeout(() => void this.resync(), RESYNC_RETRY_MS[this.resyncTries++])
+      } else {
+        this.resyncTries = 0
+        this.stale = true
+        showToast(e instanceof Error ? e.message : String(e), 'error')
+      }
     } finally {
       const held = this.held
       this.held = null

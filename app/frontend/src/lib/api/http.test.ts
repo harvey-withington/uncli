@@ -66,6 +66,13 @@ describe('httpBackend', () => {
     expect((err as RPCError).message).toBe('The server sent something UNCLI didn’t expect (502 Bad Gateway). Try again in a moment.')
   })
 
+  it('says it couldn’t reach the server, not the browser’s "Failed to fetch"', async () => {
+    const b = httpBackend({ base: '', token: () => 'tok', fetch: vi.fn(async () => { throw new TypeError('Failed to fetch') }) as never })
+    const err = await b.bootstrap().catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RPCError)
+    expect((err as RPCError).message).toBe('Couldn’t reach the server. Check the connection and try again.')
+  })
+
   it('refuses what only works at the server', async () => {
     const b = httpBackend({ base: '', token: () => 'tok', fetch: vi.fn() as never })
     await expect(b.openFolder('C:\\')).rejects.toBeInstanceOf(RemoteOnlyError)

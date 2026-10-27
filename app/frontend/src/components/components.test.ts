@@ -261,6 +261,20 @@ describe('Outline panel', () => {
     expect(JSON.parse(localStorage.getItem('uncli-outline') ?? '{}').open).toBe(false)
   })
 
+  it('shows in a new session with no page yet, with its File tab', async () => {
+    localStorage.clear()
+    render(App, { props: { backend: mockBackend({ empty: true }) } })
+    await fireEvent.click(await screen.findByRole('button', { name: /^Code/ }))
+    const dialog = (await screen.findAllByRole('dialog', { name: 'New session' })).at(-1) as HTMLElement
+    await fireEvent.click(within(dialog).getByRole('button', { name: /Choose/ }))
+    await within(dialog).findByText(/projects.demo$/)
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Start session' }))
+    await screen.findByRole('heading', { name: 'New session' })
+    const panel = await screen.findByRole('complementary', { name: 'On this page' })
+    expect(within(panel).getByText('Nothing here until the session has a page.')).toBeInTheDocument()
+    expect(within(panel).getByRole('tab', { name: /File|Watch/ })).toBeInTheDocument()
+  })
+
   it('resizes with the arrow keys on its edge', async () => {
     localStorage.clear()
     render(App, { props: { backend: mockBackend() } })

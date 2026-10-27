@@ -16,7 +16,7 @@
   // folder, watched live), as tabs. The first two have a badge with how
   // many sections or artifacts the page has; File is named for the file it
   // shows. The left edge resizes the panel. A session with no page yet
-  // shows the panel only on its File tab.
+  // shows the panel all the same, its page tabs saying so.
 
   interface Props {
     sessionId: string

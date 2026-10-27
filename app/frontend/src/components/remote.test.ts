@@ -134,6 +134,50 @@ describe('a remote client', () => {
     expect(s.connection).toEqual({ state: 'offline', lastOnline: 1, error: 'gone' })
   })
 
+  it('tries again when fetching state afresh fails as the phone wakes', async () => {
+    const backend = mockBackend()
+    const s = new AppStore(backend)
+    await s.init()
+    const real = backend.bootstrap.bind(backend)
+    let fails = 1
+    const boot = vi.spyOn(backend, 'bootstrap').mockImplementation(() => (fails-- > 0 ? Promise.reject(new Error('Couldn’t reach the server.')) : real()))
+    vi.useFakeTimers()
+    try {
+      await s.resync()
+      expect(boot).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(boot).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+      s.destroy()
+    }
+  })
+
+  it('fetches state afresh once the connection is back, after giving up', async () => {
+    const backend = mockBackend()
+    let handlers: Handlers | null = null
+    const subscribe = backend.subscribe.bind(backend)
+    backend.subscribe = h => { handlers = h; return subscribe(h) }
+    const s = new AppStore(backend)
+    await s.init()
+    const real = backend.bootstrap.bind(backend)
+    let down = true
+    const boot = vi.spyOn(backend, 'bootstrap').mockImplementation(() => (down ? Promise.reject(new Error('Couldn’t reach the server.')) : real()))
+    vi.useFakeTimers()
+    try {
+      await s.resync()
+      await vi.advanceTimersByTimeAsync(20_000)
+      expect(boot).toHaveBeenCalledTimes(4)
+      down = false
+      handlers!.connection?.({ state: 'online', lastOnline: Date.now() })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(boot).toHaveBeenCalledTimes(5)
+    } finally {
+      vi.useRealTimers()
+      s.destroy()
+    }
+  })
+
   it("keeps a change that arrives while it's fetching state afresh", async () => {
     const backend = mockBackend()
     let handlers: Handlers | null = null
