@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fly } from 'svelte/transition'
   import { clickOutside } from '../lib/actions'
-  import type { SessionView } from '../lib/api'
+  import type { MCPServer, SessionView } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { needOf, statusKey } from '../lib/mcp'
@@ -9,8 +9,10 @@
 
   // The header's MCP servers button (plug; a dot when one needs the user)
   // and its popover: every server of the session's CLI with its status and
-  // what can be done with it (decision 0020). Only for a CLI that can sign
-  // its servers in, once it has reported them.
+  // what can be done with it (decision 0020). A sign-in waiting for the
+  // browser can open its page again or take the address the browser ended
+  // up on, for when the browser can't reach the CLI. Only for a CLI that
+  // can sign its servers in, once it has reported them.
   interface Props {
     session: SessionView
   }
@@ -20,6 +22,15 @@
   const servers = $derived(session.mcp ?? [])
   const attention = $derived(servers.some(sv => needOf(sv) !== null))
   let open = $state(false)
+  const link = (sv: MCPServer) => app.mcpLinks[`${session.id}:${sv.name}`] ?? ''
+  let pasting = $state('') // the server whose address is being pasted
+  let pasted = $state('')
+
+  async function usePasted(server: string) {
+    if (await app.mcpPaste(session.id, server, pasted)) {
+      pasting = pasted = ''
+    }
+  }
 </script>
 
 <svelte:window onkeydown={e => open && e.key === 'Escape' && (open = false)} />
@@ -63,6 +74,23 @@
                   <button class="btn ghost small" onclick={() => app.mcpSignOut(session.id, sv.name)}>{t('mcp.signOut')}</button>
                 {/if}
               </span>
+              {#if (sv.signing || sv.site) && (link(sv) || sv.signing)}
+                <span class="more">
+                  {#if link(sv)}
+                    <button class="btn ghost small" onclick={() => app.backend.openURL(link(sv))}>{t('mcp.openAgain')}</button>
+                  {/if}
+                  {#if sv.signing}
+                    <button class="btn ghost small" onclick={() => (pasting = pasting === sv.name ? '' : sv.name)} aria-expanded={pasting === sv.name}>{t('mcp.paste')}</button>
+                  {/if}
+                </span>
+              {/if}
+              {#if pasting === sv.name && sv.signing}
+                <form class="paste" onsubmit={e => { e.preventDefault(); void usePasted(sv.name) }}>
+                  <!-- svelte-ignore a11y_autofocus -->
+                  <input bind:value={pasted} autofocus placeholder={t('mcp.pastePlaceholder')} aria-label={t('mcp.pasteLabel', { name: sv.name })} spellcheck="false" autocomplete="off" />
+                  <button class="btn small primary" disabled={!pasted.trim()}>{t('mcp.pasteUse')}</button>
+                </form>
+              {/if}
               {#if sv.error}<p class="err">{sv.error}</p>{/if}
             </li>
           {/each}
@@ -97,6 +125,8 @@
     z-index: 20;
     width: 380px;
     max-width: calc(100vw - 2 * var(--space-4));
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
     padding: var(--space-4);
     background: var(--surface);
     border: 1px solid var(--border);
@@ -162,6 +192,31 @@
   .acts {
     display: inline-flex;
     gap: var(--space-1);
+  }
+  /* Under the name while a sign-in waits for the browser. */
+  .more {
+    grid-column: 2 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-left: calc(-1 * var(--space-2));
+  }
+  .paste {
+    grid-column: 2 / -1;
+    display: flex;
+    gap: var(--space-2);
+  }
+  .paste input {
+    flex: 1;
+    min-width: 0;
+    height: 26px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-xs);
   }
   .err {
     grid-column: 2 / -1;

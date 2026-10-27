@@ -55,13 +55,13 @@ describe('Notes strip', () => {
   }
   const ctx = (s: AppStore) => new Map([[APP_CONTEXT, s]])
 
-  it('holds the status line, the MCP warnings and an error, under the header', async () => {
+  it('holds the status line and an error under the header, but not MCP servers (the plug button has them)', async () => {
     const s = await store()
     render(SessionPane, { props: { session: { ...s.current!, state: 'error', error: 'The CLI stopped.' } }, context: ctx(s) })
     const notes = document.querySelector('.notes') as HTMLElement
     expect(notes.previousElementSibling).toBe(document.querySelector('header.top'))
     expect(within(notes).getByText(/Claude prompts you before anything unsafe/)).toBeInTheDocument()
-    expect(within(notes).getByText(/BRUV needs signing in/)).toBeInTheDocument()
+    expect(within(notes).queryByText(/BRUV/)).toBeNull()
     expect(within(notes).getByRole('alert')).toHaveTextContent('The CLI stopped.')
     expect(document.querySelector('header.top [role=alert]')).toBeNull()
   })

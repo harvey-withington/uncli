@@ -41,26 +41,33 @@ describe('MCP logic', () => {
   })
 })
 
+// The header's popover of MCP servers, opened, and a server's row in it.
+async function popover() {
+  await fireEvent.click(screen.getByRole('button', { name: /^MCP servers/ }))
+  const pop = screen.getByRole('dialog', { name: 'MCP servers' })
+  return { pop, row: (name: string) => within(pop).getByText(name).closest('li') as HTMLElement }
+}
+
 describe('MCP sign-in', () => {
-  it('shows a server that needs signing in, signs in through the browser, and toasts when it connects', async () => {
+  it('signs a server in from the popover through the browser, and toasts when it connects', async () => {
     const s = await code()
     const opened = vi.spyOn(s.backend, 'openURL')
     const { rerender } = render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
-    const lines = screen.getByRole('list', { name: 'MCP servers' })
-    expect(within(lines).getByText(/BRUV needs signing in/)).toBeInTheDocument()
-    // The header's servers button carries the attention dot.
-    expect(screen.getByRole('button', { name: 'MCP servers: one needs you' })).toBeInTheDocument()
+    // No lines under the header: the servers button carries the attention dot.
+    expect(screen.queryByText(/needs signing in/)).not.toBeInTheDocument()
+    const { row } = await popover()
+    expect(within(row('BRUV')).getByText('needs signing in')).toBeInTheDocument()
 
-    await fireEvent.click(within(within(lines).getByText(/BRUV needs signing in/).closest('li')!).getByRole('button', { name: 'Sign in' }))
+    await fireEvent.click(within(row('BRUV')).getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(opened).toHaveBeenCalledWith('https://auth.example.com/authorize?client_id=uncli'))
     await rerender({ session: s.current! })
-    await waitFor(() => expect(within(lines).getByText(/Waiting for you to sign in to BRUV/)).toBeInTheDocument())
-    expect(within(lines).getByRole('button', { name: 'Open the page again' })).toBeInTheDocument()
+    await waitFor(() => expect(within(row('BRUV')).getByText('waiting for you to sign in')).toBeInTheDocument())
+    expect(within(row('BRUV')).getByRole('button', { name: 'Open the page again' })).toBeInTheDocument()
 
-    // The mock connects it a moment later: the line goes, a toast says so.
+    // The mock connects it a moment later, and a toast says so.
     await waitFor(() => expect(s.current?.mcp?.find(x => x.name === 'BRUV')?.status).toBe('connected'), { timeout: 3000 })
     await rerender({ session: s.current! })
-    expect(within(lines).queryByText(/BRUV/)).not.toBeInTheDocument()
+    expect(within(row('BRUV')).getByText('connected, 12 tools')).toBeInTheDocument()
     expect(toasts.list.map(t => t.message)).toContain('BRUV connected: 12 tools')
   })
 
@@ -70,11 +77,11 @@ describe('MCP sign-in', () => {
     const { rerender } = render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
     await s.mcpSignIn('s-code', 'BRUV')
     await rerender({ session: s.current! })
-    const lines = screen.getByRole('list', { name: 'MCP servers' })
-    await fireEvent.click(within(lines).getByRole('button', { name: 'Paste the address' }))
-    const box = within(lines).getByRole('textbox', { name: /after signing in to BRUV/ })
+    const { row } = await popover()
+    await fireEvent.click(within(row('BRUV')).getByRole('button', { name: 'Paste the address' }))
+    const box = within(row('BRUV')).getByRole('textbox', { name: /after signing in to BRUV/ })
     await fireEvent.input(box, { target: { value: ' http://localhost:4567/callback?code=c&state=s ' } })
-    await fireEvent.click(within(lines).getByRole('button', { name: 'Use it' }))
+    await fireEvent.click(within(row('BRUV')).getByRole('button', { name: 'Use it' }))
     expect(pasted).toHaveBeenCalledWith('s-code', 'BRUV', 'http://localhost:4567/callback?code=c&state=s')
   })
 
@@ -85,8 +92,9 @@ describe('MCP sign-in', () => {
     await s.mcpSignIn('s-code', 'Google Drive')
     expect(opened).toHaveBeenCalledWith('https://example.com/settings/connectors')
     await rerender({ session: s.current! })
-    const lines = screen.getByRole('list', { name: 'MCP servers' })
-    const line = within(lines).getByText(/Sign in to Google Drive on the page that opened. It connects by itself/).closest('li') as HTMLElement
+    const { row } = await popover()
+    const line = row('Google Drive')
+    expect(within(line).getByText('waiting for you to sign in on the page that opened')).toBeInTheDocument()
     // Reconnect (now) and Cancel are there; no Sign in, no paste box.
     expect(within(line).getByRole('button', { name: 'Reconnect' })).toBeInTheDocument()
     expect(within(line).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
@@ -98,21 +106,12 @@ describe('MCP sign-in', () => {
   it('lists every server in the popover and the palette, with what can be done', async () => {
     const s = await code()
     render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
-    await fireEvent.click(screen.getByRole('button', { name: 'MCP servers: one needs you' }))
-    const pop = screen.getByRole('dialog', { name: 'MCP servers' })
-    const row = (name: string) => within(pop).getByText(name).closest('li') as HTMLElement
+    expect(screen.getByRole('button', { name: 'MCP servers: one needs you' })).toBeInTheDocument()
+    const { row } = await popover()
     expect(within(row('notes')).getByText('connected, 3 tools')).toBeInTheDocument()
     expect(within(row('notes')).getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
     expect(within(row('BRUV')).getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
     const ids = commands(s).map(c => c.id)
     expect(ids).toEqual(expect.arrayContaining(['mcp.signIn.BRUV', 'mcp.reconnect.notes', 'mcp.signOut.notes', 'mcp.signIn.Google Drive']))
-  })
-
-  it('leaves the lines to the plug button’s dot in compact mode', async () => {
-    const s = await code()
-    s.toggleHeaderCompact()
-    render(SessionPane, { props: { session: s.current! }, context: ctx(s) })
-    expect(screen.queryByRole('list', { name: 'MCP servers' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'MCP servers: one needs you' })).toBeInTheDocument()
   })
 })

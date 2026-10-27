@@ -11,7 +11,6 @@
   import ScrollKeeper from './ScrollKeeper.svelte'
   import SessionStatus from './SessionStatus.svelte'
   import McpServers from './McpServers.svelte'
-  import McpStatus from './McpStatus.svelte'
   import SharesNote from './SharesNote.svelte'
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
@@ -174,13 +173,12 @@
     </Toolbar>
   </header>
   <!-- Status and warnings, in a strip of their own under the header, all
-       aligned on the left. Compact shows only an error there (the MCP ones
-       are left to the plug button's dot). -->
+       aligned on the left. Compact shows only an error there. MCP servers
+       that need the user are left to the plug button's dot. -->
   {#if !app.headerCompact || failed}
     <div class="notes">
       {#if !app.headerCompact}
         <SessionStatus {session} />
-        <McpStatus {session} />
       {/if}
       {#if failed}
         <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>

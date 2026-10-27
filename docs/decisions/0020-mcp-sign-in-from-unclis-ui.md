@@ -70,13 +70,15 @@ Other CLIs will have their own ways, or none.
   other running sessions on the same CLI in the same place that were
   waiting for it. One that keeps sign-ins of its own (sandboxed, another
   container) refuses quietly.
-- **UI.** A line under the session's folder for each server that needs
-  you: sign in; waiting for the browser (open the page again, paste the
+- **UI.** The header's plug button lists every server with what it
+  needs: sign in; waiting for the browser (open the page again, paste the
   address, cancel); a connector to reconnect after signing in on the
-  provider's site; couldn't connect (reconnect). It shows in either
-  header mode. The header's plug button lists every server with Sign in,
-  Reconnect and Sign out, and the palette has the same commands. A toast
-  says when a server you acted on connects, with its tool count.
+  provider's site; couldn't connect (reconnect); and Reconnect and Sign
+  out once connected. A dot on the button says when one needs you. The
+  palette has the same commands. A toast says when a server you acted on
+  connects, with its tool count. (Lines under the header for each server
+  that needs you came first. They went on 2026-10-27, because with many
+  connectors they crowded out the session.)
 
 ## Consequences
 
