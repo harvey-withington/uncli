@@ -4,6 +4,24 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.5.0-alpha
+
+Updating from the phone, and faster.
+
+- **Check for updates from the phone.** The phone's Settings has Updates:
+  the version the PC runs, Check now and Update now. You don't have to wait
+  for the PC's next check.
+- **Updates finish sooner.** Update now starts installing after a few
+  seconds instead of twenty. After a drop, the phone tries to reconnect
+  every few seconds, and asks for the update status again once it's back,
+  so it shows the new version as soon as the PC is up.
+- On the phone, a session's Options button shows sliders, leaving the cog
+  for Settings.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone.
+
 ## 0.4.0-alpha
 
 UNCLI updates itself, installs without an administrator, and the fixes
