@@ -7,11 +7,14 @@
 
   // Settings → Updates (decision 0025): the version this is, whether it
   // looks for newer releases by itself, Check now, and Update now when
-  // there's one. A development build says it's updated another way.
+  // there's one. A development build says it's updated another way. The
+  // phone's Settings has it without prefs: the PC's version, Check now and
+  // Update now, but not the automatic box (the PC's preferences are set at
+  // the PC).
 
   interface Props {
-    prefs: Preferences
-    savePrefs: (next: Preferences) => Promise<boolean>
+    prefs?: Preferences
+    savePrefs?: (next: Preferences) => Promise<boolean>
   }
 
   let { prefs, savePrefs }: Props = $props()
@@ -35,15 +38,19 @@
 
 <section id="settings-updates">
   <h3>{t('update.title')}</h3>
-  <p class="muted">{u && !u.dev ? t('update.version', { version: u.current }) : t('update.body')}</p>
-  <label class="check">
-    <input
-      type="checkbox"
-      checked={(prefs.updateCheck ?? 'auto') === 'auto'}
-      disabled={!u || u.dev}
-      onchange={e => savePrefs({ ...prefs, updateCheck: e.currentTarget.checked ? 'auto' : 'off' })}
-    />{t('update.auto')}
-  </label>
+  {#if prefs && savePrefs}
+    <p class="muted">{u && !u.dev ? t('update.version', { version: u.current }) : t('update.body')}</p>
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={(prefs.updateCheck ?? 'auto') === 'auto'}
+        disabled={!u || u.dev}
+        onchange={e => savePrefs({ ...prefs, updateCheck: e.currentTarget.checked ? 'auto' : 'off' })}
+      />{t('update.auto')}
+    </label>
+  {:else if u && !u.dev}
+    <p class="muted">{t('update.versionRemote', { version: u.current })}</p>
+  {/if}
   {#if line}
     <p class="line" class:err={u?.state === 'error'} role="status">
       {#if busy}<Icon name="loader" spin size={13} />{/if}{line}

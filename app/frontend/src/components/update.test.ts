@@ -60,6 +60,24 @@ describe('updates', () => {
   })
 })
 
+describe('the phone’s Settings', () => {
+  it('check the PC for updates now, without the PC’s own automatic box', async () => {
+    scenario('none')
+    const base = mockBackend()
+    const check = vi.spyOn(base, 'checkForUpdates')
+    const backend = { ...withServer(base, serverKey(location.origin)), kind: 'http' as const }
+    render(MobileApp, { props: { backend } })
+    await screen.findByRole('list', { name: 'Sessions' })
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const section = (await screen.findByRole('heading', { name: 'Updates' })).closest('section') as HTMLElement
+    expect(within(section).getByText(/The PC runs UNCLI 0.3.0-alpha/)).toBeInTheDocument()
+    expect(within(section).queryByRole('checkbox')).toBeNull()
+    await fireEvent.click(within(section).getByRole('button', { name: 'Check now' }))
+    await waitFor(() => expect(check).toHaveBeenCalled())
+    expect(await within(section).findByText(/UNCLI is up to date \(checked/)).toBeInTheDocument()
+  })
+})
+
 describe('the phone, once the PC has updated', () => {
   it('offers Reload after reconnecting to a new build', async () => {
     const base = mockBackend()

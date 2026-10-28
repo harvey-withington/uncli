@@ -518,6 +518,7 @@
   "update.body": "UNCLI looks for a newer release by itself and offers to install it.",
   "update.version": "This is UNCLI {version}. UNCLI looks for a newer release by itself and offers to install it.",
   "update.auto": "Check for updates automatically",
+  "update.versionRemote": "The PC runs UNCLI {version}. It looks for a newer release by itself every few hours.",
   "update.checkNow": "Check now",
   "update.checking": "Checking for updates…",
   "update.upToDate": "UNCLI is up to date (checked {when}).",

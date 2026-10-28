@@ -1,12 +1,14 @@
 <script lang="ts">
   import AppearanceSection from '../components/AppearanceSection.svelte'
   import Modal from '../components/Modal.svelte'
+  import UpdateSection from '../components/UpdateSection.svelte'
   import { confirm } from '../lib/confirm.svelte'
   import { t } from '../lib/i18n.svelte'
   import type { Snippet } from 'svelte'
 
   // The phone's Settings: this device and the server it's paired with,
-  // its look, what it's told about (notifications, from the slot), and
+  // its look, what it's told about (notifications, from the slot), the
+  // PC's updates (Check now, Update now: decision 0025), and
   // Forget this device, which drops its token here (the server keeps it
   // listed until it's revoked there).
 
@@ -40,6 +42,7 @@
     </dl>
   </section>
   {@render notifications?.()}
+  <UpdateSection />
   <AppearanceSection />
   <section>
     <h3>{t('mobile.pairing')}</h3>
