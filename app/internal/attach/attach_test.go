@@ -2,6 +2,8 @@ package attach
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,6 +76,24 @@ func TestLoad(t *testing.T) {
 	}
 	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "folders can't be attached") {
 		t.Errorf("folder: %v", err)
+	}
+}
+
+// A file that went between attaching and sending says so, and one the OS
+// won't open says what it said, not just "can't be read".
+func TestUnreadableSaysWhy(t *testing.T) {
+	dir := t.TempDir()
+	p := write(t, dir, "notes.txt", []byte("hello"))
+	if !Describe(p).Attachable() {
+		t.Fatal("not attachable")
+	}
+	os.Remove(p)
+	if _, err := Load(p); err == nil || err.Error() != "can't attach notes.txt: it isn't there any more (moved, renamed or deleted)" {
+		t.Errorf("gone: %v", err)
+	}
+	locked := &fs.PathError{Op: "open", Path: p, Err: errors.New("The process cannot access the file because it is being used by another process.")}
+	if got := unreadable(locked); got != "it can't be read: The process cannot access the file because it is being used by another process" {
+		t.Errorf("locked: %q", got)
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -58,7 +59,7 @@ func Describe(path string) Info {
 	info := Info{Path: path, Name: filepath.Base(path)}
 	st, err := os.Stat(path)
 	if err != nil {
-		info.Kind, info.Reason = Unsupported, "it can't be read"
+		info.Kind, info.Reason = Unsupported, unreadable(err)
 		return info
 	}
 	if st.IsDir() {
@@ -75,7 +76,7 @@ func Describe(path string) Info {
 	default:
 		head, err := readHead(path, 8<<10)
 		if err != nil {
-			info.Kind, info.Reason = Unsupported, "it can't be read"
+			info.Kind, info.Reason = Unsupported, unreadable(err)
 			return info
 		}
 		if !isText(head) {
@@ -125,6 +126,19 @@ func FromData(name, mediaType string, data []byte) (core.Attachment, error) {
 		name = "Pasted image"
 	}
 	return core.Attachment{Name: name, MediaType: mediaType, Data: data}, nil
+}
+
+// unreadable says why a file can't be read: gone, or what the OS said (in
+// use by another program, access denied…), without repeating its path.
+func unreadable(err error) string {
+	if errors.Is(err, fs.ErrNotExist) {
+		return "it isn't there any more (moved, renamed or deleted)"
+	}
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		err = pe.Err
+	}
+	return "it can't be read: " + strings.TrimSuffix(err.Error(), ".")
 }
 
 func readHead(path string, n int) ([]byte, error) {
