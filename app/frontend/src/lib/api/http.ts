@@ -35,8 +35,10 @@ export class RPCError extends Error {
 }
 
 // How long to wait before reconnecting, by attempt; a stream that says
-// nothing (the server pings every 20 s) for STALL_MS is given up on.
-const BACKOFF_MS = [500, 1000, 2000, 5000, 10000, 15000]
+// nothing (the server pings every 20 s) for STALL_MS is given up on. The
+// first half minute retries every few seconds, so a PC that restarted (an
+// update takes about 30 s) is back on the phone soon after it is.
+const BACKOFF_MS = [500, 1000, 2000, 3000, 3000, 3000, 3000, 5000, 10000, 15000]
 const STALL_MS = 45_000
 
 export interface SSEFrame {

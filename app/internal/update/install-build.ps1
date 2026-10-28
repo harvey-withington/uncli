@@ -29,6 +29,11 @@ install-build runs it on a local build.
 The installer to run. Default: app\build\bin\uncli-amd64-installer.exe,
 the one `wails build -nsis` (and publish-build.mjs) leaves.
 
+.PARAMETER Delay
+Seconds the task waits before installing (default 20): long enough for a
+session that ran this to finish its reply before UNCLI quits. Update now
+in UNCLI passes a few seconds, as nothing waits on it.
+
 .PARAMETER DryRun
 Do everything except install, quit or start UNCLI: the task runs, logs
 what it would do, and exits. To check the task works.
@@ -38,6 +43,7 @@ npm run install-build   (from the repository root)
 #>
 param(
   [string]$Installer = (Join-Path $PSScriptRoot '..\..\build\bin\uncli-amd64-installer.exe'),
+  [int]$Delay = 20,
   [switch]$DryRun,
   [switch]$Run # internal: set when the scheduled task runs this copy
 )
@@ -91,7 +97,7 @@ if ($Run) {
   # In the scheduled task, outside UNCLI.
   try {
     Log '--- update starts'
-    Start-Sleep -Seconds 20 # let the session that asked finish saying so before UNCLI quits
+    Start-Sleep -Seconds $Delay # let the session that asked finish saying so before UNCLI quits
     $before = Get-Uncli
     Log ('Running now: ' + (($before | ForEach-Object { "$($_.Id) $($_.Path)" }) -join '; '))
     if ($DryRun) {
@@ -153,6 +159,7 @@ if ($PSCommandPath -ne $StagedScript) { Copy-Item -Path $PSCommandPath -Destinat
 $hash = (Get-FileHash -Path $Installer -Algorithm SHA256).Hash.ToLower()
 
 $taskArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StagedScript`" -Run"
+$taskArgs += " -Delay $Delay"
 if ($DryRun) { $taskArgs += ' -DryRun' }
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $taskArgs -WorkingDirectory $UpdateDir
 $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
@@ -163,4 +170,4 @@ Start-ScheduledTask -TaskName $TaskName
 $mode = if ($DryRun) { 'dry run' } else { 'install' }
 Write-Host "Started the '$TaskName' task ($mode) for $Installer"
 Write-Host "sha256 $hash"
-Write-Host "UNCLI quits in about 20 seconds and comes back about half a minute after that. Log: $LogFile"
+Write-Host "UNCLI quits in about $Delay seconds and comes back about half a minute after that. Log: $LogFile"

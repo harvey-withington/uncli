@@ -64,7 +64,7 @@
         <h1>{session.title || t('session.untitled')}</h1>
         <ActivityBadge state={session.state} />
       </div>
-      <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="settings" /></button>
+      <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="sliders-horizontal" /></button>
       <button class="btn ghost icon touch" onclick={() => app.togglePanel()} aria-pressed={app.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name="table-of-contents" /></button>
     </header>
     {#if options}

@@ -159,6 +159,9 @@ export class AppStore {
       connection: c => {
         this.connection = c
         if (c.state === 'online' && this.stale) void this.resync()
+        // Back after a drop, the server may be a new one (it just updated):
+        // what it says about updates now, not what the old one last said.
+        if (c.state === 'online') void this.backend.updateStatus().then(u => { this.update = u }, () => {})
       },
     })
     const [boot, cli] = await Promise.all([this.backend.bootstrap(), this.backend.cliStatus(false)])

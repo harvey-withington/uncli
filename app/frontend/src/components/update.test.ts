@@ -79,6 +79,21 @@ describe('the phone’s Settings', () => {
 })
 
 describe('the phone, once the PC has updated', () => {
+  it('asks the PC for its update status again when it reconnects, so Settings shows it done', async () => {
+    scenario('available')
+    const base = mockBackend()
+    let h: Handlers | null = null
+    const subscribe = base.subscribe.bind(base)
+    base.subscribe = x => { h = x; return subscribe(x) }
+    const backend = { ...withServer(base, serverKey(location.origin)), kind: 'http' as const }
+    render(MobileApp, { props: { backend } })
+    expect(await screen.findByText('UNCLI 0.4.0-alpha is available.')).toBeInTheDocument()
+    // The PC restarted on 0.4.0-alpha: it has nothing newer to offer.
+    vi.spyOn(backend, 'updateStatus').mockResolvedValue({ current: '0.4.0-alpha', dev: false, state: 'idle', available: false })
+    h!.connection?.({ state: 'online', lastOnline: Date.now() })
+    await waitFor(() => expect(screen.queryByText('UNCLI 0.4.0-alpha is available.')).toBeNull())
+  })
+
   it('offers Reload after reconnecting to a new build', async () => {
     const base = mockBackend()
     let h: Handlers | null = null

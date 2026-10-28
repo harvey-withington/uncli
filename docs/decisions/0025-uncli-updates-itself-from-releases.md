@@ -43,8 +43,11 @@ than the last release, not older.
   progress. It downloads the installer to `%LocalAppData%\UNCLI\update`,
   checks its SHA-256 against `SHA256SUMS.txt`, and deletes a file that
   doesn't match. Then it hands the installer to the install script
-  (decision 0024), which UNCLI embeds. UNCLI quits about 20 seconds later
-  and is back within a minute.
+  (decision 0024), which UNCLI embeds, with a 3-second wait (a session
+  running `npm run install-build` gets 20, to finish its reply). UNCLI is
+  back in well under a minute. The phone retries every few seconds for the
+  first half minute after a drop, and asks for the update status again when
+  it reconnects, so it shows the new version as soon as the PC is back.
 - **From the phone too.** A paired device sees the same status and can
   start the update (three RPC methods). Updating isn't setting up, and the
   PC is often reached only from the phone. When the phone reconnects to a
