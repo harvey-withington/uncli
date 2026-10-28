@@ -20,6 +20,11 @@ Requires Windows 10 or 11 (x64). Download the installer from
 `SHA256SUMS.txt` beside it has its checksum. The installer adds Microsoft's
 WebView2 runtime if Windows doesn't have it yet.
 
+UNCLI installs for you alone, in `%LocalAppData%\Programs\UNCLI`, so
+installing and updating never ask for an administrator (decision 0024). If
+an older version is installed for everyone in Program Files, the installer
+offers to remove it, and Windows asks for permission once.
+
 On first run UNCLI downloads its own copy of Claude Code (the version this
 release is tested with, about 240 MB, checked against Anthropic's published
 checksum) and asks you to sign in with your Claude account in the browser.
@@ -166,6 +171,7 @@ npm run test:e2e          # real app and CLI on Windows, driven in headless Edge
 npm run website           # landing page on http://localhost:5180
 npm run notices           # regenerate THIRD-PARTY-NOTICES.md after changing dependencies
 npm run release           # build a release into dist/ (needs RELEASE_VERSION and NSIS)
+npm run install-build     # install the built installer on this PC and start UNCLI again, even from a session (scripts/install-build.ps1)
 ```
 
 The npm scripts are the only entry points; VS Code tasks and CI call the

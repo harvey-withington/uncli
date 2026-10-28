@@ -30,6 +30,16 @@ var startupEntry = func() func(on bool, command string) error {
 	return setStartupEntry
 }()
 
+// refreshStartup rewrites the Run entry at start while the preference is
+// on, so it names this copy of UNCLI: after a move (from Program Files to
+// the per-user folder, decision 0024) it would start the old one, or
+// nothing.
+func (s *Service) refreshStartup() {
+	if StartupSupported && s.Preferences().StartWithWindows {
+		_ = applyStartup(true)
+	}
+}
+
 // applyStartup makes the Run entry match the preference.
 func applyStartup(on bool) error {
 	exe, err := os.Executable()

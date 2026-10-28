@@ -169,6 +169,7 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	s.containers.percent = map[string]int{}
 	s.artifactStore = artifacts.NewStore(filepath.Join(paths.Config, "artifact-store"))
 	go s.clearOldUploads()
+	s.refreshStartup()
 	sink := newAttention(newCoalescer(emit, 50*time.Millisecond),
 		func(id string) bool { return s.Sessions != nil && s.Sessions.Focused(id) },
 		func() string { return s.Preferences().Notifications },

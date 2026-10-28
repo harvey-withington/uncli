@@ -32,6 +32,9 @@ Unicode true
 ####
 ## Include the wails tools
 ####
+# UNCLI installs for the user who runs it, in their own folder, so installing
+# and updating never need an administrator (decision 0024).
+!define REQUEST_EXECUTION_LEVEL "user"
 !include "wails_tools.nsh"
 
 # The version information for this two must consist of 4 parts
@@ -55,6 +58,9 @@ ManifestDPIAware true
 # !define MUI_WELCOMEFINISHPAGE_BITMAP "resources\leftimage.bmp" #Include this to add a bitmap on the left side of the Welcome Page. Must be a size of 164x314
 !define MUI_FINISHPAGE_NOAUTOCLOSE # Wait on the INSTFILES page so the user can take a look into the details of the installation steps
 !define MUI_ABORTWARNING # This will warn the user if they exit from the installer.
+# The installer quits a running UNCLI, so it offers to start it again.
+!define MUI_FINISHPAGE_RUN "$INSTDIR\${PRODUCT_EXECUTABLE}"
+!define MUI_FINISHPAGE_RUN_TEXT "Start UNCLI"
 
 !insertmacro MUI_PAGE_WELCOME # Welcome to the installer page.
 # !insertmacro MUI_PAGE_LICENSE "resources\eula.txt" # Adds a EULA page to the installer
@@ -72,7 +78,7 @@ ManifestDPIAware true
 
 Name "${INFO_PRODUCTNAME}"
 OutFile "..\..\bin\${INFO_PROJECTNAME}-${ARCH}-installer.exe" # Name of the installer's file.
-InstallDir "$PROGRAMFILES64\${INFO_COMPANYNAME}\${INFO_PRODUCTNAME}" # Default installing folder ($PROGRAMFILES is Program Files folder).
+InstallDir "$LOCALAPPDATA\Programs\${INFO_PRODUCTNAME}" # The user's own programs folder: no administrator needed.
 ShowInstDetails show # This will always show the installation details.
 
 Function .onInit
@@ -83,11 +89,19 @@ FunctionEnd
 # is asked to quit (as its tray menu's Quit does) before its files are
 # replaced or removed. EXE is the copy that asks: the installer brings its
 # own, since a copy installed before --quit (0.3.0) opens instead of
-# quitting. A copy that doesn't quit (an older one only brings its window
-# up) is waited for, then the user is asked to close it.
+# quitting. Any running copy is asked, wherever it's installed (one in
+# Program Files, from before per-user installs, too); with none running,
+# --quit does nothing. A copy here that doesn't quit (an older one only
+# brings its window up) is waited for, then the user is asked to close it.
+# UNCLI_INSTALL_TEST set skips all of it, to try an installer into another
+# folder while UNCLI runs.
 !macro uncli.quitRunning EXE
-    ${If} ${FileExists} "$INSTDIR\${PRODUCT_EXECUTABLE}"
+    ReadEnvStr $R7 UNCLI_INSTALL_TEST
+    ${If} $R7 == ""
         ExecWait '"${EXE}" --quit'
+    ${EndIf}
+    ${If} ${FileExists} "$INSTDIR\${PRODUCT_EXECUTABLE}"
+    ${AndIf} $R7 == ""
         StrCpy $R9 0
         ${Do}
             # A running exe can't be opened for writing.
@@ -109,6 +123,66 @@ FunctionEnd
     ${EndIf}
 !macroend
 
+# The uninstall entry, in the user's own registry (SHCTX is HKCU for a
+# per-user install), as wails.writeUninstaller writes it machine-wide.
+!macro uncli.writeUninstaller
+    WriteUninstaller "$INSTDIR\uninstall.exe"
+
+    SetRegView 64
+    WriteRegStr SHCTX "${UNINST_KEY}" "Publisher" "${INFO_COMPANYNAME}"
+    WriteRegStr SHCTX "${UNINST_KEY}" "DisplayName" "${INFO_PRODUCTNAME}"
+    WriteRegStr SHCTX "${UNINST_KEY}" "DisplayVersion" "${INFO_PRODUCTVERSION}"
+    WriteRegStr SHCTX "${UNINST_KEY}" "DisplayIcon" "$INSTDIR\${PRODUCT_EXECUTABLE}"
+    WriteRegStr SHCTX "${UNINST_KEY}" "InstallLocation" "$INSTDIR"
+    WriteRegStr SHCTX "${UNINST_KEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
+    WriteRegStr SHCTX "${UNINST_KEY}" "QuietUninstallString" "$\"$INSTDIR\uninstall.exe$\" /S"
+    WriteRegDWORD SHCTX "${UNINST_KEY}" "NoModify" 1
+    WriteRegDWORD SHCTX "${UNINST_KEY}" "NoRepair" 1
+
+    ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
+    IntFmt $0 "0x%08X" $0
+    WriteRegDWORD SHCTX "${UNINST_KEY}" "EstimatedSize" "$0"
+!macroend
+
+!macro uncli.deleteUninstaller
+    Delete "$INSTDIR\uninstall.exe"
+
+    SetRegView 64
+    DeleteRegKey SHCTX "${UNINST_KEY}"
+!macroend
+
+# An older UNCLI installed for everyone (in Program Files, before per-user
+# installs) stays where it is until its own uninstaller removes it, which
+# needs an administrator. Run by hand, the installer offers to: Windows asks
+# for permission. Silent installs (updates) leave it alone. Its uninstaller
+# works in the all-users folders, so the window state this copy keeps in
+# the user's %AppData% is untouched.
+Function uncli.removeMachineCopy
+    IfSilent done
+    SetRegView 64
+    ReadRegStr $R0 HKLM "${UNINST_KEY}" "UninstallString"
+    StrCmp $R0 "" done
+    MessageBox MB_YESNO|MB_ICONQUESTION "UNCLI is now installed just for you, in $INSTDIR, so installing updates never needs an administrator.$\r$\n$\r$\nAn older copy, installed for everyone in Program Files, is still there. Remove it now? Windows will ask for permission." IDNO done
+    StrCpy $R1 $R0 "" 1 # the path, without its quotes
+    StrCpy $R1 $R1 -1
+    ClearErrors
+    ExecShellWait "runas" "$R1" "/S"
+    IfErrors done # permission refused
+    # It hands over to a copy of itself and returns at once: wait for its
+    # entry to go, which it removes last (two minutes at most).
+    StrCpy $R2 0
+    ${Do}
+        ReadRegStr $R0 HKLM "${UNINST_KEY}" "UninstallString"
+        ${If} $R0 == ""
+        ${OrIf} $R2 > 240
+            ${Break}
+        ${EndIf}
+        IntOp $R2 $R2 + 1
+        Sleep 500
+    ${Loop}
+    done:
+FunctionEnd
+
 Section
     !insertmacro wails.setShellContext
 
@@ -129,7 +203,9 @@ Section
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols
 
-    !insertmacro wails.writeUninstaller
+    !insertmacro uncli.writeUninstaller
+
+    Call uncli.removeMachineCopy
 SectionEnd
 
 Section "uninstall"
@@ -150,5 +226,5 @@ Section "uninstall"
     !insertmacro wails.unassociateFiles
     !insertmacro wails.unassociateCustomProtocols
 
-    !insertmacro wails.deleteUninstaller
+    !insertmacro uncli.deleteUninstaller
 SectionEnd
