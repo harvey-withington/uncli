@@ -12,6 +12,7 @@ import { mockTheme } from './mock-theme'
 import { mockContainers } from './mock-containers'
 import { mockFiles } from './mock-files'
 import { mockRemote } from './mock-remote'
+import { mockUpdate } from './mock-update'
 import { mockTranscriptPages, mockTranscripts } from './mock-import'
 import { mockWatch } from './mock-watch'
 
@@ -353,6 +354,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     pair: r => h?.pairRequest?.(r),
     devices: d => h?.devicesChanged?.(d),
   })
+  const updates = mockUpdate(s => h?.updateStatus?.(s))
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
   let decisionKey = ''
   let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }
@@ -970,6 +972,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     async revealFile() {},
     ...mockWatch(),
     ...remote,
+    ...updates,
     ...mockFiles(),
     async usageReport(q) { return mockUsageReport(q) },
     async theme() { return mockTheme() },

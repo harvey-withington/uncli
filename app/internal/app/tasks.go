@@ -51,6 +51,9 @@ type Preferences struct {
 	// StartWithWindows starts UNCLI, minimised to the tray, when the user
 	// signs in to Windows (startup.go).
 	StartWithWindows bool `json:"startWithWindows"`
+	// UpdateCheck is whether a release build looks for newer releases by
+	// itself (updates.go): auto or off.
+	UpdateCheck string `json:"updateCheck"`
 }
 
 // Conversation cache lifetimes. Auto leaves it to the CLI: Claude Code
@@ -88,7 +91,7 @@ const settingPrefs = "prefs"
 
 func defaultPreferences() Preferences {
 	return Preferences{QuickTaskModel: ModelRef{Provider: "claude", Model: "haiku"}, AutoSummary: SummaryOff, UnknownCommands: session.UnknownModel,
-		DecisionModel: DecisionModel{Provider: DeciderQuickTask}, Notifications: NotifyAll, Editor: ide.Auto, PromptCache: CacheAuto}
+		DecisionModel: DecisionModel{Provider: DeciderQuickTask}, Notifications: NotifyAll, Editor: ide.Auto, PromptCache: CacheAuto, UpdateCheck: UpdateAuto}
 }
 
 func (s *Service) Preferences() Preferences {
@@ -167,6 +170,12 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 	}
 	if !validCache(p.PromptCache) {
 		return s.Preferences(), fmt.Errorf("unknown conversation cache setting %q", p.PromptCache)
+	}
+	if p.UpdateCheck == "" {
+		p.UpdateCheck = UpdateAuto
+	}
+	if p.UpdateCheck != UpdateAuto && p.UpdateCheck != UpdateOff {
+		return s.Preferences(), fmt.Errorf("unknown update check setting %q", p.UpdateCheck)
 	}
 	if p.StartWithWindows != s.Preferences().StartWithWindows {
 		if p.StartWithWindows && !StartupSupported {

@@ -41,7 +41,7 @@ prompt, which quietly gets around UAC.
   uninstaller works in the all-users folders, so the window state in the
   user's `%AppData%` is untouched. Start with Windows is rewritten at every
   start while it's on, so it names the copy that's running.
-- **Installing from a session.** `scripts/install-build.ps1` copies an
+- **Installing from a session.** `app/internal/update/install-build.ps1` copies an
   installer and itself to `%LocalAppData%\UNCLI\update` and starts a
   scheduled task of the user's own ("UNCLI update", no administrator). The
   task runs outside UNCLI's job. It installs silently, waits for every

@@ -12,7 +12,7 @@ const NOT_SESSION = [
   'cliChannels', 'providerStatus', 'installProvider', 'setProviderVersion', 'providerChannels', 'enablePlugin',
   'disablePlugin', 'signInTerminal', 'revealCLI', 'startDeviceSignIn', 'cancelDeviceSignIn', 'pickFolder',
   'createSession', 'describePaths', 'describeAttachments', 'search', 'clipboardFiles', 'pinned', 'setPreferences',
-  'setDecisionKey', 'hasDecisionKey', 'testDecisionModel', 'testNotification', 'usage', 'usageReport', 'containers',
+  'setDecisionKey', 'hasDecisionKey', 'testDecisionModel', 'testNotification', 'usage', 'usageReport', 'updateStatus', 'checkForUpdates', 'installUpdate', 'containers',
   'installWSL', 'stopContainers', 'buildContainer', 'removeContainer', 'saveContainer', 'removeContainerConfig',
   'startContainerSignIn', 'finishContainerSignIn', 'cancelContainerSignIn', 'signOutContainers',
   'startContainerAccountSignIn', 'finishContainerAccountSignIn', 'cancelContainerAccountSignIn',

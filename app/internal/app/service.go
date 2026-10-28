@@ -111,6 +111,7 @@ type Service struct {
 	remoteNotes   NoteSink // notes for paired devices (SetRemoteNotes)
 	artifactStore *artifacts.Store
 	containers    containers
+	updates       updates                  // checking for and installing newer releases (updates.go)
 	providers     []Provider               // names for the interface (providers.yaml)
 	transcripts   *core.TranscriptLocation // where saved conversations are read from; nil: the CLI's own (tests set it)
 
@@ -170,6 +171,8 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	s.artifactStore = artifacts.NewStore(filepath.Join(paths.Config, "artifact-store"))
 	go s.clearOldUploads()
 	s.refreshStartup()
+	s.initUpdates()
+	go s.watchUpdates()
 	sink := newAttention(newCoalescer(emit, 50*time.Millisecond),
 		func(id string) bool { return s.Sessions != nil && s.Sessions.Focused(id) },
 		func() string { return s.Preferences().Notifications },

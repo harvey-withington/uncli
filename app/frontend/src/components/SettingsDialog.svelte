@@ -15,6 +15,7 @@
   import RemoteSection from './RemoteSection.svelte'
   import SafeSection from './SafeSection.svelte'
   import StartupSection from './StartupSection.svelte'
+  import UpdateSection from './UpdateSection.svelte'
   import type { Preferences } from '../lib/api'
   import { loadSettingsTab, nextTab, saveSettingsTab, tabOf, tabsFor, type SettingsTab } from '../lib/settings'
 
@@ -98,6 +99,7 @@
         {#if prefs}
           <NotifySection {prefs} {savePrefs} />
           <StartupSection {prefs} {savePrefs} />
+          <UpdateSection {prefs} {savePrefs} />
           <EditorSection {prefs} {savePrefs} />
           <QuickSection {prefs} {savePrefs} />
         {/if}

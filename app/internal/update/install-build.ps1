@@ -21,6 +21,10 @@ UNCLI:
 Everything is logged to %LOCALAPPDATA%\UNCLI\update\update.log. Remote
 access is a saved setting, so paired devices reconnect once UNCLI is back.
 
+UNCLI embeds this script and runs it itself for Update now, with a release
+it downloaded and checked (internal/update, decision 0025); npm run
+install-build runs it on a local build.
+
 .PARAMETER Installer
 The installer to run. Default: app\build\bin\uncli-amd64-installer.exe,
 the one `wails build -nsis` (and publish-build.mjs) leaves.
@@ -30,10 +34,10 @@ Do everything except install, quit or start UNCLI: the task runs, logs
 what it would do, and exits. To check the task works.
 
 .EXAMPLE
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-build.ps1
+npm run install-build   (from the repository root)
 #>
 param(
-  [string]$Installer = (Join-Path $PSScriptRoot '..\app\build\bin\uncli-amd64-installer.exe'),
+  [string]$Installer = (Join-Path $PSScriptRoot '..\..\build\bin\uncli-amd64-installer.exe'),
   [switch]$DryRun,
   [switch]$Run # internal: set when the scheduled task runs this copy
 )
@@ -142,8 +146,10 @@ if ($Run) {
 $Installer = [IO.Path]::GetFullPath($Installer)
 if (-not (Test-Path $Installer)) { throw "No installer at $Installer. Build one first (npm run build, or node scripts/publish-build.mjs)." }
 New-Item -ItemType Directory -Force -Path $UpdateDir | Out-Null
-if (-not $DryRun) { Copy-Item -Path $Installer -Destination $Staged -Force }
-Copy-Item -Path $PSCommandPath -Destination $StagedScript -Force
+# The app runs its own copy from $UpdateDir (Settings, Update now): nothing
+# is copied onto itself.
+if (-not $DryRun -and $Installer -ne $Staged) { Copy-Item -Path $Installer -Destination $Staged -Force }
+if ($PSCommandPath -ne $StagedScript) { Copy-Item -Path $PSCommandPath -Destination $StagedScript -Force }
 $hash = (Get-FileHash -Path $Installer -Algorithm SHA256).Hash.ToLower()
 
 $taskArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StagedScript`" -Run"
@@ -151,7 +157,7 @@ if ($DryRun) { $taskArgs += ' -DryRun' }
 $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $taskArgs -WorkingDirectory $UpdateDir
 $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
-Register-ScheduledTask -TaskName $TaskName -Action $action -Principal $principal -Settings $settings -Description 'Installs a UNCLI build and starts UNCLI again (scripts/install-build.ps1).' -Force | Out-Null
+Register-ScheduledTask -TaskName $TaskName -Action $action -Principal $principal -Settings $settings -Description 'Installs a UNCLI build and starts UNCLI again (install-build.ps1).' -Force | Out-Null
 Start-ScheduledTask -TaskName $TaskName
 
 $mode = if ($DryRun) { 'dry run' } else { 'install' }

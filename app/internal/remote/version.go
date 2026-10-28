@@ -3,7 +3,8 @@ package remote
 import (
 	"encoding/json"
 	"net/http"
-	"runtime/debug"
+
+	"uncli/internal/buildinfo"
 )
 
 // GET /version needs no token: a client checks it before pairing and on
@@ -13,10 +14,6 @@ import (
 
 // Protocol is the remote API's version.
 const Protocol = 1
-
-// Version is the app's version, stamped by release builds
-// (-ldflags "-X uncli/internal/remote.Version=0.3.0").
-var Version = "dev"
 
 // Capabilities are optional features this server has, for clients newer
 // or older than it to check rather than guess.
@@ -32,17 +29,9 @@ type VersionInfo struct {
 }
 
 func versionInfo() VersionInfo {
-	v := VersionInfo{App: Version, Protocol: Protocol, Capabilities: Capabilities}
-	if bi, ok := debug.ReadBuildInfo(); ok {
-		for _, s := range bi.Settings {
-			switch s.Key {
-			case "vcs.revision":
-				v.Commit = s.Value
-			case "vcs.time":
-				v.CommitDate = s.Value
-			}
-		}
-	}
+	// The app's version is the release's (buildinfo), or "dev".
+	v := VersionInfo{App: buildinfo.Version, Protocol: Protocol, Capabilities: Capabilities}
+	v.Commit, v.CommitDate = buildinfo.Commit()
 	return v
 }
 

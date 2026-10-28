@@ -13,16 +13,16 @@ import (
 // widening of what the network can do: check it belongs (decision 0021).
 var pinnedMethods = []string{
 	"AnswerApproval", "AnswerAsk", "Archive", "ArtifactFiles", "ArtifactLink",
-	"Bootstrap", "CLIChannels", "CLIStatus", "Commands", "Containers",
+	"Bootstrap", "CLIChannels", "CLIStatus", "CheckForUpdates", "Commands", "Containers",
 	"CreateSession", "Delete", "DeleteSafeEntry", "Editors", "ExplainCommand",
-	"Focus", "HasDecisionKey", "ImportTranscript", "Interrupt", "KnownTools",
+	"Focus", "HasDecisionKey", "ImportTranscript", "InstallUpdate", "Interrupt", "KnownTools",
 	"ListFolder", "MCPCallback", "MCPCancel", "MCPReconnect", "MCPSignIn",
 	"MCPSignOut", "MarkSafe", "MoveSafeEntry", "Pages", "Pinned",
 	"PreviewClasses", "ProviderChannels", "ProviderStatus", "PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "ReadArtifact",
-	"Rename", "Restart","SafeList", "Search", "Send", "SessionAllowlist", "SetBookmark",
+	"Rename", "Restart", "SafeList", "Search", "Send", "SessionAllowlist", "SetBookmark",
 	"SetMode", "SetModel", "SetPinned", "SetPushNotifications", "SetSafeEntry", "SetSafeLabel",
 	"SetShares", "SetSortOrder", "SetUnattended", "SummarisePage", "Teach", "TestPush",
-	"ToggleModifier", "Transcripts", "UploadLink", "Usage", "UsageReport",
+	"ToggleModifier", "Transcripts", "UpdateStatus", "UploadLink", "Usage", "UsageReport",
 	"WatchFiles", "WatchRead",
 }
 

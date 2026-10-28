@@ -51,6 +51,9 @@ var rpcMethods = []string{
 	"ArtifactLink", "UploadLink",
 	// This device's notifications (push).
 	"PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "SetPushNotifications", "TestPush",
+	// UNCLI's own updates (decision 0025): the phone can start one, as a
+	// session on the PC could.
+	"UpdateStatus", "CheckForUpdates", "InstallUpdate",
 }
 
 var rpcNames = func() map[string]bool {

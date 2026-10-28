@@ -11,6 +11,7 @@ const SECTION_TAB: Record<string, SettingsTab> = {
   appearance: 'general',
   notify: 'general',
   startup: 'general',
+  updates: 'general',
   editor: 'general',
   quick: 'general',
   safe: 'approvals',

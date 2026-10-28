@@ -2,7 +2,7 @@
 // the live text of answers still streaming. All state is keyed by id.
 import type {
   ArtifactFile, AttachmentRef, Backend, ContainersInfo, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
-  CommandInfo, Connection, ModelInfo, PairRequest, PairedDevice, RemoteStatus, Share, ThinkingData, UsageLimit,
+  CommandInfo, Connection, ModelInfo, PairRequest, PairedDevice, RemoteStatus, Share, ThinkingData, UpdateStatus, UsageLimit,
 } from '../lib/api'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
@@ -45,6 +45,8 @@ export class AppStore {
   pairRequest = $state<PairRequest | null>(null) // a device waiting for "Allow <name>?"
   // A remote client's link to its server (null for the window, always connected).
   connection = $state<Connection | null>(null)
+  // UNCLI's own updates (decision 0025), on the PC or the phone alike.
+  update = $state<UpdateStatus | null>(null)
   // What in Settings needs the user, per tab (lib/attention.ts).
   attention = $derived(settingsAttention(this.containers))
   sessions = $state<SessionView[]>([])
@@ -152,6 +154,7 @@ export class AppStore {
       remoteStatus: s => { this.remote = s },
       pairRequest: r => { this.pairRequest = r },
       devicesChanged: d => { this.devices = d },
+      updateStatus: u => { this.update = u },
       resync: () => { void this.resync() },
       connection: c => {
         this.connection = c
@@ -170,6 +173,7 @@ export class AppStore {
     void this.loadProviders()
     // Remote access, for the header's button; later changes arrive as events.
     if (this.backend.kind !== 'http') void this.backend.remoteStatus().then(s => { this.remote ??= s }, () => {})
+    void this.backend.updateStatus().then(u => { this.update ??= u }, () => {})
     this.ready = true
     // The session open last time, else the first.
     if (!this.openLast) return
@@ -628,6 +632,34 @@ export class AppStore {
       delete this.live[id]
       this.upsertSession(await this.backend.restart(id))
       showToast(t('restart.done', names), 'success')
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
+  }
+
+  // checkForUpdates looks for a newer release now (Settings → Updates).
+  async checkForUpdates() {
+    try {
+      this.update = await this.backend.checkForUpdates()
+    } catch (e) {
+      showToast(String(e), 'error')
+    }
+  }
+
+  // installUpdate downloads the newer release and hands it to the installer:
+  // UNCLI quits, installs and starts again. An answer in progress would stop
+  // where it is, so that's asked first.
+  async installUpdate() {
+    const v = this.update?.latest?.version ?? ''
+    const busy = this.sessions.some(s => s.busy)
+    if (!(await confirm({
+      title: t('update.confirmTitle', { version: v }),
+      message: t(busy ? 'update.confirmBusy' : 'update.confirmBody'),
+      confirmLabel: t('update.now'),
+      danger: busy,
+    }))) return
+    try {
+      this.update = await this.backend.installUpdate()
     } catch (e) {
       showToast(String(e), 'error')
     }

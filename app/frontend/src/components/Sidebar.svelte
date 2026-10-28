@@ -7,6 +7,7 @@
   import ResizeHandle from './ResizeHandle.svelte'
   import SearchPanel from './SearchPanel.svelte'
   import SessionItem from './SessionItem.svelte'
+  import UpdateNotice from './UpdateNotice.svelte'
   import { SIDEBAR_MAX, SIDEBAR_MIN } from '../lib/panels'
   import { dragSort } from '../lib/actions'
 
@@ -74,6 +75,7 @@
     {/if}
   </nav>
 
+  <UpdateNotice />
   <footer>
     <button class="btn ghost small settings" onclick={() => app.openSettings(attentionAt)} title={attentionTitle}>
       <span class="gear"><Icon name="settings" size={14} />{#if attentionAt}<span class="dot" aria-hidden="true"></span>{/if}</span>

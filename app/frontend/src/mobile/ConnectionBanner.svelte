@@ -7,14 +7,16 @@
 
   // When the server can't be reached: which, why, when it last connected,
   // and that it keeps trying (lib/api/http.ts reconnects by itself). A
-  // server on another protocol says so too.
+  // server on another protocol says so too, and one that has been updated
+  // since this page loaded offers Reload, for the page to match it.
 
   interface Props {
     server: string
     mismatch?: boolean // the server speaks another protocol version
+    updated?: boolean // the server runs another build than when this page loaded
   }
 
-  let { server, mismatch = false }: Props = $props()
+  let { server, mismatch = false, updated = false }: Props = $props()
   const app = useApp()
   const c = $derived(app.connection)
   let now = $state(Date.now())
@@ -25,6 +27,13 @@
 
 {#if mismatch}
   <p class="banner warn" role="alert"><Icon name="triangle-alert" size={15} />{t('mobile.versionMismatch', { server })}</p>
+{/if}
+{#if updated}
+  <p class="banner info" role="status">
+    <Icon name="circle-arrow-up" size={15} />
+    <span>{t('mobile.updated')}</span>
+    <button class="btn primary small" onclick={() => location.reload()}>{t('mobile.reload')}</button>
+  </p>
 {/if}
 {#if down && c}
   <p class="banner" role="status">
@@ -54,6 +63,17 @@
     flex: none;
     margin-top: 2px;
     color: var(--warning);
+  }
+  .banner.info {
+    align-items: center;
+    background: var(--accent-soft);
+  }
+  .banner.info :global(svg) {
+    margin-top: 0;
+    color: var(--accent);
+  }
+  .banner.info span {
+    flex: 1;
   }
   .why {
     color: var(--text-muted);

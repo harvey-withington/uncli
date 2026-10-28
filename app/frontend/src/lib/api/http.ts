@@ -194,6 +194,9 @@ export function httpBackend(opts: HttpOptions): Backend {
     testNotification: only('testNotification'),
     summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     usage: () => call('Usage'),
+    updateStatus: () => call('UpdateStatus'),
+    checkForUpdates: () => call('CheckForUpdates'),
+    installUpdate: () => call('InstallUpdate'),
     usageReport: q => call('UsageReport', q),
     containers: () => call('Containers'),
     installWSL: only('installWSL'),
@@ -298,6 +301,7 @@ function stream(opts: HttpOptions, f: typeof fetch, auth: () => Record<string, s
       case 'cli:status': return h.cliStatus(data as never)
       case 'provider:status': return h.providerStatus?.(data as never)
       case 'containers:changed': return h.containersChanged?.(data as never)
+      case 'update:status': return h.updateStatus?.(data as never)
     }
   }
 

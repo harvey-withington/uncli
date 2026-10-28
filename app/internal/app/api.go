@@ -361,6 +361,19 @@ func (a *API) SignOutContainerAccount() error { return a.svc.SignOutContainerAcc
 
 func (a *API) Usage() *core.UsageLimit { return a.svc.Sessions.Usage() }
 
+// UpdateStatus, CheckForUpdates and InstallUpdate are UNCLI's own updates
+// (decision 0025).
+func (a *API) UpdateStatus() UpdateStatus { return a.svc.UpdateStatus() }
+
+func (a *API) CheckForUpdates() (UpdateStatus, error) {
+	return a.svc.CheckForUpdates(context.Background())
+}
+
+// InstallUpdate returns once the installer has it; UNCLI quits shortly after.
+func (a *API) InstallUpdate() (UpdateStatus, error) {
+	return a.svc.InstallUpdate(context.Background())
+}
+
 // Theme reads the user's theme.yaml (decision 0010).
 func (a *API) Theme() (ThemeFile, error) { return a.svc.Theme() }
 

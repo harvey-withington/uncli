@@ -10,7 +10,7 @@
 // The version is a tag without its v: 1.0.0, or a pre-release such as
 // 1.0.0-rc1 or 1.0.0b1. Windows and NSIS only take numbers, so the installer
 // and the exe are stamped with the numeric part (1.0.0); wails.json is put
-// back afterwards. CHANGELOG.md must have a "## <version>" (or "## <x.y.z>")
+// back afterwards. The app itself carries the whole version (buildinfo). CHANGELOG.md must have a "## <version>" (or "## <x.y.z>")
 // section, and THIRD-PARTY-NOTICES.md must be current (npm run notices).
 
 import { execFileSync } from 'node:child_process'
@@ -54,7 +54,9 @@ const config = JSON.parse(original)
 config.info.productVersion = numeric
 writeFileSync(wailsJson, JSON.stringify(config, null, 2) + '\n')
 try {
-  execFileSync('wails', ['build', '-clean', '-nsis', '-platform', 'windows/amd64'], { cwd: appDir, stdio: 'inherit', shell: true })
+  // The full version (pre-release part and all) goes into the app, which
+  // reports it and checks it against newer releases (decision 0025).
+  execFileSync('wails', ['build', '-clean', '-nsis', '-platform', 'windows/amd64', '-ldflags', `"-X uncli/internal/buildinfo.Version=${version}"`], { cwd: appDir, stdio: 'inherit', shell: true })
 } finally {
   writeFileSync(wailsJson, original)
 }

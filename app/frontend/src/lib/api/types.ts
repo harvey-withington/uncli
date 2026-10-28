@@ -474,6 +474,29 @@ export interface Preferences {
   editorCommand?: string // custom: a template with {file}, {line}, {folder}
   promptCache?: PromptCache // how long a session's conversation stays cached (default auto)
   startWithWindows?: boolean // start at sign-in, minimised to the tray (Windows only)
+  updateCheck?: 'auto' | 'off' // look for newer releases by itself (default auto)
+}
+
+// UNCLI's own updates (decision 0025): the newest release found on GitHub,
+// and how far an update has got.
+export interface UpdateRelease {
+  version: string // 0.4.0-alpha
+  url: string // its page on GitHub
+  published: string
+  setup: string
+}
+
+export type UpdateState = 'idle' | 'checking' | 'downloading' | 'installing' | 'error'
+
+export interface UpdateStatus {
+  current: string // this build's version, or "dev"
+  dev: boolean // a development build: it never checks
+  state: UpdateState
+  latest?: UpdateRelease
+  available: boolean // latest is newer than this build
+  percent?: number // while downloading
+  error?: string
+  checkedAt?: number // ms
 }
 
 // How long a session's conversation stays cached after its last message:
@@ -702,6 +725,7 @@ export interface Handlers {
   connection?(c: Connection): void
   pairRequest?(r: PairRequest): void // a device waits for "Allow <name>?" (the server's window only)
   devicesChanged?(d: PairedDevice[]): void // paired devices changed (the server's window only)
+  updateStatus?(s: UpdateStatus): void // an update check or install moved on
 }
 
 // Pairing a device (decision 0022): a one-use code that lasts a few
@@ -876,6 +900,11 @@ export interface Backend {
   testPush(): Promise<void>
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   usage(): Promise<UsageLimit | null>
+  // UNCLI's own updates (decision 0025). installUpdate resolves once the
+  // installer has it; UNCLI quits a few seconds later and comes back.
+  updateStatus(): Promise<UpdateStatus>
+  checkForUpdates(): Promise<UpdateStatus>
+  installUpdate(): Promise<UpdateStatus>
   usageReport(q: UsageQuery): Promise<UsageReport>
   containers(): Promise<ContainersInfo> // WSL, the sign-in and each container profile (decision 0011)
   installWSL(): Promise<void> // one administrator prompt; Windows restarts before WSL works

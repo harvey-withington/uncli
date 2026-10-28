@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '../components/Icon.svelte'
   import SessionItem from '../components/SessionItem.svelte'
+  import UpdateNotice from '../components/UpdateNotice.svelte'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
 
@@ -32,6 +33,7 @@
   {#if !app.cliReady}
     <p class="note" role="status"><Icon name="triangle-alert" size={15} />{t('mobile.cliNotReady')}</p>
   {/if}
+  <UpdateNotice />
   <button class="btn primary new" onclick={() => app.openNewSession()} disabled={!app.cliReady}>
     <Icon name="plus" size={16} />{t('session.new')}
   </button>

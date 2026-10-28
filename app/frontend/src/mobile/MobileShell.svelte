@@ -38,6 +38,21 @@
   let failed = $state('')
   let settingsOpen = $state(false)
   let version = $state<ServerVersion | null>(null)
+  // The build this page came with: once the server runs another (it was
+  // updated, decision 0025), the banner offers Reload.
+  let loadedWith: ServerVersion | null = null
+  let updated = $state(false)
+  async function readVersion() {
+    const v = await fetchVersion(fetch)
+    if (!v) return
+    version = v
+    if (!loadedWith) loadedWith = v
+    else if (v.app !== loadedWith.app || v.commit !== loadedWith.commit) updated = true
+  }
+  // Each reconnect may follow a restart of the server, new build and all.
+  $effect(() => {
+    if (app.connection?.state === 'online') untrack(() => void readVersion())
+  })
   // The session shown; the store's currentId may lag behind a Back.
   let open = $state(false)
 
@@ -109,7 +124,7 @@
         }
       })
       .catch(e => (failed = String(e)))
-    void fetchVersion(fetch).then(v => (version = v))
+    void readVersion()
     addEventListener('popstate', onpop)
     document.addEventListener('visibilitychange', onvisible)
   })
@@ -121,7 +136,7 @@
 </script>
 
 <div class="shell mobile">
-  <ConnectionBanner {server} mismatch={mismatched(version)} />
+  <ConnectionBanner {server} mismatch={mismatched(version)} {updated} />
   {#if failed}
     <main class="center"><p class="fatal" role="alert"><Icon name="triangle-alert" />{failed}</p></main>
   {:else if !app.ready}

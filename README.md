@@ -25,6 +25,11 @@ installing and updating never ask for an administrator (decision 0024). If
 an older version is installed for everyone in Program Files, the installer
 offers to remove it, and Windows asks for permission once.
 
+UNCLI looks for a newer release by itself and offers to install it: Update
+now downloads it, checks its checksum, then quits, installs and starts UNCLI
+again (decision 0025). Settings → Updates checks on demand, or turns the
+automatic checks off. Builds you make yourself don't check.
+
 On first run UNCLI downloads its own copy of Claude Code (the version this
 release is tested with, about 240 MB, checked against Anthropic's published
 checksum) and asks you to sign in with your Claude account in the browser.
@@ -171,7 +176,7 @@ npm run test:e2e          # real app and CLI on Windows, driven in headless Edge
 npm run website           # landing page on http://localhost:5180
 npm run notices           # regenerate THIRD-PARTY-NOTICES.md after changing dependencies
 npm run release           # build a release into dist/ (needs RELEASE_VERSION and NSIS)
-npm run install-build     # install the built installer on this PC and start UNCLI again, even from a session (scripts/install-build.ps1)
+npm run install-build     # install the built installer on this PC and start UNCLI again, even from a session (app/internal/update/install-build.ps1)
 ```
 
 The npm scripts are the only entry points; VS Code tasks and CI call the
