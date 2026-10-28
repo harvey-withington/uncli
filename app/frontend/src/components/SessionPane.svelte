@@ -11,6 +11,7 @@
   import ScrollKeeper from './ScrollKeeper.svelte'
   import SessionStatus from './SessionStatus.svelte'
   import McpServers from './McpServers.svelte'
+  import RemoteButton from './RemoteButton.svelte'
   import SharesNote from './SharesNote.svelte'
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
@@ -109,6 +110,7 @@
         <SharesNote {session} compact />
       {/if}
       <span class="gap"></span>
+      <RemoteButton />
       <McpServers {session} />
       {#if !session.archived}
         <button

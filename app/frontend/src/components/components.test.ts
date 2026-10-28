@@ -142,7 +142,8 @@ describe('App', () => {
   it('switches pages with the arrow keys and bookmarks with B', async () => {
     render(App, { props: { backend: mockBackend() } })
     await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
-    await fireEvent.click(screen.getByText('Summarise the Q3 planning notes'))
+    // The session's row, not its pinned page, which has the same title.
+    await fireEvent.click(document.querySelector<HTMLElement>('[data-id="s-cowork"] .main')!)
     await screen.findByText('Page 3 of 3')
     await fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()

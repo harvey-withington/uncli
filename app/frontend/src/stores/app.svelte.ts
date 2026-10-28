@@ -168,6 +168,8 @@ export class AppStore {
     // Containers' labels, and whether one needs the user (the Settings dot).
     if (boot.platform === 'windows') void this.loadContainers()
     void this.loadProviders()
+    // Remote access, for the header's button; later changes arrive as events.
+    if (this.backend.kind !== 'http') void this.backend.remoteStatus().then(s => { this.remote ??= s }, () => {})
     this.ready = true
     // The session open last time, else the first.
     if (!this.openLast) return

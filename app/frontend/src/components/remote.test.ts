@@ -7,6 +7,7 @@ import { AppStore } from '../stores/app.svelte'
 import { atServer } from '../lib/remoteonly'
 import { APP_CONTEXT } from '../lib/context'
 import Composer from './Composer.svelte'
+import SessionPane from './SessionPane.svelte'
 
 async function openRemote(backend = mockBackend()) {
   render(App, { props: { backend } })
@@ -224,5 +225,28 @@ describe('a remote client', () => {
   it('knows what only works at the server', () => {
     expect(atServer({ kind: 'wails' })).toBe(true)
     expect(atServer({ kind: 'http' })).toBe(false)
+  })
+})
+
+describe('the header’s Remote access button', () => {
+  it('says whether remote access is on, turns green once it is, and opens its settings', async () => {
+    const backend = mockBackend()
+    render(App, { props: { backend } })
+    const off = await screen.findByRole('button', { name: 'Remote access is off' })
+    expect(off).not.toHaveClass('ok')
+    await backend.setRemoteAccess(true, 9871) // the change arrives as an event
+    const on = await screen.findByRole('button', { name: 'Remote access is on: paired devices can reach this PC' })
+    expect(on).toHaveClass('ok')
+    await fireEvent.click(on)
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+    expect(within(dialog).getByRole('tab', { name: 'Remote access' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('isn’t shown on a remote client', async () => {
+    const backend = { ...mockBackend(), kind: 'http' as const }
+    const s = new AppStore(backend)
+    await s.init()
+    render(SessionPane, { props: { session: s.current! }, context: new Map([[APP_CONTEXT, s]]) })
+    expect(screen.queryByRole('button', { name: /^Remote access/ })).toBeNull()
   })
 })
