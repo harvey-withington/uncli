@@ -213,9 +213,10 @@ func sumFor(sums, name string) (string, bool) {
 }
 
 // Valid says v is a version UNCLI releases use: 1.2.3, or 1.2.3 with a
-// pre-release part (1.2.3-alpha, 1.2.3-rc.1).
+// pre-release part (1.2.3-alpha, 1.2.3-rc.1), and perhaps build metadata
+// (a test build's +dev.66).
 func Valid(v string) bool {
-	core, _, _ := strings.Cut(v, "-")
+	core, _, _ := strings.Cut(bare(v), "-")
 	parts := strings.Split(core, ".")
 	if len(parts) != 3 {
 		return false
@@ -230,10 +231,12 @@ func Valid(v string) bool {
 
 // Compare orders versions as semantic versioning does: by the numbers, then
 // a release before any of its pre-releases (1.0.0 > 1.0.0-rc.1), whose
-// parts compare as numbers when both are, else as text. -1, 0 or 1.
+// parts compare as numbers when both are, else as text. Build metadata
+// counts for nothing, so a test build (0.3.0-alpha+dev.66) is the release
+// it was built after. -1, 0 or 1.
 func Compare(a, b string) int {
-	ac, ap, _ := strings.Cut(a, "-")
-	bc, bp, _ := strings.Cut(b, "-")
+	ac, ap, _ := strings.Cut(bare(a), "-")
+	bc, bp, _ := strings.Cut(bare(b), "-")
 	an, bn := strings.Split(ac, "."), strings.Split(bc, ".")
 	for i := 0; i < 3; i++ {
 		if c := cmpInt(at(an, i), at(bn, i)); c != 0 {
@@ -268,6 +271,12 @@ func Compare(a, b string) int {
 		}
 	}
 	return cmp(len(ai), len(bi))
+}
+
+// bare is a version without its build metadata (+...).
+func bare(v string) string {
+	v, _, _ = strings.Cut(v, "+")
+	return v
 }
 
 func at(s []string, i int) string {

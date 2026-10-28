@@ -28,7 +28,9 @@ offers to remove it, and Windows asks for permission once.
 UNCLI looks for a newer release by itself and offers to install it: Update
 now downloads it, checks its checksum, then quits, installs and starts UNCLI
 again (decision 0025). Settings → Updates checks on demand, or turns the
-automatic checks off. Builds you make yourself don't check.
+automatic checks off. Builds you make yourself (`npm run build`) don't
+check; test builds from `npm run publish-build` carry the last release's
+version plus `+dev.<build>`, so they're offered the next release.
 
 On first run UNCLI downloads its own copy of Claude Code (the version this
 release is tested with, about 240 MB, checked against Anthropic's published

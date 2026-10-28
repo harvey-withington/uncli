@@ -19,11 +19,15 @@ than the last release, not older.
 
 ## Decision
 
-- **Which builds check.** Only release builds. `release.mjs` stamps the whole
+- **Which builds check.** Stamped builds. `release.mjs` stamps the whole
   version, pre-release part and all, into `internal/buildinfo` (`-ldflags
-  -X`). A development build ("dev") never checks: it says it's updated with
-  `npm run install-build`, so a PC running a test build is never offered an
-  older release.
+  -X`). A test build from `publish-build.mjs` carries the last release tag
+  plus `+dev.<build>` (`0.3.0-alpha+dev.66`). Build metadata counts for
+  nothing when versions are compared, so a test build checks as that
+  release would: it's offered the next release, never the same or an older
+  one, which lets the next release test updating on the PC that runs test
+  builds. An unstamped build ("dev": `npm run build`, `wails dev`) never
+  checks, and says it's updated with `npm run install-build`.
 - **Finding one.** The releases API lists releases. The newest is the
   highest version (semantic versioning, pre-releases included, drafts not)
   that has both the installer and `SHA256SUMS.txt`. UNCLI checks 30 seconds
@@ -54,5 +58,8 @@ than the last release, not older.
 - The installer's SHA-256 comes from the same release as the installer, so
   it catches a broken or partial download, not a compromised release.
   Signing the installer would close that, and is not done yet.
-- A test build needs `npm run install-build`, as before.
+- A test build is installed with `npm run install-build`, as before, and is
+  then offered the next release like any copy of the last one. A test build
+  made from code newer than a release would still be offered that release,
+  if a release were ever cut from an older commit.
 - Only Windows can install this way. Elsewhere Update now says so.

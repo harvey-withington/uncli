@@ -82,6 +82,20 @@ func TestUpdatesSayWhenUpToDate(t *testing.T) {
 	}
 }
 
+// A test build (publish-build) is the release it was built after, so the
+// next release is offered to it.
+func TestUpdatesOfferTheNextReleaseToATestBuild(t *testing.T) {
+	asRelease(t, "0.3.0-alpha+dev.66")
+	s := newTestService(t)
+	s.initUpdates()
+	srv := releaseServer(t, []byte("x"))
+	s.updates.url, s.updates.client = srv.URL+"/releases", srv.Client()
+	st, err := s.CheckForUpdates(context.Background())
+	if err != nil || st.Dev || !st.Available || st.Latest.Version != "0.4.0-alpha" {
+		t.Fatalf("check = %+v, %v", st, err)
+	}
+}
+
 func TestUpdatesNeverCheckInADevelopmentBuild(t *testing.T) {
 	asRelease(t, "dev")
 	s := newTestService(t)

@@ -38,11 +38,6 @@ const target = `${user}@${host}`
 const appDir = fileURLToPath(new URL('../app/', import.meta.url))
 const installer = join(appDir, 'build', 'bin', 'uncli-amd64-installer.exe')
 
-// No -clean: it would delete build/bin, which fails while `npm run dev` runs.
-if (!skipBuild) {
-  execFileSync('wails', ['build', '-nsis', '-platform', 'windows/amd64'], { cwd: appDir, stdio: 'inherit', shell: true })
-}
-
 const ssh = cmd => execFileSync('ssh', ['-o', 'BatchMode=yes', target, cmd], { encoding: 'utf8' })
 
 // The builds already there, oldest first.
@@ -62,6 +57,19 @@ const d = new Date()
 const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const name = `uncli-setup-${date}-${String(seq).padStart(3, '0')}.exe`
 
+// A test build carries the last release's version with +dev.<build>
+// (0.3.0-alpha+dev.66). Build metadata counts for nothing when versions are
+// compared, so it checks for updates as that release would: it's offered
+// the next one, never an older one (decision 0025).
+const lastTag = execFileSync('git', ['describe', '--tags', '--abbrev=0', '--match', 'v*'], { encoding: 'utf8' }).trim()
+const version = `${lastTag.replace(/^v/, '')}+dev.${seq}`
+
+// No -clean: it would delete build/bin, which fails while `npm run dev` runs.
+// --skip-build keeps whatever build/bin holds, stamped or not.
+if (!skipBuild) {
+  execFileSync('wails', ['build', '-nsis', '-platform', 'windows/amd64', '-ldflags', `"-X uncli/internal/buildinfo.Version=${version}"`], { cwd: appDir, stdio: 'inherit', shell: true })
+}
+
 const data = readFileSync(installer)
 const sha256 = createHash('sha256').update(data).digest('hex')
 execFileSync('scp', ['-q', '-o', 'BatchMode=yes', installer, `${target}:${dir}/${name}`], { stdio: 'inherit' })
@@ -73,6 +81,7 @@ if (removed.length) ssh(removed.map(f => `del /q ${dir}\\${f}`).join(' & '))
 console.log(JSON.stringify({
   build: seq,
   name,
+  version: skipBuild ? undefined : version,
   date,
   bytes: statSync(installer).size,
   sha256,

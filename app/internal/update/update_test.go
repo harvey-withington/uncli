@@ -27,6 +27,11 @@ func TestCompare(t *testing.T) {
 		{"0.3.0-rc.1", "0.3.0-rc", 1},      // more parts win when the rest match
 		{"0.10.0-alpha", "0.9.0-alpha", 1}, // not as text
 		{"1.0.0-alpha", "0.99.0", 1},
+		// A test build is the release it was built after: offered the next
+		// one, never the same or an older one.
+		{"0.3.0-alpha+dev.66", "0.3.0-alpha", 0},
+		{"0.4.0-alpha", "0.3.0-alpha+dev.66", 1},
+		{"0.3.0-alpha+dev.66", "0.2.0-alpha", 1},
 	} {
 		if got := Compare(c.a, c.b); got != c.want {
 			t.Errorf("Compare(%s, %s) = %d, want %d", c.a, c.b, got, c.want)
@@ -35,7 +40,7 @@ func TestCompare(t *testing.T) {
 			t.Errorf("Compare(%s, %s) = %d, want %d", c.b, c.a, got, -c.want)
 		}
 	}
-	for v, ok := range map[string]bool{"0.3.0-alpha": true, "1.2.3": true, "dev": false, "1.2": false, "1.x.3": false, "": false} {
+	for v, ok := range map[string]bool{"0.3.0-alpha": true, "1.2.3": true, "0.3.0-alpha+dev.66": true, "dev": false, "1.2": false, "1.x.3": false, "": false} {
 		if Valid(v) != ok {
 			t.Errorf("Valid(%q) = %v", v, !ok)
 		}
