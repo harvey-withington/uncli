@@ -4,6 +4,64 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.4.0-alpha
+
+UNCLI updates itself, installs without an administrator, and the fixes
+from the first days of using it from a phone.
+
+### Updates
+
+- **UNCLI updates itself.** It looks for a newer release when it starts
+  and every few hours. When there is one, the sidebar (and the phone's
+  session list) says "UNCLI <version> is available", with Update now and
+  What's new. Update now downloads it, checks it against the release's
+  SHA-256, then quits, installs and starts UNCLI again in under a minute.
+  It asks first if an answer is in progress. Settings → Updates checks on
+  demand, or turns the automatic checks off (decision 0025).
+- **Start it from the phone, too.** Once the PC has updated, the phone
+  offers Reload, so its app matches the PC without closing and reopening it.
+- **Installs just for you.** UNCLI now installs in
+  `%LocalAppData%\Programs\UNCLI` and never asks for an administrator. Run
+  by hand over a copy in Program Files, the installer offers to remove it;
+  Windows asks for permission once (decision 0024).
+- Coming from 0.3.0-alpha, install this one by hand: 0.3.0-alpha can't tell
+  it's out of date. Later releases come through Update now.
+
+### Remote access
+
+- A remote access button in the session header shows whether paired
+  devices can reach this PC: green when they can, amber when only this PC
+  can, red when it can't listen. It opens Settings → Remote access.
+- On the phone, a session you're looking at no longer turns Unread when
+  its answer finishes.
+- Coming back to the phone app catches up even when the network isn't
+  back yet, instead of showing "TypeError: Failed to fetch". "Couldn't
+  reach the server" now fades by itself, and no message starts with an
+  error's type name.
+
+### Sessions
+
+- MCP servers that need you are listed only in the plug button's drop-down,
+  not as a line each under the header. The drop-down has Open the page
+  again and Paste the address while a sign-in waits for the browser, and
+  scrolls when there are many.
+- When the agent switches branch (or pulls, merges or rebases), the files
+  that changed with it fold into one line, "Switched from main to
+  server-mode: 312 files differ", instead of being listed as the agent's
+  own work.
+- The side panel shows in a session with no answer yet, so its File tab is
+  always there.
+- Watch is greyed out, saying why, for a changed file outside the session
+  folder.
+- A file that can't be attached says why: it isn't there any more, or what
+  Windows said when it couldn't be opened.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone.
+- Attaching several files copied in Explorer failed once on one PC with
+  "it can't be read". The message now says why, to find the cause.
+
 ## 0.3.0-alpha
 
 Your sessions from your phone: UNCLI keeps running in the tray and, when
