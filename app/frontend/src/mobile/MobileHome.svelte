@@ -42,7 +42,7 @@
   {:else}
     <ul class="list" aria-label={t('mobile.sessions')}>
       {#each app.activeSessions as s (s.id)}
-        <SessionItem session={s} active={false} />
+        <SessionItem session={s} active={s.id === app.currentId} />
       {/each}
     </ul>
   {/if}

@@ -17,6 +17,7 @@
   import PushSection from './PushSection.svelte'
   import { sessionFromHash } from './pairing'
   import { fetchVersion, mismatched, type ServerVersion } from './version'
+  import { wide } from './wide.svelte'
 
   // The paired phone's app around the window's own store and components:
   // the session list, or one session, with Back to the list (the phone's
@@ -99,11 +100,14 @@
     if (app.connection?.state === 'online') untrack(() => void showing())
   })
 
-  // Tapping a session in the list selects it: show it.
+  // Tapping a session in the list selects it: show it. On a tablet the
+  // list stays beside the session, so another can be tapped while one is
+  // open: the link follows it.
   let shown = ''
   $effect(() => {
     const id = app.currentId
     if (id && id !== shown && !open) void show(id)
+    else if (id && id !== shown && open) history.replaceState({ session: id }, '', `#s=${encodeURIComponent(id)}`)
     shown = id ?? ''
   })
 
@@ -141,6 +145,20 @@
     <main class="center"><p class="fatal" role="alert"><Icon name="triangle-alert" />{failed}</p></main>
   {:else if !app.ready}
     <main class="center" aria-busy="true"><Icon name="loader" spin size={20} label={t('app.loading')} /></main>
+  {:else if wide.on}
+    <!-- A tablet: the list beside the open session (or a word to pick one).
+         Below 1200 px the side panel takes the list's place while it's
+         open, so the answer keeps a readable width. -->
+    <div class="split" class:panel-open={open && app.outline.open}>
+      <div class="home list"><MobileHome {server} onsettings={() => (settingsOpen = true)} /></div>
+      <div class="pane">
+        {#if open && app.current}
+          <MobileSession session={app.current} onback={back} />
+        {:else}
+          <p class="pick">{t('mobile.pickSession')}</p>
+        {/if}
+      </div>
+    </div>
   {:else if open && app.current}
     <MobileSession session={app.current} onback={back} />
   {:else}
@@ -167,6 +185,35 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+  }
+  .split {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+  .list {
+    flex: none;
+    width: 340px;
+    border-right: 1px solid var(--border);
+  }
+  .pane {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .pane > :global(.session) {
+    flex: 1;
+  }
+  @media (max-width: 1199px) {
+    .split.panel-open .list {
+      display: none;
+    }
+  }
+  .pick {
+    margin: auto;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
   }
   .center {
     flex: 1;

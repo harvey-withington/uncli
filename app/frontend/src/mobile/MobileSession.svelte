@@ -14,12 +14,14 @@
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
   import { showToast } from '../lib/toasts.svelte'
+  import { wide } from './wide.svelte'
 
   // A session on the phone, from the window's own components in a compact
   // layout: a header with Back, the page and its controls, the approval
   // cards over the end of it, and the composer. The toolbar (model,
   // modifiers, prompt level, Unattended) folds away under Options; the
-  // side panel (outline, artifacts, a watched file) opens over the page.
+  // side panel (outline, artifacts, a watched file) opens over the page,
+  // or on a tablet (wide.svelte.ts) beside it, as wide as it's dragged.
 
   interface Props {
     session: SessionView
@@ -94,6 +96,9 @@
     {/if}
   </div>
 
+  <!-- Everything under the header. On a phone it makes no box of its own
+       (display: contents); on a tablet it leaves room for the side panel. -->
+  <div class="body" class:with-panel={wide.on && app.outline.open} style:--panel-w="min({app.outline.width}px, 45vw)">
   <div class="scroll" bind:this={scroller}>
     <div class="content">
       {#if page}
@@ -124,12 +129,13 @@
     {/if}
   </footer>
 
-  {#if app.outline.open && (page || app.tabFor(session.id) === 'file')}
-    <div class="panel" role="dialog" aria-label={t('outline.toggle')}>
-      <button class="btn ghost icon touch close" onclick={() => app.togglePanel()} aria-label={t('common.close')}><Icon name="x" /></button>
+  {#if app.outline.open}
+    <div class="panel" role={wide.on ? undefined : 'dialog'} aria-label={wide.on ? undefined : t('outline.toggle')}>
+      {#if !wide.on}<button class="btn ghost icon touch close" onclick={() => app.togglePanel()} aria-label={t('common.close')}><Icon name="x" /></button>{/if}
       <SidePanel sessionId={session.id} page={page ?? null} {scroller} />
     </div>
   {/if}
+  </div>
 </section>
 
 <style>
@@ -325,6 +331,38 @@
   }
   .panel .close {
     align-self: flex-end;
+  }
+  /* A phone: the body is no box, so its parts sit in the session's column
+     as they always have, and the side panel covers the whole screen. */
+  .body {
+    display: contents;
+  }
+  /* A tablet: the body is the column under the header, the side panel sits
+     at its right as wide as it's dragged, and the message box and approval
+     cards line up with the answer column, as on the desktop. */
+  @media (min-width: 900px) {
+    .body {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .body.with-panel {
+      padding-right: var(--panel-w);
+    }
+    .panel {
+      inset: 0 0 0 auto;
+      width: var(--panel-w);
+      border-left: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .bottom > :global(*),
+    .approvals > :global(*) {
+      max-width: calc(var(--reading-width) + 2 * var(--space-6));
+      margin-left: auto;
+      margin-right: auto;
+    }
   }
   .panel :global(> *:last-child) {
     flex: 1;

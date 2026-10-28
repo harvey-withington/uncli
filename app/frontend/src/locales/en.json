@@ -536,6 +536,7 @@
   "update.confirmBusy": "An answer is in progress: it stops where it is. UNCLI downloads the update, quits, installs it and starts again, in under a minute, and each conversation carries on at your next message.",
   "mobile.updated": "UNCLI on the PC has been updated.",
   "mobile.reload": "Reload",
+  "mobile.pickSession": "Choose a session from the list, or start a new one.",
   "settings.startupWindowsOnly": "Only on Windows for now.",
   "settings.cacheTitle": "Conversation cache",
   "settings.cacheBody": "Each message re-reads the session’s conversation from a cache, at a tenth of the normal input price, for as long as the cache lasts. A change applies from each session’s next message.",
