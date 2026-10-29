@@ -81,7 +81,7 @@
 
 <main class="setup">
   <div class="card">
-    <span class="brand"><img src="/uncli-mark.svg" alt="" width="22" height="26" /><span class="wordmark">UNCLI</span></span>
+    <span class="brand"><img src="/uncli-mark.svg" alt="" width="26" height="26" /><span class="wordmark">UNCLI</span></span>
     <h1>{t('setup.title')}</h1>
     <p class="lead">{t('setup.lead')}</p>
 

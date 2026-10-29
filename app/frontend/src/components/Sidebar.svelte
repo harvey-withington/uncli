@@ -31,7 +31,7 @@
     oncommit={w => app.setSidebarWidth(w)}
   />
   <div class="brand">
-    <img class="mark" src="/uncli-mark.svg" alt="" width="20" height="24" />
+    <img class="mark" src="/uncli-mark.svg" alt="" width="24" height="24" />
     <span class="wordmark">UNCLI</span>
     <span class="tag">{t('app.tagline')}</span>
   </div>
@@ -110,7 +110,7 @@
   }
   .mark {
     align-self: center;
-    width: 20px;
+    width: 24px;
     height: 24px;
   }
   .wordmark {
