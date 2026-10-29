@@ -7,6 +7,7 @@
   import Toasts from '../components/Toasts.svelte'
   import type { Backend } from '../lib/api'
   import { LOCAL, parseRef, qualify } from '../lib/api/identity'
+  import { take, watch } from '../lib/backguard'
   import { provideApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { AppStore } from '../stores/app.svelte'
@@ -72,6 +73,7 @@
   }
 
   function back() {
+    if (take()) return
     if (history.state?.session) history.back()
     else close()
   }
@@ -111,7 +113,47 @@
     shown = id ?? ''
   })
 
+  // While an edit is open (a rename), Back cancels it and the page stays
+  // (lib/backguard.ts): a history entry of its own gives the back gesture
+  // something to undo, and goes when the edit ends some other way.
+  // history.back() lands later: an edit starting before it has must wait
+  // for it (wantEntry), or the late pop would take the new edit's entry.
+  let editEntry = false
+  let wantEntry = false
+  let skipPops = 0
+  function pushEditEntry() {
+    history.pushState({ ...history.state, edit: true }, '', location.href)
+    editEntry = true
+  }
+  const stopWatching = watch(held => {
+    if (held) {
+      if (skipPops > 0) wantEntry = true
+      else if (!editEntry) pushEditEntry()
+      return
+    }
+    wantEntry = false
+    if (editEntry) {
+      editEntry = false
+      skipPops++
+      history.back()
+    }
+  })
+
   const onpop = () => {
+    if (skipPops > 0) {
+      skipPops--
+      if (skipPops === 0 && wantEntry) {
+        wantEntry = false
+        pushEditEntry()
+      }
+      return
+    }
+    if (editEntry) {
+      // The back gesture took the edit's entry: cancel the edit, stay here.
+      editEntry = false
+      take()
+      return
+    }
     const id = sessionFromHash(location.hash)
     if (id) void show(id)
     else close()
@@ -134,6 +176,7 @@
   })
   onDestroy(() => {
     removeEventListener('popstate', onpop)
+    stopWatching()
     document.removeEventListener('visibilitychange', onvisible)
     app.destroy()
   })

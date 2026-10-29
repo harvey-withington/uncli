@@ -10,6 +10,7 @@
   import ModeSwitch from './ModeSwitch.svelte'
   import ScrollKeeper from './ScrollKeeper.svelte'
   import SessionStatus from './SessionStatus.svelte'
+  import SessionTitle from './SessionTitle.svelte'
   import McpServers from './McpServers.svelte'
   import RemoteButton from './RemoteButton.svelte'
   import SharesNote from './SharesNote.svelte'
@@ -102,7 +103,7 @@
   <header class="top" class:compact={app.headerCompact}>
     <div class="title-row">
       <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
-      <h1 title={session.title}>{session.title || t('session.untitled')}</h1>
+      <h1><SessionTitle {session} /></h1>
       <ActivityBadge state={session.state} />
       {#if app.headerCompact}
         <!-- Compact: the folder follows the title on its line. -->

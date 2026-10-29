@@ -7,6 +7,7 @@
   import NavBar from '../components/NavBar.svelte'
   import PageView from '../components/PageView.svelte'
   import SessionStatus from '../components/SessionStatus.svelte'
+  import SessionTitle from '../components/SessionTitle.svelte'
   import SidePanel from '../components/SidePanel.svelte'
   import Toolbar from '../components/Toolbar.svelte'
   import type { SessionView } from '../lib/api'
@@ -60,14 +61,16 @@
   <!-- One panel down to the page's question bar, which sits flush under it. -->
   <div class="head">
     <header class="bar">
-      <button class="btn ghost icon touch" onclick={onback} aria-label={t('mobile.back')} title={t('mobile.back')}><Icon name="arrow-left" /></button>
+      <!-- Pressing Back leaves the focus where it is: a rename box losing it
+           would save, where Back cancels (lib/backguard.ts). -->
+      <button class="btn ghost icon touch" onmousedown={e => e.preventDefault()} onclick={onback} aria-label={t('mobile.back')} title={t('mobile.back')}><Icon name="arrow-left" /></button>
       <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <div class="title">
-        <h1>{session.title || t('session.untitled')}</h1>
+        <h1><SessionTitle {session} /></h1>
         <ActivityBadge state={session.state} />
       </div>
       <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="sliders-horizontal" /></button>
-      <button class="btn ghost icon touch" onclick={() => app.togglePanel()} aria-pressed={app.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name="table-of-contents" /></button>
+      <button class="btn ghost icon touch" onclick={() => app.togglePanel()} aria-pressed={app.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name={app.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>
     </header>
     {#if options}
       <div class="options">

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SessionView } from '../lib/api'
+  import { hold } from '../lib/backguard'
   import { confirm } from '../lib/confirm.svelte'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
@@ -19,6 +20,10 @@
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   let editing = $state(false)
   let draft = $state('')
+  // While the box is open, Back cancels it (lib/backguard.ts).
+  $effect(() => {
+    if (editing) return hold(() => (editing = false))
+  })
 
   function startRename() {
     draft = session.title

@@ -68,6 +68,31 @@ describe('the phone app', () => {
     await waitFor(() => expect(screen.getByRole('list', { name: 'Sessions' })).toBeInTheDocument())
   })
 
+  it('cancels a rename on Back, the button or the gesture, and stays in the session', async () => {
+    const backend = phoneBackend()
+    const rename = vi.spyOn(backend, 'rename')
+    render(MobileApp, { props: { backend } })
+    const list = await screen.findByRole('list', { name: 'Sessions' })
+    await fireEvent.click(within(list).getAllByRole('button', { name: /Fix the flaky parser test/ })[0]!)
+    const heading = await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
+
+    for (const goBack of [() => fireEvent.click(screen.getByRole('button', { name: 'Back' })), () => history.back()]) {
+      await fireEvent.click(within(heading).getByRole('button'))
+      await fireEvent.input(within(heading).getByRole('textbox', { name: 'Rename' }), { target: { value: 'Not this' } })
+      await goBack()
+      await waitFor(() => expect(within(heading).queryByRole('textbox')).toBeNull())
+      expect(heading).toHaveAccessibleName('Fix the flaky parser test')
+      expect(screen.queryByRole('list', { name: 'Sessions' })).toBeNull()
+      // The edit's history entry is gone again, Back on the button too.
+      await waitFor(() => expect(history.state?.edit).toBeUndefined())
+    }
+    expect(rename).not.toHaveBeenCalled()
+
+    // With nothing being edited, Back goes back to the list.
+    await fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(screen.getByRole('list', { name: 'Sessions' })).toBeInTheDocument())
+  })
+
   it('tells the server which session it shows, and none once it leaves or goes to the background', async () => {
     const backend = phoneBackend()
     const focus = vi.spyOn(backend, 'focus')

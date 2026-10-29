@@ -34,6 +34,25 @@ describe('Session header', () => {
   })
 })
 
+describe('Session title', () => {
+  it('renames the session when its title in the header is clicked; Escape cancels', async () => {
+    localStorage.clear()
+    render(App, { props: { backend: mockBackend() } })
+    const heading = await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
+    await fireEvent.click(within(heading).getByRole('button'))
+    let box = within(heading).getByRole('textbox', { name: 'Rename' })
+    await fireEvent.input(box, { target: { value: 'Not this' } })
+    await fireEvent.keyDown(box, { key: 'Escape' })
+    expect(heading).toHaveAccessibleName('Fix the flaky parser test')
+
+    await fireEvent.click(within(heading).getByRole('button'))
+    box = within(heading).getByRole('textbox', { name: 'Rename' })
+    await fireEvent.input(box, { target: { value: 'Parser test, fixed' } })
+    await fireEvent.keyDown(box, { key: 'Enter' })
+    expect(await screen.findByRole('heading', { name: 'Parser test, fixed' })).toBeInTheDocument()
+  })
+})
+
 describe('A stopped session', () => {
   it('says the next message starts it again', async () => {
     const backend = mockBackend()

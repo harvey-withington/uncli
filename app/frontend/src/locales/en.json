@@ -60,6 +60,7 @@
   "session.none": "No sessions yet.",
   "session.untitled": "New session",
   "session.rename": "Rename",
+  "session.renameHint": "{title} (click to rename)",
   "session.delete": "Delete",
   "session.deleteTitle": "Delete this session?",
   "session.deleteMessage": "\"{title}\" and its pages and bookmarks will be removed from UNCLI. The CLI's own transcript is kept.",
