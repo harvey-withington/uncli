@@ -1,14 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="136 64 328 348" width="328" height="348" role="img" aria-label="UNCLI">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="150 118 300 292" width="300" height="292" role="img" aria-label="UNCLI">
   <title>UNCLI</title>
+  <!-- Close to square, so the build's icons fill their square with little
+       to spare: tucked-in ears and rounded hair set the width and height. -->
   <g stroke="#2A1F1A" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
     <!-- Ears -->
-    <circle cx="172" cy="292" r="26" fill="#F6C9A3"/>
-    <circle cx="428" cy="292" r="26" fill="#F6C9A3"/>
-    <path d="M176,292 q8,-6 12,4" fill="none" stroke-width="5"/>
-    <path d="M424,292 q-8,-6 -12,4" fill="none" stroke-width="5"/>
-    <!-- Face and hair -->
+    <circle cx="178" cy="292" r="24" fill="#F6C9A3"/>
+    <circle cx="422" cy="292" r="24" fill="#F6C9A3"/>
+    <path d="M182,292 q7,-5 10,4" fill="none" stroke-width="5"/>
+    <path d="M418,292 q-7,-5 -10,4" fill="none" stroke-width="5"/>
+    <!-- Face -->
     <ellipse cx="300" cy="275" rx="130" ry="128" fill="#F6C9A3"/>
-    <path d="M168,268 C162,215 182,178 214,160 L196,118 L240,146 L244,92 L276,138 L298,74 L318,134 L350,88 L354,140 L392,104 L382,156 C414,174 436,214 432,268 C418,236 398,216 372,206 C332,194 268,194 228,206 C202,216 182,236 168,268 Z" fill="#2A1F1A"/>
+    <!-- Hair: combed back, a mid brown that still shows on a dark taskbar -->
+    <path d="M166,270 C156,196 204,126 300,124 C396,126 444,196 434,270 C420,236 398,216 372,206 C332,194 268,194 228,206 C202,216 180,236 166,270 Z" fill="#7A5236"/>
+    <path d="M300,132 C282,152 258,168 228,180" fill="none" stroke-width="5"/>
+    <path d="M336,140 C322,160 304,174 282,184" fill="none" stroke-width="5"/>
     <!-- Brows and eyes -->
     <path d="M222,234 Q248,214 274,230" fill="none" stroke-width="7"/>
     <path d="M326,230 Q352,214 378,234" fill="none" stroke-width="7"/>

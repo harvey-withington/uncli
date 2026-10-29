@@ -63,13 +63,14 @@ async function generatePng(svgPath, outPath, size) {
 }
 
 // A maskable icon (Android's adaptive icons crop it to a circle or
-// squircle): the mark inside the middle 60%, on the phone app's
+// squircle, keeping at least the middle circle 80% across): the mark,
+// which is round, at 78% so it fills that circle, on the phone app's
 // background (its manifest's background_color).
 const MASK_BACKGROUND = { r: 0x18, g: 0x18, b: 0x1b, alpha: 1 }
 
 async function generateMaskable(svgPath, outPath, size) {
   mkdirSync(dirname(outPath), { recursive: true })
-  const inner = Math.round(size * 0.6)
+  const inner = Math.round(size * 0.78)
   const mark = await (await render(svgPath, inner)).toBuffer()
   await sharp({ create: { width: size, height: size, channels: 4, background: MASK_BACKGROUND } })
     .composite([{ input: mark, gravity: 'center' }])

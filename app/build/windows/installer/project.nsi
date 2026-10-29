@@ -199,6 +199,10 @@ Section
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
+    # The exe changes in place, so Explorer would keep showing its cached
+    # icon on the shortcuts after an update that changes it: tell it that
+    # icons changed (SHCNE_ASSOCCHANGED), as restarting Explorer would.
+    System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 
     !insertmacro wails.associateFiles
     !insertmacro wails.associateCustomProtocols

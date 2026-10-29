@@ -4,6 +4,22 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.6.2-alpha
+
+The new face, tidied.
+
+- **The icon fills its space.** On a dark taskbar the spiky hair vanished,
+  so the face looked small and low. The hair is now combed back and a
+  mid brown, and the face fills the icon, in the taskbar, the tray, the
+  window and on the phone's home screen.
+- **Shortcuts show the new icon.** After an update, the desktop and Start
+  menu shortcuts could keep showing the old icon until Windows was
+  restarted. The installer now tells Windows the icons changed.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone.
+
 ## 0.6.1-alpha
 
 A new face.
