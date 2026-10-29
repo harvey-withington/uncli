@@ -4,6 +4,32 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.6.0-alpha
+
+The phone app on a tablet, renaming from the session itself, and a Back
+button that doesn't lose your place.
+
+- **On a tablet, side by side.** On a screen 900 px wide or more, the phone
+  app shows the session list beside the open session, and the side panel
+  beside the answer, as wide as you drag it. The message box lines up with
+  the answer, as on the desktop. Below 1200 px, an open side panel takes
+  the list's place. On a phone, nothing changes.
+- **Rename a session from its header.** Click or tap the title at the top
+  of a session to rename it there, on the desktop and the phone. Enter
+  saves, and so does clicking away; Escape cancels.
+- **Back cancels a rename.** On the phone, Back while you rename a session
+  (the ← button, the back gesture or the phone's own Back) cancels the
+  rename and leaves you where you were. Before, it saved the name and left
+  the session.
+- On the phone, the side panel button shows a panel, as on the desktop,
+  rather than a list that looked too much like Options.
+- On the phone, the side panel opens in a session with no answer yet, as
+  on the desktop.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone.
+
 ## 0.5.0-alpha
 
 Updating from the phone, and faster.
