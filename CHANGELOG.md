@@ -4,6 +4,23 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.6.1-alpha
+
+A new face.
+
+- **A new icon.** UNCLI's icon is now its character's face: spiky hair
+  and a handlebar moustache, in place of the orange cap and tilde. It's in
+  the window, the taskbar, the tray, the installer and the phone app.
+- On an Android phone, the home-screen icon changes once Chrome next
+  checks the installed app, usually within a day of opening it. The app
+  itself and its notifications show the new face straight away.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone. There, a
+  home-screen icon never updates: remove it and add it again to get the
+  new one.
+
 ## 0.6.0-alpha
 
 The phone app on a tablet, renaming from the session itself, and a Back
