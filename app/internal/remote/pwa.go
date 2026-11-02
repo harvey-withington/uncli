@@ -1,7 +1,9 @@
 package remote
 
 import (
+	"encoding/json"
 	"io/fs"
+	"net"
 	"net/http"
 	"path"
 	"strings"
@@ -39,9 +41,53 @@ func servePWA(files fs.FS) http.Handler {
 		case path.Ext(name) == ".webmanifest":
 			h.Set("Cache-Control", "no-cache")
 			h.Set("Content-Type", "application/manifest+json")
+			if data, err := fs.ReadFile(files, name); err == nil {
+				if named, err := namedManifest(data, machineName(r.Host)); err == nil {
+					_, _ = w.Write(named)
+					return
+				}
+			}
 		case strings.HasPrefix(name, "assets/"):
 			h.Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
 		fileServer.ServeHTTP(w, r)
 	})
+}
+
+// The app installed from each PC is named for it, so a phone paired with
+// two tells them apart on its home screen: "UNCLI · deviant", labelled
+// "deviant" under the icon (a launcher has room for about 12 letters).
+
+// machineName is the PC's name from the host a request was sent to: the
+// first label of a DNS name (deviant.tail1234.ts.net → deviant), or ''
+// for an IP address or localhost.
+func machineName(host string) string {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if host == "" || net.ParseIP(host) != nil || strings.EqualFold(host, "localhost") {
+		return ""
+	}
+	label, _, _ := strings.Cut(host, ".")
+	return label
+}
+
+// namedManifest is the app's manifest named for machine; unchanged when
+// there's no name.
+func namedManifest(data []byte, machine string) ([]byte, error) {
+	if machine == "" {
+		return data, nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	base, _ := m["name"].(string)
+	if base == "" {
+		base = "UNCLI"
+	}
+	m["name"] = base + " · " + machine
+	m["short_name"] = machine
+	return json.Marshal(m)
 }

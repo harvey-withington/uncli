@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,6 +16,38 @@ import (
 	"uncli/internal/notify"
 	"uncli/internal/push"
 )
+
+// The app installed from each PC is named for it, from the name the phone
+// reached it by; an address or localhost keeps the plain name.
+func TestPWANamedForMachine(t *testing.T) {
+	for host, want := range map[string]string{
+		"deviant.tail1234.ts.net:9871": "deviant",
+		"deviant.tail1234.ts.net":      "deviant",
+		"100.101.102.103:9871":         "",
+		"[fd7a:115c::1]:9871":          "",
+		"127.0.0.1:9871":               "",
+		"localhost:9871":               "",
+	} {
+		if got := machineName(host); got != want {
+			t.Errorf("machineName(%q) = %q, want %q", host, got, want)
+		}
+	}
+	named, err := namedManifest([]byte(`{"name":"UNCLI","short_name":"UNCLI","scope":"/m/"}`), "deviant")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]string
+	if err := json.Unmarshal(named, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["name"] != "UNCLI · deviant" || m["short_name"] != "deviant" || m["scope"] != "/m/" {
+		t.Errorf("named manifest = %v", m)
+	}
+	plain := []byte(`{"name":"UNCLI"}`)
+	if same, _ := namedManifest(plain, ""); string(same) != string(plain) {
+		t.Errorf("unnamed manifest changed: %s", same)
+	}
+}
 
 // The phone app's files are served with the right types, caching and
 // content security policy.
@@ -41,6 +74,16 @@ func TestPWAServing(t *testing.T) {
 	if ct := get("/m/manifest.webmanifest").Header.Get("Content-Type"); ct != "application/manifest+json" {
 		t.Errorf("manifest type = %q", ct)
 	}
+	resp, err := r.https.Get(r.base() + "/m/manifest.webmanifest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest map[string]string
+	err = json.NewDecoder(resp.Body).Decode(&manifest)
+	resp.Body.Close()
+	if err != nil || manifest["name"] != "UNCLI · test" || manifest["short_name"] != "test" {
+		t.Errorf("served manifest = %v (%v), want it named for the machine", manifest, err)
+	}
 	if cc := get("/m/sw.js").Header.Get("Cache-Control"); cc != "no-cache" {
 		t.Errorf("service worker caching = %q", cc)
 	}
@@ -50,7 +93,7 @@ func TestPWAServing(t *testing.T) {
 	if code := get("/m/assets/").StatusCode; code != http.StatusNotFound {
 		t.Errorf("folder listing = %d", code)
 	}
-	resp, err := (&http.Client{Transport: r.https.Transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Get(r.base() + "/")
+	resp, err = (&http.Client{Transport: r.https.Transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Get(r.base() + "/")
 	if err != nil || resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "/m/" {
 		t.Errorf("root = %v, %v", resp, err)
 	}
