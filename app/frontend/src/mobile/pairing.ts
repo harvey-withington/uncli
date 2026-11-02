@@ -45,6 +45,29 @@ export function saveDeviceName(name: string) {
   }
 }
 
+// The paired PC's nickname, shown instead of its address (which may be a
+// Tailscale address best kept off a screenshot or a stream); '' shows the
+// address. Kept on the phone, for this origin's pairing only.
+const NICKNAME_KEY = 'uncli-server-nickname'
+
+export function loadNickname(): string {
+  try {
+    return localStorage.getItem(NICKNAME_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export function saveNickname(nickname: string) {
+  try {
+    const n = nickname.trim()
+    if (n) localStorage.setItem(NICKNAME_KEY, n)
+    else localStorage.removeItem(NICKNAME_KEY)
+  } catch {
+    // not kept: the address shows after a reload
+  }
+}
+
 // pairCodeFromHash reads the code from a link's fragment.
 export function pairCodeFromHash(hash: string): string {
   const m = /(?:^#|&)pair=([A-Za-z0-9]{4,20})(?:&|$)/.exec(hash)

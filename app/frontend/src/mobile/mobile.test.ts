@@ -142,6 +142,19 @@ describe('the phone app', () => {
     expect(await screen.findByRole('heading', { name: late.title })).toBeInTheDocument()
   })
 
+  it('shows the PC\u2019s nickname instead of its address once one is set', async () => {
+    render(MobileApp, { props: { backend: phoneBackend() } })
+    await screen.findByRole('list', { name: 'Sessions' })
+    expect(document.querySelector('.server')?.textContent).toBe(SERVER)
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const box = screen.getByRole('textbox', { name: 'Nickname for the PC' })
+    await fireEvent.change(box, { target: { value: 'Home PC' } })
+    expect(document.querySelector('.server')?.textContent).toBe('Home PC')
+    expect(localStorage.getItem('uncli-server-nickname')).toBe('Home PC')
+    await fireEvent.change(box, { target: { value: '' } })
+    expect(document.querySelector('.server')?.textContent).toBe(SERVER)
+  })
+
   it('says when the server can\u2019t be reached', async () => {
     const b = phoneBackend()
     let h: Handlers | null = null
@@ -151,6 +164,28 @@ describe('the phone app', () => {
     await screen.findByRole('list', { name: 'Sessions' })
     h!.connection?.({ state: 'offline', lastOnline: Date.now() - 5 * 60_000, error: 'Failed to fetch' })
     await waitFor(() => expect(document.querySelector('.banner')?.textContent).toMatch(/Can’t reach .*\(Failed to fetch\).*Last connected 5 min ago\..*Trying again/s))
+  })
+
+  it('fetches the list again when it couldn’t at first: with Try again, or once the server is back', async () => {
+    const b = phoneBackend()
+    let h: Handlers | null = null
+    const sub = b.subscribe.bind(b)
+    b.subscribe = x => { h = x; return sub(x) }
+    const boot = b.bootstrap.bind(b)
+    let down = true
+    b.bootstrap = () => (down ? Promise.reject(new Error('Couldn’t reach the server. Check the connection and try again.')) : boot())
+    render(MobileApp, { props: { backend: b } })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t reach the server')
+    // Still down: Try again says so again.
+    await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    // Back: the events reconnecting fetch it without a tap.
+    down = false
+    h!.connection?.({ state: 'offline', lastOnline: null, error: 'Failed to fetch' })
+    h!.connection?.({ state: 'online', lastOnline: Date.now() })
+    expect(await screen.findByRole('list', { name: 'Sessions' })).toBeInTheDocument()
   })
 
   it('imports a saved conversation from New session and opens it', async () => {

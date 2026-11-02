@@ -40,6 +40,9 @@ export class RPCError extends Error {
 // update takes about 30 s) is back on the phone soon after it is.
 const BACKOFF_MS = [500, 1000, 2000, 3000, 3000, 3000, 3000, 5000, 10000, 15000]
 const STALL_MS = 45_000
+// How long the state the app opens with may take before the server is
+// taken as unreachable.
+const OPEN_DEADLINE_MS = 15_000
 
 export interface SSEFrame {
   id: string
@@ -111,11 +114,30 @@ export function httpBackend(opts: HttpOptions): Backend {
   }
 
   async function call<T>(method: string, ...params: unknown[]): Promise<T> {
-    const res = await f(`${opts.base}/rpc`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...auth() },
-      body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }),
-    })
+    return callWithin<T>(0, method, ...params)
+  }
+
+  // A call given a deadline (the state the app opens with) that hasn't
+  // been answered by then is taken as not reaching the server: a PC whose
+  // network is down otherwise leaves it waiting on the browser's own
+  // timeout, minutes on a phone.
+  async function callWithin<T>(deadlineMs: number, method: string, ...params: unknown[]): Promise<T> {
+    const ctl = deadlineMs ? new AbortController() : null
+    const timer = ctl ? setTimeout(() => ctl.abort(), deadlineMs) : undefined
+    let res: Response
+    try {
+      res = await f(`${opts.base}/rpc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth() },
+        body: JSON.stringify({ jsonrpc: '2.0', id: ++id, method, params }),
+        signal: ctl?.signal,
+      })
+    } catch (e) {
+      if (ctl?.signal.aborted) throw new RPCError(t('remote.unreachable'), 0)
+      throw e
+    } finally {
+      clearTimeout(timer)
+    }
     if (res.status === 401) unpaired()
     const body = await replyOf<{ result?: T; error?: { code: number; message: string } }>(res)
     if (body.error) throw new RPCError(body.error.message, body.error.code)
@@ -129,8 +151,8 @@ export function httpBackend(opts: HttpOptions): Backend {
     subscribe(h: Handlers) {
       return stream(opts, raw, auth, h) // its banner says it can't reach the server itself
     },
-    bootstrap: () => call('Bootstrap'),
-    cliStatus: fresh => call('CLIStatus', fresh),
+    bootstrap: () => callWithin(OPEN_DEADLINE_MS, 'Bootstrap'),
+    cliStatus: fresh => (fresh ? call('CLIStatus', fresh) : callWithin(OPEN_DEADLINE_MS, 'CLIStatus', fresh)),
     providerStatus: (pid, fresh) => call('ProviderStatus', pid, fresh),
     cliChannels: () => call('CLIChannels'),
     providerChannels: pid => call('ProviderChannels', pid),

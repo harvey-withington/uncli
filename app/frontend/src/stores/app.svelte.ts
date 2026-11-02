@@ -164,6 +164,12 @@ export class AppStore {
         if (c.state === 'online') void this.backend.updateStatus().then(u => { this.update = u }, () => {})
       },
     })
+    await this.load()
+  }
+
+  // load fetches the first state. A remote client that couldn't reach its
+  // server calls it again (the events keep reconnecting meanwhile).
+  async load() {
     const [boot, cli] = await Promise.all([this.backend.bootstrap(), this.backend.cliStatus(false)])
     this.boot = boot
     setNames(namesOf(providerOf(boot)))

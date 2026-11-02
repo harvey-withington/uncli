@@ -16,7 +16,7 @@
   import MobileSession from './MobileSession.svelte'
   import MobileSettings from './MobileSettings.svelte'
   import PushSection from './PushSection.svelte'
-  import { sessionFromHash } from './pairing'
+  import { loadNickname, saveNickname, sessionFromHash } from './pairing'
   import { fetchVersion, mismatched, type ServerVersion } from './version'
   import { wide } from './wide.svelte'
 
@@ -39,6 +39,13 @@
   app.outline.open = false
   let failed = $state('')
   let settingsOpen = $state(false)
+  // The server as shown: its nickname when it has one, else its address.
+  let nickname = $state(loadNickname())
+  const label = $derived(nickname || server)
+  function rename(n: string) {
+    saveNickname(n)
+    nickname = n.trim()
+  }
   let version = $state<ServerVersion | null>(null)
   // The build this page came with: once the server runs another (it was
   // updated, decision 0025), the banner offers Reload.
@@ -159,17 +166,49 @@
     else close()
   }
 
+  // A session a notification's link asked for, read as the page opens and
+  // shown once the list is in (by then the hash may be one a tap set).
+  let linked = sessionFromHash(location.hash)
+  function opened() {
+    const id = linked
+    linked = ''
+    if (id) {
+      history.replaceState(null, '', location.pathname)
+      void show(id)
+    }
+  }
+  const failure = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+  // The list couldn't be fetched (the PC's network down, say): Try again
+  // fetches it again, as does the connection coming back by itself.
+  let loading = false
+  async function retry() {
+    if (loading) return
+    loading = true
+    failed = ''
+    try {
+      await app.load()
+      opened()
+    } catch (e) {
+      failed = failure(e)
+    } finally {
+      loading = false
+    }
+  }
+  let wasOnline = false
+  $effect(() => {
+    const on = app.connection?.state === 'online'
+    if (on && !wasOnline) untrack(() => { if (failed) void retry() })
+    wasOnline = on
+  })
+
   onMount(() => {
+    loading = true
     app
       .init()
-      .then(() => {
-        const id = sessionFromHash(location.hash)
-        if (id) {
-          history.replaceState(null, '', location.pathname)
-          void show(id)
-        }
-      })
-      .catch(e => (failed = String(e)))
+      .then(opened)
+      .catch(e => (failed = failure(e)))
+      .finally(() => (loading = false))
     void readVersion()
     addEventListener('popstate', onpop)
     document.addEventListener('visibilitychange', onvisible)
@@ -183,9 +222,14 @@
 </script>
 
 <div class="shell mobile">
-  <ConnectionBanner {server} mismatch={mismatched(version)} {updated} />
+  <ConnectionBanner server={label} mismatch={mismatched(version)} {updated} />
   {#if failed}
-    <main class="center"><p class="fatal" role="alert"><Icon name="triangle-alert" />{failed}</p></main>
+    <main class="center">
+      <div class="failed">
+        <p class="fatal" role="alert"><Icon name="triangle-alert" />{failed}</p>
+        <button class="btn primary retry" onclick={retry}><Icon name="rotate-ccw" size={16} />{t('mobile.tryAgain')}</button>
+      </div>
+    </main>
   {:else if !app.ready}
     <main class="center" aria-busy="true"><Icon name="loader" spin size={20} label={t('app.loading')} /></main>
   {:else if wide.on}
@@ -193,7 +237,7 @@
          Below 1200 px the side panel takes the list's place while it's
          open, so the answer keeps a readable width. -->
     <div class="split" class:panel-open={open && app.outline.open}>
-      <div class="home list"><MobileHome {server} onsettings={() => (settingsOpen = true)} /></div>
+      <div class="home list"><MobileHome server={label} onsettings={() => (settingsOpen = true)} /></div>
       <div class="pane">
         {#if open && app.current}
           <MobileSession session={app.current} onback={back} />
@@ -205,13 +249,13 @@
   {:else if open && app.current}
     <MobileSession session={app.current} onback={back} />
   {:else}
-    <div class="home"><MobileHome {server} onsettings={() => (settingsOpen = true)} /></div>
+    <div class="home"><MobileHome server={label} onsettings={() => (settingsOpen = true)} /></div>
   {/if}
 </div>
 {#if app.newSessionOpen}{#key app.newSessionSeq}<NewSessionDialog />{/key}{/if}
 {#if app.importOpen}<ImportDialog />{/if}
 {#if settingsOpen}
-  <MobileSettings {server} {deviceName} version={version?.app ?? ''} {onforget} onclose={() => (settingsOpen = false)}>
+  <MobileSettings {server} {nickname} onrename={rename} {deviceName} version={version?.app ?? ''} {onforget} onclose={() => (settingsOpen = false)}>
     {#snippet notifications()}<PushSection />{/snippet}
   </MobileSettings>
 {/if}
@@ -264,11 +308,21 @@
     place-items: center;
     color: var(--text-muted);
   }
+  .failed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
   .fatal {
     display: flex;
     gap: var(--space-2);
-    padding: var(--space-4);
+    margin: 0;
     color: var(--danger);
+  }
+  .retry {
+    min-height: 44px;
   }
   /* Touch: the session list's buttons are big enough to tap, and its
      actions show without hovering. */

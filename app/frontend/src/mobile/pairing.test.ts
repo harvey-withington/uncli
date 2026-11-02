@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PairError, claimPair, guessDeviceName, loadPending, normaliseCode, pair, pairCodeFromHash, requestPair, sessionFromHash } from './pairing'
+import { PairError, claimPair, guessDeviceName, loadNickname, loadPending, normaliseCode, pair, pairCodeFromHash, requestPair, saveNickname, sessionFromHash } from './pairing'
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 
@@ -22,6 +22,13 @@ describe('pairing links', () => {
     expect(guessDeviceName('Mozilla/5.0 (Linux; Android 15; Pixel 9 Build/AP4A) AppleWebKit')).toBe('Pixel 9')
     expect(guessDeviceName('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36')).toBe('Android phone')
     expect(guessDeviceName('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)')).toBe('iPhone')
+  })
+
+  it('keeps the PC’s nickname trimmed, and none when it’s blank', () => {
+    saveNickname('  Home PC ')
+    expect(loadNickname()).toBe('Home PC')
+    saveNickname('   ')
+    expect(loadNickname()).toBe('')
   })
 })
 

@@ -73,6 +73,27 @@ describe('httpBackend', () => {
     expect((err as RPCError).message).toBe('Couldn’t reach the server. Check the connection and try again.')
   })
 
+  it('gives up on the opening state after a while, as not reaching the server', async () => {
+    vi.useFakeTimers()
+    try {
+      // A server whose network is down: the request is never answered.
+      const fetch = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+      }))
+      const b = httpBackend({ base: '', token: () => 'tok', fetch: fetch as never })
+      const err = b.bootstrap().catch((e: unknown) => e)
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(await err).toBeInstanceOf(RPCError)
+      expect(((await err) as RPCError).message).toBe('Couldn’t reach the server. Check the connection and try again.')
+      // Other calls wait as long as they need (a summary, say).
+      expect(fetch.mock.calls.length).toBe(1)
+      void b.pages('s1')
+      expect(fetch.mock.calls[1]![1].signal).toBeUndefined()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('refuses what only works at the server', async () => {
     const b = httpBackend({ base: '', token: () => 'tok', fetch: vi.fn() as never })
     await expect(b.openFolder('C:\\')).rejects.toBeInstanceOf(RemoteOnlyError)

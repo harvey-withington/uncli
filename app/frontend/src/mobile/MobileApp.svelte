@@ -4,7 +4,7 @@
   import type { Backend } from '../lib/api'
   import MobileShell from './MobileShell.svelte'
   import PairScreen from './PairScreen.svelte'
-  import { loadDeviceName, loadToken, pairCodeFromHash, saveToken, type Paired } from './pairing'
+  import { loadDeviceName, loadToken, pairCodeFromHash, saveNickname, saveToken, type Paired } from './pairing'
 
   // The phone app UNCLI serves at /m/ (decision 0021). Not paired (or
   // revoked), it pairs: with the code from the server's QR code, or with
@@ -42,6 +42,7 @@
 
   function forget(wasRevoked: boolean) {
     saveToken(null)
+    saveNickname('')
     revoked = wasRevoked
     token = null
   }
