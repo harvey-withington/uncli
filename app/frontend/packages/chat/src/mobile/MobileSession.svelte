@@ -1,19 +1,14 @@
 <script lang="ts">
-  import ActivityBadge from '../components/ActivityBadge.svelte'
   import ApprovalCard from '../components/ApprovalCard.svelte'
   import Composer from '../components/Composer.svelte'
   import Icon from '../components/Icon.svelte'
-  import ModeSwitch from '../components/ModeSwitch.svelte'
   import NavBar from '../components/NavBar.svelte'
   import PageView from '../components/PageView.svelte'
-  import SessionStatus from '../components/SessionStatus.svelte'
-  import SessionTitle from '../components/SessionTitle.svelte'
+  import SessionHeader from '../components/SessionHeader.svelte'
   import SidePanel from '../components/SidePanel.svelte'
-  import Toolbar from '../components/Toolbar.svelte'
   import type { SessionView } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
-  import { tintStyle } from '../lib/tint'
   import { wide } from './wide.svelte'
   import { useShell } from '../lib/shell.svelte'
 
@@ -37,22 +32,11 @@
   let { session, onback, wide: wideProp }: Props = $props()
   const isWide = $derived(wideProp ?? wide.on)
   const app = useChat()
-  const names = $derived(app.namesFor(session.adapter))
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   const page = $derived(app.currentPage)
   const cards = $derived((session.approvals ?? []).filter(a => !a.judging))
   const checking = $derived((session.approvals ?? []).some(a => a.judging))
-  const failed = $derived(!!session.error && session.state === 'error')
-  let options = $state(false)
   let scroller: HTMLElement | undefined = $state()
-
-  async function toggleUnattended() {
-    try {
-      app.upsertSession(await app.backend.setUnattended(session.id, !session.unattended))
-    } catch (e) {
-      shell.toast(String(e), 'error')
-    }
-  }
 
   async function restore() {
     try {
@@ -64,48 +48,7 @@
 </script>
 
 <section class="session" class:wide={isWide}>
-  <!-- One panel down to the page's question bar, which sits flush under it. -->
-  <div class="head" part="header">
-    <header class="bar">
-      <!-- Pressing Back leaves the focus where it is: a rename box losing it
-           would save, where Back cancels (lib/backguard.ts). -->
-      {#if onback}<button class="btn ghost icon touch" onmousedown={e => e.preventDefault()} onclick={onback} aria-label={t('mobile.back')} title={t('mobile.back')}><Icon name="arrow-left" /></button>{/if}
-      <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
-      <div class="title">
-        <h1><SessionTitle {session} /></h1>
-        <ActivityBadge state={session.state} />
-      </div>
-      <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="sliders-horizontal" /></button>
-      <button class="btn ghost icon touch" onclick={() => app.togglePanel()} aria-pressed={app.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name={app.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>
-    </header>
-    <!-- An embedding host's own controls (decision 0026). -->
-    {#if app.embedded}<svelte:element this={'slot'} name="header-extra" />{/if}
-    {#if options}
-      <div class="options">
-        <Toolbar {session}>
-          {#snippet end()}
-            <ModeSwitch {session} />
-            <button class="btn ghost small away" class:on={session.unattended} onclick={toggleUnattended} aria-pressed={!!session.unattended} title={t('unattended.hint', names)}>
-              <Icon name="coffee" size={15} />{t('unattended.label')}
-            </button>
-          {/snippet}
-        </Toolbar>
-        {#if !session.archived}
-          <p class="restart">
-            <button class="btn ghost small away" onclick={() => app.restart(session.id)}><Icon name="rotate-ccw" size={15} />{t('restart.label')}</button>
-            <span>{t('restart.hintShort', names)}</span>
-          </p>
-        {/if}
-      </div>
-    {/if}
-    <!-- With the question compact, only an error (as the desktop's compact header). -->
-    {#if !app.questionCompact || failed}
-      <div class="notes">
-        {#if !app.questionCompact}<SessionStatus {session} />{/if}
-        {#if failed}<p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>{/if}
-      </div>
-    {/if}
-  </div>
+  <SessionHeader {session} compact {onback} />
 
   <!-- Everything under the header. On a phone it makes no box of its own
        (display: contents); on a tablet it leaves room for the side panel. -->
@@ -159,94 +102,10 @@
     min-height: 0;
     background: var(--bg);
   }
-  .head {
-    background: var(--surface);
-  }
-  .bar {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    padding: var(--space-1) var(--space-1);
-  }
   .touch {
     width: 44px;
     height: 44px;
     flex: none;
-  }
-  .mode {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
-    background: var(--tint-soft, var(--accent-soft));
-    color: var(--tint, var(--accent));
-  }
-  .title {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding-left: var(--space-2);
-  }
-  h1 {
-    margin: 0;
-    font-size: var(--text-md);
-    font-weight: 620;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .options {
-    padding: var(--space-2) var(--space-3);
-    border-top: 1px solid var(--border);
-  }
-  /* On a phone the prompt level and Unattended start their line, like
-     everything else in Options, rather than sitting at the right end of it. */
-  .options :global(.end) {
-    margin-left: 0;
-    padding-left: 0;
-  }
-  /* The toolbar wraps here, so a divider between groups would end a line. */
-  .options :global(.sep) {
-    display: none;
-  }
-  .away {
-    gap: 6px;
-    color: var(--text-muted);
-  }
-  .away.on {
-    background: var(--warning-soft);
-    color: var(--warning);
-  }
-  .restart {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: var(--space-2) 0 0;
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-  }
-  .restart .btn {
-    flex: none;
-  }
-  .notes {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 0 var(--space-3) var(--space-2);
-  }
-  .notes:empty {
-    display: none;
-  }
-  .err {
-    display: flex;
-    gap: var(--space-2);
-    margin: var(--space-1) 0;
-    font-size: var(--text-sm);
-    color: var(--danger);
   }
   /* No padding: the question bar sticks at the very top, under the header,
      with nothing showing above or beside it. */

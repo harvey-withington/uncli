@@ -5,20 +5,13 @@
   import { tintStyle } from '../lib/tint'
   import { blockMatching } from '../lib/search'
   import ApprovalCard from './ApprovalCard.svelte'
-  import ActivityBadge from './ActivityBadge.svelte'
-  import ModeSwitch from './ModeSwitch.svelte'
   import ScrollKeeper from './ScrollKeeper.svelte'
-  import SessionStatus from './SessionStatus.svelte'
-  import SessionTitle from './SessionTitle.svelte'
-  import McpServers from './McpServers.svelte'
-  import RemoteButton from './RemoteButton.svelte'
-  import SharesNote from './SharesNote.svelte'
+  import SessionHeader from './SessionHeader.svelte'
   import Composer from './Composer.svelte'
   import Icon from './Icon.svelte'
   import NavBar from './NavBar.svelte'
   import PageView from './PageView.svelte'
   import SidePanel from './SidePanel.svelte'
-  import Toolbar from './Toolbar.svelte'
   import { useShell } from '../lib/shell.svelte'
 
   const shell = useShell()
@@ -29,12 +22,8 @@
 
   let { session }: Props = $props()
   const chat = useChat()
-  const names = $derived(chat.namesFor(session.adapter))
   const profile = $derived(chat.boot?.profiles.find(p => p.id === session.profileId))
-  // A session in a container says which (decision 0011).
-  const place = $derived(session.runtimeRef ? ` · ${t('session.inContainer', { label: chat.containers?.containers.find(c => c.id === session.runtimeRef)?.label ?? session.runtimeRef })}` : '')
   const page = $derived(chat.currentPage)
-  const failed = $derived(!!session.error && session.state === 'error')
   let scroller: HTMLElement | undefined = $state()
   // The approval cards fade out under the page controls only while there is
   // more of them below; a card that fits doesn't fade.
@@ -58,16 +47,6 @@
   const cards = $derived((session.approvals ?? []).filter(a => !a.judging))
   const checking = $derived((session.approvals ?? []).some(a => a.judging))
 
-  // Unattended: rules still apply, but anything that would wait for the
-  // user is declined, and Claude is told the user is away.
-  async function toggleUnattended() {
-    try {
-      chat.upsertSession(await chat.backend.setUnattended(session.id, !session.unattended))
-    } catch (e) {
-      shell.toast(String(e), 'error')
-    }
-  }
-
   async function restore() {
     try {
       await chat.archive(session.id, false)
@@ -75,7 +54,6 @@
       shell.toast(String(e), 'error')
     }
   }
-
 
   // Opened from search: once the page has rendered, scroll to the first
   // block holding a search word (below the sticky question) and flash it.
@@ -102,99 +80,7 @@
 </script>
 
 <section class="pane">
-  <header class="top" class:compact={chat.headerCompact} part="header">
-    <div class="title-row">
-      <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
-      <h1><SessionTitle {session} /></h1>
-      <ActivityBadge state={session.state} />
-      {#if chat.headerCompact}
-        <!-- Compact: the folder follows the title on its line. -->
-        <span class="path" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
-        <SharesNote {session} compact />
-      {/if}
-      <span class="gap"></span>
-      <RemoteButton />
-      <McpServers {session} />
-      {#if !session.archived}
-        <button
-          class="btn ghost small icon"
-          onclick={() => chat.restart(session.id)}
-          aria-label={t('restart.label')}
-          title={t('restart.hint', names)}
-        >
-          <Icon name="rotate-ccw" />
-        </button>
-      {/if}
-      {#if chat.openSettings}
-        {@const open = chat.openSettings}
-        <button
-          class="btn ghost small icon"
-          onclick={() => open('safe')}
-          aria-label={t('safe.open')}
-          title={t('safe.open')}
-        >
-          <Icon name="shield" />
-        </button>
-      {/if}
-      <button
-        class="btn ghost small icon"
-        onclick={() => chat.togglePanel()}
-        aria-pressed={chat.outline.open}
-        aria-label={t(chat.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
-        title={t(chat.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
-      >
-        <Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} />
-      </button>
-      <!-- Always last on the line, expanded or compact. -->
-      <button
-        class="btn ghost small icon h-toggle"
-        onclick={() => chat.toggleHeaderCompact()}
-        aria-expanded={!chat.headerCompact}
-        aria-label={t(chat.headerCompact ? 'header.expand' : 'header.collapse')}
-        title={t(chat.headerCompact ? 'header.expand' : 'header.collapse')}
-      >
-        <Icon name={chat.headerCompact ? 'chevron-down' : 'chevron-up'} size={14} />
-      </button>
-    </div>
-    {#if !chat.headerCompact}
-      <div class="where">
-        <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
-        <SharesNote {session} />
-      </div>
-    {/if}
-    <!-- The toolbar, with the prompt level and Unattended at the right end
-         of its last line (a line of their own, still at the right, when
-         there's no room). -->
-    <Toolbar {session}>
-      {#snippet end()}
-        <ModeSwitch {session} />
-        <button
-          class="btn ghost small away-btn"
-          class:on={session.unattended}
-          onclick={toggleUnattended}
-          aria-pressed={!!session.unattended}
-          title={t('unattended.hint', names)}
-        >
-          <Icon name="coffee" size={15} />{t('unattended.label')}
-        </button>
-      {/snippet}
-    </Toolbar>
-    <!-- An embedding host's own controls (decision 0026). -->
-    {#if chat.embedded}<svelte:element this={'slot'} name="header-extra" />{/if}
-  </header>
-  <!-- Status and warnings, in a strip of their own under the header, all
-       aligned on the left. Compact shows only an error there. MCP servers
-       that need the user are left to the plug button's dot. -->
-  {#if !chat.headerCompact || failed}
-    <div class="notes">
-      {#if !chat.headerCompact}
-        <SessionStatus {session} />
-      {/if}
-      {#if failed}
-        <p class="err" role="alert"><Icon name="triangle-alert" size={14} />{session.error}</p>
-      {/if}
-    </div>
-  {/if}
+  <SessionHeader {session} />
 
   <div class="middle">
     <!-- The answer column: the page, the page controls floating on the line
@@ -259,95 +145,6 @@
     height: 100%;
     background: var(--bg);
   }
-  .top {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-4) var(--space-6) var(--space-3);
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-  }
-  .title-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-width: 0;
-  }
-  .mode {
-    display: grid;
-    place-items: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
-    background: var(--tint-soft, var(--accent-soft));
-    color: var(--tint, var(--accent));
-    flex: none;
-  }
-  h1 {
-    margin: 0;
-    font-size: var(--text-lg);
-    font-weight: 620;
-    letter-spacing: -0.01em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  /* Compact: the folder takes the room between the title and the controls,
-     cut short (from the end) before anything else gives way. */
-  .path {
-    flex: 0 1 auto;
-    min-width: 0;
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .compact {
-    padding-top: var(--space-3);
-  }
-  .compact h1 {
-    flex: 0 1 auto;
-    max-width: 45%;
-  }
-  .h-toggle {
-    flex: none;
-    margin-left: calc(-1 * var(--space-2));
-    color: var(--text-faint);
-  }
-  .notes {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: var(--space-2) var(--space-6);
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-2);
-  }
-  .where {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
-    margin: -4px 0 2px 38px;
-    font-size: var(--text-xs);
-  }
-  .workdir {
-    display: block;
-    min-width: 0;
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .err {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--text-sm);
-    color: var(--danger);
-  }
   .middle {
     flex: 1;
     display: flex;
@@ -400,17 +197,6 @@
   }
   .dock :global(.navbar) {
     transform: translateY(-50%);
-  }
-  .gap {
-    flex: 1;
-  }
-  .away-btn {
-    gap: 6px;
-    color: var(--text-muted);
-  }
-  .away-btn.on {
-    background: var(--warning-soft);
-    color: var(--warning);
   }
   /* Approval cards sit just above the page controls, over the end of the
      answer, so they're in view whatever page is showing. Like the answer,
