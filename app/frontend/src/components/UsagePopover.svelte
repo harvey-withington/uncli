@@ -4,7 +4,7 @@
   import type { UsageLimit } from '../lib/api'
   import { resetsIn } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import Icon from './Icon.svelte'
 
   interface Props {

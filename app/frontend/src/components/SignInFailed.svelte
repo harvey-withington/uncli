@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Page } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { providerOf } from '../lib/api'
   import { errorDetail, resend } from '../lib/signin'

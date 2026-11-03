@@ -1,7 +1,7 @@
 <script lang="ts">
   import { slide } from 'svelte/transition'
   import type { HeadMove, TouchedFile } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { artifactPathOf } from '../lib/artifacts'
   import { watchPathOf } from '../lib/watched'
   import { canOpenDefault, editorLabel, HOW_ICON, moveLabel, relPath, splitByMove, splitPath } from '../lib/files'

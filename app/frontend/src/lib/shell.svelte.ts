@@ -3,7 +3,7 @@
 // toasts and confirm dialogs: the window's app, the phone's, and later
 // each embedded element.
 import { getContext, setContext } from 'svelte'
-import { APP_CONTEXT, CHAT_CONTEXT } from './context'
+import { APP_CONTEXT, CHAT_CONTEXT } from './chatcontext'
 import { t } from './i18n.svelte'
 import type { ChatStore } from '../stores/chat.svelte'
 

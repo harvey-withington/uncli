@@ -2,7 +2,7 @@
   import type { Page } from '../lib/api'
   import { artifactKind, artifactsAt, KIND_ICON } from '../lib/artifacts'
   import { formatSize } from '../lib/attachments'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import ArtifactViewer from './ArtifactViewer.svelte'
   import Icon from './Icon.svelte'

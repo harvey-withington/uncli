@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import type { Modifier, SessionView, ToolbarItem } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { arrange, choicesOf, chosenIn } from '../lib/modifiers'

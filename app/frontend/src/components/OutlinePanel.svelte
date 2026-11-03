@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Page } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { cost } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
   import { modelLabel } from '../lib/models'

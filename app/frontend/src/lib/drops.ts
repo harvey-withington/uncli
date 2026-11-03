@@ -5,13 +5,9 @@
 // - anywhere else: the first folder (or the first file's folder) starts a
 //   new session there, in the last type used that works on a folder.
 import type { AppStore } from '../stores/app.svelte'
+import { ATTACH_EVENT, INSERT_EVENT, quotePath } from './composerevents'
 
-export const INSERT_EVENT = 'uncli-insert' // detail: text to insert at the cursor
-export const ATTACH_EVENT = 'uncli-attach' // detail: paths to attach
-
-export function quotePath(p: string): string {
-  return /\s/.test(p) ? `"${p}"` : p
-}
+export { ATTACH_EVENT, INSERT_EVENT, quotePath }
 
 export async function handleDrop(app: AppStore, target: Element | null, dropped: string[]) {
   const paths = dropped.filter(Boolean) // a file the WebView couldn't resolve comes back empty

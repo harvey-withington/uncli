@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { dragSort } from '../lib/actions'
-  import { provideChat } from '../lib/context'
+  import { provideChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import type { ChatStore } from '../stores/chat.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'

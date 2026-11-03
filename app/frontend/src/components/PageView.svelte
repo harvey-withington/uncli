@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fade } from 'svelte/transition'
   import type { Page } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { displayAnswer } from '../stores/chat.svelte'
   import { attachmentIcon, formatSize } from '../lib/attachments'

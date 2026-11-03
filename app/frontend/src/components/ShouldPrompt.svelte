@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SafeClass, Scope } from '../lib/api'
   import { classLabel, loadScope, saveScope } from '../lib/approvals'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import { useShell } from '../lib/shell.svelte'

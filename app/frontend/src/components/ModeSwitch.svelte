@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SessionMode, SessionView } from '../lib/api'
   import { MODES, modeOf } from '../lib/approvals'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import CycleButton from './CycleButton.svelte'
   import { useShell } from '../lib/shell.svelte'

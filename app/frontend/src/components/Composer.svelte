@@ -1,10 +1,10 @@
 <script lang="ts">
   import { autosize } from '../lib/actions'
   import type { SessionView } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { attachmentIcon, formatSize, pendingKey, readImage, releasePreviews, shrinkPhoto, toRefs, type Pending } from '../lib/attachments'
-  import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/drops'
+  import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/composerevents'
   import { loadDraft, saveDraft } from '../lib/keep'
   import { atServer } from '../lib/remoteonly'
   import Icon from './Icon.svelte'

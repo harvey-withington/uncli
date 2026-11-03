@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { back, forward, nextBookmark, prevBookmark } from '../lib/nav'
   import Icon from './Icon.svelte'

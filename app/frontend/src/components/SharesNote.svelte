@@ -2,7 +2,7 @@
   import { fly } from 'svelte/transition'
   import { clickOutside } from '../lib/actions'
   import type { Share, SessionView } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { sharesNote, toggled } from '../lib/shares'
   import Icon from './Icon.svelte'

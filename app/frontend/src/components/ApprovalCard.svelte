@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Approval, Scope, SessionView } from '../lib/api'
   import { cardNotes, classLabel, describeApproval, fixedReason, isShell, loadScope, modeOf, saveScope } from '../lib/approvals'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import CommandView from './CommandView.svelte'
   import Icon from './Icon.svelte'

@@ -1,7 +1,7 @@
 import { mount } from 'svelte'
 import './app.css'
 import App from './App.svelte'
-import { createBackend } from './lib/api'
+import { createBackend } from './lib/backend'
 import { applyTheme } from './lib/theme.svelte'
 
 applyTheme()

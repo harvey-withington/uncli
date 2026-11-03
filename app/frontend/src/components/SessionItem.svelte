@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SessionView } from '../lib/api'
   import { hold } from '../lib/backguard'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
   import ActivityBadge from './ActivityBadge.svelte'

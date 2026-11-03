@@ -11,7 +11,7 @@
   import SidePanel from '../components/SidePanel.svelte'
   import Toolbar from '../components/Toolbar.svelte'
   import type { SessionView } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
   import { wide } from './wide.svelte'

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { WatchEntry } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { splitPath } from '../lib/files'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'

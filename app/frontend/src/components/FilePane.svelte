@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import type { WatchFile } from '../lib/api'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { canOpenDefault, editorLabel, splitPath } from '../lib/files'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'

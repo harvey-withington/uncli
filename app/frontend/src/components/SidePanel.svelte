@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Page } from '../lib/api'
   import { artifactsAt } from '../lib/artifacts'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { OUTLINE_MAX, OUTLINE_MIN } from '../lib/outline'
   import type { PanelTab } from '../lib/panels'

@@ -2,7 +2,7 @@
   import { untrack } from 'svelte'
   import type { ArtifactEntry } from '../lib/artifacts'
   import { artifactKind, artifactLang, decodeText, imageType, sandboxDoc, svgDoc } from '../lib/artifacts'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { canOpenDefault } from '../lib/files'
   import { t } from '../lib/i18n.svelte'
   import { atServer, serverTitle } from '../lib/remoteonly'

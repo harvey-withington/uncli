@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Approval, SessionView } from '../lib/api'
   import { planOf } from '../lib/asks'
-  import { useChat } from '../lib/context'
+  import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import Icon from './Icon.svelte'
