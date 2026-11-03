@@ -37,13 +37,33 @@ authors. It covers what exists today and says what doesn't yet.
 
 The element fills the box you give it, so give it a height. In a grid or flex layout, let its container shrink (`min-width: 0`).
 
+## A list of sessions
+
+`<uncli-session-list>` shows a server's sessions as UNCLI's sidebar does:
+- drag or Alt+arrows to reorder;
+- rename, archive and delete;
+- the archived sessions apart.
+
+Picking a session doesn't open it. The list sends `uncli-select` and your page decides what to show:
+
+```js
+list.backend = chat.backend // the same backend: one client for both
+list.addEventListener('uncli-select', e => {
+  chat.session = e.detail.session
+  list.selected = e.detail.session // marked as the one shown
+})
+```
+
+Its attributes are `selected` and `scheme`.
+
 ## Events
 
 The element sends these events. They bubble and are composed, so you can listen on the element or the document. `detail` is `{ session }`.
 
 | Event | When |
 |---|---|
-| `uncli-ready` | The chat has the server's state and shows its session |
+| `uncli-ready` | The chat has the server's state and shows its session (a list: has its sessions) |
+| `uncli-select` | The user picked a session in a list |
 | `uncli-busy` | The session started answering |
 | `uncli-idle` | It finished |
 | `uncli-needs-approval` | A tool call is waiting for the user |
@@ -74,7 +94,6 @@ The element is one ES module, with Svelte and UNCLI's client inside it. Code hig
 
 ## What's not there yet
 
-- **`<uncli-session-list>`,** the session list as its own element.
 - **The host adapter.** Not yet available:
   - `openLink` for the host's own links;
   - `complete` for @mentions;

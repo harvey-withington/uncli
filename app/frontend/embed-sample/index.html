@@ -13,10 +13,12 @@
     header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: #20302b; color: #fff; }
     header h1 { margin: 0; font-size: 18px; font-weight: normal; }
     .btn { padding: 6px 14px; border: 2px solid var(--accent); background: #fff; color: var(--accent); font: inherit; }
-    main { display: grid; grid-template-columns: 1fr 1fr 380px; gap: 16px; padding: 16px 20px; }
+    main { display: grid; grid-template-columns: 260px 1fr 1fr 380px; gap: 16px; padding: 16px 20px; }
     figure { margin: 0; min-width: 0; }
     figcaption { margin-bottom: 6px; font-size: 14px; color: #555; }
-    uncli-chat { height: 640px; border: 1px solid #c9c4b8; border-radius: 8px; }
+    uncli-chat, uncli-session-list { height: 640px; }
+    uncli-session-list { background: #fbfaf7; border: 1px solid #c9c4b8; border-radius: 8px; }
+    uncli-chat { border: 1px solid #c9c4b8; border-radius: 8px; }
     /* The second chat takes the host's accent through UNCLI's public tokens. */
     #second { --uncli-accent: #0b7a5c; }
     #log { margin: 0 20px 20px; font: 13px/1.4 ui-monospace, monospace; color: #555; white-space: pre-wrap; }
@@ -29,7 +31,11 @@
 </header>
 <main>
   <figure>
-    <figcaption>A Code session, light, the host's font</figcaption>
+    <figcaption>A session list: pick one for the next chat</figcaption>
+    <uncli-session-list id="list" selected="s-code" scheme="light"></uncli-session-list>
+  </figure>
+  <figure>
+    <figcaption>The list's session, light, the host's font</figcaption>
     <uncli-chat id="first" session="s-code" scheme="light"></uncli-chat>
   </figure>
   <figure>

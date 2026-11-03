@@ -16,20 +16,10 @@
 // uncli-busy, uncli-idle, uncli-needs-approval; detail: { session }.
 import { mount, unmount } from 'svelte'
 import { chatClient, type Backend, type SessionSnapshot } from '@uncli/client'
-import themeCss from '../styles/theme.css?inline'
 import Chat from '../components/Chat.svelte'
 import { keyedMemory } from '../lib/layoutmemory'
 import { ChatStore } from '../stores/chat.svelte'
-import { shadowCss } from './shadow'
-
-// One stylesheet, adopted by every element's shadow root.
-let sheet: CSSStyleSheet | null = null
-function stylesheet(): CSSStyleSheet | null {
-  if (sheet || typeof CSSStyleSheet === 'undefined' || !('replaceSync' in CSSStyleSheet.prototype)) return sheet
-  sheet = new CSSStyleSheet()
-  sheet.replaceSync(shadowCss(themeCss))
-  return sheet
-}
+import { applyScheme, hostFont, shadowFor } from './root'
 
 export class UncliChat extends HTMLElement {
   static observedAttributes = ['session', 'scheme', 'compact']
@@ -62,20 +52,9 @@ export class UncliChat extends HTMLElement {
   }
 
   connectedCallback() {
-    if (!this.shadowRoot) {
-      const root = this.attachShadow({ mode: 'open' })
-      const s = stylesheet()
-      if (s) root.adoptedStyleSheets = [s]
-      else {
-        const style = document.createElement('style')
-        style.textContent = shadowCss(themeCss)
-        root.append(style)
-      }
-    }
-    // The host page's font, for UNCLI's text unless the host sets --uncli-font.
-    const font = getComputedStyle(this.parentElement ?? document.body).fontFamily
-    if (font) this.style.setProperty('--uncli-host-font', font)
-    this.#scheme()
+    shadowFor(this)
+    hostFont(this)
+    applyScheme(this)
     this.#mount()
   }
 
@@ -84,7 +63,7 @@ export class UncliChat extends HTMLElement {
   }
 
   attributeChangedCallback(name: string) {
-    if (name === 'scheme') this.#scheme()
+    if (name === 'scheme') applyScheme(this)
     if (name === 'compact' && this.#props) this.#props.compact = this.#compact()
     if (name === 'session') {
       if (this.#props) this.#props.session = this.session
@@ -97,13 +76,6 @@ export class UncliChat extends HTMLElement {
   #compact(): boolean | undefined {
     const c = this.getAttribute('compact')
     return c === null ? undefined : c !== 'false'
-  }
-
-  // UNCLI's own scheme attribute, which the theme keys on.
-  #scheme() {
-    const s = this.getAttribute('scheme')
-    if (s === 'light' || s === 'dark') this.setAttribute('data-uncli-scheme', s)
-    else this.removeAttribute('data-uncli-scheme')
   }
 
   #mount() {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SessionView } from '../lib/api'
   import { hold } from '../lib/backguard'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
   import ActivityBadge from './ActivityBadge.svelte'
@@ -14,10 +14,13 @@
   interface Props {
     session: SessionView
     active: boolean
+    // onpick: what picking it does; showing it here otherwise (an embedded
+    // list tells its host instead).
+    onpick?: (id: string) => void
   }
 
-  let { session, active }: Props = $props()
-  const app = useApp()
+  let { session, active, onpick }: Props = $props()
+  const app = useChat()
   const names = $derived(app.namesFor(session.adapter))
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   let editing = $state(false)
@@ -102,7 +105,7 @@
   {:else}
     <button
       class="row main"
-      onclick={() => app.select(session.id)}
+      onclick={() => (onpick ? onpick(session.id) : app.select(session.id))}
       ondblclick={startRename}
       onkeydown={moveWithKeys}
       aria-current={active ? 'true' : undefined}

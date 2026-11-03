@@ -103,6 +103,9 @@ export class ChatStore {
   })
   readonly summarising = keyed(pageId => this.chat.sessions.some(s => this.chat.dataOf(s.id).summarising[pageId]) || undefined)
 
+  // The session list shows active sessions; archived ones are listed apart.
+  activeSessions = $derived.by(() => this.sessions.filter(s => !s.archived))
+  archivedSessions = $derived.by(() => this.sessions.filter(s => s.archived))
   current = $derived.by(() => this.sessions.find(s => s.id === this.currentId) ?? null)
   currentPages = $derived.by(() => (this.currentId ? this.chat.dataOf(this.currentId).pages ?? [] : []))
   currentIndex = $derived.by(() => (this.currentId ? this.chat.dataOf(this.currentId).index : 0))
@@ -364,6 +367,22 @@ export class ChatStore {
   // archive archives a session (stopping its CLI) or restores it.
   archive(id: string, on: boolean) {
     return this.client.archive(id, on)
+  }
+
+  // moveSession puts a session at a position in the list as shown (drag
+  // and drop, or Alt+arrows).
+  async moveSession(id: string, to: number) {
+    try {
+      await this.client.moveSession(id, to)
+    } catch (e) {
+      this.shell.toast(String(e), 'error')
+    }
+  }
+
+  // remove deletes a session from UNCLI (its CLI's transcript is kept).
+  async remove(id: string) {
+    await this.client.remove(id)
+    if (this.currentId === id) this.currentId = null
   }
 
   upsertSession(v: SessionView) {

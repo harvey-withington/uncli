@@ -77,9 +77,6 @@ export class AppStore extends ChatStore {
 
   // What in Settings needs the user, per tab (lib/attention.ts).
   attention = $derived(settingsAttention(this.containers))
-  // The session list shows active sessions; archived ones are listed apart.
-  activeSessions = $derived.by(() => this.sessions.filter(s => !s.archived))
-  archivedSessions = $derived.by(() => this.sessions.filter(s => s.archived))
 
   // loaded follows the first state: the theme file, then (the window) the
   // session open last time, else the first.
@@ -176,16 +173,6 @@ export class AppStore extends ChatStore {
     return r
   }
 
-  // moveSession puts a session at a position in the list as shown (drag
-  // and drop, or Alt+arrows).
-  async moveSession(id: string, to: number) {
-    try {
-      await this.client.moveSession(id, to)
-    } catch (e) {
-      this.shell.toast(String(e), 'error')
-    }
-  }
-
   async refreshPins() {
     try {
       await this.client.refreshPins()
@@ -194,13 +181,12 @@ export class AppStore extends ChatStore {
     }
   }
 
-  async remove(id: string) {
-    await this.client.remove(id)
-    if (this.currentId === id) {
-      this.currentId = null
-      const next = this.activeSessions[0]
-      if (next) await this.select(next.id)
-    }
+  // remove deletes a session; the window then shows the first one left.
+  override async remove(id: string) {
+    const shown = this.currentId === id
+    await super.remove(id)
+    const next = this.activeSessions[0]
+    if (shown && next) await this.select(next.id)
   }
 
   // ---- updates (decision 0025)
