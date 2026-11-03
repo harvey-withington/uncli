@@ -3,9 +3,9 @@
 // toasts and confirm dialogs: the window's app, the phone's, and later
 // each embedded element.
 import { getContext, setContext } from 'svelte'
-import { APP_CONTEXT } from './context'
+import { APP_CONTEXT, CHAT_CONTEXT } from './context'
 import { t } from './i18n.svelte'
-import type { AppStore } from '../stores/app.svelte'
+import type { ChatStore } from '../stores/chat.svelte'
 
 export type ToastKind = 'info' | 'success' | 'error'
 
@@ -68,9 +68,11 @@ export function provideShell(shell: Shell) {
   setContext(SHELL_CONTEXT, shell)
 }
 
-// useShell is the nearest root's shell; under an app store, the store's.
+// useShell is the nearest root's shell; under a chat's (or the app's)
+// store, the store's.
 export function useShell(): Shell {
-  const s = getContext<Shell | undefined>(SHELL_CONTEXT) ?? getContext<AppStore | undefined>(APP_CONTEXT)?.shell
+  const store = getContext<ChatStore | undefined>(CHAT_CONTEXT) ?? getContext<ChatStore | undefined>(APP_CONTEXT)
+  const s = getContext<Shell | undefined>(SHELL_CONTEXT) ?? store?.shell
   if (!s) throw new Error('useShell() outside a root')
   return s
 }

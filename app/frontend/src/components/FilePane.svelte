@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import type { WatchFile } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { canOpenDefault, editorLabel, splitPath } from '../lib/files'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
@@ -37,16 +37,16 @@
   // on every state change; as a derived it only changes with the id, so the
   // file isn't reloaded (and the tab doesn't flicker) as a turn runs.
   const sessionId = $derived(given)
-  const app = useApp()
+  const chat = useChat()
   const POLL_MS = 1000
   const GRACE_MS = 2500
-  const watched = $derived(app.watchedFor(sessionId))
+  const watched = $derived(chat.watchedFor(sessionId))
   const current = $derived(watched.current)
   const parts = $derived(splitPath(current))
   const starred = $derived(watched.starred.includes(current))
-  const session = $derived(app.sessions.find(s => s.id === sessionId))
-  const ideLinks = $derived(!!app.boot?.profiles.find(p => p.id === session?.profileId)?.ideLinks)
-  const editor = $derived(editorLabel(app.boot?.preferences, app.boot?.editors ?? []))
+  const session = $derived(chat.sessions.find(s => s.id === sessionId))
+  const ideLinks = $derived(!!chat.boot?.profiles.find(p => p.id === session?.profileId)?.ideLinks)
+  const editor = $derived(editorLabel(chat.boot?.preferences, chat.boot?.editors ?? []))
   const openLabel = $derived(ideLinks && editor ? t('files.openIn', { editor }) : canOpenDefault(current) ? t('files.open') : '')
   let file = $state<WatchFile | null>(null)
   let error = $state('')
@@ -68,8 +68,8 @@
   // focus when asked for) in its place.
   let picks = $state(0)
   $effect(() => {
-    if (!app.fileSwitcher) return
-    app.fileSwitcher = false
+    if (!chat.fileSwitcher) return
+    chat.fileSwitcher = false
     if (untrack(() => current)) switching = true
     else picks++
   })
@@ -90,7 +90,7 @@
       busy = true
       try {
         const since = !last ? 0 : last.missing ? -1 : last.modified
-        const next = await app.backend.watchRead(sid, path, since)
+        const next = await chat.backend.watchRead(sid, path, since)
         if (stopped) return
         now = Date.now()
         error = ''
@@ -121,7 +121,7 @@
 
   function choose(path: string) {
     switching = false
-    app.setWatched(sessionId, pick(watched, path))
+    chat.setWatched(sessionId, pick(watched, path))
   }
 
   // abs is the file's full path, in the folder's own separators.
@@ -151,7 +151,7 @@
       </button>
       <span class="gap"></span>
       <button class="btn ghost small icon" class:on={starred} aria-pressed={starred}
-        onclick={() => app.setWatched(sessionId, toggleStar(watched, current))}
+        onclick={() => chat.setWatched(sessionId, toggleStar(watched, current))}
         aria-label={t(starred ? 'watch.unstar' : 'watch.star')} title={t(starred ? 'watch.unstar' : 'watch.star')}>
         <Icon name="star" size={14} fill={starred} />
       </button>
@@ -163,13 +163,13 @@
       {/if}
       {#if file?.text}<CopyButton text={file.text} label={t('watch.copy')} />{/if}
       {#if openLabel && !file?.missing}
-        <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, abs(), 0))} disabled={!atServer(app.backend)} aria-label={openLabel} title={serverTitle(app.backend, openLabel)}><Icon name="external-link" size={14} /></button>
+        <button class="btn ghost small icon" onclick={() => run(chat.backend.openFile(sessionId, abs(), 0))} disabled={!atServer(chat.backend)} aria-label={openLabel} title={serverTitle(chat.backend, openLabel)}><Icon name="external-link" size={14} /></button>
       {/if}
       {#if !file?.missing}
-        <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(abs()))} disabled={!atServer(app.backend)} aria-label={t('files.reveal')} title={serverTitle(app.backend, t('files.reveal'))}><Icon name="folder-search" size={14} /></button>
+        <button class="btn ghost small icon" onclick={() => run(chat.backend.revealFile(abs()))} disabled={!atServer(chat.backend)} aria-label={t('files.reveal')} title={serverTitle(chat.backend, t('files.reveal'))}><Icon name="folder-search" size={14} /></button>
       {/if}
       <span class="sep" aria-hidden="true"></span>
-      <button class="btn ghost small icon" onclick={() => app.closeFile(sessionId)} aria-label={t('watch.close')} title={t('watch.close')}><Icon name="x" size={14} /></button>
+      <button class="btn ghost small icon" onclick={() => chat.closeFile(sessionId)} aria-label={t('watch.close')} title={t('watch.close')}><Icon name="x" size={14} /></button>
     </div>
     {#if file && !file.missing}
       <p class="when">{t('watch.updated', { when: relativeTime(file.modified, now) })}</p>
@@ -191,7 +191,7 @@
     {:else if file.missing}
       <p class="note">
         <Icon name="file-x" size={14} /><span>{t('watch.missing', { path: current })}</span>
-        <button class="btn ghost small" onclick={() => app.setWatched(sessionId, forget(watched, current))}>{t('watch.forget')}</button>
+        <button class="btn ghost small" onclick={() => chat.setWatched(sessionId, forget(watched, current))}>{t('watch.forget')}</button>
       </p>
     {:else if file.binary}
       <p class="note">{t('watch.binary', { path: current })}</p>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { WatchEntry } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { splitPath } from '../lib/files'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
@@ -24,7 +24,7 @@
   }
 
   let { sessionId, overlay = false, focus = 1, onpick, onclose }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   let query = $state('')
   let entries = $state<WatchEntry[]>([])
   let loading = $state(true)
@@ -32,7 +32,7 @@
   let active = $state(0)
   let listEl: HTMLElement | undefined = $state()
   let input: HTMLInputElement | undefined = $state()
-  const watched = $derived(app.watchedFor(sessionId))
+  const watched = $derived(chat.watchedFor(sessionId))
   const list = $derived(choices(query, entries, watched))
   const now = Date.now()
 
@@ -43,7 +43,7 @@
     const sid = sessionId
     let stale = false
     const timer = setTimeout(() => {
-      app.backend
+      chat.backend
         .watchFiles(sid, q)
         .then(list => {
           if (stale) return

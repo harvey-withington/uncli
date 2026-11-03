@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Page } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { cost, duration, tokens } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
   import { modelLabel } from '../lib/models'
@@ -11,13 +11,13 @@
   }
 
   let { page }: Props = $props()
-  const app = useApp()
-  const mods = $derived((page.modifiers ?? []).map(id => app.boot?.modifiers.find(m => m.id === id)).filter(m => !!m))
+  const chat = useChat()
+  const mods = $derived((page.modifiers ?? []).map(id => chat.boot?.modifiers.find(m => m.id === id)).filter(m => !!m))
   const done = $derived(page.status !== 'open')
 </script>
 
 <div class="chips" aria-label={t('page.details')}>
-  <span class="chip model" title={t('page.model')}><Icon name="sparkles" size={12} />{modelLabel(app.boot?.models ?? null, page.model)}</span>
+  <span class="chip model" title={t('page.model')}><Icon name="sparkles" size={12} />{modelLabel(chat.boot?.models ?? null, page.model)}</span>
   {#each mods as m (m.id)}
     <span class="chip mod" title={t('page.modifier')}><Icon name={m.icon} size={12} />{m.label}</span>
   {/each}

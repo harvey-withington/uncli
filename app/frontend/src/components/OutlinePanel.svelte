@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Page } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { cost } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
   import { modelLabel } from '../lib/models'
@@ -17,26 +17,26 @@
   }
 
   let { page, scroller }: Props = $props()
-  const app = useApp()
-  const outline = $derived(app.outlineFor(page))
+  const chat = useChat()
+  const outline = $derived(chat.outlineFor(page))
   const blocks = $derived(outline.blocks)
   const showingSummary = $derived(outline.showingSummary)
   const entries = $derived(outline.entries)
-  const quick = $derived(app.boot?.preferences.quickTaskModel)
-  const quickLabel = $derived(quick ? modelLabel(app.boot?.models ?? null, quick.model) : '')
-  const summarising = $derived(!!app.summarising[page.id])
+  const quick = $derived(chat.boot?.preferences.quickTaskModel)
+  const quickLabel = $derived(quick ? modelLabel(chat.boot?.models ?? null, quick.model) : '')
+  const summarising = $derived(!!chat.summarising[page.id])
   let active = $state(-1)
   // A finished answer the automatic summary passed over for being short.
   const short = $derived(
-    page.status === 'done' && !page.outline && autoSummaryFor(page.answerMd, blocks.length, app.boot?.preferences.autoSummary ?? 'off') === 'short',
+    page.status === 'done' && !page.outline && autoSummaryFor(page.answerMd, blocks.length, chat.boot?.preferences.autoSummary ?? 'off') === 'short',
   )
 
-  const summarise = () => app.summarise(page)
+  const summarise = () => chat.summarise(page)
 
   // Answers summarise themselves as they finish (the store does that); an
   // older page opened here gets the same chance.
   $effect(() => {
-    app.autoSummarise(page)
+    chat.autoSummarise(page)
   })
 
   // The sticky question covers the top of the scroller; content is "being
@@ -103,8 +103,8 @@
 
   {#if outline.summary.length > 0 && outline.headings.length > 0}
     <div class="switch" role="group" aria-label={t('outline.show')}>
-      <button class:on={showingSummary} aria-pressed={showingSummary} onclick={() => delete app.preferHeadings[page.id]}>{t('outline.summary')}</button>
-      <button class:on={!showingSummary} aria-pressed={!showingSummary} onclick={() => (app.preferHeadings[page.id] = true)}>{t('outline.headings')}</button>
+      <button class:on={showingSummary} aria-pressed={showingSummary} onclick={() => delete chat.preferHeadings[page.id]}>{t('outline.summary')}</button>
+      <button class:on={!showingSummary} aria-pressed={!showingSummary} onclick={() => (chat.preferHeadings[page.id] = true)}>{t('outline.headings')}</button>
     </div>
   {/if}
 
@@ -147,7 +147,7 @@
   {#if showingSummary && page.outline}
     <p class="note by">
       <Icon name="sparkles" size={12} />
-      {t('outline.by', { model: modelLabel(app.boot?.models ?? null, page.outline.model), cost: cost(page.outline.costUsd) })}
+      {t('outline.by', { model: modelLabel(chat.boot?.models ?? null, page.outline.model), cost: cost(page.outline.costUsd) })}
     </p>
   {/if}
 </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { back, forward, nextBookmark, prevBookmark } from '../lib/nav'
   import Icon from './Icon.svelte'
@@ -9,15 +9,15 @@
 
   // Page controls floating on the line between the answer and the composer:
   // separate rounded buttons, icons only; each has a label and tooltip.
-  const app = useApp()
-  const pages = $derived(app.currentPages)
-  const i = $derived(app.currentIndex)
+  const chat = useChat()
+  const pages = $derived(chat.currentPages)
+  const i = $derived(chat.currentIndex)
   const n = $derived(pages.length)
-  const page = $derived(app.currentPage)
+  const page = $derived(chat.currentPage)
 
   async function toggle() {
     try {
-      await app.toggleBookmark()
+      await chat.toggleBookmark()
     } catch (e) {
       shell.toast(String(e), 'error')
     }
@@ -25,7 +25,7 @@
 
   async function pin() {
     try {
-      await app.togglePin()
+      await chat.togglePin()
     } catch (e) {
       shell.toast(String(e), 'error')
     }
@@ -33,10 +33,10 @@
 </script>
 
 <nav class="navbar" aria-label={t('nav.label')}>
-  <button onclick={() => app.goTo(prevBookmark(pages, i))} disabled={n === 0 || i === 0} title={t('nav.prevBookmark')} aria-label={t('nav.prevBookmark')}>
+  <button onclick={() => chat.goTo(prevBookmark(pages, i))} disabled={n === 0 || i === 0} title={t('nav.prevBookmark')} aria-label={t('nav.prevBookmark')}>
     <Icon name="rewind" fill size={15} />
   </button>
-  <button onclick={() => app.goTo(back(i))} disabled={i === 0} title={t('nav.back')} aria-label={t('nav.back')}>
+  <button onclick={() => chat.goTo(back(i))} disabled={i === 0} title={t('nav.back')} aria-label={t('nav.back')}>
     <Icon name="play" fill flip size={14} />
   </button>
   <span class="pos" aria-live="polite">
@@ -48,10 +48,10 @@
       <span class="visually-hidden">{t('nav.noPages')}</span>
     {/if}
   </span>
-  <button onclick={() => app.goTo(forward(i, n))} disabled={i >= n - 1} title={t('nav.forward')} aria-label={t('nav.forward')}>
+  <button onclick={() => chat.goTo(forward(i, n))} disabled={i >= n - 1} title={t('nav.forward')} aria-label={t('nav.forward')}>
     <Icon name="play" fill size={14} />
   </button>
-  <button onclick={() => app.goTo(nextBookmark(pages, i))} disabled={n === 0 || i >= n - 1} title={t('nav.nextBookmark')} aria-label={t('nav.nextBookmark')}>
+  <button onclick={() => chat.goTo(nextBookmark(pages, i))} disabled={n === 0 || i >= n - 1} title={t('nav.nextBookmark')} aria-label={t('nav.nextBookmark')}>
     <Icon name="fast-forward" fill size={15} />
   </button>
   <button

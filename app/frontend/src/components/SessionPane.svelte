@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SessionView } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
   import { blockMatching } from '../lib/search'
@@ -28,12 +28,12 @@
   }
 
   let { session }: Props = $props()
-  const app = useApp()
-  const names = $derived(app.namesFor(session.adapter))
-  const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
+  const chat = useChat()
+  const names = $derived(chat.namesFor(session.adapter))
+  const profile = $derived(chat.boot?.profiles.find(p => p.id === session.profileId))
   // A session in a container says which (decision 0011).
-  const place = $derived(session.runtimeRef ? ` · ${t('session.inContainer', { label: app.containers?.containers.find(c => c.id === session.runtimeRef)?.label ?? session.runtimeRef })}` : '')
-  const page = $derived(app.currentPage)
+  const place = $derived(session.runtimeRef ? ` · ${t('session.inContainer', { label: chat.containers?.containers.find(c => c.id === session.runtimeRef)?.label ?? session.runtimeRef })}` : '')
+  const page = $derived(chat.currentPage)
   const failed = $derived(!!session.error && session.state === 'error')
   let scroller: HTMLElement | undefined = $state()
   // The approval cards fade out under the page controls only while there is
@@ -62,7 +62,7 @@
   // user is declined, and Claude is told the user is away.
   async function toggleUnattended() {
     try {
-      app.upsertSession(await app.backend.setUnattended(session.id, !session.unattended))
+      chat.upsertSession(await chat.backend.setUnattended(session.id, !session.unattended))
     } catch (e) {
       shell.toast(String(e), 'error')
     }
@@ -70,7 +70,7 @@
 
   async function restore() {
     try {
-      await app.archive(session.id, false)
+      await chat.archive(session.id, false)
     } catch (e) {
       shell.toast(String(e), 'error')
     }
@@ -80,13 +80,13 @@
   // Opened from search: once the page has rendered, scroll to the first
   // block holding a search word (below the sticky question) and flash it.
   $effect(() => {
-    const r = app.reveal
+    const r = chat.reveal
     const el = scroller
     if (!r || !el || page?.id !== r.pageId) return
     const frame = window.requestAnimationFrame ?? ((f: FrameRequestCallback) => window.setTimeout(f, 16))
     frame(() => frame(() => {
-      if (app.reveal !== r) return
-      app.reveal = null
+      if (chat.reveal !== r) return
+      chat.reveal = null
       const blocks = Array.from(el.querySelectorAll<HTMLElement>('[data-block]'))
       const i = blockMatching(blocks.map(b => b.textContent ?? ''), r.terms)
       const target = blocks[i]
@@ -102,12 +102,12 @@
 </script>
 
 <section class="pane">
-  <header class="top" class:compact={app.headerCompact}>
+  <header class="top" class:compact={chat.headerCompact}>
     <div class="title-row">
       <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <h1><SessionTitle {session} /></h1>
       <ActivityBadge state={session.state} />
-      {#if app.headerCompact}
+      {#if chat.headerCompact}
         <!-- Compact: the folder follows the title on its line. -->
         <span class="path" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
         <SharesNote {session} compact />
@@ -118,42 +118,45 @@
       {#if !session.archived}
         <button
           class="btn ghost small icon"
-          onclick={() => app.restart(session.id)}
+          onclick={() => chat.restart(session.id)}
           aria-label={t('restart.label')}
           title={t('restart.hint', names)}
         >
           <Icon name="rotate-ccw" />
         </button>
       {/if}
+      {#if chat.openSettings}
+        {@const open = chat.openSettings}
+        <button
+          class="btn ghost small icon"
+          onclick={() => open('safe')}
+          aria-label={t('safe.open')}
+          title={t('safe.open')}
+        >
+          <Icon name="shield" />
+        </button>
+      {/if}
       <button
         class="btn ghost small icon"
-        onclick={() => app.openSettings('safe')}
-        aria-label={t('safe.open')}
-        title={t('safe.open')}
+        onclick={() => chat.togglePanel()}
+        aria-pressed={chat.outline.open}
+        aria-label={t(chat.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
+        title={t(chat.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
       >
-        <Icon name="shield" />
-      </button>
-      <button
-        class="btn ghost small icon"
-        onclick={() => app.togglePanel()}
-        aria-pressed={app.outline.open}
-        aria-label={t(app.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
-        title={t(app.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
-      >
-        <Icon name={app.outline.open ? 'panel-right-close' : 'panel-right-open'} />
+        <Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} />
       </button>
       <!-- Always last on the line, expanded or compact. -->
       <button
         class="btn ghost small icon h-toggle"
-        onclick={() => app.toggleHeaderCompact()}
-        aria-expanded={!app.headerCompact}
-        aria-label={t(app.headerCompact ? 'header.expand' : 'header.collapse')}
-        title={t(app.headerCompact ? 'header.expand' : 'header.collapse')}
+        onclick={() => chat.toggleHeaderCompact()}
+        aria-expanded={!chat.headerCompact}
+        aria-label={t(chat.headerCompact ? 'header.expand' : 'header.collapse')}
+        title={t(chat.headerCompact ? 'header.expand' : 'header.collapse')}
       >
-        <Icon name={app.headerCompact ? 'chevron-down' : 'chevron-up'} size={14} />
+        <Icon name={chat.headerCompact ? 'chevron-down' : 'chevron-up'} size={14} />
       </button>
     </div>
-    {#if !app.headerCompact}
+    {#if !chat.headerCompact}
       <div class="where">
         <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
         <SharesNote {session} />
@@ -180,9 +183,9 @@
   <!-- Status and warnings, in a strip of their own under the header, all
        aligned on the left. Compact shows only an error there. MCP servers
        that need the user are left to the plug button's dot. -->
-  {#if !app.headerCompact || failed}
+  {#if !chat.headerCompact || failed}
     <div class="notes">
-      {#if !app.headerCompact}
+      {#if !chat.headerCompact}
         <SessionStatus {session} />
       {/if}
       {#if failed}
@@ -238,7 +241,7 @@
         </div>
       </footer>
     </div>
-    {#if app.outline.open}
+    {#if chat.outline.open}
       <SidePanel sessionId={session.id} page={page ?? null} {scroller} />
     {/if}
   </div>

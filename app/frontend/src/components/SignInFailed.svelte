@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Page } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { providerOf } from '../lib/api'
   import { errorDetail, resend } from '../lib/signin'
@@ -19,13 +19,13 @@
   }
 
   let { page }: Props = $props()
-  const app = useApp()
-  const session = $derived(app.sessions.find(s => s.id === page.sessionId))
-  const names = $derived(app.namesFor(session?.adapter))
-  const provider = $derived(providerOf(app.boot, session?.adapter))
+  const chat = useChat()
+  const session = $derived(chat.sessions.find(s => s.id === page.sessionId))
+  const names = $derived(chat.namesFor(session?.adapter))
+  const provider = $derived(providerOf(chat.boot, session?.adapter))
   // Only the first provider signs in by link and code from here (Service.SignIn).
-  const here = $derived(provider?.signIn === 'link' && provider.id === app.boot?.providers[0]?.id)
-  const latest = $derived(app.pages[page.sessionId]?.at(-1)?.id === page.id)
+  const here = $derived(provider?.signIn === 'link' && provider.id === chat.boot?.providers[0]?.id)
+  const latest = $derived(chat.pages[page.sessionId]?.at(-1)?.id === page.id)
   let signedIn = $state(false)
   let signingIn = $state(false) // the code is being asked for: Send again waits
   let sending = $state(false)
@@ -34,7 +34,7 @@
     const { text, refs } = resend(page)
     sending = true
     try {
-      await app.backend.send(page.sessionId, text, refs)
+      await chat.backend.send(page.sessionId, text, refs)
     } catch (e) {
       shell.toast(String(e), 'error')
     } finally {
@@ -51,8 +51,9 @@
       <span class="ok"><Icon name="check" size={14} />{t('signinFailed.signedIn', names)}</span>
     {:else if here}
       <CodeSignIn label={t('signinFailed.signIn')} primary onsignedin={() => { signedIn = true; signingIn = false }} bind:active={signingIn} />
-    {:else if provider}
-      <button class="btn small primary" onclick={() => app.openSettings(`provider-${provider.id}`)}>
+    {:else if provider && chat.openSettings}
+      {@const open = chat.openSettings}
+      <button class="btn small primary" onclick={() => open(`provider-${provider.id}`)}>
         <Icon name="log-in" size={13} />{t('signinFailed.signInSettings')}
       </button>
     {/if}

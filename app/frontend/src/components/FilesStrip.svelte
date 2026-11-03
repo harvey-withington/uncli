@@ -1,7 +1,7 @@
 <script lang="ts">
   import { slide } from 'svelte/transition'
   import type { HeadMove, TouchedFile } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { artifactPathOf } from '../lib/artifacts'
   import { watchPathOf } from '../lib/watched'
   import { canOpenDefault, editorLabel, HOW_ICON, moveLabel, relPath, splitByMove, splitPath } from '../lib/files'
@@ -29,14 +29,14 @@
   }
 
   let { files: raw, sessionId, move }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   // Opening a file or its folder happens on the server's screen.
-  const here = $derived(atServer(app.backend))
+  const here = $derived(atServer(chat.backend))
   const files = $derived(raw ?? [])
-  const session = $derived(app.sessions.find(s => s.id === sessionId))
-  const ideLinks = $derived(!!app.boot?.profiles.find(p => p.id === session?.profileId)?.ideLinks)
-  const artifacts = $derived(app.hasArtifacts(sessionId))
-  const editor = $derived(editorLabel(app.boot?.preferences, app.boot?.editors ?? []))
+  const session = $derived(chat.sessions.find(s => s.id === sessionId))
+  const ideLinks = $derived(!!chat.boot?.profiles.find(p => p.id === session?.profileId)?.ideLinks)
+  const artifacts = $derived(chat.hasArtifacts(sessionId))
+  const editor = $derived(editorLabel(chat.boot?.preferences, chat.boot?.editors ?? []))
   let open = $state<boolean | null>(null) // null: open while the list is short
   const parts = $derived(splitByMove(files, move))
   // Open while the rows are few (a HEAD move's files count as one).
@@ -71,9 +71,9 @@
     <!-- The name opens the file the way its first action does: an
          artifact in the Artifacts tab, else in the editor or app. -->
     {#if artifact}
-      <button class="path open" title={`${t('files.view')}: ${f.path}`} onclick={() => app.openArtifact(sessionId, artifact)}>{@render path()}</button>
+      <button class="path open" title={`${t('files.view')}: ${f.path}`} onclick={() => chat.openArtifact(sessionId, artifact)}>{@render path()}</button>
     {:else if label && here}
-      <button class="path open" title={`${label}: ${f.path}`} onclick={() => run(app.backend.openFile(sessionId, f.path, f.line ?? 0))}>{@render path()}</button>
+      <button class="path open" title={`${label}: ${f.path}`} onclick={() => run(chat.backend.openFile(sessionId, f.path, f.line ?? 0))}>{@render path()}</button>
     {:else}
       <span class="path" title={f.path}>{@render path()}</span>
     {/if}
@@ -86,22 +86,22 @@
     {#if f.how !== 'deleted'}
       <span class="actions">
         {#if artifact}
-          <button class="btn ghost small icon" onclick={() => app.openArtifact(sessionId, artifact)} aria-label={`${t('files.view')}: ${name.name}`} title={t('files.view')}>
+          <button class="btn ghost small icon" onclick={() => chat.openArtifact(sessionId, artifact)} aria-label={`${t('files.view')}: ${name.name}`} title={t('files.view')}>
             <Icon name="layers" size={13} />
           </button>
         {/if}
         <!-- Off, saying why, for a file outside the session folder:
              the File tab reads only that folder. -->
-        <button class="btn ghost small icon" onclick={() => watchable && app.watchFile(sessionId, watchable)} disabled={!watchable}
+        <button class="btn ghost small icon" onclick={() => watchable && chat.watchFile(sessionId, watchable)} disabled={!watchable}
           aria-label={`${t('files.watch')}: ${name.name}`} title={watchable ? t('files.watch') : t('files.watchOutside')}>
           <Icon name="eye" size={13} />
         </button>
         {#if label}
-          <button class="btn ghost small icon" onclick={() => run(app.backend.openFile(sessionId, f.path, f.line ?? 0))} disabled={!here} aria-label={`${label}: ${name.name}`} title={serverTitle(app.backend, label)}>
+          <button class="btn ghost small icon" onclick={() => run(chat.backend.openFile(sessionId, f.path, f.line ?? 0))} disabled={!here} aria-label={`${label}: ${name.name}`} title={serverTitle(chat.backend, label)}>
             <Icon name="external-link" size={13} />
           </button>
         {/if}
-        <button class="btn ghost small icon" onclick={() => run(app.backend.revealFile(f.path))} disabled={!here} aria-label={`${t('files.reveal')}: ${name.name}`} title={serverTitle(app.backend, t('files.reveal'))}>
+        <button class="btn ghost small icon" onclick={() => run(chat.backend.revealFile(f.path))} disabled={!here} aria-label={`${t('files.reveal')}: ${name.name}`} title={serverTitle(chat.backend, t('files.reveal'))}>
           <Icon name="folder-search" size={13} />
         </button>
       </span>

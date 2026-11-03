@@ -1,7 +1,7 @@
 <script lang="ts">
   import { autosize } from '../lib/actions'
   import type { SessionView } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { attachmentIcon, formatSize, pendingKey, readImage, releasePreviews, shrinkPhoto, toRefs, type Pending } from '../lib/attachments'
   import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/drops'
@@ -18,7 +18,7 @@
   }
 
   let { session }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   let text = $state('')
   let sending = $state(false)
   let input: HTMLTextAreaElement | undefined = $state()
@@ -26,7 +26,7 @@
   let attachments = $state<Pending[]>([]) // files going with the next turn
   // A remote client picks files (a photo, from the camera or gallery) and
   // sends each to the server first; the turn names them by upload id.
-  const remote = $derived(!atServer(app.backend))
+  const remote = $derived(!atServer(chat.backend))
   let picker: HTMLInputElement | undefined = $state()
   let uploading = $state(0)
 
@@ -64,7 +64,7 @@
     if ((!q && attachments.length === 0) || session.busy || sending) return
     sending = true
     try {
-      await app.send(q, toRefs(attachments))
+      await chat.send(q, toRefs(attachments))
       text = ''
       releasePreviews(attachments)
       attachments = []
@@ -80,7 +80,7 @@
 
   async function stop() {
     try {
-      await app.backend.interrupt(session.id)
+      await chat.backend.interrupt(session.id)
     } catch (e) {
       shell.toast(String(e), 'error')
     }
@@ -93,7 +93,7 @@
     const id = session.id
     let infos
     try {
-      infos = await app.backend.describeAttachments(paths)
+      infos = await chat.backend.describeAttachments(paths)
     } catch (e) {
       shell.toast(String(e), 'error')
       return
@@ -116,7 +116,7 @@
       try {
         const body = await shrinkPhoto(file)
         const name = body === file ? file.name : file.name.replace(/\.\w+$/, '') + '.jpg'
-        const up = await app.backend.upload(body, name)
+        const up = await chat.backend.upload(body, name)
         if (up.kind === 'folder' || up.kind === 'unsupported') {
           shell.toast(t('composer.notAttached', { name: up.name, reason: up.reason ?? '' }), 'info')
           continue
@@ -197,7 +197,7 @@
         el.dispatchEvent(new CustomEvent(INSERT_EVENT, { detail: pasted }))
       }
     }
-    app.backend.clipboardFiles().then(
+    chat.backend.clipboardFiles().then(
       paths => (paths.length ? attachPaths(paths) : fallback()),
       () => fallback(),
     )

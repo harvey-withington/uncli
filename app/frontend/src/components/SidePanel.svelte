@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Page } from '../lib/api'
   import { artifactsAt } from '../lib/artifacts'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { OUTLINE_MAX, OUTLINE_MIN } from '../lib/outline'
   import type { PanelTab } from '../lib/panels'
@@ -25,18 +25,18 @@
   }
 
   let { sessionId, page, scroller }: Props = $props()
-  const app = useApp()
-  const hasArtifacts = $derived(app.hasArtifacts(sessionId))
-  const tab = $derived(app.tabFor(sessionId))
+  const chat = useChat()
+  const hasArtifacts = $derived(chat.hasArtifacts(sessionId))
+  const tab = $derived(chat.tabFor(sessionId))
   const tabs = $derived<PanelTab[]>(hasArtifacts ? ['outline', 'artifacts', 'file'] : ['outline', 'file'])
-  const watching = $derived(app.watchedFor(sessionId).current)
+  const watching = $derived(chat.watchedFor(sessionId).current)
 
-  const sections = $derived(page ? app.outlineFor(page).entries.length : 0)
+  const sections = $derived(page ? chat.outlineFor(page).entries.length : 0)
   const artifacts = $derived.by(() => {
     if (!hasArtifacts || !page) return 0
-    const pages = app.pages[sessionId] ?? []
+    const pages = chat.pages[sessionId] ?? []
     const index = Math.max(0, pages.findIndex(p => p.id === page.id))
-    return artifactsAt(pages, index, app.artifactLive[sessionId] ?? null).length
+    return artifactsAt(pages, index, chat.artifactLive[sessionId] ?? null).length
   })
 
   const TAB_ICON: Record<PanelTab, string> = { outline: 'table-of-contents', artifacts: 'layers', file: 'eye' }
@@ -49,8 +49,8 @@
   }
 
   function choose(k: PanelTab) {
-    app.setTab(k)
-    if (k === 'artifacts') void app.refreshArtifacts(sessionId)
+    chat.setTab(k)
+    if (k === 'artifacts') void chat.refreshArtifacts(sessionId)
   }
 
   // Arrow keys move between the tabs (one tab stop, as in ModeSwitch).
@@ -66,9 +66,9 @@
   }
 </script>
 
-<aside class="side" style:width="{app.outline.width}px" aria-label={label(tab)}>
-  <ResizeHandle edge="left" width={app.outline.width} min={OUTLINE_MIN} max={OUTLINE_MAX} label={t('panel.resize')}
-    onresize={w => (app.outline.width = w)} oncommit={w => app.setOutlineWidth(w)} />
+<aside class="side" style:width="{chat.outline.width}px" aria-label={label(tab)}>
+  <ResizeHandle edge="left" width={chat.outline.width} min={OUTLINE_MIN} max={OUTLINE_MAX} label={t('panel.resize')}
+    onresize={w => (chat.outline.width = w)} oncommit={w => chat.setOutlineWidth(w)} />
   <div class="tabs" role="tablist" aria-label={t('panel.label')} tabindex="-1" {onkeydown}>
     {#each tabs as k (k)}
       <button

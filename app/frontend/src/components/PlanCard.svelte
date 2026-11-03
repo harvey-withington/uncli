@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Approval, SessionView } from '../lib/api'
   import { planOf } from '../lib/asks'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import Icon from './Icon.svelte'
@@ -18,8 +18,8 @@
   }
 
   let { session, approval }: Props = $props()
-  const app = useApp()
-  const names = $derived(app.namesFor(session.adapter))
+  const chat = useChat()
+  const names = $derived(chat.namesFor(session.adapter))
   const plan = $derived(planOf(approval.input))
   let note = $state('')
   let busy = $state(false)
@@ -28,7 +28,7 @@
     if (busy) return
     busy = true
     try {
-      await app.backend.answerAsk(session.id, approval.requestId, allow, null, allow ? '' : note)
+      await chat.backend.answerAsk(session.id, approval.requestId, allow, null, allow ? '' : note)
     } catch (e) {
       shell.toast(String(e), 'error')
     } finally {

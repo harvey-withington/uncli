@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { linkTarget } from '../lib/links'
   import { atServer } from '../lib/remoteonly'
@@ -20,7 +20,7 @@
   }
 
   let { markdown, streaming = false, markers }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   const blocks = $derived(toBlocks(markdown))
 
   // Links never open inside the app window: web links open in the user's
@@ -30,13 +30,13 @@
     const a = (e.target as HTMLElement).closest('a')
     if (!a) return
     e.preventDefault()
-    const session = app.current
+    const session = chat.current
     const target = linkTarget(a.getAttribute('href') ?? '', session?.workdir ?? '')
-    if (target?.kind === 'web') void app.backend.openURL(target.url)
+    if (target?.kind === 'web') void chat.backend.openURL(target.url)
     else if (target?.kind === 'file' && session) {
       // Files open on the server's screen; a remote client says so.
-      if (!atServer(app.backend)) shell.toast(t('remote.onlyAtServerFor', { what: target.path }), 'info')
-      else app.backend.openPath(session.id, target.path, target.line).catch(err => shell.toast(String(err), 'error'))
+      if (!atServer(chat.backend)) shell.toast(t('remote.onlyAtServerFor', { what: target.path }), 'info')
+      else chat.backend.openPath(session.id, target.path, target.line).catch(err => shell.toast(String(err), 'error'))
     }
   }
 </script>

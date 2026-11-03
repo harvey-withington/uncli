@@ -22,6 +22,14 @@ with the code.
   two embedded chats on one page never show each other's.
 - Keyed `{#each}` blocks use stable ids, never the index (toolbar items,
   which have no ids and never reorder, are the one exception).
+- **The chat's components read `useChat()`, not `useApp()`** (decision
+  0026). `ChatStore` (`stores/chat.svelte.ts`) is everything a session
+  view needs: the session shown, its side panel, the outline, its actions.
+  `AppStore` builds on it with the window's and phone's shell (dialogs,
+  search, sidebar, Settings, updates). What only the app can do is a hook
+  on `ChatStore` (`openSettings`, `openUsage`) that an embedded chat
+  leaves out, and the button that needs it doesn't show. The server's
+  state itself lives in `@uncli/client`'s `ChatClient`.
 - Shared DOM behaviours (click-outside, focus trap, autosize, drag) are
   actions in `lib/actions.ts`. Code that may end up in an embedded element
   never assumes the document: it finds UNCLI's root with `rootOf(node)`

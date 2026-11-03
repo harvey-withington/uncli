@@ -2,7 +2,7 @@
   import { untrack } from 'svelte'
   import type { ArtifactEntry } from '../lib/artifacts'
   import { artifactKind, artifactLang, decodeText, imageType, sandboxDoc, svgDoc } from '../lib/artifacts'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { canOpenDefault } from '../lib/files'
   import { t } from '../lib/i18n.svelte'
   import { atServer, serverTitle } from '../lib/remoteonly'
@@ -27,7 +27,7 @@
   }
 
   let { sessionId, entry }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   const kind = $derived(artifactKind(entry.path))
   const name = $derived(entry.path.slice(entry.path.lastIndexOf('/') + 1))
   let data = $state<string | null>(null) // base64
@@ -50,7 +50,7 @@
     text = diagram = error = ''
     if (k === 'pdf' || k === 'other') return
     loading = true
-    app.backend
+    chat.backend
       .readArtifact(sessionId, e.hash ? { hash: e.hash } : { path: e.path })
       .then(async c => {
         if (mine !== seq) return
@@ -77,7 +77,7 @@
 
   async function onDisk(): Promise<string | null> {
     try {
-      return await app.backend.artifactPath(sessionId, entry.path)
+      return await chat.backend.artifactPath(sessionId, entry.path)
     } catch (e) {
       shell.toast(String(e), 'error')
       return null
@@ -86,20 +86,20 @@
   // At the server it opens with the default app; on a remote client, in
   // the device's browser through a signed link.
   async function open() {
-    if (!atServer(app.backend)) {
+    if (!atServer(chat.backend)) {
       try {
-        await app.backend.openURL(await app.backend.artifactLink(sessionId, entry.hash ? { hash: entry.hash } : { path: entry.path }))
+        await chat.backend.openURL(await chat.backend.artifactLink(sessionId, entry.hash ? { hash: entry.hash } : { path: entry.path }))
       } catch (e) {
         shell.toast(String(e), 'error')
       }
       return
     }
     const p = await onDisk()
-    if (p) app.backend.openFile(sessionId, p, 0).catch(e => shell.toast(String(e), 'error'))
+    if (p) chat.backend.openFile(sessionId, p, 0).catch(e => shell.toast(String(e), 'error'))
   }
   async function reveal() {
     const p = await onDisk()
-    if (p) app.backend.revealFile(p).catch(e => shell.toast(String(e), 'error'))
+    if (p) chat.backend.revealFile(p).catch(e => shell.toast(String(e), 'error'))
   }
 </script>
 
@@ -112,7 +112,7 @@
     {#if canOpenDefault(entry.path)}
       <button class="btn ghost small icon" onclick={open} aria-label={t('artifacts.open')} title={t('artifacts.open')}><Icon name="external-link" size={14} /></button>
     {/if}
-    <button class="btn ghost small icon" onclick={reveal} disabled={!atServer(app.backend)} aria-label={t('files.reveal')} title={serverTitle(app.backend, t('files.reveal'))}><Icon name="folder-search" size={14} /></button>
+    <button class="btn ghost small icon" onclick={reveal} disabled={!atServer(chat.backend)} aria-label={t('files.reveal')} title={serverTitle(chat.backend, t('files.reveal'))}><Icon name="folder-search" size={14} /></button>
   </div>
   <div class="body" class:framed={kind === 'html' || kind === 'svg' || kind === 'mermaid'} use:keepScroll={{ key: `artifact:${sessionId}:${entry.path}` }}>
     {#if error}

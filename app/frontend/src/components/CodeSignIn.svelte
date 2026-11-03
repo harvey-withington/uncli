@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
 
@@ -16,7 +16,7 @@
   }
 
   let { label, primary = false, onsignedin, active = $bindable(false) }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   let step = $state<'idle' | 'starting' | 'code' | 'verifying'>('idle')
   $effect(() => {
     active = step === 'code' || step === 'verifying'
@@ -30,9 +30,9 @@
     step = 'starting'
     error = ''
     try {
-      const s = await app.backend.signIn()
+      const s = await chat.backend.signIn()
       if (s.signedIn) {
-        app.cli = s.status
+        chat.cli = s.status
         step = 'idle'
         onsignedin?.()
         return
@@ -49,7 +49,7 @@
     step = 'verifying'
     error = ''
     try {
-      app.cli = await app.backend.submitLoginCode(code)
+      chat.cli = await chat.backend.submitLoginCode(code)
       step = 'idle'
       code = ''
       onsignedin?.()
@@ -61,7 +61,7 @@
   }
 
   async function cancel() {
-    await app.backend.cancelSignIn().catch(() => {})
+    await chat.backend.cancelSignIn().catch(() => {})
     step = 'idle'
     code = ''
   }
@@ -71,9 +71,9 @@
   {#if step === 'code' || step === 'verifying'}
     <p class="opened">
       {t('setup.signin.opened')}
-      <button class="link" onclick={() => app.backend.openURL(url)}>{t('setup.signin.openAgain')}</button>
+      <button class="link" onclick={() => chat.backend.openURL(url)}>{t('setup.signin.openAgain')}</button>
       ·
-      <button class="link" onclick={() => app.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
+      <button class="link" onclick={() => chat.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
     </p>
     <form class="row" onsubmit={e => { e.preventDefault(); void finish() }}>
       <!-- svelte-ignore a11y_autofocus -->

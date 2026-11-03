@@ -2,7 +2,7 @@
   import type { Page } from '../lib/api'
   import { artifactKind, artifactsAt, KIND_ICON } from '../lib/artifacts'
   import { formatSize } from '../lib/attachments'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import ArtifactViewer from './ArtifactViewer.svelte'
   import Icon from './Icon.svelte'
@@ -16,20 +16,20 @@
   }
 
   let { page }: Props = $props()
-  const app = useApp()
-  const names = $derived(app.namesFor(app.sessions.find(s => s.id === page.sessionId)?.adapter))
+  const chat = useChat()
+  const names = $derived(chat.namesFor(chat.sessions.find(s => s.id === page.sessionId)?.adapter))
   const sessionId = $derived(page.sessionId)
-  const pages = $derived(app.pages[sessionId] ?? [])
+  const pages = $derived(chat.pages[sessionId] ?? [])
   const index = $derived(Math.max(0, pages.findIndex(p => p.id === page.id)))
-  const entries = $derived(artifactsAt(pages, index, app.artifactLive[sessionId] ?? null))
+  const entries = $derived(artifactsAt(pages, index, chat.artifactLive[sessionId] ?? null))
   // The one chosen, if it exists as of this page; else what this page
   // changed, else the first.
   const selected = $derived(
-    entries.find(e => e.path === app.artifactSel[sessionId]) ?? entries.find(e => e.changed) ?? entries[0] ?? null,
+    entries.find(e => e.path === chat.artifactSel[sessionId]) ?? entries.find(e => e.changed) ?? entries[0] ?? null,
   )
 
   $effect(() => {
-    void app.refreshArtifacts(sessionId)
+    void chat.refreshArtifacts(sessionId)
   })
 </script>
 
@@ -41,7 +41,7 @@
     <ul class="list" aria-label={t('artifacts.list')}>
       {#each entries as e (e.path)}
         <li>
-          <button class="item" class:on={selected?.path === e.path} aria-current={selected?.path === e.path} onclick={() => app.client.session(sessionId).selectArtifact(e.path)}>
+          <button class="item" class:on={selected?.path === e.path} aria-current={selected?.path === e.path} onclick={() => chat.client.session(sessionId).selectArtifact(e.path)}>
             <Icon name={KIND_ICON[artifactKind(e.path)]} size={14} />
             <span class="path">{e.path}</span>
             {#if e.changed}<span class="changed" title={t('artifacts.changedHere')}>{t('artifacts.changed')}</span>{/if}

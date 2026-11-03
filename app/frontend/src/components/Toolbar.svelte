@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import type { Modifier, SessionView, ToolbarItem } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { arrange, choicesOf, chosenIn } from '../lib/modifiers'
@@ -19,12 +19,12 @@
   }
 
   let { session, end }: Props = $props()
-  const app = useApp()
-  const items = $derived(app.boot?.toolbar ?? [])
-  const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
-  const models = $derived(modelOptions(app.modelsFor(session.adapter), session.model, t('model.cliDefault', app.namesFor(session.adapter))))
+  const chat = useChat()
+  const items = $derived(chat.boot?.toolbar ?? [])
+  const profile = $derived(chat.boot?.profiles.find(p => p.id === session.profileId))
+  const models = $derived(modelOptions(chat.modelsFor(session.adapter), session.model, t('model.cliDefault', chat.namesFor(session.adapter))))
   // A modifier needs its tools to exist in the profile (empty = CLI defaults).
-  const modifiers = $derived((app.boot?.modifiers ?? []).filter(m => {
+  const modifiers = $derived((chat.boot?.modifiers ?? []).filter(m => {
     const tools = profile?.tools ?? []
     return tools.length === 0 || (m.requiresTools ?? []).every(r => tools.includes(r))
   }))
@@ -40,19 +40,19 @@
 
   function setModel(e: Event) {
     const value = (e.currentTarget as HTMLSelectElement).value
-    run(() => app.backend.setModel(session.id, value))
+    run(() => chat.backend.setModel(session.id, value))
   }
 
   function toggle(id: string) {
     const on = !session.modifiers.includes(id)
-    run(async () => app.upsertSession(await app.backend.toggleModifier(session.id, id, on)))
+    run(async () => chat.upsertSession(await chat.backend.toggleModifier(session.id, id, on)))
   }
 
   // groupHint is what a group's choice does (modifier.hint.<group>), in the
   // session's provider's words; '' when there's none.
   function groupHint(group: string): string {
     const key = `modifier.hint.${group}`
-    const hint = t(key, app.namesFor(session.adapter))
+    const hint = t(key, chat.namesFor(session.adapter))
     return hint === key ? '' : hint
   }
 
@@ -61,25 +61,25 @@
   function choose(members: Modifier[], id: string) {
     const on = chosenIn(members, session.modifiers)
     if (id) {
-      run(async () => app.upsertSession(await app.backend.toggleModifier(session.id, id, true)))
+      run(async () => chat.upsertSession(await chat.backend.toggleModifier(session.id, id, true)))
     } else if (on) {
-      run(async () => app.upsertSession(await app.backend.toggleModifier(session.id, on, false)))
+      run(async () => chat.upsertSession(await chat.backend.toggleModifier(session.id, on, false)))
     }
   }
 
   function slash(item: ToolbarItem) {
     const command = item.command
-    if (command) run(() => app.send(command))
+    if (command) run(() => chat.send(command))
   }
 
   async function native(item: ToolbarItem) {
-    if (item.action === 'open_workdir') return run(() => app.backend.openFolder(session.workdir))
+    if (item.action === 'open_workdir') return run(() => chat.backend.openFolder(session.workdir))
     if (item.action === 'usage') {
       usageOpen = !usageOpen
       if (usageOpen) {
         await run(async () => {
-          const u = await app.backend.usage()
-          if (u) app.usage = u
+          const u = await chat.backend.usage()
+          if (u) chat.usage = u
         })
       }
     }
@@ -117,18 +117,18 @@
       {/each}
     {:else if item.kind === 'separator'}
       <span class="sep" aria-hidden="true"></span>
-    {:else if item.kind === 'slash' && app.takesSlash(session)}
+    {:else if item.kind === 'slash' && chat.takesSlash(session)}
       <button class="btn small ghost" onclick={() => slash(item)} disabled={session.busy} title={item.command}>
         <Icon name={item.icon ?? 'terminal'} size={13} />{item.label}
       </button>
     {:else if item.kind === 'native'}
-      {@const away = item.action === 'open_workdir' && !atServer(app.backend)}
+      {@const away = item.action === 'open_workdir' && !atServer(chat.backend)}
       <span class="native">
         <button class="btn small ghost" onclick={() => native(item)} disabled={away} title={away ? onlyAtServer() : undefined} aria-expanded={item.action === 'usage' ? usageOpen : undefined}>
           <Icon name={item.icon ?? 'sparkles'} size={13} />{item.label}
         </button>
         {#if item.action === 'usage' && usageOpen}
-          <UsagePopover usage={app.usage} onclose={() => (usageOpen = false)} />
+          <UsagePopover usage={chat.usage} onclose={() => (usageOpen = false)} />
         {/if}
       </span>
     {/if}

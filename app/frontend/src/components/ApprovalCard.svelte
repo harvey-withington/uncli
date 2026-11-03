@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Approval, Scope, SessionView } from '../lib/api'
   import { cardNotes, classLabel, describeApproval, fixedReason, isShell, loadScope, modeOf, saveScope } from '../lib/approvals'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import CommandView from './CommandView.svelte'
   import Icon from './Icon.svelte'
@@ -27,8 +27,8 @@
   }
 
   let { session, approval }: Props = $props()
-  const app = useApp()
-  const names = $derived(app.namesFor(session.adapter))
+  const chat = useChat()
+  const names = $derived(chat.namesFor(session.adapter))
   const view = $derived(describeApproval(approval))
   const notes = $derived(cardNotes(approval))
   const always = $derived(modeOf(session) === 'always')
@@ -49,10 +49,10 @@
       busy = false
     }
   }
-  const answer = (decision: 'allow' | 'deny') => act(() => app.backend.answerApproval(session.id, approval.requestId, decision))
+  const answer = (decision: 'allow' | 'deny') => act(() => chat.backend.answerApproval(session.id, approval.requestId, decision))
   function toggleSafe() {
     if (!marked) saveScope(scope)
-    void act(() => app.backend.markSafe(session.id, approval.requestId, !marked, scope))
+    void act(() => chat.backend.markSafe(session.id, approval.requestId, !marked, scope))
   }
 </script>
 

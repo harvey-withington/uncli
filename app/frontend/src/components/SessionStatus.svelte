@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SessionView } from '../lib/api'
   import { modeOf } from '../lib/approvals'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
 
@@ -13,8 +13,8 @@
   }
 
   let { session }: Props = $props()
-  const app = useApp()
-  const names = $derived(app.namesFor(session.adapter))
+  const chat = useChat()
+  const names = $derived(chat.namesFor(session.adapter))
   const mode = $derived(modeOf(session))
   // Sub-agents or shells still running after the turn that started them;
   // when one finishes, Claude carries on by itself on a page of its own.

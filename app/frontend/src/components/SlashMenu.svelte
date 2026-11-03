@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SessionView } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { complete, matchCommands, slashQuery } from '../lib/slash'
 
@@ -16,18 +16,18 @@
   }
 
   let { session, text = $bindable(), input }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   let active = $state(0)
   let closedFor = $state('') // Escape: closed for this text
-  const query = $derived(app.takesSlash(session) ? slashQuery(text, input?.selectionStart ?? text.length) : null)
-  const list = $derived(app.commands[session.id] ?? [])
+  const query = $derived(chat.takesSlash(session) ? slashQuery(text, input?.selectionStart ?? text.length) : null)
+  const list = $derived(chat.commands[session.id] ?? [])
   const matches = $derived(query === null ? [] : matchCommands(list, query))
-  const waiting = $derived(query !== null && list.length === 0 && !!app.commandsPending[session.id])
+  const waiting = $derived(query !== null && list.length === 0 && !!chat.commandsPending[session.id])
   const open = $derived(query !== null && (matches.length > 0 || waiting) && closedFor !== text)
 
   // The commands are fetched when the first "/" is typed.
   $effect(() => {
-    if (query !== null) void app.loadCommands(session.id)
+    if (query !== null) void chat.loadCommands(session.id)
   })
   $effect(() => {
     void query
@@ -74,7 +74,7 @@
 {#if open}
   <div class="menu" role="listbox" id="slash-menu-{session.id}" aria-label={t('slash.title')}>
     {#if waiting}
-      <div class="item waiting" role="option" aria-selected="false" aria-disabled="true">{t('slash.loading', app.namesFor(session.adapter))}</div>
+      <div class="item waiting" role="option" aria-selected="false" aria-disabled="true">{t('slash.loading', chat.namesFor(session.adapter))}</div>
     {/if}
     {#each matches as c, i (c.name)}
       <!-- svelte-ignore a11y_click_events_have_key_events (the message box's keys drive it) -->

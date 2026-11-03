@@ -4,7 +4,7 @@
   import type { UsageLimit } from '../lib/api'
   import { resetsIn } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import Icon from './Icon.svelte'
 
   interface Props {
@@ -13,7 +13,7 @@
   }
 
   let { usage, onclose }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   const windows = $derived(Object.entries(usage?.windows ?? {}).sort(([a], [b]) => a.localeCompare(b)))
 </script>
 
@@ -37,7 +37,10 @@
       </div>
     {/each}
   {/if}
-  <button class="over-time" onclick={() => { onclose(); app.usageOpen = true }}><Icon name="bar-chart" size={13} />{t('dash.open')}</button>
+  {#if chat.openUsage}
+    {@const open = chat.openUsage}
+    <button class="over-time" onclick={() => { onclose(); open() }}><Icon name="bar-chart" size={13} />{t('dash.open')}</button>
+  {/if}
 </div>
 
 <style>

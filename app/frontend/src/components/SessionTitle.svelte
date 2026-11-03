@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SessionView } from '../lib/api'
   import { hold } from '../lib/backguard'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { useShell } from '../lib/shell.svelte'
 
@@ -17,7 +17,7 @@
   }
 
   let { session }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   let editing = $state(false)
   let draft = $state('')
   // While the box is open, Back cancels it (lib/backguard.ts).
@@ -36,7 +36,7 @@
     const title = draft.trim()
     if (title === session.title) return
     try {
-      app.upsertSession(await app.backend.rename(session.id, title))
+      chat.upsertSession(await chat.backend.rename(session.id, title))
     } catch (e) {
       shell.toast(String(e), 'error')
     }

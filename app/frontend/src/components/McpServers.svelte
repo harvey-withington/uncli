@@ -2,7 +2,7 @@
   import { fly } from 'svelte/transition'
   import { clickOutside } from '../lib/actions'
   import type { MCPServer, SessionView } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { needOf, statusKey } from '../lib/mcp'
   import Icon from './Icon.svelte'
@@ -18,16 +18,16 @@
   }
 
   let { session }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   const servers = $derived(session.mcp ?? [])
   const attention = $derived(servers.some(sv => needOf(sv) !== null))
   let open = $state(false)
-  const link = (sv: MCPServer) => app.mcpLinks[`${session.id}:${sv.name}`] ?? ''
+  const link = (sv: MCPServer) => chat.mcpLinks[`${session.id}:${sv.name}`] ?? ''
   let pasting = $state('') // the server whose address is being pasted
   let pasted = $state('')
 
   async function usePasted(server: string) {
-    if (await app.mcpPaste(session.id, server, pasted)) {
+    if (await chat.mcpPaste(session.id, server, pasted)) {
       pasting = pasted = ''
     }
   }
@@ -61,23 +61,23 @@
               </span>
               <span class="acts">
                 {#if sv.signing}
-                  <button class="btn ghost small" onclick={() => app.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
+                  <button class="btn ghost small" onclick={() => chat.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
                 {:else if sv.site}
-                  <button class="btn ghost small" onclick={() => app.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
-                  <button class="btn ghost small" onclick={() => app.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
+                  <button class="btn ghost small" onclick={() => chat.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
+                  <button class="btn ghost small" onclick={() => chat.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
                 {:else if sv.status === 'needs-auth'}
-                  <button class="btn small" onclick={() => app.mcpSignIn(session.id, sv.name)}>{t('mcp.signIn')}</button>
+                  <button class="btn small" onclick={() => chat.mcpSignIn(session.id, sv.name)}>{t('mcp.signIn')}</button>
                 {:else if sv.status === 'failed'}
-                  <button class="btn small" onclick={() => app.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
+                  <button class="btn small" onclick={() => chat.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
                 {:else if sv.status === 'connected'}
-                  <button class="btn ghost small" onclick={() => app.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
-                  <button class="btn ghost small" onclick={() => app.mcpSignOut(session.id, sv.name)}>{t('mcp.signOut')}</button>
+                  <button class="btn ghost small" onclick={() => chat.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
+                  <button class="btn ghost small" onclick={() => chat.mcpSignOut(session.id, sv.name)}>{t('mcp.signOut')}</button>
                 {/if}
               </span>
               {#if (sv.signing || sv.site) && (link(sv) || sv.signing)}
                 <span class="more">
                   {#if link(sv)}
-                    <button class="btn ghost small" onclick={() => app.backend.openURL(link(sv))}>{t('mcp.openAgain')}</button>
+                    <button class="btn ghost small" onclick={() => chat.backend.openURL(link(sv))}>{t('mcp.openAgain')}</button>
                   {/if}
                   {#if sv.signing}
                     <button class="btn ghost small" onclick={() => (pasting = pasting === sv.name ? '' : sv.name)} aria-expanded={pasting === sv.name}>{t('mcp.paste')}</button>
@@ -95,7 +95,7 @@
             </li>
           {/each}
         </ul>
-        <p class="hint">{t('mcp.hint', app.namesFor(session.adapter))}</p>
+        <p class="hint">{t('mcp.hint', chat.namesFor(session.adapter))}</p>
       </div>
     {/if}
   </span>

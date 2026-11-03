@@ -1,9 +1,9 @@
 <script lang="ts">
   import { fade } from 'svelte/transition'
   import type { Page } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { displayAnswer } from '../stores/app.svelte'
+  import { displayAnswer } from '../stores/chat.svelte'
   import { attachmentIcon, formatSize } from '../lib/attachments'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import CopyButton from './CopyButton.svelte'
@@ -19,26 +19,26 @@
   }
 
   let { page }: Props = $props()
-  const app = useApp()
-  const names = $derived(app.namesFor(app.sessions.find(s => s.id === page.sessionId)?.adapter))
-  const live = $derived(app.live[page.sessionId])
+  const chat = useChat()
+  const names = $derived(chat.namesFor(chat.sessions.find(s => s.id === page.sessionId)?.adapter))
+  const live = $derived(chat.live[page.sessionId])
   const answer = $derived(displayAnswer(page, live))
   const open = $derived(page.status === 'open')
   const thinking = $derived(open && !answer)
-  const compact = $derived(app.questionCompact)
+  const compact = $derived(chat.questionCompact)
   // A question sent with files only reads as their names.
   // A turn the CLI started by itself (a background task finished) has no
   // question: the header says so instead.
   const byCli = $derived(page.origin === 'cli')
   const questionLine = $derived(byCli ? t('page.byCli', names) : page.question || (page.attachments ?? []).map(f => f.name).join(', '))
   // The outline's entries, marked beside their blocks in the left margin.
-  const markers = $derived(new Map(app.outlineFor(page).entries.map(e => [e.block, e])))
+  const markers = $derived(new Map(chat.outlineFor(page).entries.map(e => [e.block, e])))
 </script>
 
 {#snippet toggle()}
   <button
     class="btn ghost small icon q-toggle"
-    onclick={() => app.toggleQuestionCompact()}
+    onclick={() => chat.toggleQuestionCompact()}
     aria-expanded={!compact}
     aria-label={t(compact ? 'page.expandQuestion' : 'page.collapseQuestion')}
     title={t(compact ? 'page.expandQuestion' : 'page.collapseQuestion')}

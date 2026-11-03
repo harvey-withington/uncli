@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import { useShell } from '../lib/shell.svelte'
@@ -12,14 +12,14 @@
   }
 
   let { text, label }: Props = $props()
-  const app = useApp()
+  const chat = useChat()
   let copied = $state(false)
   let timer: ReturnType<typeof setTimeout> | undefined
 
   async function copy(e: MouseEvent) {
     e.stopPropagation()
     try {
-      await app.backend.copyText(text)
+      await chat.backend.copyText(text)
       copied = true
       clearTimeout(timer)
       timer = setTimeout(() => (copied = false), 1400)

@@ -2,7 +2,7 @@
   import { fly } from 'svelte/transition'
   import { clickOutside } from '../lib/actions'
   import type { Share, SessionView } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { sharesNote, toggled } from '../lib/shares'
   import Icon from './Icon.svelte'
@@ -19,8 +19,8 @@
   }
 
   let { session, compact = false }: Props = $props()
-  const app = useApp()
-  const names = $derived(app.namesFor(session.adapter))
+  const chat = useChat()
+  const names = $derived(chat.namesFor(session.adapter))
   const shares = $derived(session.shares ?? [])
   let open = $state(false)
   let saving = $state(false)
@@ -28,7 +28,7 @@
   async function set(share: Share, on: boolean) {
     saving = true
     try {
-      app.upsertSession(await app.backend.setShares(session.id, toggled(shares, share, on)))
+      chat.upsertSession(await chat.backend.setShares(session.id, toggled(shares, share, on)))
     } catch (e) {
       shell.toast(String(e), 'error')
     } finally {

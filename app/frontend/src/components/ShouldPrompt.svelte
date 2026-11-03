@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SafeClass, Scope } from '../lib/api'
   import { classLabel, loadScope, saveScope } from '../lib/approvals'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
   import { useShell } from '../lib/shell.svelte'
@@ -18,8 +18,8 @@
   }
 
   let { sessionId, classes }: Props = $props()
-  const app = useApp()
-  const names = $derived(app.namesFor(app.sessions.find(s => s.id === sessionId)?.adapter))
+  const chat = useChat()
+  const names = $derived(chat.namesFor(chat.sessions.find(s => s.id === sessionId)?.adapter))
   let scope = $state<Scope>(loadScope())
   let busy = $state(false)
   let done = $state(false)
@@ -29,7 +29,7 @@
     busy = true
     try {
       saveScope(scope)
-      await app.backend.teach(sessionId, classes, 'unsafe', scope)
+      await chat.backend.teach(sessionId, classes, 'unsafe', scope)
       done = true
     } catch (e) {
       shell.toast(String(e), 'error')
