@@ -3,7 +3,7 @@
 import { defineUncliChat } from './element.svelte'
 import { defineUncliSessionList } from './list.svelte'
 
-export { UncliChat, defineUncliChat } from './element.svelte'
+export { UncliChat, defineUncliChat, type ChatHost } from './element.svelte'
 export { UncliSessionList, defineUncliSessionList } from './list.svelte'
 
 defineUncliChat()

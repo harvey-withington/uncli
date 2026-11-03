@@ -45,12 +45,28 @@ md.core.ruler.after('inline', 'tasks', state => {
 
 // What raw HTML may keep: the HTML profile (no SVG or MathML), less what
 // could run, submit, restyle or cover the app, or clash with its ids and
-// classes. URLs may also be file: links, as markdown ones may.
+// classes. URLs may also be file: links, as markdown ones may, and links in
+// an embedding host's own schemes (allowLinkSchemes).
+const BASE_SCHEMES = ['https?', 'mailto', 'tel', 'file']
+const uriRegexp = (schemes: string[]) => new RegExp(`^(?:(?:${schemes.join('|')}):|[^a-z]|[a-z+.-]+(?:[^a-z+.\\-:]|$))`, 'i')
 const PURIFY = {
   USE_PROFILES: { html: true },
   FORBID_TAGS: ['style', 'form', 'button', 'textarea', 'select', 'option', 'iframe', 'frame', 'object', 'embed', 'dialog', 'template', 'link', 'meta', 'base'],
   FORBID_ATTR: ['style', 'id', 'name', 'target', 'form', 'formaction', 'srcset', 'autofocus', 'tabindex', 'contenteditable', 'popover'],
-  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|file):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+  ALLOWED_URI_REGEXP: uriRegexp(BASE_SCHEMES),
+}
+
+// Schemes that can run code or smuggle content are never a host's links.
+const NEVER = new Set(['javascript', 'vbscript', 'data', 'blob', 'about', 'filesystem'])
+
+// allowLinkSchemes keeps links in an embedding host's own schemes ("bruv"
+// for bruv:card:…), for its openLink to handle (decision 0026). One host
+// per page: the schemes are the page's. Answers already parsed are parsed
+// again.
+export function allowLinkSchemes(schemes: string[]) {
+  const extra = schemes.map(x => x.trim().toLowerCase().replace(/:$/, '')).filter(x => /^[a-z][a-z0-9+.-]*$/.test(x) && !NEVER.has(x))
+  PURIFY.ALLOWED_URI_REGEXP = uriRegexp([...BASE_SCHEMES, ...extra])
+  recent.clear()
 }
 const KEEP_CLASS = new Set(['task'])
 

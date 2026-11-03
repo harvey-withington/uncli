@@ -92,13 +92,30 @@ The element is one ES module, with Svelte and UNCLI's client inside it. Code hig
 - **Measured size:** about 215 KB gzipped, unminified, on 2026-11-03.
 - **Load it lazily:** a dynamic `import()` when a chat first opens.
 
+## Your links, your strings, your keys
+
+The `host` property is what your page does for the chat:
+
+```js
+chat.setAttribute('link-schemes', 'bruv') // keep bruv:… links in answers
+chat.host = {
+  // Every link clicked in an answer comes here first: true when you took it.
+  openLink: href => href.startsWith('bruv:') && (openCard(href), true),
+  // Your text for one of UNCLI's strings (keys as in its en.json), or
+  // nothing to keep UNCLI's.
+  t: (key, params) => myStrings[key],
+}
+```
+
+- **Link schemes.** Links in answers keep only `http(s)`, `mailto`, `tel` and `file` targets unless `link-schemes` names your own. Schemes that can run code or carry content (`javascript`, `data` and the like) are never kept.
+- **Links you don't take.** They open as in UNCLI: web links in the browser, and file links at the server's screen.
+- **One host per page.** The schemes and strings apply to every chat on the page.
+
+**Keys.** Before the chat acts on Escape, or on Ctrl+Enter (Cmd+Enter), it sends `uncli-escape` or `uncli-submit`. They're cancelable: cancel one (`event.preventDefault()`) and the chat leaves that key alone, so layered dialogs of your own can decide first.
+
 ## What's not there yet
 
-- **The host adapter.** Not yet available:
-  - `openLink` for the host's own links;
-  - `complete` for @mentions;
-  - `turnContext`;
-  - `t` for the host's strings.
-- **Cancelable `uncli-escape` and `uncli-submit` events,** named slots (`header-extra`, `below-composer`), and `::part()` names.
+- **`complete` for @mentions and `turnContext`.** They need the host protocol below.
+- **Named slots** (`header-extra`, `below-composer`) and **`::part()` names.**
 - **React, Vue and Angular wrappers,** generated from a Custom Elements Manifest.
 - **Host credentials and host sessions** (the host protocol). Until then, a host reaches UNCLI as a paired device.

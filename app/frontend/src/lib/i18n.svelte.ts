@@ -17,7 +17,19 @@ export function setNames(n: Partial<Record<'agent' | 'cli' | 'account', string>>
   for (const [k, v] of Object.entries(n)) if (v) names[k] = v
 }
 
+// An embedding host's strings (decision 0026): its translate function sees
+// every key first and gives back its text, or nothing to keep UNCLI's.
+// One host per page: the strings are the page's.
+type HostText = (key: string, params?: Record<string, string | number>) => string | undefined | null
+let hostText: HostText | null = null
+
+export function setHostText(f: HostText | null) {
+  hostText = f
+}
+
 export function t(key: string, params?: Record<string, string | number>): string {
+  const own = hostText?.(key, params)
+  if (own) return own
   const dict = locales[i18n.locale] ?? base
   let s = dict[key] ?? base[key] ?? key
   for (const [k, v] of Object.entries({ ...names, ...params })) s = s.replaceAll(`{${k}}`, String(v))

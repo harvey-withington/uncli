@@ -11,20 +11,37 @@
 // Attributes: session, scheme ("light" or "dark"; the system's otherwise),
 // compact (the phone's layout; compact="false" the desktop's; by the
 // element's width when left out), storage-key (remember the side panel and
-// compact layout under it).
+// compact layout under it), link-schemes (the host's own link schemes kept
+// in answers, "bruv" say, for host.openLink).
+// Property host (ChatHost): openLink(href) sees every link in an answer
+// first, true when the host took it; t(key, params) gives the host's text
+// for UNCLI's, or nothing to keep UNCLI's.
 // Events (composed, so they cross into the host's page): uncli-ready,
-// uncli-busy, uncli-idle, uncli-needs-approval; detail: { session }.
+// uncli-busy, uncli-idle, uncli-needs-approval; detail: { session }. Before
+// the chat acts on Escape or Ctrl+Enter, uncli-escape and uncli-submit go
+// out, cancelable: a host that cancels one keeps the key for itself.
 import { mount, unmount } from 'svelte'
 import { chatClient, type Backend, type SessionSnapshot } from '@uncli/client'
 import Chat from '../components/Chat.svelte'
+import { setHostText } from '../lib/i18n.svelte'
 import { keyedMemory } from '../lib/layoutmemory'
+import { allowLinkSchemes } from '../lib/render/markdown'
 import { ChatStore } from '../stores/chat.svelte'
 import { applyScheme, hostFont, shadowFor } from './root'
 
+// What a host can do for the chat (decision 0026).
+export interface ChatHost {
+  // openLink: a link in an answer was clicked; true when the host took it.
+  openLink?(href: string): boolean
+  // t: the host's text for one of UNCLI's strings, or nothing to keep UNCLI's.
+  t?(key: string, params?: Record<string, string | number>): string | undefined | null
+}
+
 export class UncliChat extends HTMLElement {
-  static observedAttributes = ['session', 'scheme', 'compact']
+  static observedAttributes = ['session', 'scheme', 'compact', 'link-schemes']
 
   #backend: Backend | null = null
+  #host: ChatHost | null = null
   #props = $state<{ store: ChatStore; session: string; compact: boolean | undefined } | null>(null)
   #app: ReturnType<typeof mount> | null = null
   #offSession: (() => void) | null = null
@@ -42,6 +59,16 @@ export class UncliChat extends HTMLElement {
     this.#mount()
   }
 
+  // What the host does for the chat: its links and its strings.
+  get host(): ChatHost | null {
+    return this.#host
+  }
+
+  set host(h: ChatHost | null) {
+    this.#host = h
+    setHostText(h?.t ? (key, params) => h.t?.(key, params) : null)
+  }
+
   // The session shown (the session attribute).
   get session(): string {
     return this.getAttribute('session') ?? ''
@@ -55,19 +82,41 @@ export class UncliChat extends HTMLElement {
     shadowFor(this)
     hostFont(this)
     applyScheme(this)
+    this.#linkSchemes()
+    this.shadowRoot?.addEventListener('keydown', this.#keys, true)
     this.#mount()
   }
 
   disconnectedCallback() {
+    this.shadowRoot?.removeEventListener('keydown', this.#keys, true)
     this.#unmount()
   }
 
   attributeChangedCallback(name: string) {
     if (name === 'scheme') applyScheme(this)
+    if (name === 'link-schemes') this.#linkSchemes()
     if (name === 'compact' && this.#props) this.#props.compact = this.#compact()
     if (name === 'session') {
       if (this.#props) this.#props.session = this.session
       this.#watch()
+    }
+  }
+
+  #linkSchemes() {
+    const s = this.getAttribute('link-schemes')
+    if (s) allowLinkSchemes(s.split(/[\s,]+/))
+  }
+
+  // Escape and Ctrl+Enter (or Cmd+Enter) go to the host first: cancelling
+  // the event keeps the key from the chat (a host's layered dialogs, say).
+  #keys = (e: Event) => {
+    const k = e as KeyboardEvent
+    const type = k.key === 'Escape' ? 'uncli-escape' : k.key === 'Enter' && (k.ctrlKey || k.metaKey) ? 'uncli-submit' : ''
+    if (!type) return
+    const go = this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: true, cancelable: true, detail: { session: this.session } }))
+    if (!go) {
+      k.preventDefault()
+      k.stopPropagation()
     }
   }
 
@@ -81,6 +130,7 @@ export class UncliChat extends HTMLElement {
   #mount() {
     if (this.#app || !this.isConnected || !this.#backend || !this.shadowRoot) return
     const store = new ChatStore(this.#backend, { client: chatClient(this.#backend), memory: keyedMemory(this.getAttribute('storage-key')) })
+    store.openLink = href => this.#host?.openLink?.(href) ?? false
     const target = document.createElement('div')
     target.className = 'uncli-root'
     this.shadowRoot.append(target)

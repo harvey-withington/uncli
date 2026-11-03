@@ -59,6 +59,9 @@ export class ChatStore {
   // buttons that need them don't show.
   openSettings: ((section?: string) => void) | undefined = undefined
   openUsage: (() => void) | undefined = undefined
+  // An embedding host's links: openLink sees every link in an answer first,
+  // and true means the host took it (its own bruv:card:… links, say).
+  openLink: ((href: string) => boolean) | undefined = undefined
 
   constructor(backend: Backend, opts: ChatStoreOptions = {}) {
     this.client = opts.client ?? new ChatClient(backend)

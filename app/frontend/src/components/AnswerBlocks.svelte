@@ -30,8 +30,11 @@
     const a = (e.target as HTMLElement).closest('a')
     if (!a) return
     e.preventDefault()
+    const href = a.getAttribute('href') ?? ''
+    // An embedding host sees it first (its own links).
+    if (chat.openLink?.(href)) return
     const session = chat.current
-    const target = linkTarget(a.getAttribute('href') ?? '', session?.workdir ?? '')
+    const target = linkTarget(href, session?.workdir ?? '')
     if (target?.kind === 'web') void chat.backend.openURL(target.url)
     else if (target?.kind === 'file' && session) {
       // Files open on the server's screen; a remote client says so.
