@@ -101,7 +101,7 @@ The element is one ES module, with Svelte and UNCLI's client inside it. Code hig
 - **Measured size** (2026-11-03): about 218 KB gzipped as built, and about 184 KB once your bundler minifies it.
 - **Load it lazily:** a dynamic `import()` when a chat first opens.
 
-## Your links, your strings, your keys
+## Your links, strings, mentions and context, and your keys
 
 The `host` property is what your page does for the chat:
 
@@ -113,11 +113,18 @@ chat.host = {
   // Your text for one of UNCLI's strings (keys as in its en.json), or
   // nothing to keep UNCLI's.
   t: (key, params) => myStrings[key],
+  // @mentions: what matches the word typed after an @. Picking one puts
+  // its insert in the message.
+  complete: async query => (await searchCards(query)).map(c => ({ label: c.title, detail: 'card', insert: `[${c.title}](bruv:card:${c.id})` })),
+  // What the user has in front of them now, asked for as each turn is sent.
+  turnContext: () => describeOpenCard(),
 }
 ```
 
 - **Link schemes.** Links in answers keep only `http(s)`, `mailto`, `tel` and `file` targets unless `link-schemes` names your own. Schemes that can run code or carry content (`javascript`, `data` and the like) are never kept.
 - **Links you don't take.** They open as in UNCLI: web links in the browser, and file links at the server's screen.
+- **Mentions.** `complete` may answer at once or with a promise. While the user types an `@` and a word, the menu shows up to eight matches; Up, Down, Tab or Enter, and Escape work as in the slash-command menu.
+- **Turn context.** `turnContext` is told to the model with that turn only, among the instructions the chat hides, quoted as what your app says the user has in front of them. The model weighs it as context, not as the user's request. Up to 8,000 characters are kept. It needs a UNCLI that has the `SendWith` call (added on the `feat/packages` branch); a turn without context is sent as before and works with any UNCLI.
 - **One host per page.** The schemes and strings apply to every chat on the page.
 
 **Keys.** Before the chat acts on Escape, or on Ctrl+Enter (Cmd+Enter), it sends `uncli-escape` or `uncli-submit`. They're cancelable: cancel one (`event.preventDefault()`) and the chat leaves that key alone, so layered dialogs of your own can decide first.
@@ -148,6 +155,5 @@ The part names are part of the contract; the structure inside them isn't.
 
 ## What's not there yet
 
-- **`complete` for @mentions and `turnContext`.** They need the host protocol below.
 - **React, Vue and Angular wrappers,** generated from a Custom Elements Manifest.
 - **Host credentials and host sessions** (the host protocol). Until then, a host reaches UNCLI as a paired device.

@@ -189,6 +189,11 @@ func TestRefusals(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "uploading") {
 		t.Errorf("path attachment = %v", err)
 	}
+	// With options (an embedding host's turn context) the same holds.
+	err = r.call(nil, "SendWith", created.Session.ID, "hi", []app.AttachmentRef{{Path: `C:\Windows\win.ini`}}, app.SendOptions{Context: "Card 42"})
+	if err == nil || !strings.Contains(err.Error(), "uploading") {
+		t.Errorf("path attachment with options = %v", err)
+	}
 	// Nor is a network path a folder it can browse or start a session in.
 	for _, p := range []string{`\\attacker\share`, "//attacker/share"} {
 		if err := r.call(nil, "ListFolder", p); err == nil || !strings.Contains(err.Error(), "network path") {

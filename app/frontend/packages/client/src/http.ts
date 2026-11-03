@@ -173,7 +173,8 @@ export function httpBackend(opts: HttpOptions): Backend {
     createSession: (p, d, m, c, prov, sh) => call('CreateSession', p, d, m, c, prov, sh),
     setShares: (s, sh) => call('SetShares', s, sh),
     pages: s => call('Pages', s),
-    send: (s, text, attachments = []) => call('Send', s, text, attachments),
+    // Only a turn with options needs SendWith; Send works with any server.
+    send: (s, text, attachments = [], sendOpts) => (sendOpts?.context ? call('SendWith', s, text, attachments, sendOpts) : call('Send', s, text, attachments)),
     interrupt: s => call('Interrupt', s),
     restart: s => call('Restart', s),
     setModel: (s, m) => call('SetModel', s, m),

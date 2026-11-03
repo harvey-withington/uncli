@@ -22,6 +22,14 @@ import { Shell } from '../lib/shell.svelte'
 
 export type { Live }
 
+// A host's @mention: what the menu shows, and what picking it puts in
+// the message (a link in the host's own scheme, say).
+export interface Mention {
+  label: string
+  detail?: string
+  insert: string
+}
+
 export interface ChatStoreOptions {
   shell?: Shell
   // The client to use (shared with other chats on the page); one of the
@@ -64,6 +72,11 @@ export class ChatStore {
   openLink: ((href: string) => boolean) | undefined = undefined
   // In a host's page (the elements): the chat offers the host its slots.
   embedded = false
+  // An embedding host's word on what the user has in front of them, asked
+  // for as each turn is sent and told to the model with it (hidden).
+  turnContext: (() => string | null | undefined) | undefined = undefined
+  // An embedding host's @mentions: what matches what's typed after an @.
+  complete: ((query: string) => Promise<Mention[]> | Mention[]) | undefined = undefined
 
   constructor(backend: Backend, opts: ChatStoreOptions = {}) {
     this.client = opts.client ?? new ChatClient(backend)
@@ -188,7 +201,9 @@ export class ChatStore {
   }
 
   async send(text: string, attachments: AttachmentRef[] = []) {
-    if (this.currentId) await this.client.session(this.currentId).send(text, attachments)
+    if (!this.currentId) return
+    const context = this.turnContext?.()?.trim()
+    await this.client.session(this.currentId).send(text, attachments, context ? { context } : undefined)
   }
 
   async toggleBookmark() {

@@ -70,7 +70,7 @@ export function wailsBackend(): Backend {
     createSession: (p, d, m, c, prov, sh) => call('CreateSession', p, d, m, c, prov, sh),
     setShares: (id, sh) => call('SetShares', id, sh),
     pages: id => call('Pages', id),
-    send: (id, text, attachments = []) => call('Send', id, text, attachments),
+    send: (id, text, attachments = [], opts) => (opts?.context ? call('SendWith', id, text, attachments, opts) : call('Send', id, text, attachments)),
     interrupt: id => call('Interrupt', id),
     restart: id => call('Restart', id),
     setModel: (id, m) => call('SetModel', id, m),

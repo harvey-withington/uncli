@@ -46,6 +46,19 @@ describe('httpBackend', () => {
     expect(calls.every(c => !c.url.includes('tok'))).toBe(true)
   })
 
+  it('sends a turn with options only through SendWith, so a plain turn works with any server', async () => {
+    const methods: string[] = []
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      methods.push(JSON.parse(init.body as string).method)
+      return reply({ jsonrpc: '2.0', id: 1, result: null })
+    })
+    const b = httpBackend({ base: '', token: () => 'tok', fetch: fetch as never })
+    await b.send('s1', 'plain')
+    await b.send('s1', 'with context', [], { context: 'Card 42' })
+    await b.send('s1', 'empty context', [], { context: '' })
+    expect(methods).toEqual(['Send', 'SendWith', 'Send'])
+  })
+
   it('surfaces the server\u2019s errors, and a lost pairing', async () => {
     const unauthorized = vi.fn()
     let status = 200

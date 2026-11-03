@@ -15,7 +15,9 @@
 // in answers, "bruv" say, for host.openLink).
 // Property host (ChatHost): openLink(href) sees every link in an answer
 // first, true when the host took it; t(key, params) gives the host's text
-// for UNCLI's, or nothing to keep UNCLI's.
+// for UNCLI's, or nothing to keep UNCLI's; complete(query) offers
+// @mentions; turnContext() says what the user has in front of them, sent
+// (hidden) with each turn.
 // Events (composed, so they cross into the host's page): uncli-ready,
 // uncli-busy, uncli-idle, uncli-needs-approval; detail: { session }. Before
 // the chat acts on Escape or Ctrl+Enter, uncli-escape and uncli-submit go
@@ -27,7 +29,7 @@ import { setHostText } from '../lib/i18n.svelte'
 import { keyedMemory } from '../lib/layoutmemory'
 import { keepInMemory } from '../lib/storage'
 import { allowLinkSchemes } from '../lib/render/markdown'
-import { ChatStore } from '../stores/chat.svelte'
+import { ChatStore, type Mention } from '../stores/chat.svelte'
 import { applyScheme, hostFont, shadowFor } from './root'
 
 // What a host can do for the chat (decision 0026).
@@ -36,6 +38,11 @@ export interface ChatHost {
   openLink?(href: string): boolean
   // t: the host's text for one of UNCLI's strings, or nothing to keep UNCLI's.
   t?(key: string, params?: Record<string, string | number>): string | undefined | null
+  // complete: what matches an @mention being typed (the word after the @).
+  complete?(query: string): Promise<Mention[]> | Mention[]
+  // turnContext: what the user has in front of them now, asked for as each
+  // turn is sent and told to the model with it, hidden in the chat.
+  turnContext?(): string | undefined | null
 }
 
 export class UncliChat extends HTMLElement {
@@ -132,6 +139,8 @@ export class UncliChat extends HTMLElement {
     if (this.#app || !this.isConnected || !this.#backend || !this.shadowRoot) return
     const store = new ChatStore(this.#backend, { client: chatClient(this.#backend), memory: keyedMemory(this.getAttribute('storage-key')) })
     store.openLink = href => this.#host?.openLink?.(href) ?? false
+    store.turnContext = () => this.#host?.turnContext?.()
+    store.complete = query => this.#host?.complete?.(query) ?? []
     store.embedded = true
     const target = document.createElement('div')
     target.className = 'uncli-root'

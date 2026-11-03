@@ -358,6 +358,13 @@ export interface AttachmentInfo {
   reason?: string
 }
 
+// What can come with a turn beyond its text and files. context is an
+// embedding host's word on what the user has in front of them now
+// (decision 0026), told to the model with the turn and hidden in the chat.
+export interface SendOptions {
+  context?: string
+}
+
 // A file to send with a turn: a path the app reads, or pasted image data.
 export interface AttachmentRef {
   path?: string
@@ -833,7 +840,8 @@ export interface Backend {
   createSession(profileId: string, workdir: string, model: string, container: string, provider: string, shares: Share[] | null): Promise<CreatedSession>
   setShares(sessionId: string, shares: Share[]): Promise<SessionView> // from the next turn
   pages(sessionId: string): Promise<Page[]>
-  send(sessionId: string, text: string, attachments?: AttachmentRef[]): Promise<void>
+  // opts: what comes with the turn beyond its text and files.
+  send(sessionId: string, text: string, attachments?: AttachmentRef[], opts?: SendOptions): Promise<void>
   interrupt(sessionId: string): Promise<void>
   restart(sessionId: string): Promise<SessionView> // stops its CLI and starts it again on the conversation
   setModel(sessionId: string, model: string): Promise<void>

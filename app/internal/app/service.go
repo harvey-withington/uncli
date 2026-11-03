@@ -598,9 +598,22 @@ type AttachmentRef struct {
 	Data      string `json:"data,omitempty"`
 }
 
+// SendOptions is what can come with a turn beyond its text and files.
+type SendOptions struct {
+	// Context is an embedding host's word on what the user has in front of
+	// them now (decision 0026), told to the model with the turn and hidden in
+	// the chat.
+	Context string `json:"context,omitempty"`
+}
+
 // Send starts a turn in a session, reading its attachments first; one that
 // can't be attached stops the turn with the reason.
 func (s *Service) Send(ctx context.Context, sessionID, text string, refs []AttachmentRef) error {
+	return s.SendWith(ctx, sessionID, text, refs, SendOptions{})
+}
+
+// SendWith is Send with the turn's options.
+func (s *Service) SendWith(ctx context.Context, sessionID, text string, refs []AttachmentRef, opts SendOptions) error {
 	files := make([]core.Attachment, 0, len(refs))
 	for _, r := range refs {
 		var f core.Attachment
@@ -624,7 +637,7 @@ func (s *Service) Send(ctx context.Context, sessionID, text string, refs []Attac
 		}
 		files = append(files, f)
 	}
-	return s.Sessions.Send(ctx, sessionID, text, files...)
+	return s.Sessions.SendWith(ctx, sessionID, text, opts.Context, files...)
 }
 
 // DescribeAttachments says, for each dropped or pasted path, whether it

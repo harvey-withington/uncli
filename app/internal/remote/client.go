@@ -35,7 +35,7 @@ var rpcMethods = []string{
 	"Bootstrap", "CLIStatus", "ProviderStatus", "CLIChannels", "ProviderChannels",
 	"Containers", "Editors", "HasDecisionKey", "Usage", "UsageReport",
 	// Sessions.
-	"CreateSession", "Pages", "Send", "Interrupt", "Restart", "Focus", "Rename", "Delete",
+	"CreateSession", "Pages", "Send", "SendWith", "Interrupt", "Restart", "Focus", "Rename", "Delete",
 	"Archive", "SetSortOrder", "SetModel", "ToggleModifier", "SetShares",
 	"SetMode", "SetUnattended", "Search", "SummarisePage",
 	"SetBookmark", "SetPinned", "Pinned", "Commands",
@@ -91,12 +91,17 @@ func (c *client) Focus(sessionID string) {
 // Send takes attachments uploaded to the server or pasted images, never a
 // path on the server chosen by the client.
 func (c *client) Send(sessionID, text string, attachments []app.AttachmentRef) error {
+	return c.SendWith(sessionID, text, attachments, app.SendOptions{})
+}
+
+// SendWith is Send with the turn's options (an embedding host's context).
+func (c *client) SendWith(sessionID, text string, attachments []app.AttachmentRef, opts app.SendOptions) error {
 	for _, r := range attachments {
 		if r.Path != "" {
 			return errors.New("attach files by uploading them")
 		}
 	}
-	return c.API.Send(sessionID, text, attachments)
+	return c.API.SendWith(sessionID, text, attachments, opts)
 }
 
 // A device browses and starts sessions in folders on the server's own

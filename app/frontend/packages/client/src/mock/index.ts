@@ -568,7 +568,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       return { session: { ...s }, lastNewSession: structuredClone(lastNew) }
     },
     async pages(id) { return (pages[id] ?? []).map(p => structuredClone(p)) },
-    async send(id, text, attachments = []) {
+    async send(id, text, attachments = [], opts) {
       const s = find(id)
       if (s.archived) throw new Error('this session is archived; restore it to continue')
       if (s.busy) throw new Error('this session is still answering; wait or stop it first')
@@ -579,6 +579,8 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       })
       const p = page(id, list.length + 1, text, '', {
         model: s.model, modifiers: [...s.modifiers], status: 'open', outputTokens: 0, costUsd: 0, durationMs: 0, attachments: attached,
+        // As the server tells the model a host's context: among the hidden directives.
+        ...(opts?.context ? { directives: `- The app this chat is part of says what the user has in front of them now:\n  ${opts.context}` } : {}),
       })
       list.push(p)
       if (!s.title) s.title = (text || attached[0]?.name || '').slice(0, 60)

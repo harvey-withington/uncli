@@ -295,7 +295,7 @@ func (s *Session) warm(ctx context.Context) error {
 	return s.spawn(ctx, spec)
 }
 
-func (s *Session) Send(ctx context.Context, text string, files []core.Attachment) error {
+func (s *Session) Send(ctx context.Context, text string, files []core.Attachment, hostContext string) error {
 	text = strings.TrimSpace(text)
 	if text == "" && len(files) == 0 {
 		return errors.New("nothing to send")
@@ -334,7 +334,11 @@ func (s *Session) Send(ctx context.Context, text string, files []core.Attachment
 		}
 	}
 
-	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods, append(s.modeDirectives(), s.placeDirectives()...)...)
+	extra := append(s.modeDirectives(), s.placeDirectives()...)
+	if d := hostDirective(hostContext); d != "" {
+		extra = append(extra, d)
+	}
+	directives := set.RenderDirectives(s.rec.Model, active, s.lastMods, extra...)
 	for _, f := range files {
 		if strings.HasPrefix(f.MediaType, "image/") && !caps.Images || !strings.HasPrefix(f.MediaType, "image/") && !caps.Documents {
 			return fmt.Errorf("this CLI can't take %s as an attachment", f.Name)
@@ -943,4 +947,22 @@ func (s *Session) dialect() string {
 		return DialectPowerShell
 	}
 	return DialectBash
+}
+
+// hostContextMax is the most of a host's turn context told to the model:
+// what's on its screen, not a document.
+const hostContextMax = 8000
+
+// hostDirective is a host's turn context as a directive (decision 0026):
+// the embedding app's own words about what the user is looking at, quoted
+// as that, so the model weighs it as context and not as the user's ask.
+func hostDirective(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return ""
+	}
+	if r := []rune(text); len(r) > hostContextMax {
+		text = string(r[:hostContextMax]) + "…"
+	}
+	return "The app this chat is part of says what the user has in front of them now:\n  " + strings.ReplaceAll(text, "\n", "\n  ")
 }

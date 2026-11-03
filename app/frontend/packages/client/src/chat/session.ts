@@ -3,7 +3,7 @@
 // to it, with no session argument: it is that session. subscribe() is
 // told only when this session changes, so a UI showing one chat isn't
 // woken by another's streaming text.
-import type { AttachmentRef, Page, SessionView } from '../types'
+import type { AttachmentRef, Page, SendOptions, SessionView } from '../types'
 import type { ChatClient } from './client'
 import type { SessionData } from './state'
 
@@ -83,8 +83,9 @@ export class SessionStore {
     if (n > 0) this.goTo(n - 1)
   }
 
-  async send(text: string, attachments: AttachmentRef[] = []) {
-    await this.client.backend.send(this.id, text, attachments)
+  async send(text: string, attachments: AttachmentRef[] = [], opts?: SendOptions) {
+    if (opts) await this.client.backend.send(this.id, text, attachments, opts)
+    else await this.client.backend.send(this.id, text, attachments)
   }
 
   async interrupt() {

@@ -697,3 +697,34 @@ func TestSendWithAttachments(t *testing.T) {
 		t.Errorf("stored attachments = %+v, %v", again, err)
 	}
 }
+
+// An embedding host's turn context goes to the model with that turn, among
+// the directives the chat hides, and only with that turn (decision 0026).
+func TestHostContextGoesWithItsTurn(t *testing.T) {
+	h := newHarness(t, "multi-turn-partial")
+	v, _ := h.m.Create("chat", "", "sonnet")
+	if err := h.m.SendWith(context.Background(), v.ID, "one", "Card 42: Offline cards\nStatus: in progress"); err != nil {
+		t.Fatal(err)
+	}
+	pages := h.waitIdle(v.ID)
+	if !strings.Contains(pages[0].Directives, "says what the user has in front of them now:\n  Card 42: Offline cards\n  Status: in progress") {
+		t.Errorf("page 1 directives = %q", pages[0].Directives)
+	}
+	if pages[0].Question != "one" {
+		t.Errorf("the question carries only the user's text: %q", pages[0].Question)
+	}
+	pages = h.send(v.ID, "two")
+	if strings.Contains(pages[1].Directives, "Card 42") {
+		t.Errorf("page 2 still told the host's context: %q", pages[1].Directives)
+	}
+}
+
+func TestHostDirective(t *testing.T) {
+	if hostDirective("  \n ") != "" {
+		t.Error("blank context should say nothing")
+	}
+	long := hostDirective(strings.Repeat("x", hostContextMax+50))
+	if !strings.HasSuffix(long, "…") || strings.Count(long, "x") != hostContextMax {
+		t.Errorf("long context not cut at %d: %d x's", hostContextMax, strings.Count(long, "x"))
+	}
+}

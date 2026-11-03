@@ -59,7 +59,7 @@ func servePWA(files fs.FS) http.Handler {
 // "deviant" under the icon (a launcher has room for about 12 letters).
 
 // machineName is the PC's name from the host a request was sent to: the
-// first label of a DNS name (deviant.tail1234.ts.net → deviant), or ''
+// first label of a DNS name (deviant.tail1234.ts.net → deviant), or empty
 // for an IP address or localhost.
 func machineName(host string) string {
 	if h, _, err := net.SplitHostPort(host); err == nil {

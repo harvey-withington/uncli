@@ -280,6 +280,13 @@ func (m *Manager) View(id string) (View, error) {
 func (m *Manager) Pages(id string) ([]store.Page, error) { return m.d.Store.ListPages(id) }
 
 func (m *Manager) Send(ctx context.Context, id, text string, files ...core.Attachment) error {
+	return m.SendWith(ctx, id, text, "", files...)
+}
+
+// SendWith starts a turn with an embedding host's context for it (what is
+// on the host's screen now, decision 0026): told to the model with the
+// turn, hidden in the chat like the other directives.
+func (m *Manager) SendWith(ctx context.Context, id, text, hostContext string, files ...core.Attachment) error {
 	s, err := m.get(id)
 	if err != nil {
 		return err
@@ -289,7 +296,7 @@ func (m *Manager) Send(ctx context.Context, id, text string, files ...core.Attac
 			return err
 		}
 	}
-	return s.Send(ctx, text, files)
+	return s.Send(ctx, text, files, hostContext)
 }
 
 // AnswerAsk answers a waiting question or plan (Session.AnswerAsk).

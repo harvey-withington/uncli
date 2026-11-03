@@ -100,6 +100,11 @@ func (a *API) Send(sessionID, text string, attachments []AttachmentRef) error {
 	return a.svc.Send(context.Background(), sessionID, text, attachments)
 }
 
+// SendWith starts a turn with options: an embedding host's context for it.
+func (a *API) SendWith(sessionID, text string, attachments []AttachmentRef, opts SendOptions) error {
+	return a.svc.SendWith(context.Background(), sessionID, text, attachments, opts)
+}
+
 func (a *API) Interrupt(sessionID string) error { return a.svc.Sessions.Interrupt(sessionID) }
 
 // Restart stops a session's CLI and starts it again on its conversation:

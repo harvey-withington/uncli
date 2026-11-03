@@ -58,6 +58,37 @@ describe('the host adapter', () => {
     expect(el.shadowRoot!.querySelector('textarea')).toHaveAttribute('placeholder', 'Frag etwas')
   })
 
+  it('sends what the host says is in front of the user with each turn, hidden from the chat', async () => {
+    const backend = mockBackend()
+    const send = vi.spyOn(backend, 'send')
+    const el = chat(backend)
+    el.host = { turnContext: () => 'Card 42: Offline cards (in progress)' }
+    await inside(el).findByText(QUESTION)
+    const box = el.shadowRoot!.querySelector('textarea')!
+    await fireEvent.input(box, { target: { value: 'What’s left on it?' } })
+    await fireEvent.keyDown(box, { key: 'Enter' })
+    await waitFor(() => expect(send).toHaveBeenCalledWith('s-code', 'What’s left on it?', [], { context: 'Card 42: Offline cards (in progress)' }))
+    const page = chatClient(backend).session('s-code').snapshot().pages!.at(-1)!
+    expect(page.question).toBe('What’s left on it?')
+    expect(page.directives).toContain('Card 42: Offline cards (in progress)')
+  })
+
+  it('offers the host’s @mentions as the user types, and puts the chosen one in the message', async () => {
+    const el = chat()
+    const complete = vi.fn((q: string) => (q.toLowerCase().startsWith('off') ? [{ label: 'Offline cards', detail: 'card', insert: '[Offline cards](bruv:card:42)' }] : []))
+    el.host = { complete }
+    await inside(el).findByText(QUESTION)
+    const box = el.shadowRoot!.querySelector('textarea')!
+    box.focus()
+    await fireEvent.input(box, { target: { value: 'Look at @Off' } })
+    expect(await inside(el).findByRole('option', { name: /Offline cards/ })).toBeInTheDocument()
+    expect(complete).toHaveBeenCalledWith('Off')
+    // Enter picks the mention; it doesn't send.
+    await fireEvent.keyDown(box, { key: 'Enter' })
+    await waitFor(() => expect(box.value).toBe('Look at [Offline cards](bruv:card:42) '))
+    expect(inside(el).queryByRole('option', { name: /Offline cards/ })).toBeNull()
+  })
+
   it('asks the host first about Escape and Ctrl+Enter; a host that cancels keeps the key', async () => {
     const el = chat()
     await inside(el).findByText(QUESTION)

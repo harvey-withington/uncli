@@ -9,6 +9,7 @@
   import { atServer } from '../lib/remoteonly'
   import Icon from './Icon.svelte'
   import SlashMenu from './SlashMenu.svelte'
+  import MentionMenu from './MentionMenu.svelte'
   import { useShell } from '../lib/shell.svelte'
 
   const shell = useShell()
@@ -23,6 +24,7 @@
   let sending = $state(false)
   let input: HTMLTextAreaElement | undefined = $state()
   let menu: SlashMenu | undefined = $state() // the slash-command menu, which sees keys first
+  let mentions: MentionMenu | undefined = $state() // a host's @mentions, next
   let attachments = $state<Pending[]>([]) // files going with the next turn
   // A remote client picks files (a photo, from the camera or gallery) and
   // sends each to the server first; the turn names them by upload id.
@@ -204,7 +206,7 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
-    if (menu?.onkey(e)) return
+    if (menu?.onkey(e) || mentions?.onkey(e)) return
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault()
       send()
@@ -214,6 +216,7 @@
 
 <div class="composer">
   <SlashMenu bind:this={menu} {session} bind:text {input} />
+  <MentionMenu bind:this={mentions} bind:text {input} />
   <div class="field">
     {#if attachments.length > 0}
       <ul class="attachments" aria-label={t('composer.attachments')}>

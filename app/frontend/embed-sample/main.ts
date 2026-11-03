@@ -24,3 +24,21 @@ for (const type of ['uncli-ready', 'uncli-select', 'uncli-busy', 'uncli-idle', '
     log.textContent += `${type} ${detail.session}\n`
   })
 }
+
+// The dark chat's host offers @mentions of its own things, and says what
+// the user is looking at with each turn.
+const second = document.getElementById('second') as UncliChat
+const things = [
+  { label: 'Lisbon trip', detail: 'card', insert: '[Lisbon trip](sample:card:1)' },
+  { label: 'Lisbon budget', detail: 'sheet', insert: '[Lisbon budget](sample:sheet:7)' },
+  { label: 'Packing list', detail: 'card', insert: '[Packing list](sample:card:2)' },
+]
+second.setAttribute('link-schemes', 'sample')
+second.host = {
+  complete: query => things.filter(x => x.label.toLowerCase().includes(query.toLowerCase())),
+  turnContext: () => 'The user has the card "Lisbon trip" open.',
+  openLink: href => {
+    log.textContent += `host opens ${href}\n`
+    return href.startsWith('sample:')
+  },
+}
