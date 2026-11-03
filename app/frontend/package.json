@@ -16,7 +16,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "vitest",
     "test:run": "vitest run",
-    "build:embed": "vite build --config vite.embed.config.ts && vite build --config vite.embed.config.ts --mode sample"
+    "build:embed": "vite build --config vite.embed.config.ts && vite build --config vite.embed.config.ts --mode sample",
+    "pack:packages": "npm run build:embed && node -e \"require('fs').mkdirSync('dist-embed/packs', { recursive: true })\" && npm pack --workspace @uncli/client --workspace @uncli/chat --pack-destination dist-embed/packs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.1.1",

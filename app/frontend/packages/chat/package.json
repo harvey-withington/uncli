@@ -7,10 +7,12 @@
   "type": "module",
   "sideEffects": [
     "**/*.css",
+    "./dist/**",
     "./src/embed/index.ts",
     "./src/lib/api/index.ts"
   ],
   "exports": {
+    "./element": "./dist/uncli-chat.js",
     "./embed": "./src/embed/index.ts",
     "./*": "./src/*"
   },
@@ -24,5 +26,10 @@
   },
   "peerDependencies": {
     "svelte": "^5.57.1"
-  }
+  },
+  "files": [
+    "src",
+    "dist",
+    "!**/*.test.ts"
+  ]
 }

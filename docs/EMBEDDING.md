@@ -5,20 +5,29 @@ UNCLI's chat can be shown in any web page as the `<uncli-chat>` element
 a standard custom element, so it works in any stack. This page is for host
 authors. It covers what exists today and says what doesn't yet.
 
-## Status
+## Status and getting it
 
 | | |
 |---|---|
-| **Status** | Alpha. It's built on the `feat/packages` branch and not published. |
-| **Build** | `npm --prefix app/frontend run build:embed` writes the element to `app/frontend/dist-embed/lib/uncli-chat.js`, and a sample host page on UNCLI's mock to `dist-embed/sample/`. |
-| **Packages** | The elements and the Svelte components are `@uncli/chat` (`app/frontend/packages/chat`); a Svelte host can use the components directly. `@uncli/client` (`app/frontend/packages/client`) is the library underneath. Neither is published yet. |
+| **Status** | Alpha, on the `feat/packages` branch. Not published to a registry yet. |
+| **Packages** | `@uncli/chat` (`app/frontend/packages/chat`): the elements, built, as `@uncli/chat/element`, and the Svelte components as source. `@uncli/client` (`app/frontend/packages/client`): the client underneath, and its mock as `@uncli/client/mock`. |
+| **Getting them** | `npm --prefix app/frontend run pack:packages` builds the element and packs both packages as tarballs into `app/frontend/dist-embed/packs/`. A host installs the two tarballs (`npm install <path>/uncli-client-….tgz <path>/uncli-chat-….tgz`). |
+| **A sample** | `npm --prefix app/frontend run build:embed` also builds a sample host page on UNCLI's mock, into `dist-embed/sample/`. |
+
+Import the element once, anywhere in your app:
+
+```js
+import '@uncli/chat/element' // registers <uncli-chat> and <uncli-session-list>
+```
+
+It's built already, Svelte inside, so your bundler needs nothing special and your stack can be anything. A Svelte host can also mount the components themselves (`@uncli/chat/components/Chat.svelte` on a `ChatStore`), but then it styles and provides them like UNCLI's own app does. The element is the supported way in.
 
 ## Showing a chat
 
 ```html
 <uncli-chat session="s-code" scheme="dark" storage-key="card-chat"></uncli-chat>
 <script type="module">
-  import './uncli-chat.js' // registers <uncli-chat>
+  import '@uncli/chat/element' // registers <uncli-chat>
   import { httpBackend } from '@uncli/client'
 
   const chat = document.querySelector('uncli-chat')
@@ -89,7 +98,7 @@ You theme it through UNCLI's public tokens (decision 0010):
 
 The element is one ES module, with Svelte and UNCLI's client inside it. Code highlighting's languages load separately, only when a code block needs one.
 
-- **Measured size:** about 215 KB gzipped, unminified, on 2026-11-03.
+- **Measured size** (2026-11-03): about 218 KB gzipped as built, and about 184 KB once your bundler minifies it.
 - **Load it lazily:** a dynamic `import()` when a chat first opens.
 
 ## Your links, your strings, your keys

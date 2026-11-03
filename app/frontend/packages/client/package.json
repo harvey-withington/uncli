@@ -9,5 +9,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./mock": "./src/mock/index.ts"
-  }
+  },
+  "files": [
+    "src",
+    "!**/*.test.ts"
+  ]
 }
