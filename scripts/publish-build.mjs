@@ -2,7 +2,13 @@
 // with the date and a sequence number (uncli-setup-2026-10-03-001.exe).
 // Only the newest few builds are kept there; older ones are deleted.
 //
-//   node scripts/publish-build.mjs [--skip-build] [--keep 6]
+//   node scripts/publish-build.mjs [--skip-build] [--keep 6] [--branch]
+//
+// --branch publishes a build of the current git branch apart from the
+// regular ones: named uncli-<branch>-<date>-<n>.exe (feat/packages →
+// uncli-feat-packages-2026-11-04-001.exe) and stamped <release>+<branch>.<n>,
+// with its own sequence, and only that branch's builds are pruned. The
+// regular builds are never counted or deleted by it.
 //
 // The server is reached over ssh/scp (OpenSSH, key auth, a cmd.exe shell
 // on the far side). Its address stays out of the repo:
@@ -20,6 +26,14 @@ import { join } from 'node:path'
 
 const args = process.argv.slice(2)
 const skipBuild = args.includes('--skip-build')
+const branch = args.includes('--branch')
+  ? execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  : ''
+if (args.includes('--branch') && (!branch || branch === 'main')) {
+  console.error('--branch is for a branch other than main.')
+  process.exit(2)
+}
+const prefix = branch ? `uncli-${branch}` : 'uncli-setup'
 const keepAt = args.indexOf('--keep')
 const keep = keepAt >= 0 ? Number(args[keepAt + 1]) : 6
 const host = process.env.UNCLI_BUILD_HOST
@@ -41,7 +55,7 @@ const installer = join(appDir, 'build', 'bin', 'uncli-amd64-installer.exe')
 const ssh = cmd => execFileSync('ssh', ['-o', 'BatchMode=yes', target, cmd], { encoding: 'utf8' })
 
 // The builds already there, oldest first.
-const pattern = /^uncli-setup-(\d{4}-\d{2}-\d{2})-(\d{3,})\.exe$/
+const pattern = new RegExp(`^${prefix}-(\\d{4}-\\d{2}-\\d{2})-(\\d{3,})\\.exe$`)
 // The brackets matter: without them cmd makes `& dir …` part of the `if`,
 // so the listing only ran when the folder was missing.
 const listed = ssh(`(if not exist ${dir} mkdir ${dir}) & dir /b ${dir} 2>nul & exit 0`)
@@ -55,14 +69,14 @@ const last = builds.length ? Number(builds.at(-1).match(pattern)[2]) : 0
 const seq = last + 1
 const d = new Date()
 const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const name = `uncli-setup-${date}-${String(seq).padStart(3, '0')}.exe`
+const name = `${prefix}-${date}-${String(seq).padStart(3, '0')}.exe`
 
 // A test build carries the last release's version with +dev.<build>
 // (0.3.0-alpha+dev.66). Build metadata counts for nothing when versions are
 // compared, so it checks for updates as that release would: it's offered
 // the next one, never an older one (decision 0025).
 const lastTag = execFileSync('git', ['describe', '--tags', '--abbrev=0', '--match', 'v*'], { encoding: 'utf8' }).trim()
-const version = `${lastTag.replace(/^v/, '')}+dev.${seq}`
+const version = `${lastTag.replace(/^v/, '')}+${branch || 'dev'}.${seq}`
 
 // No -clean: it would delete build/bin, which fails while `npm run dev` runs.
 // --skip-build keeps whatever build/bin holds, stamped or not.
