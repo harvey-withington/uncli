@@ -13,6 +13,7 @@ import { mount, unmount } from 'svelte'
 import { chatClient, type Backend } from '@uncli/client'
 import SessionList from '../components/SessionList.svelte'
 import { keyedMemory } from '../lib/layoutmemory'
+import { keepInMemory } from '../lib/storage'
 import { ChatStore } from '../stores/chat.svelte'
 import { applyScheme, hostFont, shadowFor } from './root'
 
@@ -85,5 +86,8 @@ export class UncliSessionList extends HTMLElement {
 
 // defineUncliSessionList registers <uncli-session-list> (once).
 export function defineUncliSessionList(name = 'uncli-session-list') {
+  // A page that shows UNCLI's elements is a host's: what the chat remembers
+  // stays in memory, not the host's storage (lib/storage.ts).
+  keepInMemory()
   if (!customElements.get(name)) customElements.define(name, UncliSessionList)
 }

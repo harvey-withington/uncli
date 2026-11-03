@@ -69,6 +69,16 @@ describe('<uncli-chat>', () => {
     await waitFor(() => expect(el.shadowRoot!.querySelector('section.pane')).not.toBeNull())
   })
 
+  it('writes nothing to the page’s storage: a draft stays in memory', async () => {
+    const el = chat(mockBackend(), 's-code')
+    await inside(el).findByText('Why does TestMultiTurnPartial fail about one run in five?')
+    const box = el.shadowRoot!.querySelector('textarea')!
+    box.value = 'half a thought'
+    box.dispatchEvent(new Event('input', { bubbles: true }))
+    await new Promise(r => setTimeout(r, 600))
+    expect(Object.keys(localStorage).filter(k => k.startsWith('uncli'))).toEqual([])
+  })
+
   it('switches session when its attribute changes', async () => {
     const el = chat(mockBackend(), 's-code')
     await inside(el).findByText('Why does TestMultiTurnPartial fail about one run in five?')

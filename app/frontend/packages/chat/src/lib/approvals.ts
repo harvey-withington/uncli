@@ -2,6 +2,7 @@
 // do, why it prompts, and what an entry covers.
 import type { Approval, Approver, Risk, SafeClass, SafeEntry, Scope, SessionMode, SessionView, ToolRule, TraceReason } from './api'
 import { t } from './i18n.svelte'
+import { store } from './storage'
 
 export interface ApprovalView {
   title: string // "Run a command", "Write a file"…
@@ -328,7 +329,7 @@ const SCOPE_KEY = 'uncli-scope'
 
 export function loadScope(): Scope {
   try {
-    return localStorage.getItem(SCOPE_KEY) === 'all' ? 'all' : 'project'
+    return store.getItem(SCOPE_KEY) === 'all' ? 'all' : 'project'
   } catch {
     return 'project'
   }
@@ -336,7 +337,7 @@ export function loadScope(): Scope {
 
 export function saveScope(scope: Scope) {
   try {
-    localStorage.setItem(SCOPE_KEY, scope)
+    store.setItem(SCOPE_KEY, scope)
   } catch {
     // only a convenience
   }

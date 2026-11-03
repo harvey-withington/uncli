@@ -1,7 +1,8 @@
-// What UNCLI keeps for the viewer between runs, in localStorage: what they
+// What UNCLI keeps for the viewer between runs (lib/storage.ts): what they
 // were typing in each session, the session they had open, and whether the
 // page follows the end of an answer as it streams. Storage that fails
 // (private mode, full) only means it isn't kept.
+import { store } from './storage'
 
 const DRAFT_PREFIX = 'uncli-draft:'
 const LAST_SESSION = 'uncli-last-session'
@@ -9,7 +10,7 @@ const FOLLOW = 'uncli-scroll'
 
 function get(key: string): string | null {
   try {
-    return localStorage.getItem(key)
+    return store.getItem(key)
   } catch {
     return null
   }
@@ -17,8 +18,8 @@ function get(key: string): string | null {
 
 function set(key: string, value: string | null) {
   try {
-    if (value === null) localStorage.removeItem(key)
-    else localStorage.setItem(key, value)
+    if (value === null) store.removeItem(key)
+    else store.setItem(key, value)
   } catch {
     // not kept; still there for this run
   }

@@ -5,6 +5,7 @@
 // the viewer's doing, so the spot they chose comes back once there is room
 // for it. A spot at the end stays at the end as the content grows.
 import { atEnd } from './keep'
+import { store } from './storage'
 
 const KEY = 'uncli-scroll-spots'
 export const SPOTS_MAX = 300
@@ -19,7 +20,7 @@ type Stored = Record<string, [top: number, end: 0 | 1, height: number, at: numbe
 
 function read(): Stored {
   try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? 'null')
+    const v = JSON.parse(store.getItem(KEY) ?? 'null')
     return v && typeof v === 'object' && !Array.isArray(v) ? (v as Stored) : {}
   } catch {
     return {}
@@ -42,7 +43,7 @@ export function saveSpot(key: string, spot: Spot, now = Date.now()) {
     for (const k of keys.slice(0, keys.length - SPOTS_MAX)) delete all[k]
   }
   try {
-    localStorage.setItem(KEY, JSON.stringify(all))
+    store.setItem(KEY, JSON.stringify(all))
   } catch {
     // not kept; still held for this run
   }

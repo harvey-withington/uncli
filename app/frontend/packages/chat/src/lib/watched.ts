@@ -4,6 +4,7 @@
 import type { WatchEntry } from './api'
 import { artifactLang } from './artifacts'
 import { relPath } from './files'
+import { store } from './storage'
 
 const PREFIX = 'uncli-watch:'
 export const RECENT_MAX = 8
@@ -20,7 +21,7 @@ const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is
 
 export function loadWatched(sessionId: string): Watched {
   try {
-    const v = JSON.parse(localStorage.getItem(PREFIX + sessionId) ?? 'null')
+    const v = JSON.parse(store.getItem(PREFIX + sessionId) ?? 'null')
     if (v && typeof v === 'object') {
       return { current: typeof v.current === 'string' ? v.current : '', recent: strings(v.recent).slice(0, RECENT_MAX), starred: strings(v.starred) }
     }
@@ -32,8 +33,8 @@ export function loadWatched(sessionId: string): Watched {
 
 export function saveWatched(sessionId: string, w: Watched) {
   try {
-    if (!w.current && !w.recent.length && !w.starred.length) localStorage.removeItem(PREFIX + sessionId)
-    else localStorage.setItem(PREFIX + sessionId, JSON.stringify(w))
+    if (!w.current && !w.recent.length && !w.starred.length) store.removeItem(PREFIX + sessionId)
+    else store.setItem(PREFIX + sessionId, JSON.stringify(w))
   } catch {
     // not kept; still there for this run
   }

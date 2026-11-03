@@ -25,6 +25,7 @@ import { chatClient, type Backend, type SessionSnapshot } from '@uncli/client'
 import Chat from '../components/Chat.svelte'
 import { setHostText } from '../lib/i18n.svelte'
 import { keyedMemory } from '../lib/layoutmemory'
+import { keepInMemory } from '../lib/storage'
 import { allowLinkSchemes } from '../lib/render/markdown'
 import { ChatStore } from '../stores/chat.svelte'
 import { applyScheme, hostFont, shadowFor } from './root'
@@ -180,5 +181,8 @@ export class UncliChat extends HTMLElement {
 
 // defineUncliChat registers <uncli-chat> (once).
 export function defineUncliChat(name = 'uncli-chat') {
+  // A page that shows UNCLI's elements is a host's: what the chat remembers
+  // stays in memory, not the host's storage (lib/storage.ts).
+  keepInMemory()
   if (!customElements.get(name)) customElements.define(name, UncliChat)
 }

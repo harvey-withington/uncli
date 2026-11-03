@@ -3,6 +3,7 @@
 import type { AutoSummary } from './api'
 import type { MdBlock } from './render/markdown'
 import { classifySection, isKind, type SectionKind } from './sections'
+import { store } from './storage'
 
 export interface OutlineEntry {
   block: number // index of the heading's block in the answer
@@ -71,7 +72,7 @@ export interface OutlineLayout {
 
 export function loadLayout(): OutlineLayout {
   try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<OutlineLayout> | null
+    const v = JSON.parse(store.getItem(KEY) ?? 'null') as Partial<OutlineLayout> | null
     if (v) return { open: v.open !== false, width: clampWidth(v.width ?? OUTLINE_DEFAULT) }
   } catch {
     // fall through to defaults
@@ -81,7 +82,7 @@ export function loadLayout(): OutlineLayout {
 
 export function saveLayout(l: OutlineLayout) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(l))
+    store.setItem(KEY, JSON.stringify(l))
   } catch {
     // not persisted; still applied for this run
   }

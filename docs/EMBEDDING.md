@@ -42,7 +42,7 @@ It's built already, Svelte inside, so your bundler needs nothing special and you
 - **`session`** (attribute or property) is the session to show. Changing it shows another.
 - **`scheme`** is `light` or `dark`. Leave it out to follow the system.
 - **`compact`** shows the phone's compact layout, and `compact="false"` the desktop's. Leave it out and the element picks by its own width: compact below 720 px.
-- **`storage-key`** remembers the side panel and the compact layout under `uncli-layout:<key>` in the page's local storage. Without it the chat remembers nothing, so UNCLI never writes to your storage unasked. The side panel starts closed.
+- **`storage-key`** remembers the side panel and the compact layout under `uncli-layout:<key>` in the page's local storage. That's the only thing UNCLI ever writes to your storage, and only when you ask. Everything else the chat remembers (drafts, scroll positions, the File tab, the approval scope) stays in memory for as long as the page is open. The side panel starts closed.
 
 The element fills the box you give it, so give it a height. In a grid or flex layout, let its container shrink (`min-width: 0`).
 
