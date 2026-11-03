@@ -9,7 +9,7 @@ authors. It covers what exists today and says what doesn't yet.
 
 | | |
 |---|---|
-| **Status** | Alpha, on the `feat/packages` branch. Not published to a registry yet. |
+| **Status** | Alpha, on the `feat/packages` branch. Not published to a registry yet. Your page can't reach a real UNCLI yet: build against the mock (see "What's not there yet"). |
 | **Packages** | `@uncli/chat` (`app/frontend/packages/chat`): the elements, built, as `@uncli/chat/element`, and the Svelte components as source. `@uncli/client` (`app/frontend/packages/client`): the client underneath, and its mock as `@uncli/client/mock`. |
 | **Getting them** | `npm --prefix app/frontend run pack:packages` builds the element and packs both packages as tarballs into `app/frontend/dist-embed/packs/`. A host installs the two tarballs (`npm install <path>/uncli-client-….tgz <path>/uncli-chat-….tgz`). |
 | **A sample** | `npm --prefix app/frontend run build:embed` also builds a sample host page on UNCLI's mock, into `dist-embed/sample/`. |
@@ -36,8 +36,8 @@ It's built already, Svelte inside, so your bundler needs nothing special and you
 ```
 
 - **`backend`** (property) is how the chat reaches UNCLI.
-  - `httpBackend` reaches a UNCLI over its remote access server (decision 0021), with a paired device's token.
-  - Any object implementing `Backend` works, including `@uncli/client/mock`.
+  - `httpBackend` reaches a UNCLI over its remote access server (decision 0021), with a paired device's token. **Not from your page yet:** that server refuses requests from any page it didn't serve itself (decision 0022), so today `httpBackend` works only in UNCLI's own phone app. Host access is being designed (see "What's not there yet").
+  - Any object implementing `Backend` works, including `@uncli/client/mock`, which is what to build against for now.
   - Every element given the same backend object shares one client: one event stream, one copy of the server's state.
 - **`session`** (attribute or property) is the session to show. Changing it shows another.
 - **`scheme`** is `light` or `dark`. Leave it out to follow the system.
@@ -156,4 +156,5 @@ The part names are part of the contract; the structure inside them isn't.
 ## What's not there yet
 
 - **React, Vue and Angular wrappers,** generated from a Custom Elements Manifest.
-- **Host credentials and host sessions** (the host protocol). Until then, a host reaches UNCLI as a paired device.
+- **Reaching a real UNCLI from your page.** A host needs its own credentials, approved in UNCLI, and UNCLI's server has to accept requests from the host's origin. Until then, the chat runs only on the mock in your page.
+- **UNCLI inside your app,** without a separate install: a headless UNCLI your app starts itself, or links in if it's written in Go.
