@@ -9,7 +9,9 @@
 //   chat.session = '<session id>'
 //
 // Attributes: session, scheme ("light" or "dark"; the system's otherwise),
-// storage-key (remember the side panel and compact layout under it).
+// compact (the phone's layout; compact="false" the desktop's; by the
+// element's width when left out), storage-key (remember the side panel and
+// compact layout under it).
 // Events (composed, so they cross into the host's page): uncli-ready,
 // uncli-busy, uncli-idle, uncli-needs-approval; detail: { session }.
 import { mount, unmount } from 'svelte'
@@ -30,10 +32,10 @@ function stylesheet(): CSSStyleSheet | null {
 }
 
 export class UncliChat extends HTMLElement {
-  static observedAttributes = ['session', 'scheme']
+  static observedAttributes = ['session', 'scheme', 'compact']
 
   #backend: Backend | null = null
-  #props = $state<{ store: ChatStore; session: string } | null>(null)
+  #props = $state<{ store: ChatStore; session: string; compact: boolean | undefined } | null>(null)
   #app: ReturnType<typeof mount> | null = null
   #offSession: (() => void) | null = null
 
@@ -83,10 +85,18 @@ export class UncliChat extends HTMLElement {
 
   attributeChangedCallback(name: string) {
     if (name === 'scheme') this.#scheme()
+    if (name === 'compact' && this.#props) this.#props.compact = this.#compact()
     if (name === 'session') {
       if (this.#props) this.#props.session = this.session
       this.#watch()
     }
+  }
+
+  // compact: the attribute present means yes, compact="false" no, absent
+  // lets the width decide.
+  #compact(): boolean | undefined {
+    const c = this.getAttribute('compact')
+    return c === null ? undefined : c !== 'false'
   }
 
   // UNCLI's own scheme attribute, which the theme keys on.
@@ -102,7 +112,7 @@ export class UncliChat extends HTMLElement {
     const target = document.createElement('div')
     target.className = 'uncli-root'
     this.shadowRoot.append(target)
-    this.#props = { store, session: this.session }
+    this.#props = { store, session: this.session, compact: this.#compact() }
     this.#app = mount(Chat, { target, props: this.#props })
     store.init().then(() => this.#emit('uncli-ready'), () => {})
     this.#watch()

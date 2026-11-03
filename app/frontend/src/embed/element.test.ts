@@ -58,6 +58,17 @@ describe('<uncli-chat>', () => {
     expect(plain.hasAttribute('data-uncli-scheme')).toBe(false)
   })
 
+  it('shows the phone’s compact layout when asked, without a Back button, and the desktop’s again when not', async () => {
+    const el = chat(mockBackend(), 's-code', { compact: '' })
+    await inside(el).findByText('Why does TestMultiTurnPartial fail about one run in five?')
+    expect(el.shadowRoot!.querySelector('section.session')).not.toBeNull()
+    expect(el.shadowRoot!.querySelector('section.pane')).toBeNull()
+    expect(inside(el).queryByRole('button', { name: 'Back' })).toBeNull()
+    expect(inside(el).getByRole('button', { name: 'Options' })).toBeInTheDocument()
+    el.setAttribute('compact', 'false')
+    await waitFor(() => expect(el.shadowRoot!.querySelector('section.pane')).not.toBeNull())
+  })
+
   it('switches session when its attribute changes', async () => {
     const el = chat(mockBackend(), 's-code')
     await inside(el).findByText('Why does TestMultiTurnPartial fail about one run in five?')

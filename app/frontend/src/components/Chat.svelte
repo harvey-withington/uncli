@@ -7,17 +7,26 @@
   import Icon from './Icon.svelte'
   import SessionPane from './SessionPane.svelte'
   import Toasts from './Toasts.svelte'
+  import MobileSession from '../mobile/MobileSession.svelte'
 
   // One chat (decision 0026): a session's view on a ChatStore, with its own
   // toasts and confirm dialog. The <uncli-chat> element mounts it in its
-  // shadow root; it shows the session given, once the store has it.
+  // shadow root; it shows the session given, once the store has it. Its
+  // layout follows its own width, not the window's: the desktop's session
+  // view when there's room, the phone's compact one below COMPACT_AT, or
+  // whichever compact says.
+
+  const COMPACT_AT = 720
 
   interface Props {
     store: ChatStore
     session: string
+    compact?: boolean // force a layout; by width when left out
   }
 
-  let { store, session }: Props = $props()
+  let { store, session, compact }: Props = $props()
+  let width = $state(0)
+  const narrow = $derived(compact ?? (width > 0 && width < COMPACT_AT))
   // svelte-ignore state_referenced_locally
   provideChat(store)
   let failed = $state('')
@@ -34,11 +43,13 @@
   })
 </script>
 
-<div class="chat">
+<div class="chat" bind:clientWidth={width}>
   {#if failed}
     <p class="note" role="alert"><Icon name="triangle-alert" />{failed}</p>
   {:else if !store.ready}
     <p class="note" aria-busy="true"><Icon name="loader" spin size={18} label={t('app.loading')} /></p>
+  {:else if view && narrow}
+    <MobileSession session={view} wide={false} />
   {:else if view}
     <SessionPane session={view} />
   {:else}
@@ -56,7 +67,8 @@
     height: 100%;
     min-height: 0;
   }
-  .chat > :global(.pane) {
+  .chat > :global(.pane),
+  .chat > :global(.session) {
     flex: 1;
     min-height: 0;
   }

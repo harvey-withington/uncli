@@ -13,7 +13,7 @@
     header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: #20302b; color: #fff; }
     header h1 { margin: 0; font-size: 18px; font-weight: normal; }
     .btn { padding: 6px 14px; border: 2px solid var(--accent); background: #fff; color: var(--accent); font: inherit; }
-    main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 20px; }
+    main { display: grid; grid-template-columns: 1fr 1fr 380px; gap: 16px; padding: 16px 20px; }
     figure { margin: 0; min-width: 0; }
     figcaption { margin-bottom: 6px; font-size: 14px; color: #555; }
     uncli-chat { height: 640px; border: 1px solid #c9c4b8; border-radius: 8px; }
@@ -35,6 +35,10 @@
   <figure>
     <figcaption>A Chat session, dark, the host's accent, layout remembered under "sample"</figcaption>
     <uncli-chat id="second" session="s-chat" scheme="dark" storage-key="sample"></uncli-chat>
+  </figure>
+  <figure>
+    <figcaption>A narrow sidebar: the compact layout, by its width</figcaption>
+    <uncli-chat id="third" session="s-cowork"></uncli-chat>
   </figure>
 </main>
 <pre id="log"></pre>

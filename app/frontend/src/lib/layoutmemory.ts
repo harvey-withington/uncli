@@ -21,8 +21,10 @@ export interface LayoutMemory {
   save(l: ChatLayout): void
 }
 
+// An embedded chat starts with its side panel closed: it often sits in a
+// narrow space, and in the compact layout the panel covers the page.
 export function defaultLayout(): ChatLayout {
-  return { outline: { open: true, width: OUTLINE_DEFAULT }, panel: { tab: 'outline' }, questionCompact: false, headerCompact: false }
+  return { outline: { open: false, width: OUTLINE_DEFAULT }, panel: { tab: 'outline' }, questionCompact: false, headerCompact: false }
 }
 
 // The app's memory: its existing keys.

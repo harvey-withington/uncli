@@ -11,7 +11,7 @@
   import SidePanel from '../components/SidePanel.svelte'
   import Toolbar from '../components/Toolbar.svelte'
   import type { SessionView } from '../lib/api'
-  import { useApp } from '../lib/context'
+  import { useChat } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
   import { wide } from './wide.svelte'
@@ -24,15 +24,19 @@
   // cards over the end of it, and the composer. The toolbar (model,
   // modifiers, prompt level, Unattended) folds away under Options; the
   // side panel (outline, artifacts, a watched file) opens over the page,
-  // or on a tablet (wide.svelte.ts) beside it, as wide as it's dragged.
+  // or when wide (a tablet, wide.svelte.ts) beside it, as wide as it's
+  // dragged. It's also an embedded chat's compact layout (Chat.svelte),
+  // which says how wide it is and has no Back.
 
   interface Props {
     session: SessionView
-    onback: () => void
+    onback?: () => void
+    wide?: boolean // the layout beside the answer; the phone's tablet width otherwise
   }
 
-  let { session, onback }: Props = $props()
-  const app = useApp()
+  let { session, onback, wide: wideProp }: Props = $props()
+  const isWide = $derived(wideProp ?? wide.on)
+  const app = useChat()
   const names = $derived(app.namesFor(session.adapter))
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   const page = $derived(app.currentPage)
@@ -59,13 +63,13 @@
   }
 </script>
 
-<section class="session">
+<section class="session" class:wide={isWide}>
   <!-- One panel down to the page's question bar, which sits flush under it. -->
   <div class="head">
     <header class="bar">
       <!-- Pressing Back leaves the focus where it is: a rename box losing it
            would save, where Back cancels (lib/backguard.ts). -->
-      <button class="btn ghost icon touch" onmousedown={e => e.preventDefault()} onclick={onback} aria-label={t('mobile.back')} title={t('mobile.back')}><Icon name="arrow-left" /></button>
+      {#if onback}<button class="btn ghost icon touch" onmousedown={e => e.preventDefault()} onclick={onback} aria-label={t('mobile.back')} title={t('mobile.back')}><Icon name="arrow-left" /></button>{/if}
       <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <div class="title">
         <h1><SessionTitle {session} /></h1>
@@ -103,7 +107,7 @@
 
   <!-- Everything under the header. On a phone it makes no box of its own
        (display: contents); on a tablet it leaves room for the side panel. -->
-  <div class="body" class:with-panel={wide.on && app.outline.open} style:--panel-w="min({app.outline.width}px, 45vw)">
+  <div class="body" class:with-panel={isWide && app.outline.open} style:--panel-w="min({app.outline.width}px, 45%)">
   <div class="scroll" bind:this={scroller}>
     <div class="content">
       {#if page}
@@ -135,8 +139,8 @@
   </footer>
 
   {#if app.outline.open}
-    <div class="panel" role={wide.on ? undefined : 'dialog'} aria-label={wide.on ? undefined : t('outline.toggle')}>
-      {#if !wide.on}<button class="btn ghost icon touch close" onclick={() => app.togglePanel()} aria-label={t('common.close')}><Icon name="x" /></button>{/if}
+    <div class="panel" role={isWide ? undefined : 'dialog'} aria-label={isWide ? undefined : t('outline.toggle')}>
+      {#if !isWide}<button class="btn ghost icon touch close" onclick={() => app.togglePanel()} aria-label={t('common.close')}><Icon name="x" /></button>{/if}
       <SidePanel sessionId={session.id} page={page ?? null} {scroller} />
     </div>
   {/if}
@@ -345,29 +349,27 @@
   /* A tablet: the body is the column under the header, the side panel sits
      at its right as wide as it's dragged, and the message box and approval
      cards line up with the answer column, as on the desktop. */
-  @media (min-width: 900px) {
-    .body {
-      position: relative;
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    .body.with-panel {
-      padding-right: var(--panel-w);
-    }
-    .panel {
-      inset: 0 0 0 auto;
-      width: var(--panel-w);
-      border-left: 1px solid var(--border);
-      background: var(--bg);
-    }
-    .bottom > :global(*),
-    .approvals > :global(*) {
-      max-width: calc(var(--reading-width) + 2 * var(--space-6));
-      margin-left: auto;
-      margin-right: auto;
-    }
+  .wide .body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .wide .body.with-panel {
+    padding-right: var(--panel-w);
+  }
+  .wide .panel {
+    inset: 0 0 0 auto;
+    width: var(--panel-w);
+    border-left: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .wide .bottom > :global(*),
+  .wide .approvals > :global(*) {
+    max-width: calc(var(--reading-width) + 2 * var(--space-6));
+    margin-left: auto;
+    margin-right: auto;
   }
   .panel :global(> *:last-child) {
     flex: 1;
