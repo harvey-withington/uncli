@@ -15,7 +15,7 @@ friendly UI: sessions, pages, approvals, artifacts.
 - `docs/`: `BRIEF.md` (the frozen design handover), `decisions/`
   (architecture decision records, extending the brief),
   `UI-CONVENTIONS.md` (the frontend contract), `PLUGINS.md` (the provider
-  plugin reference).
+  plugin reference), `EMBEDDING.md` (`<uncli-chat>` for host authors).
 - `website/`: the landing page. `scripts/`: build, release and test
   helpers.
 - `plan/`: a private scratchpad, its own git repo, ignored here.

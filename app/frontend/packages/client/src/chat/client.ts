@@ -26,6 +26,7 @@ export class ChatClient {
   private noticeListeners = new Set<(n: Notice) => void>()
   private stores = new Map<string, SessionStore>()
   private off: (() => void) | null = null
+  private started: Promise<void> | null = null
   private held: (() => void)[] | null = null // changes arriving during a resync
   private resyncAgain = false
   private resyncTries = 0 // failed in a row, retried after a pause
@@ -85,7 +86,17 @@ export class ChatClient {
   // ---- lifecycle
 
   // init subscribes to the server's events and fetches the first state.
-  async init() {
+  // Several UIs sharing the client all call it; it happens once (again
+  // only if the first state couldn't be fetched).
+  init(): Promise<void> {
+    this.started ??= this.start().catch(e => {
+      this.started = null
+      throw e
+    })
+    return this.started
+  }
+
+  private async start() {
     this.off ??= this.backend.subscribe({
       sessionEvent: m => this.onEvent(m),
       sessionChanged: v => this.later(() => { this.pinsFollowSession(v); this.upsertSession(v) }),
@@ -129,6 +140,7 @@ export class ChatClient {
   destroy() {
     this.off?.()
     this.off = null
+    this.started = null
     clearTimeout(this.resyncTimer)
   }
 

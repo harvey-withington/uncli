@@ -18,6 +18,7 @@ __debug_bin*
 node_modules/
 **/frontend/dist/*
 !**/frontend/dist/.gitkeep
+**/frontend/dist-embed/
 .svelte-kit/
 .vite/
 

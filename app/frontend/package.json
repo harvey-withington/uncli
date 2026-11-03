@@ -15,7 +15,8 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "build:embed": "vite build --config vite.embed.config.ts && vite build --config vite.embed.config.ts --mode sample"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.1.1",

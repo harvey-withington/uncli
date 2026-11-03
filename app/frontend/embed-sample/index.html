@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>&lt;uncli-chat&gt; sample host</title>
+  <style>
+    /* A host page with its own look, including names UNCLI uses itself
+       (--bg, --accent, .btn): none of it should reach the chats, and
+       theirs shouldn't reach the page. */
+    :root { --bg: #f1efe9; --accent: #0b7a5c; }
+    body { margin: 0; font-family: Georgia, 'Times New Roman', serif; background: var(--bg); color: #222; }
+    header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: #20302b; color: #fff; }
+    header h1 { margin: 0; font-size: 18px; font-weight: normal; }
+    .btn { padding: 6px 14px; border: 2px solid var(--accent); background: #fff; color: var(--accent); font: inherit; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 20px; }
+    figure { margin: 0; min-width: 0; }
+    figcaption { margin-bottom: 6px; font-size: 14px; color: #555; }
+    uncli-chat { height: 640px; border: 1px solid #c9c4b8; border-radius: 8px; }
+    /* The second chat takes the host's accent through UNCLI's public tokens. */
+    #second { --uncli-accent: #0b7a5c; }
+    #log { margin: 0 20px 20px; font: 13px/1.4 ui-monospace, monospace; color: #555; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>A host app</h1>
+  <button class="btn" id="host-btn">The host's own button</button>
+</header>
+<main>
+  <figure>
+    <figcaption>A Code session, light, the host's font</figcaption>
+    <uncli-chat id="first" session="s-code" scheme="light"></uncli-chat>
+  </figure>
+  <figure>
+    <figcaption>A Chat session, dark, the host's accent, layout remembered under "sample"</figcaption>
+    <uncli-chat id="second" session="s-chat" scheme="dark" storage-key="sample"></uncli-chat>
+  </figure>
+</main>
+<pre id="log"></pre>
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

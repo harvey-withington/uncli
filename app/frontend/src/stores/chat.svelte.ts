@@ -11,8 +11,9 @@ import {
   type Bootstrap, type Live, type ProviderNames,
 } from '../lib/api'
 import { ChatState, keyed } from '../lib/chat.svelte'
-import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
-import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, savePanelLayout, saveQuestionCompact, type PanelTab } from '../lib/panels'
+import { autoSummaryFor, outlineOf, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
+import type { PanelLayout, PanelTab } from '../lib/panels'
+import { appMemory, type LayoutMemory } from '../lib/layoutmemory'
 import { loadWatched, pick, saveWatched, type Watched } from '../lib/watched'
 import { toBlocks } from '../lib/render/markdown'
 import { setNames, t } from '../lib/i18n.svelte'
@@ -23,8 +24,11 @@ export type { Live }
 
 export interface ChatStoreOptions {
   shell?: Shell
-  // The client to use; one of the store's own otherwise.
+  // The client to use (shared with other chats on the page); one of the
+  // store's own otherwise, which it closes with itself.
   client?: ChatClient
+  // Where the layout is remembered; the app's own keys otherwise.
+  memory?: LayoutMemory
 }
 
 export class ChatStore {
@@ -34,20 +38,22 @@ export class ChatStore {
   readonly shell: Shell
   ready = $state(false)
   currentId = $state<string | null>(null)
-  outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
+  outline = $state<OutlineLayout>({ open: true, width: 0 }) // the "On this page" panel
   // The side panel's tab ("On this page", "Artifacts" or "File"; its open
   // state and width are outline's).
-  panel = $state(loadPanelLayout())
+  panel = $state<PanelLayout>({ tab: 'outline' })
   // The File tab's choices per session (lib/watched.ts), loaded as they're
   // first changed, and a request for its switcher (the File tab takes it).
   watched = $state<Record<string, Watched>>({})
   fileSwitcher = $state(false)
-  questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
-  headerCompact = $state(loadHeaderCompact()) // the session header collapsed to two lines
+  questionCompact = $state(false) // the question header collapsed to one line
+  headerCompact = $state(false) // the session header collapsed to two lines
   reveal = $state<{ pageId: string; terms: string[] } | null>(null) // a page to scroll to a search match on
   preferHeadings = $state<Record<string, boolean>>({}) // page id → show its headings, not its summary
   private autoSummarised = new Set<string>() // tried once, so a failure isn't retried in a loop
   private offNotices: (() => void) | null = null
+  private ownsClient: boolean
+  private memory: LayoutMemory
 
   // What only an app can do; an embedded chat leaves them out, and the
   // buttons that need them don't show.
@@ -56,8 +62,15 @@ export class ChatStore {
 
   constructor(backend: Backend, opts: ChatStoreOptions = {}) {
     this.client = opts.client ?? new ChatClient(backend)
+    this.ownsClient = !opts.client
     this.chat = new ChatState(this.client)
     this.shell = opts.shell ?? new Shell()
+    this.memory = opts.memory ?? appMemory
+    const l = this.memory.load()
+    this.outline = l.outline
+    this.panel = l.panel
+    this.questionCompact = l.questionCompact
+    this.headerCompact = l.headerCompact
   }
 
   // ---- the client's state, as runes
@@ -119,7 +132,7 @@ export class ChatStore {
 
   destroy() {
     this.offNotices?.()
-    this.client.destroy()
+    if (this.ownsClient) this.client.destroy()
     this.chat.destroy()
   }
 
@@ -187,7 +200,7 @@ export class ChatStore {
   // togglePanel opens or closes the side panel, on the tab it had.
   togglePanel() {
     this.outline.open = !this.outline.open
-    saveLayout(this.outline)
+    this.remember()
     if (this.outline.open && this.currentId) void this.refreshArtifacts(this.currentId)
   }
 
@@ -204,7 +217,7 @@ export class ChatStore {
 
   setTab(tab: PanelTab) {
     this.panel.tab = tab
-    savePanelLayout(this.panel)
+    this.remember()
   }
 
   // tabFor is the tab a session shows: Artifacts only for a session type
@@ -272,17 +285,17 @@ export class ChatStore {
 
   toggleHeaderCompact() {
     this.headerCompact = !this.headerCompact
-    saveHeaderCompact(this.headerCompact)
+    this.remember()
   }
 
   toggleQuestionCompact() {
     this.questionCompact = !this.questionCompact
-    saveQuestionCompact(this.questionCompact)
+    this.remember()
   }
 
   setOutlineWidth(width: number) {
     this.outline.width = width
-    saveLayout(this.outline)
+    this.remember()
   }
 
   // ---- MCP sign-in (decision 0020), with errors as toasts
@@ -394,6 +407,11 @@ export class ChatStore {
     if (autoSummaryFor(page.answerMd, blocks.length, this.boot?.preferences.autoSummary ?? 'off') !== 'summarise') return
     this.autoSummarised.add(page.id)
     void this.summarise(page)
+  }
+
+  // remember saves the layout where this chat remembers it.
+  private remember() {
+    this.memory.save({ outline: { ...this.outline }, panel: { ...this.panel }, questionCompact: this.questionCompact, headerCompact: this.headerCompact })
   }
 
   protected async toasting(p: Promise<unknown>) {
