@@ -65,7 +65,7 @@
 
 <section class="session" class:wide={isWide}>
   <!-- One panel down to the page's question bar, which sits flush under it. -->
-  <div class="head">
+  <div class="head" part="header">
     <header class="bar">
       <!-- Pressing Back leaves the focus where it is: a rename box losing it
            would save, where Back cancels (lib/backguard.ts). -->
@@ -78,6 +78,8 @@
       <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="sliders-horizontal" /></button>
       <button class="btn ghost icon touch" onclick={() => app.togglePanel()} aria-pressed={app.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name={app.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>
     </header>
+    <!-- An embedding host's own controls (decision 0026). -->
+    {#if app.embedded}<svelte:element this={'slot'} name="header-extra" />{/if}
     {#if options}
       <div class="options">
         <Toolbar {session}>
@@ -108,7 +110,7 @@
   <!-- Everything under the header. On a phone it makes no box of its own
        (display: contents); on a tablet it leaves room for the side panel. -->
   <div class="body" class:with-panel={isWide && app.outline.open} style:--panel-w="min({app.outline.width}px, 45%)">
-  <div class="scroll" bind:this={scroller}>
+  <div class="scroll" bind:this={scroller} part="page">
     <div class="content">
       {#if page}
         <PageView {page} />
@@ -119,7 +121,7 @@
   </div>
 
   {#if cards.length || checking}
-    <div class="approvals">
+    <div class="approvals" part="approvals">
       {#each cards as a (a.requestId)}
         <ApprovalCard {session} approval={a} />
       {/each}
@@ -127,7 +129,7 @@
     </div>
   {/if}
   <div class="dock"><NavBar /></div>
-  <footer class="bottom">
+  <footer class="bottom" part="composer">
     {#if session.archived}
       <div class="restore" role="status">
         <span>{t('archive.readOnly')}</span>
@@ -136,6 +138,7 @@
     {:else}
       <Composer {session} />
     {/if}
+    {#if app.embedded}<svelte:element this={'slot'} name="below-composer" />{/if}
   </footer>
 
   {#if app.outline.open}

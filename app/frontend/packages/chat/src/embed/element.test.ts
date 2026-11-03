@@ -69,6 +69,23 @@ describe('<uncli-chat>', () => {
     await waitFor(() => expect(el.shadowRoot!.querySelector('section.pane')).not.toBeNull())
   })
 
+  it('puts the host’s own controls in its slots, and names its parts, in both layouts', async () => {
+    for (const compact of ['false', '']) {
+      const el = document.createElement('uncli-chat') as UncliChat
+      el.setAttribute('compact', compact)
+      el.innerHTML = '<button slot="header-extra">Pending edits</button><p slot="below-composer">Model: house</p>'
+      el.session = 's-code'
+      el.backend = mockBackend()
+      document.body.append(el)
+      await inside(el).findByText('Why does TestMultiTurnPartial fail about one run in five?')
+      const slot = (name: string) => el.shadowRoot!.querySelector<HTMLSlotElement>(`slot[name="${name}"]`)!
+      expect(slot('header-extra').assignedElements().map(e => e.textContent)).toEqual(['Pending edits'])
+      expect(slot('below-composer').assignedElements().map(e => e.textContent)).toEqual(['Model: house'])
+      for (const part of ['header', 'page', 'composer', 'navbar']) expect(el.shadowRoot!.querySelector(`[part~="${part}"]`), `${part} (compact="${compact}")`).not.toBeNull()
+      el.remove()
+    }
+  })
+
   it('writes nothing to the page’s storage: a draft stays in memory', async () => {
     const el = chat(mockBackend(), 's-code')
     await inside(el).findByText('Why does TestMultiTurnPartial fail about one run in five?')

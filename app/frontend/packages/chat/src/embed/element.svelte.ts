@@ -132,6 +132,7 @@ export class UncliChat extends HTMLElement {
     if (this.#app || !this.isConnected || !this.#backend || !this.shadowRoot) return
     const store = new ChatStore(this.#backend, { client: chatClient(this.#backend), memory: keyedMemory(this.getAttribute('storage-key')) })
     store.openLink = href => this.#host?.openLink?.(href) ?? false
+    store.embedded = true
     const target = document.createElement('div')
     target.className = 'uncli-root'
     this.shadowRoot.append(target)

@@ -32,7 +32,7 @@
   })
 </script>
 
-<nav class="list" aria-label={t('session.list')}>
+<nav class="list" part="list" aria-label={t('session.list')}>
   {#if failed}
     <p class="note" role="alert"><Icon name="triangle-alert" />{failed}</p>
   {:else if !store.ready}

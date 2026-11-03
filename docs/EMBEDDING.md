@@ -122,9 +122,32 @@ chat.host = {
 
 **Keys.** Before the chat acts on Escape, or on Ctrl+Enter (Cmd+Enter), it sends `uncli-escape` or `uncli-submit`. They're cancelable: cancel one (`event.preventDefault()`) and the chat leaves that key alone, so layered dialogs of your own can decide first.
 
+## Your own controls, and restyling parts
+
+**Slots.** Put your own controls inside the chat by giving the element children with a `slot` attribute. They stay in your page's DOM and get your page's styles.
+
+| Slot | Where |
+|---|---|
+| `header-extra` | Under the chat's header (a pending-edits banner, say) |
+| `below-composer` | Under the message box |
+
+```html
+<uncli-chat session="s-code">
+  <button slot="header-extra">3 edits waiting for review</button>
+</uncli-chat>
+```
+
+**Parts.** Beyond the `--uncli-*` tokens, these parts can be restyled with `::part()`, for example `uncli-chat::part(composer) { border-top: 2px solid var(--brand); }`. Both layouts have the same parts.
+
+| Element | Parts |
+|---|---|
+| `<uncli-chat>` | `header`, `page`, `approvals`, `navbar`, `composer`, `side-panel` |
+| `<uncli-session-list>` | `list`, `item`, plus `item-current` on the one shown |
+
+The part names are part of the contract; the structure inside them isn't.
+
 ## What's not there yet
 
 - **`complete` for @mentions and `turnContext`.** They need the host protocol below.
-- **Named slots** (`header-extra`, `below-composer`) and **`::part()` names.**
 - **React, Vue and Angular wrappers,** generated from a Custom Elements Manifest.
 - **Host credentials and host sessions** (the host protocol). Until then, a host reaches UNCLI as a paired device.

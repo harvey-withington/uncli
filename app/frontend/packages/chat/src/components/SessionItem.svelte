@@ -85,7 +85,7 @@
   }
 </script>
 
-<li class="item" class:active data-id={session.id} style={tintStyle(profile?.hue)}>
+<li class="item" class:active part="item{active ? ' item-current' : ''}" data-id={session.id} style={tintStyle(profile?.hue)}>
   {#if editing}
     <div class="row">
       <span class="mode"><Icon name={profile?.icon ?? 'message-circle'} /></span>

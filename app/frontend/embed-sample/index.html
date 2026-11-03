@@ -21,6 +21,9 @@
     uncli-chat { border: 1px solid #c9c4b8; border-radius: 8px; }
     /* The second chat takes the host's accent through UNCLI's public tokens. */
     #second { --uncli-accent: #0b7a5c; }
+    /* The host restyles a part of it, and puts its own controls in its slots. */
+    #second::part(composer) { border-top: 3px solid #0b7a5c; }
+    .host-bit { margin: 4px 16px; padding: 4px 10px; border: 1px dashed #0b7a5c; border-radius: 6px; color: #9fd8c4; font: 13px Georgia, serif; background: none; }
     #log { margin: 0 20px 20px; font: 13px/1.4 ui-monospace, monospace; color: #555; white-space: pre-wrap; }
   </style>
 </head>
@@ -40,7 +43,10 @@
   </figure>
   <figure>
     <figcaption>A Chat session, dark, the host's accent, layout remembered under "sample"</figcaption>
-    <uncli-chat id="second" session="s-chat" scheme="dark" storage-key="sample"></uncli-chat>
+    <uncli-chat id="second" session="s-chat" scheme="dark" storage-key="sample">
+      <button slot="header-extra" class="host-bit">3 edits waiting for review</button>
+      <p slot="below-composer" class="host-bit">The host's own line under the composer</p>
+    </uncli-chat>
   </figure>
   <figure>
     <figcaption>A narrow sidebar: the compact layout, by its width</figcaption>

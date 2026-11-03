@@ -66,7 +66,7 @@
   }
 </script>
 
-<aside class="side" style:width="{chat.outline.width}px" aria-label={label(tab)}>
+<aside class="side" part="side-panel" style:width="{chat.outline.width}px" aria-label={label(tab)}>
   <ResizeHandle edge="left" width={chat.outline.width} min={OUTLINE_MIN} max={OUTLINE_MAX} label={t('panel.resize')}
     onresize={w => (chat.outline.width = w)} oncommit={w => chat.setOutlineWidth(w)} />
   <div class="tabs" role="tablist" aria-label={t('panel.label')} tabindex="-1" {onkeydown}>

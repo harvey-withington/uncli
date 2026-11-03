@@ -28,6 +28,8 @@ describe('the chat on its own', () => {
     await waitFor(() => expect(send).toHaveBeenCalledWith('s-code', 'One more question', []))
     expect(await screen.findByText('One more question')).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Pages' })).getByText('Page 2 of 2')).toBeInTheDocument()
+    // Slots are an embedded chat's: the app's has none.
+    expect(document.querySelector('slot')).toBeNull()
     chat.destroy()
   })
 })

@@ -32,7 +32,7 @@
   }
 </script>
 
-<nav class="navbar" aria-label={t('nav.label')}>
+<nav class="navbar" part="navbar" aria-label={t('nav.label')}>
   <button onclick={() => chat.goTo(prevBookmark(pages, i))} disabled={n === 0 || i === 0} title={t('nav.prevBookmark')} aria-label={t('nav.prevBookmark')}>
     <Icon name="rewind" fill size={15} />
   </button>

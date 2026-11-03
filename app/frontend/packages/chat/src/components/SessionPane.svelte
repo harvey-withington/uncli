@@ -102,7 +102,7 @@
 </script>
 
 <section class="pane">
-  <header class="top" class:compact={chat.headerCompact}>
+  <header class="top" class:compact={chat.headerCompact} part="header">
     <div class="title-row">
       <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <h1><SessionTitle {session} /></h1>
@@ -179,6 +179,8 @@
         </button>
       {/snippet}
     </Toolbar>
+    <!-- An embedding host's own controls (decision 0026). -->
+    {#if chat.embedded}<svelte:element this={'slot'} name="header-extra" />{/if}
   </header>
   <!-- Status and warnings, in a strip of their own under the header, all
        aligned on the left. Compact shows only an error there. MCP servers
@@ -199,7 +201,7 @@
          above the composer (centred over the answer, not the outline), and
          the composer. -->
     <div class="main">
-      <div class="scroll" bind:this={scroller}>
+      <div class="scroll" bind:this={scroller} part="page">
         <div class="content">
           {#if page}
             <PageView {page} />
@@ -216,7 +218,7 @@
            the end (the toggle under its scrollbar). -->
       <ScrollKeeper {scroller} pageId={page?.id} />
       {#if cards.length || checking}
-        <div class="approvals" class:more-below={moreBelow} bind:this={approvalsEl} onscroll={measureApprovals}>
+        <div class="approvals" class:more-below={moreBelow} bind:this={approvalsEl} onscroll={measureApprovals} part="approvals">
           {#each cards as a (a.requestId)}
             <ApprovalCard {session} approval={a} />
           {/each}
@@ -226,7 +228,7 @@
         </div>
       {/if}
       <div class="dock"><NavBar /></div>
-      <footer class="bottom">
+      <footer class="bottom" part="composer">
         <div class="inner">
           {#if session.archived}
             <!-- An archived session reads like any other, but can't take a turn. -->
@@ -238,6 +240,7 @@
           {:else}
             <Composer {session} />
           {/if}
+          {#if chat.embedded}<svelte:element this={'slot'} name="below-composer" />{/if}
         </div>
       </footer>
     </div>

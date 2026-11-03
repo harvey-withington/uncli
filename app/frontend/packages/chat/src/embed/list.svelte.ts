@@ -63,6 +63,7 @@ export class UncliSessionList extends HTMLElement {
   #mount() {
     if (this.#app || !this.isConnected || !this.#backend || !this.shadowRoot) return
     const store = new ChatStore(this.#backend, { client: chatClient(this.#backend), memory: keyedMemory(null) })
+    store.embedded = true
     const target = document.createElement('div')
     target.className = 'uncli-root'
     this.shadowRoot.append(target)
