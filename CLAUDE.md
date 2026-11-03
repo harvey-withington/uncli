@@ -8,7 +8,9 @@ friendly UI: sessions, pages, approvals, artifacts.
 
 - `app/`: the Wails app. Go packages in `app/internal/` (core seams,
   adapters, runtimes, session, store, `app` service, `bridge`), the Svelte
-  frontend in `app/frontend/`, built-in YAML in `app/config/defaults/`,
+  frontend in `app/frontend/` (the app in `src/`, the reusable packages
+  such as `@uncli/client` in `packages/`, an npm workspace; decision
+  0026), built-in YAML in `app/config/defaults/`,
   recorded CLI streams in `app/testdata/streams/`.
 - `docs/`: `BRIEF.md` (the frozen design handover), `decisions/`
   (architecture decision records, extending the brief),

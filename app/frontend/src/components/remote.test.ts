@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
-import { mockBackend } from '../lib/api/mock'
+import { mockBackend } from '@uncli/client/mock'
 import type { Handlers } from '../lib/api'
 import { AppStore } from '../stores/app.svelte'
 import { atServer } from '../lib/remoteonly'

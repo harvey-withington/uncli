@@ -6,7 +6,7 @@
   import NewSessionDialog from '../components/NewSessionDialog.svelte'
   import Toasts from '../components/Toasts.svelte'
   import type { Backend } from '../lib/api'
-  import { LOCAL, parseRef, qualify } from '../lib/api/identity'
+  import { LOCAL, parseRef, qualify } from '../lib/api'
   import { take, watch } from '../lib/backguard'
   import { provideApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'

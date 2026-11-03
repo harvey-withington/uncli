@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte'
 import { describe, expect, it } from 'vitest'
 import App from '../App.svelte'
-import { mockBackend } from '../lib/api/mock'
+import { mockBackend } from '@uncli/client/mock'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
 import SessionPane from './SessionPane.svelte'

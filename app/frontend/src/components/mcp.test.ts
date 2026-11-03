@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { describe, expect, it, vi } from 'vitest'
-import { mockBackend } from '../lib/api/mock'
+import { mockBackend } from '@uncli/client/mock'
 import type { MCPServer } from '../lib/api'
 import { commands } from '../lib/commands'
 import { APP_CONTEXT } from '../lib/context'

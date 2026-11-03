@@ -1,7 +1,7 @@
 // Containers in the browser mock. ?containers=nowsl starts without WSL,
 // ?containers=hung with WSL not responding, ?containers=built with the sandbox built and signed in; otherwise WSL is
 // on and nothing is built. Building walks through the steps on timers.
-import type { ContainerInfo, ContainerProfile, ContainerStep, ContainersInfo } from './types'
+import type { ContainerInfo, ContainerProfile, ContainerStep, ContainersInfo } from '../types'
 
 const STEPS: ContainerStep[] = ['download', 'remove', 'import', 'packages', 'setup', 'cli', 'lockdown', 'check']
 // The mock's user has no secrets folder yet, so a container sharing it says so.

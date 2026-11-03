@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte'
 import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
-import { mockBackend } from '../lib/api/mock'
+import { mockBackend } from '@uncli/client/mock'
 
 // Links in an answer, as the Antigravity CLI writes them (file URLs with
 // code as their text) and as paths in the session's folder.

@@ -2,7 +2,7 @@
 // sample tailnet address. ?remote=on starts it on; ?remote=stopped starts
 // it on with Tailscale stopped (loopback only). Pairing shows a sample
 // code; ?pair=ask has a phone ask to pair a moment after.
-import type { PairRequest, PairedDevice, Pairing, RemoteStatus } from './types'
+import type { PairRequest, PairedDevice, Pairing, RemoteStatus } from '../types'
 
 export interface RemoteEvents {
   status(s: RemoteStatus): void

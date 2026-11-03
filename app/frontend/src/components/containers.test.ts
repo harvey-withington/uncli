@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
-import { mockBackend } from '../lib/api/mock'
+import { mockBackend } from '@uncli/client/mock'
 
 async function openSettings(tab: string) {
   await fireEvent.click(await screen.findByRole('button', { name: /Claude Code 2\./ }))

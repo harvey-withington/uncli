@@ -2,7 +2,7 @@
 // that's up to date. ?update=available has 0.4.0-alpha out; ?update=dev is a
 // development build. Installing runs through downloading and installing,
 // then stays there, as UNCLI would quit.
-import type { UpdateStatus } from './types'
+import type { UpdateStatus } from '../types'
 
 export function mockUpdate(emit: (s: UpdateStatus) => void) {
   const scenario = new URLSearchParams(globalThis.location?.search ?? '').get('update')

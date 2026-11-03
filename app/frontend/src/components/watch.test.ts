@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { describe, expect, it, vi } from 'vitest'
 import { tick } from 'svelte'
-import { mockBackend } from '../lib/api/mock'
+import { mockBackend } from '@uncli/client/mock'
 import { commands } from '../lib/commands'
 import { APP_CONTEXT } from '../lib/context'
 import { loadWatched } from '../lib/watched'

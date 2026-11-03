@@ -1,7 +1,7 @@
 // Saved CLI conversations for the mock's import picker: one from the
 // terminal, a deleted UNCLI chat, one already imported, and one whose
 // folder is gone. Importing makes a session with a page per turn.
-import type { Page, TranscriptEntry } from './types'
+import type { Page, TranscriptEntry } from '../types'
 
 const HOUR = 3_600_000
 

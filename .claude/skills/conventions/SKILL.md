@@ -22,7 +22,10 @@ break (`internal/core/seams_test.go` enforces the first two):
 - Only `internal/bridge` imports Wails. Everything the UI calls lives in
   `internal/app`, which a different bridge (an HTTP server, say) can reuse.
 - The UI never parses provider JSON: it sees UNCLI's events and pages
-  through `frontend/src/lib/api`. Provider details stay in the adapter.
+  through the `Backend` interface in `@uncli/client`
+  (`frontend/packages/client`, decision 0026), which the app imports via
+  `frontend/src/lib/api`. Provider details stay in the adapter. The client
+  imports nothing from the app and no Svelte.
 - Fixtures are the contract. A new CLI behaviour gets a recorded stream in
   `app/testdata/streams/<provider>/<version>/` and a parser test before
   anything depends on it. Moving to a new CLI version means recording

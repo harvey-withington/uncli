@@ -1,4 +1,4 @@
-import type { Backend, Handlers } from './types'
+import type { Backend, Handlers } from '@uncli/client'
 
 // The Wails runtime injects window.go (bound methods) and window.runtime
 // (events, clipboard). We call them directly rather than through generated

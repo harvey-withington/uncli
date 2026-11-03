@@ -6,7 +6,7 @@
 // connection from the last one seen. What only works at the server's own
 // screen is refused here, and the UI shows it disabled with the reason
 // (lib/remoteonly.ts).
-import { t } from '../i18n.svelte'
+import { text } from './text'
 import type { Backend, Connection, Handlers, Upload } from './types'
 
 export interface HttpOptions {
@@ -20,7 +20,7 @@ export interface HttpOptions {
 // RemoteOnlyError is a call that only the server's own window can make.
 export class RemoteOnlyError extends Error {
   constructor(readonly method: string) {
-    super(t('remote.onlyAtServer'))
+    super(text('remote.onlyAtServer'))
     this.name = 'RemoteOnlyError'
   }
 }
@@ -81,12 +81,12 @@ export function parseSSE(text: string): { frames: SSEFrame[]; rest: string } {
 // parser's message.
 async function replyOf<T>(res: Response): Promise<T> {
   if (!(res.headers.get('Content-Type') ?? '').includes('application/json')) {
-    throw new RPCError(t('remote.badReply', { status: `${res.status} ${res.statusText}`.trim() }), res.status)
+    throw new RPCError(text('remote.badReply', { status: `${res.status} ${res.statusText}`.trim() }), res.status)
   }
   try {
     return (await res.json()) as T
   } catch {
-    throw new RPCError(t('remote.badReply', { status: `${res.status} ${res.statusText}`.trim() }), res.status)
+    throw new RPCError(text('remote.badReply', { status: `${res.status} ${res.statusText}`.trim() }), res.status)
   }
 }
 
@@ -99,7 +99,7 @@ export function httpBackend(opts: HttpOptions): Backend {
       return await raw(...a)
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') throw e
-      throw new RPCError(t('remote.unreachable'), 0)
+      throw new RPCError(text('remote.unreachable'), 0)
     }
   }
   const auth = (): Record<string, string> => {
@@ -110,7 +110,7 @@ export function httpBackend(opts: HttpOptions): Backend {
 
   const unpaired = (): never => {
     opts.unauthorized?.()
-    throw new RPCError(t('remote.unpaired'), 401)
+    throw new RPCError(text('remote.unpaired'), 401)
   }
 
   async function call<T>(method: string, ...params: unknown[]): Promise<T> {
@@ -133,7 +133,7 @@ export function httpBackend(opts: HttpOptions): Backend {
         signal: ctl?.signal,
       })
     } catch (e) {
-      if (ctl?.signal.aborted) throw new RPCError(t('remote.unreachable'), 0)
+      if (ctl?.signal.aborted) throw new RPCError(text('remote.unreachable'), 0)
       throw e
     } finally {
       clearTimeout(timer)
@@ -362,7 +362,7 @@ function stream(opts: HttpOptions, f: typeof fetch, auth: () => Record<string, s
         buf = rest
         frames.forEach(dispatch)
       }
-      throw new Error(t('remote.closed'))
+      throw new Error(text('remote.closed'))
     } catch (e) {
       if (stopped) return 'stop'
       report({ state: 'offline', lastOnline, error: e instanceof Error ? e.message : String(e) })

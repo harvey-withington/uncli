@@ -3,18 +3,18 @@
 // exercise streaming, states, bookmarks and errors, with canned content.
 import type {
   ActivityState, Approval, Backend, Bootstrap, CLIStatus, Editor, Handlers, MCPServer, NewSessionChoices, Page, Preferences, Provider, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
-} from './types'
-import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type MockAsk, type Outcome } from './mock-access'
+} from '../types'
+import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type MockAsk, type Outcome } from './access'
 import { SECTION_KINDS } from '../sections'
-import { MOCK_CHAT_ARTIFACTS, mockArtifactFiles, mockReadArtifact } from './mock-artifacts'
-import { mockUsageReport } from './mock-usage'
-import { mockTheme } from './mock-theme'
-import { mockContainers } from './mock-containers'
-import { mockFiles } from './mock-files'
-import { mockRemote } from './mock-remote'
-import { mockUpdate } from './mock-update'
-import { mockTranscriptPages, mockTranscripts } from './mock-import'
-import { mockWatch } from './mock-watch'
+import { MOCK_CHAT_ARTIFACTS, mockArtifactFiles, mockReadArtifact } from './artifacts'
+import { mockUsageReport } from './usage'
+import { mockTheme } from './theme'
+import { mockContainers } from './containers'
+import { mockFiles } from './files'
+import { mockRemote } from './remote'
+import { mockUpdate } from './update'
+import { mockTranscriptPages, mockTranscripts } from './import'
+import { mockWatch } from './watch'
 
 const profiles: Bootstrap['profiles'] = [
   { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false, artifacts: true, isolated: true, shares: ['tools', 'skills'] },

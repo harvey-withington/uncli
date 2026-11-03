@@ -45,13 +45,19 @@ with the code.
   own colour falls back to the one app accent. Colour is still never the
   only signal.
 - The UI never parses provider JSON. It sees only UNCLI's events and pages
-  through `lib/api` (the `Backend` interface), implemented by the Wails
-  bridge in the app, by `httpBackend` for a UNCLI on another machine (its
-  remote access server, decision 0021) and by a mock in a plain browser.
-  Components never know which: they take what they need from the backend.
+  through the `Backend` interface, implemented by the Wails bridge in the
+  app, by `httpBackend` for a UNCLI on another machine (its remote access
+  server, decision 0021) and by a mock in a plain browser. Components never
+  know which: they take what they need from the backend.
+  - The interface, `httpBackend`, the mock and the API's types are
+    `@uncli/client` (`packages/client`, decision 0026), which imports
+    nothing from the app and no Svelte. A test keeps it that way.
+  - The app imports them through `lib/api`. That module adds the Wails
+    backend and `createBackend`, and passes the app's strings to the
+    client's few messages (`setClientText`).
 - **A session id is opaque, and means server plus id.** This PC's sessions
   have bare ids; another server's come through `withServer`
-  (`lib/api/identity.ts`) as `<host>~<id>`, where host is the server
+  (`@uncli/client`'s `identity.ts`) as `<host>~<id>`, where host is the server
   address's host with its port (left out when it's 443, as URLs do), so every store map,
   persisted key (drafts, scroll spots, watched files) and link keys on both
   without knowing it. Never build anything from the parts of a session id.

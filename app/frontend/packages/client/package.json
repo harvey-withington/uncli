@@ -1,0 +1,13 @@
+{
+  "name": "@uncli/client",
+  "version": "0.6.2-alpha",
+  "description": "UNCLI's client without a UI: the API's types, the Backend interface, the HTTP backend and a mock.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./mock": "./src/mock/index.ts"
+  }
+}

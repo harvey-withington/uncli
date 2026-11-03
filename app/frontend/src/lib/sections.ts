@@ -1,23 +1,10 @@
 // Section kinds: what each part of an answer is, shown as an icon in the
 // outline. Headings get a kind from a local guess; a model summary picks
-// one itself from the same list (kept in step with sectionKinds in
-// internal/app/tasks.go).
+// one itself from the same list, which is the server's (@uncli/client).
+import { SECTION_KINDS, type SectionKind } from './api'
 import type { MdBlock } from './render/markdown'
 
-export const SECTION_KINDS = [
-  'overview',
-  'commentary',
-  'analysis',
-  'steps',
-  'code',
-  'data',
-  'example',
-  'tip',
-  'warning',
-  'conclusion',
-] as const
-
-export type SectionKind = (typeof SECTION_KINDS)[number]
+export { SECTION_KINDS, type SectionKind }
 
 export const KIND_ICONS: Record<SectionKind, string> = {
   overview: 'info',

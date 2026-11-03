@@ -121,14 +121,14 @@ func TestSectionKinds(t *testing.T) {
 	if err != nil || got[0].Kind != "overview" || got[1].Kind != "" {
 		t.Errorf("kinds = %+v, %v", got, err)
 	}
-	// The frontend's list must match: it picks the icons.
-	src, err := os.ReadFile(filepath.Join("..", "..", "frontend", "src", "lib", "sections.ts"))
+	// The client's list must match: the frontend picks the icons from it.
+	src, err := os.ReadFile(filepath.Join("..", "..", "frontend", "packages", "client", "src", "sections.ts"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := regexp.MustCompile(`(?s)SECTION_KINDS = \[(.*?)\] as const`).FindSubmatch(src)
 	if m == nil {
-		t.Fatal("SECTION_KINDS not found in sections.ts")
+		t.Fatal("SECTION_KINDS not found in the client's sections.ts")
 	}
 	ts := regexp.MustCompile(`'([a-z]+)'`).FindAllSubmatch(m[1], -1)
 	if len(ts) != len(sectionKinds) {

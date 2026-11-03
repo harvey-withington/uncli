@@ -191,7 +191,7 @@ For development, `UNCLI_DATA_DIR` moves the app data elsewhere and
 
 | Folder | What |
 |---|---|
-| `app/` | The app: Go backend (`internal/`), Svelte frontend (`frontend/`), built-in profiles (`config/defaults/`), recorded CLI streams (`testdata/streams/`) |
+| `app/` | The app: Go backend (`internal/`), Svelte frontend (`frontend/src/`) and its reusable packages (`frontend/packages/`), built-in profiles (`config/defaults/`), recorded CLI streams (`testdata/streams/`) |
 | `website/` | The landing page, published to GitHub Pages by `.github/workflows/deploy-pages.yml` |
 | `docs/` | The build brief, UI conventions and decision records |
 | `scripts/` | Build, release and dev helpers, and the end-to-end check |

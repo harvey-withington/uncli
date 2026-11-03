@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { RPCError } from './api/http'
+import { RPCError } from './api'
 import { dismissToast, showToast, toasts } from './toasts.svelte'
 
 afterEach(() => {

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
-import { mockBackend } from '../lib/api/mock'
+import { mockBackend } from '@uncli/client/mock'
 
 const box = async () => (await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement
 async function type(el: HTMLTextAreaElement, text: string) {

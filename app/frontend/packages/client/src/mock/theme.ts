@@ -1,6 +1,6 @@
 // A sample theme file for the browser mock: ?themefile=sample applies it,
 // to see a restyled UNCLI without a config folder.
-import type { ThemeFileInfo } from './types'
+import type { ThemeFileInfo } from '../types'
 
 export function mockTheme(): ThemeFileInfo {
   const info: ThemeFileInfo = { path: 'C:\\Users\\user\\AppData\\Roaming\\uncli\\theme.yaml', found: false }

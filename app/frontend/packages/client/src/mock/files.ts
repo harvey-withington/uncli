@@ -1,7 +1,7 @@
 // The server's folders, uploads and push, for the browser mock: a small
 // folder tree under C:\Users\you, uploads that remember only their name,
 // and a push subscription that's only remembered.
-import type { AttachmentKind, FolderListing, NotifySetting, PushState, PushSubscriptionInfo, Upload } from './types'
+import type { AttachmentKind, FolderListing, NotifySetting, PushState, PushSubscriptionInfo, Upload } from '../types'
 
 const TREE: Record<string, string[]> = {
   '': ['C:\\Users\\you', 'C:\\', 'D:\\'],

@@ -2,7 +2,7 @@
 // itinerary becomes a printable table on page 2, the Lisbon plan), a
 // Mermaid route, an SVG and a file no turn recorded, so the pane, paging
 // back and every viewer can be seen.
-import type { ArtifactContent, ArtifactFile, ArtifactRef, Page, TouchedFile } from './types'
+import type { ArtifactContent, ArtifactFile, ArtifactRef, Page, TouchedFile } from '../types'
 
 const ITINERARY_V1 = `<!doctype html><html><head><title>Lisbon</title><style>
 body{font-family:system-ui,sans-serif;margin:24px;color:#1d2433}h1{margin:0 0 8px}li{margin:4px 0}

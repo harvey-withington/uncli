@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { afterEach, describe, expect, it } from 'vitest'
-import { serverKey, withServer } from '../lib/api/identity'
-import { mockBackend } from '../lib/api/mock'
+import { serverKey, withServer } from '../lib/api'
+import { mockBackend } from '@uncli/client/mock'
 import MobileApp from './MobileApp.svelte'
 import { wide } from './wide.svelte'
 

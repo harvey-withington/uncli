@@ -1,8 +1,8 @@
 // A usage report for the mock: 45 days of made-up but steady history
 // (quiet weekends, a busy week), so the dashboard can be seen and tested
 // without a database. The same numbers every run.
-import { dayKey, startOfDay } from '../usage'
-import type { UsageQuery, UsageReport, UsageRow, UsageTotals } from './types'
+import { dayKey, startOfDay } from '../days'
+import type { UsageQuery, UsageReport, UsageRow, UsageTotals } from '../types'
 
 const DAY = 86_400_000
 const zero = (): UsageTotals => ({ turns: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, costUsd: 0, durationMs: 0 })

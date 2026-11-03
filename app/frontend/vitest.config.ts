@@ -9,7 +9,7 @@ export default defineConfig({
   server: { fs: { allow: ['.', '../../docs'] } },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'packages/*/src/**/*.test.ts'],
     setupFiles: ['src/test-setup.ts'],
   },
 })

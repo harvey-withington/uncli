@@ -1,32 +1,20 @@
 // The usage dashboard's logic: periods, a day for every date in the period
 // (days without turns are zero, not missing), the chart's measure and its
 // axis.
-import type { UsageRow, UsageTotals } from './api'
+import { dayKey, startOfDay, type UsageRow, type UsageTotals } from './api'
+
+export { dayKey, startOfDay }
 
 export type Period = '7d' | '30d' | 'all'
 export type Measure = 'cost' | 'tokens'
 
 const DAY = 86_400_000
 
-// startOfDay is local midnight of the day ms falls in.
-export function startOfDay(ms: number): number {
-  const d = new Date(ms)
-  d.setHours(0, 0, 0, 0)
-  return d.getTime()
-}
-
 // periodSince is where a period starts: today and the days before it.
 export function periodSince(p: Period, now = Date.now()): number | undefined {
   if (p === 'all') return undefined
   const days = p === '7d' ? 7 : 30
   return startOfDay(now) - (days - 1) * DAY
-}
-
-// dayKey is a local date as the store groups it: "2026-10-06".
-export function dayKey(ms: number): string {
-  const d = new Date(ms)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 const empty: UsageTotals = { turns: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, costUsd: 0, durationMs: 0 }

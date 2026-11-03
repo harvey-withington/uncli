@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { httpBackend } from '../lib/api/http'
-  import { serverKey, withServer } from '../lib/api/identity'
-  import type { Backend } from '../lib/api'
+  import { httpBackend, serverKey, withServer, type Backend } from '../lib/api'
   import MobileShell from './MobileShell.svelte'
   import PairScreen from './PairScreen.svelte'
   import { loadDeviceName, loadToken, pairCodeFromHash, saveNickname, saveToken, type Paired } from './pairing'

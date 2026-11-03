@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PairRequest } from '../lib/api/types'
+  import type { PairRequest } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { showToast } from '../lib/toasts.svelte'

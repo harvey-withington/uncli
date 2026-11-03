@@ -1,4 +1,4 @@
-import type { WatchEntry, WatchFile } from './types'
+import type { WatchEntry, WatchFile } from '../types'
 
 // The mock's session folders for the File tab: a few text files a session
 // might watch, newest first by when they changed. writeWatched changes one

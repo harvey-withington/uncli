@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "generate-icons": "node scripts/generate-icons.mjs",
     "predev": "npm run generate-icons",
@@ -31,6 +34,7 @@
     "vitest": "^3.2.7"
   },
   "dependencies": {
+    "@uncli/client": "*",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "dompurify": "^3.4.17",

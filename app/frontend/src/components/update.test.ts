@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
 import type { Handlers } from '../lib/api'
-import { serverKey, withServer } from '../lib/api/identity'
-import { mockBackend } from '../lib/api/mock'
+import { serverKey, withServer } from '../lib/api'
+import { mockBackend } from '@uncli/client/mock'
 import MobileApp from '../mobile/MobileApp.svelte'
 
 // UNCLI's own updates (decision 0025), on the browser mock: ?update= picks

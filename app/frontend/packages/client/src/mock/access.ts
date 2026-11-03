@@ -1,7 +1,7 @@
 // When to prompt and the safe list, for the mock backend: the real
 // backend's decision (internal/session/modes.go), cut down to a few
 // commands and tools.
-import type { ClassPreview, Explanation, SafeClass, SafeEntry, SessionView, ToolClassView, TraceReason, UnknownCommands } from './types'
+import type { ClassPreview, Explanation, SafeClass, SafeEntry, SessionView, ToolClassView, TraceReason, UnknownCommands } from '../types'
 
 // A tool use the mock's Claude asks about when the question mentions it.
 export interface MockAsk {
