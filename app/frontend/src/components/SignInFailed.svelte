@@ -2,7 +2,7 @@
   import type { Page } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { providerOf } from '../lib/providers'
+  import { providerOf } from '../lib/api'
   import { errorDetail, resend } from '../lib/signin'
   import CodeSignIn from './CodeSignIn.svelte'
   import Icon from './Icon.svelte'

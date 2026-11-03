@@ -62,7 +62,7 @@
   async function savePrefs(next: Preferences): Promise<boolean> {
     try {
       const saved = await app.backend.setPreferences($state.snapshot(next)) // plain data, not reactive proxies
-      if (app.boot) app.boot.preferences = saved
+      app.patchBoot({ preferences: saved })
       return true
     } catch (e) {
       shell.toast(String(e), 'error')

@@ -2,7 +2,7 @@
   import type { CLIStatus, Provider } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { namesOf } from '../lib/providers'
+  import { namesOf } from '../lib/api'
   import Icon from './Icon.svelte'
   import CodeSignIn from './CodeSignIn.svelte'
   import LinkSignIn from './LinkSignIn.svelte'
@@ -50,7 +50,7 @@
 
   function update(st: CLIStatus) {
     if (first) app.cli = st
-    else app.providerStatus[provider.id] = st
+    else app.setProviderStatus(provider.id, st)
   }
 
   async function run(f: () => Promise<unknown>) {
@@ -82,6 +82,12 @@
   // manifest is now; Settings shows what it would run first.
   const plugin = $derived(provider.plugin)
 
+  // setPlugin replaces this provider's plugin state in what the server said.
+  function setPlugin(changes: Partial<NonNullable<typeof provider.plugin>>) {
+    const providers = (app.boot?.providers ?? []).map(x => (x.id === provider.id && x.plugin ? { ...x, plugin: { ...x.plugin, ...changes } } : x))
+    app.patchBoot({ providers })
+  }
+
   async function enable() {
     const p = provider.plugin
     if (!p?.hash) return
@@ -94,8 +100,7 @@
     if (!ok) return
     await run(async () => {
       await app.backend.enablePlugin(provider.id, p.hash ?? '')
-      p.enabled = true
-      p.changed = false
+      setPlugin({ enabled: true, changed: false })
       await app.loadProviders(true)
     })
   }
@@ -103,7 +108,7 @@
   async function disable() {
     await run(async () => {
       await app.backend.disablePlugin(provider.id)
-      if (provider.plugin) provider.plugin.enabled = false
+      setPlugin({ enabled: false })
       await app.loadProviders(true)
     })
   }

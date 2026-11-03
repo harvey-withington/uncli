@@ -41,7 +41,7 @@
     <ul class="list" aria-label={t('artifacts.list')}>
       {#each entries as e (e.path)}
         <li>
-          <button class="item" class:on={selected?.path === e.path} aria-current={selected?.path === e.path} onclick={() => (app.artifactSel[sessionId] = e.path)}>
+          <button class="item" class:on={selected?.path === e.path} aria-current={selected?.path === e.path} onclick={() => app.client.session(sessionId).selectArtifact(e.path)}>
             <Icon name={KIND_ICON[artifactKind(e.path)]} size={14} />
             <span class="path">{e.path}</span>
             {#if e.changed}<span class="changed" title={t('artifacts.changedHere')}>{t('artifacts.changed')}</span>{/if}

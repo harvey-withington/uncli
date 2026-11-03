@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { orderAt } from './reorder'
-import { tintStyle } from './tint'
 
 const list = [
   { id: 'a', sortOrder: 4 },
@@ -27,13 +26,5 @@ describe('orderAt', () => {
     expect(orderAt(list, 'b', 1)).toBeNull()
     expect(orderAt(list, 'b', 2)).toBeNull()
     expect(orderAt(list, 'x', 0)).toBeNull()
-  })
-})
-
-describe('tintStyle', () => {
-  it('draws a hue at full saturation with the theme lightness', () => {
-    expect(tintStyle(205)).toBe('--tint: hsl(205 100% var(--tint-l)); --tint-soft: hsl(205 100% var(--tint-l) / 0.14);')
-    expect(tintStyle(0)).toBe('')
-    expect(tintStyle(undefined)).toBe('')
   })
 })

@@ -1,6 +1,6 @@
 // The names of the AI provider behind a session, for t()'s {agent}, {cli}
 // and {account}. UNCLI's text never names a CLI itself (docs/UI-CONVENTIONS.md).
-import type { Bootstrap, Provider } from './api'
+import type { Bootstrap, Provider } from './types'
 
 // A type, not an interface, so it passes as t()'s params.
 export type ProviderNames = {

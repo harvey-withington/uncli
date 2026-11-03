@@ -9,7 +9,7 @@
   import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { modelOptions } from '../lib/models'
   import { tintStyle } from '../lib/tint'
-  import { providerOf } from '../lib/providers'
+  import { providerOf } from '../lib/api'
   import { SHARES, shareableFor, startingShares, toggled } from '../lib/shares'
   import { useShell } from '../lib/shell.svelte'
 

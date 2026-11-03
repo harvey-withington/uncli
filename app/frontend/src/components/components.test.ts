@@ -295,7 +295,9 @@ describe('Page summaries', () => {
     const backend = mockBackend()
     const spy = vi.spyOn(backend, 'summarisePage')
     render(App, { props: { backend } })
-    await fireEvent.click(await screen.findByText('Summarise the Q3 planning notes'))
+    // The session in the list (its pinned page shows the same title).
+    const list = await screen.findByRole('navigation', { name: 'Sessions' })
+    await fireEvent.click(await within(list).findByText('Summarise the Q3 planning notes', { selector: '.title' }))
     const panel = await screen.findByRole('complementary', { name: 'On this page' })
     expect(within(panel).getByText(/This answer has no headings/)).toBeInTheDocument()
     await fireEvent.click(within(panel).getByRole('button', { name: 'Summarise this page with Haiku 4.5' }))

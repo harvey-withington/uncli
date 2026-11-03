@@ -68,7 +68,7 @@ describe('Artifact pane', () => {
     const reads = vi.spyOn(s.backend, 'readArtifact')
     for (const state of ['thinking', 'running_tools', 'idle'] as const) {
       s.upsertSession({ ...s.current!, state })
-      s.pages['s-chat'] = (s.pages['s-chat'] ?? []).map(p => ({ ...p }))
+      for (const p of s.pages['s-chat'] ?? []) s.upsertPage({ ...p })
       await tick()
     }
     await new Promise(r => setTimeout(r, 50))

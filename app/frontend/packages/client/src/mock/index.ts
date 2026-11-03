@@ -410,7 +410,10 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
   }
   const rejudgeAll = () => sessions.forEach(rejudge)
 
-  const changed = (s: SessionView) => h?.sessionChanged({ ...s })
+  // Sessions leave the mock as a backend sends them: fresh copies, never
+  // objects the mock goes on changing.
+  const wire = (s: SessionView): SessionView => structuredClone(s)
+  const changed = (s: SessionView) => h?.sessionChanged(wire(s))
   const setState = (s: SessionView, state: ActivityState) => {
     s.state = state
     changed(s)
@@ -427,13 +430,13 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     const p = page(s.id, list.length + 1, '', '', { origin: 'cli', model: s.model, status: 'open' })
     list.push(p)
     s.busy = true
-    h?.pageChanged({ ...p })
+    h?.pageChanged(structuredClone(p))
     setState(s, 'thinking')
     window.setTimeout(() => {
       p.answerMd = 'The background agent finished: the other three test files pass, so only the parser test was flaky.'
       p.status = 'done'
       p.finishedAt = Date.now()
-      h?.pageChanged({ ...p })
+      h?.pageChanged(structuredClone(p))
       emit(s.id, 'turn_result', p.seq, {})
       s.busy = false
       setState(s, 'idle')
@@ -455,7 +458,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       return {
         profiles, modifiers, toolbar, models, platform: 'windows', lastNewSession: structuredClone(lastNew),
         preferences: structuredClone(prefs), providers: structuredClone(providers), editors: structuredClone(MOCK_EDITORS),
-        sessions: sessions.map(s => ({ ...s })),
+        sessions: sessions.map(wire),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
           images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true, sharedTools: true, sharedSkills: true, mcpSignIn: true,
@@ -564,7 +567,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       if (s.shareable?.length) (lastNew.shares ??= {})[profileId] = [...(s.shares ?? [])]
       return { session: { ...s }, lastNewSession: structuredClone(lastNew) }
     },
-    async pages(id) { return (pages[id] ?? []).map(p => ({ ...p })) },
+    async pages(id) { return (pages[id] ?? []).map(p => structuredClone(p)) },
     async send(id, text, attachments = []) {
       const s = find(id)
       if (s.archived) throw new Error('this session is archived; restore it to continue')
@@ -581,7 +584,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       if (!s.title) s.title = (text || attached[0]?.name || '').slice(0, 60)
       s.busy = true
       s.running = true
-      h?.pageChanged({ ...p })
+      h?.pageChanged(structuredClone(p))
       setState(s, 'thinking')
       // Like the real backend, send returns once the turn has started; the
       // rest (an approval, then the streamed answer) runs on its own.
@@ -636,7 +639,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
           p.costUsd = 0.0061
           p.durationMs = at
           p.finishedAt = Date.now()
-          h?.pageChanged({ ...p })
+          h?.pageChanged(structuredClone(p))
           emit(id, 'text_block', p.seq, { text: answer })
           emit(id, 'turn_result', p.seq, {})
           s.busy = false
@@ -655,7 +658,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       if (p && p.status === 'open') {
         p.status = 'interrupted'
         p.answerMd = p.answerMd || 'Sure. In short: **stream-json** keeps one CLI'
-        h?.pageChanged({ ...p })
+        h?.pageChanged(structuredClone(p))
       }
       s.busy = false
       setState(s, 'idle')
@@ -667,14 +670,14 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       const p = pages[id]?.at(-1)
       if (p && p.status === 'open') {
         p.status = 'interrupted'
-        h?.pageChanged({ ...p })
+        h?.pageChanged(structuredClone(p))
       }
       s.busy = false
       setState(s, 'idle')
       s.running = true
       s.error = ''
       changed(s)
-      return { ...s }
+      return wire(s)
     },
     async setModel(id, m) { const s = find(id); s.model = m; changed(s) },
     async toggleModifier(id, mod, on) {
@@ -687,9 +690,9 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       }
       s.modifiers = modifiers.map(x => x.id).filter(x => next.includes(x))
       changed(s)
-      return { ...s }
+      return wire(s)
     },
-    async setSortOrder(id, o) { const s = find(id); s.sortOrder = o; changed(s); return { ...s } },
+    async setSortOrder(id, o) { const s = find(id); s.sortOrder = o; changed(s); return wire(s) },
     async answerApproval(sid, rid, decision, scope) {
       const s = find(sid)
       const a = (s.approvals ?? []).find(x => x.requestId === rid)
@@ -791,20 +794,20 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
         waiting.forEach(a => approvalWaits.get(a.requestId)?.('away'))
       }
       changed(s)
-      return { ...s }
+      return wire(s)
     },
     async setShares(sid, shares) {
       const s = find(sid)
       if (shares.some(x => !s.shareable?.includes(x))) throw new Error(`this session can't share ${shares.join(', ')}`)
       s.shares = [...shares]
       changed(s)
-      return { ...s }
+      return wire(s)
     },
     async setMode(sid, mode) {
       const s = find(sid)
       s.mode = mode
       rejudge(s)
-      return { ...s }
+      return wire(s)
     },
     async safeList(sid) { return listFor(find(sid)).map(e => ({ ...e })) },
     async setSafeEntry(sid, entry, scope) {
@@ -891,7 +894,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
         return { path: p, isDir, dir: isDir ? p : p.replace(/[\\/][^\\/]*$/, '') }
       })
     },
-    async rename(id, t) { const s = find(id); s.title = t; changed(s); return { ...s } },
+    async rename(id, t) { const s = find(id); s.title = t; changed(s); return wire(s) },
     async remove(id) {
       const i = sessions.findIndex(x => x.id === id)
       if (i >= 0) sessions.splice(i, 1)
@@ -900,15 +903,15 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       const p = pages[sid]?.find(x => x.id === pid)
       if (!p) throw new Error('page not found')
       p.bookmarked = on
-      h?.pageChanged({ ...p })
-      return { ...p }
+      h?.pageChanged(structuredClone(p))
+      return structuredClone(p)
     },
     async setPinned(sid, pid, on) {
       const p = pages[sid]?.find(x => x.id === pid)
       if (!p) throw new Error('page not found')
       p.pinned = on
-      h?.pageChanged({ ...p })
-      return { ...p }
+      h?.pageChanged(structuredClone(p))
+      return structuredClone(p)
     },
     async pinned() {
       return sessions.flatMap(s => (pages[s.id] ?? []).filter(p => p.pinned).map(p => ({
@@ -922,7 +925,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       s.archived = on
       s.running = false
       changed(s)
-      return { ...s }
+      return wire(s)
     },
     async focus(id) {
       const s = sessions.find(x => x.id === id)
@@ -959,8 +962,8 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
         kind: SECTION_KINDS[(i * 3) % SECTION_KINDS.length],
       }))
       p.outline = { provider: prefs.quickTaskModel.provider, model: prefs.quickTaskModel.model, sections, costUsd: 0.0042, at: Date.now() }
-      h?.pageChanged({ ...p })
-      return { ...p }
+      h?.pageChanged(structuredClone(p))
+      return structuredClone(p)
     },
     async usage() {
       const now = Math.floor(Date.now() / 1000)

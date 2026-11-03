@@ -123,7 +123,8 @@ describe('a remote client', () => {
     const s = new AppStore(backend)
     await s.init()
     const id = s.currentId!
-    s.live[id] = { seq: 1, text: 'half an answ', thinkingTokens: 0 }
+    handlers!.sessionEvent({ sessionId: id, event: { kind: 'text_delta', turnSeq: 1, at: '', data: { text: 'half an answ' } } })
+    expect(s.live[id]?.text).toBe('half an answ')
     const boot = vi.spyOn(backend, 'bootstrap')
     const pages = vi.spyOn(backend, 'pages')
     handlers!.resync?.()

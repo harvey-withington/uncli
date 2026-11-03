@@ -1,61 +1,34 @@
-// App state: sessions, their pages, the page each session is showing, and
-// the live text of answers still streaming. All state is keyed by id.
-import type {
-  ArtifactFile, AttachmentRef, Backend, ContainersInfo, PinnedPage, Bootstrap, SearchHit, SearchResult, CLIStatus, Page, Progress, SessionEventMsg, SessionView, TextDelta,
-  CommandInfo, Connection, ModelInfo, PairRequest, PairedDevice, RemoteStatus, Share, ThinkingData, UpdateStatus, UsageLimit,
+// The app's store: the window's (or the phone's) shell around a ChatClient
+// (decision 0026). What the server says, each session's pages and its live
+// text are the client's (@uncli/client), read here through ChatState's
+// runes; this keeps what only the app has: dialogs, search, the sidebar,
+// the side panel's layout, the session shown, and the user's preferences.
+// Errors from the client's actions show as toasts on this root's shell.
+import {
+  ChatClient, displayAnswer as display,
+  type AttachmentRef, type Backend, type CLIStatus, type ModelInfo, type Notice, type Page, type PinnedPage, type SearchHit,
+  type SearchResult, type SessionView, type Share, type Bootstrap, type Live, type ProviderNames,
 } from '../lib/api'
+import { ChatState, keyed } from '../lib/chat.svelte'
 import { autoSummaryFor, loadLayout, outlineOf, saveLayout, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import { loadHeaderCompact, loadPanelLayout, loadQuestionCompact, saveHeaderCompact, loadSidebarWidth, savePanelLayout, saveQuestionCompact, saveSidebarWidth, type PanelTab } from '../lib/panels'
 import { loadLastSession, saveLastSession } from '../lib/keep'
 import { loadWatched, pick, saveWatched, type Watched } from '../lib/watched'
-import { connectedNow } from '../lib/mcp'
 import { toBlocks } from '../lib/render/markdown'
-import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
 import { setNames, t } from '../lib/i18n.svelte'
-import { namesOf, providerOf, type ProviderNames } from '../lib/providers'
+import { namesOf, providerOf } from '../lib/api'
 import { Shell } from '../lib/shell.svelte'
 import { applyThemeFile } from '../lib/hosttheme'
 import { settingsAttention } from '../lib/attention'
 
-export interface Live {
-  seq: number
-  text: string // the text block being streamed, not yet in answerMd
-  thinkingTokens: number
-}
-
-// How long to wait before fetching state afresh again, by failed attempt.
-const RESYNC_RETRY_MS = [1000, 3000, 8000]
+export type { Live }
 
 export class AppStore {
-  backend: Backend
+  readonly client: ChatClient
+  private chat: ChatState
   ready = $state(false)
-  boot = $state<Bootstrap | null>(null)
-  cli = $state<CLIStatus | null>(null)
-  // Every other provider's CLI status, by provider id (the first's is cli),
-  // loaded once at start and kept up to date.
-  providerStatus = $state<Record<string, CLIStatus>>({})
-  progress = $state<Progress | null>(null)
-  // WSL and the container profiles (decision 0011); loaded on demand.
-  containers = $state<ContainersInfo | null>(null)
-  // Remote access (decision 0021), for the server's own window.
-  remote = $state<RemoteStatus | null>(null)
-  devices = $state<PairedDevice[]>([]) // paired devices, loaded with Settings → Remote access
-  pairRequest = $state<PairRequest | null>(null) // a device waiting for "Allow <name>?"
-  // A remote client's link to its server (null for the window, always connected).
-  connection = $state<Connection | null>(null)
-  // UNCLI's own updates (decision 0025), on the PC or the phone alike.
-  update = $state<UpdateStatus | null>(null)
-  // What in Settings needs the user, per tab (lib/attention.ts).
-  attention = $derived(settingsAttention(this.containers))
-  sessions = $state<SessionView[]>([])
   currentId = $state<string | null>(null)
-  pages = $state<Record<string, Page[]>>({})
-  index = $state<Record<string, number>>({})
-  live = $state<Record<string, Live>>({})
-  commands = $state<Record<string, CommandInfo[]>>({}) // session id → the slash commands its CLI takes
-  commandsPending = $state<Record<string, boolean>>({}) // session id → its CLI is starting, to report them
-  usage = $state<UsageLimit | null>(null)
   newSessionOpen = $state(false)
   newSessionProfile = $state<string | null>(null) // profile the dialog opens on
   newSessionFolder = $state<string | null>(null) // folder it opens with (a dropped folder)
@@ -67,19 +40,12 @@ export class AppStore {
   keysOpen = $state(false) // the keyboard map
   importOpen = $state(false) // the import picker (saved CLI conversations)
   outline = $state<OutlineLayout>(loadLayout()) // the "On this page" panel
-  // The side panel's tab ("On this page", "Artifacts" or "File"; its open state and
-  // width are outline's), the artifact each session shows there, and what is in each session's artifacts folder now.
+  // The side panel's tab ("On this page", "Artifacts" or "File"; its open
+  // state and width are outline's).
   panel = $state(loadPanelLayout())
-  artifactSel = $state<Record<string, string>>({})
-  artifactLive = $state<Record<string, ArtifactFile[]>>({})
   // The File tab's choices per session (lib/watched.ts), loaded as they're
   // first changed, and a request for its switcher (the File tab takes it).
   watched = $state<Record<string, Watched>>({})
-  // MCP sign-in: the servers the user signed in to or reconnected (by
-  // "session:server", for the toast when they connect), the last sign-in
-  // link of each, and connectors waiting to be reconnected.
-  mcpActed = new Set<string>()
-  mcpLinks = $state<Record<string, string>>({})
   fileSwitcher = $state(false)
   sidebarWidth = $state(loadSidebarWidth())
   questionCompact = $state(loadQuestionCompact()) // the question header collapsed to one line
@@ -94,19 +60,10 @@ export class AppStore {
   searchFocus = $state(0)
   search = $state<{ result: SearchResult | null; active: number }>({ result: null, active: 0 })
   reveal = $state<{ pageId: string; terms: string[] } | null>(null)
-  // Pinned pages across sessions (the sidebar's Pinned group), and whether
-  // the sidebar shows the archived sessions.
-  pins = $state<PinnedPage[]>([])
-  showArchived = $state(false)
-  summarising = $state<Record<string, boolean>>({}) // page id → a summary is being made
+  showArchived = $state(false) // the sidebar shows the archived sessions
   preferHeadings = $state<Record<string, boolean>>({}) // page id → show its headings, not its summary
   private autoSummarised = new Set<string>() // tried once, so a failure isn't retried in a loop
-  private off: (() => void) | null = null
-  private held: (() => void)[] | null = null // changes arriving during a resync
-  private resyncAgain = false
-  private resyncTries = 0 // failed in a row, retried after a pause
-  private resyncTimer: ReturnType<typeof setTimeout> | undefined
-  private stale = false // a resync gave up: try again when the connection is back
+  private offNotices: (() => void) | null = null
 
   // openLast: start on the session open last time (the window); the phone
   // starts on its session list instead.
@@ -117,19 +74,130 @@ export class AppStore {
   readonly shell: Shell
 
   constructor(backend: Backend, opts: { openLast?: boolean; shell?: Shell } = {}) {
-    this.backend = backend
+    this.client = new ChatClient(backend)
+    this.chat = new ChatState(this.client)
     this.openLast = opts.openLast ?? true
     this.shell = opts.shell ?? new Shell()
   }
 
+  // ---- the client's state, as runes
+
+  get backend(): Backend { return this.client.backend }
+  get boot(): Bootstrap | null { return this.chat.boot }
+  get cli() { return this.chat.cli }
+  set cli(v) { this.client.patch({ cli: v }) }
+  get providerStatus() { return this.chat.providerStatus }
+  get progress() { return this.chat.progress }
+  get containers() { return this.chat.containers }
+  get remote() { return this.chat.remote }
+  set remote(v) { this.client.patch({ remote: v }) }
+  get devices() { return this.chat.devices }
+  set devices(v) { this.client.patch({ devices: v }) }
+  get pairRequest() { return this.chat.pairRequest }
+  set pairRequest(v) { this.client.patch({ pairRequest: v }) }
+  get connection() { return this.chat.connection }
+  get update() { return this.chat.update }
+  get usage() { return this.chat.usage }
+  set usage(v) { this.client.patch({ usage: v }) }
+  get sessions(): SessionView[] { return this.chat.sessions }
+  get pins(): PinnedPage[] { return this.chat.pins }
+
+  // Each session's data, indexed by session id (and summaries by page id).
+  readonly pages = keyed(id => this.chat.dataOf(id).pages ?? undefined)
+  readonly index = keyed(id => this.chat.dataOf(id).index)
+  readonly live = keyed(id => this.chat.dataOf(id).live ?? undefined)
+  readonly commands = keyed(id => this.chat.dataOf(id).commands)
+  readonly commandsPending = keyed(id => this.chat.dataOf(id).commandsPending)
+  readonly artifactSel = keyed(id => this.chat.dataOf(id).artifactSel || undefined)
+  readonly artifactLive = keyed(id => this.chat.dataOf(id).artifactFiles ?? undefined)
+  // By "session:server", the last sign-in link of each MCP server.
+  readonly mcpLinks = keyed(key => {
+    const at = key.lastIndexOf(':')
+    return this.chat.dataOf(key.slice(0, at)).mcpLinks[key.slice(at + 1)]
+  })
+  readonly summarising = keyed(pageId => this.chat.sessions.some(s => this.chat.dataOf(s.id).summarising[pageId]) || undefined)
+
+  // patchBoot changes what the server said at start (a setting saved).
+  patchBoot(p: Partial<Bootstrap>) {
+    if (this.boot) this.client.patch({ boot: { ...this.boot, ...p } })
+  }
+
+  setProviderStatus(provider: string, st: CLIStatus) {
+    this.client.patch({ providerStatus: { ...this.providerStatus, [provider]: st } })
+  }
+
+  // What in Settings needs the user, per tab (lib/attention.ts).
+  attention = $derived(settingsAttention(this.containers))
   // The session list shows active sessions; archived ones are listed apart.
   activeSessions = $derived.by(() => this.sessions.filter(s => !s.archived))
   archivedSessions = $derived.by(() => this.sessions.filter(s => s.archived))
   current = $derived.by(() => this.sessions.find(s => s.id === this.currentId) ?? null)
-  currentPages = $derived.by(() => (this.currentId ? this.pages[this.currentId] ?? [] : []))
-  currentIndex = $derived.by(() => (this.currentId ? this.index[this.currentId] ?? 0 : 0))
+  currentPages = $derived.by(() => (this.currentId ? this.chat.dataOf(this.currentId).pages ?? [] : []))
+  currentIndex = $derived.by(() => (this.currentId ? this.chat.dataOf(this.currentId).index : 0))
   currentPage = $derived.by(() => this.currentPages[this.currentIndex] ?? null)
   cliReady = $derived.by(() => !!this.cli?.installed && !!this.cli?.loggedIn)
+
+  // ---- lifecycle
+
+  async init() {
+    this.offNotices ??= this.client.onNotice(n => this.onNotice(n))
+    await this.client.init()
+    await this.loaded()
+  }
+
+  // load fetches the first state. A remote client that couldn't reach its
+  // server calls it again (the events keep reconnecting meanwhile).
+  async load() {
+    await this.client.load()
+    await this.loaded()
+  }
+
+  // loaded follows the first state: the provider's names for text, the
+  // theme file, then (the window) the session open last time, else the first.
+  private async loaded() {
+    setNames(namesOf(providerOf(this.boot)))
+    void this.loadThemeFile(false)
+    this.ready = true
+    if (!this.openLast) return
+    const last = loadLastSession()
+    const first = this.activeSessions.find(s => s.id === last) ?? this.activeSessions[0]
+    if (first) await this.select(first.id)
+  }
+
+  destroy() {
+    this.offNotices?.()
+    this.client.destroy()
+    this.chat.destroy()
+  }
+
+  resync() {
+    return this.client.resync()
+  }
+
+  private onNotice(n: Notice) {
+    switch (n.kind) {
+      case 'mcpConnected':
+        this.shell.toast(t(n.tools === 1 ? 'mcp.connectedOne' : 'mcp.connected', { name: n.server, n: n.tools }), 'success')
+        break
+      case 'pageDone':
+        this.autoSummarise(n.page)
+        break
+      case 'turnEnded':
+        if (this.outline.open && n.sessionId === this.currentId) void this.refreshArtifacts(n.sessionId)
+        break
+      case 'notifyOpen':
+        void this.openFromNotification(n.sessionId)
+        break
+      case 'resynced':
+        if (this.currentId && !this.sessions.some(s => s.id === this.currentId)) this.currentId = null
+        break
+      case 'error':
+        this.shell.toast(String(n.error), 'error')
+        break
+    }
+  }
+
+  // ---- the theme file
 
   // loadThemeFile applies the user's theme.yaml (decision 0010); announce
   // says what happened, for the palette's Reload theme file.
@@ -145,132 +213,15 @@ export class AppStore {
     }
   }
 
-  async init() {
-    this.off = this.backend.subscribe({
-      sessionEvent: m => this.onEvent(m),
-      sessionChanged: v => this.later(() => { this.pinsFollowSession(v); this.upsertSession(v) }),
-      pageChanged: p => this.later(() => { this.pinsFollowPage(p); this.upsertPage(p) }),
-      cliProgress: p => { this.progress = p },
-      cliStatus: s => { this.cli = s },
-      providerStatus: s => { if (s.provider) this.providerStatus[s.provider] = s },
-      containersChanged: c => { this.containers = c },
-      notifyOpen: id => { void this.openFromNotification(id) },
-      remoteStatus: s => { this.remote = s },
-      pairRequest: r => { this.pairRequest = r },
-      devicesChanged: d => { this.devices = d },
-      updateStatus: u => { this.update = u },
-      resync: () => { void this.resync() },
-      connection: c => {
-        this.connection = c
-        if (c.state === 'online' && this.stale) void this.resync()
-        // Back after a drop, the server may be a new one (it just updated):
-        // what it says about updates now, not what the old one last said.
-        if (c.state === 'online') void this.backend.updateStatus().then(u => { this.update = u }, () => {})
-      },
-    })
-    await this.load()
-  }
-
-  // load fetches the first state. A remote client that couldn't reach its
-  // server calls it again (the events keep reconnecting meanwhile).
-  async load() {
-    const [boot, cli] = await Promise.all([this.backend.bootstrap(), this.backend.cliStatus(false)])
-    this.boot = boot
-    setNames(namesOf(providerOf(boot)))
-    this.cli = cli
-    this.sessions = sortSessions(boot.sessions)
-    void this.refreshPins()
-    void this.loadThemeFile(false)
-    // Containers' labels, and whether one needs the user (the Settings dot).
-    if (boot.platform === 'windows') void this.loadContainers()
-    void this.loadProviders()
-    // Remote access, for the header's button; later changes arrive as events.
-    if (this.backend.kind !== 'http') void this.backend.remoteStatus().then(s => { this.remote ??= s }, () => {})
-    void this.backend.updateStatus().then(u => { this.update ??= u }, () => {})
-    this.ready = true
-    // The session open last time, else the first.
-    if (!this.openLast) return
-    const last = loadLastSession()
-    const first = this.activeSessions.find(s => s.id === last) ?? this.activeSessions[0]
-    if (first) await this.select(first.id)
-  }
-
-  destroy() {
-    this.off?.()
-    clearTimeout(this.resyncTimer)
-  }
-
-  // later applies a session or page change now, or, while a resync is
-  // fetching state, after it: the snapshot would otherwise replace a
-  // change that arrived while it was on its way. Replayed in order, the
-  // newest wins either way.
-  private later(apply: () => void) {
-    if (this.held) this.held.push(apply)
-    else apply()
-  }
-
-  // resync fetches state afresh: a remote client missed events its server
-  // no longer holds (decision 0021). The sessions, the pages already
-  // loaded and the pins come back as they are now; text that was streaming
-  // shows again from its page. Changes arriving meanwhile are applied
-  // after the snapshot. One that fails (a phone's network not back yet as
-  // it wakes) is tried again after a pause, then when the connection is.
-  async resync() {
-    if (!this.ready) return
-    if (this.held) {
-      this.resyncAgain = true // asked again while fetching: fetch once more after
-      return
-    }
-    clearTimeout(this.resyncTimer)
-    this.stale = false
-    this.held = []
-    try {
-      const boot = await this.backend.bootstrap()
-      this.boot = boot
-      this.sessions = sortSessions(boot.sessions)
-      this.live = {}
-      const loaded = Object.keys(this.pages).filter(id => boot.sessions.some(s => s.id === id))
-      const fresh = await Promise.all(loaded.map(id => this.backend.pages(id)))
-      const pages: Record<string, Page[]> = {}
-      loaded.forEach((id, i) => {
-        const list = fresh[i] ?? []
-        pages[id] = list
-        this.index[id] = Math.min(this.index[id] ?? list.length - 1, Math.max(0, list.length - 1))
-      })
-      this.pages = pages
-      if (this.currentId && !boot.sessions.some(s => s.id === this.currentId)) this.currentId = null
-      void this.refreshPins()
-      this.resyncTries = 0
-    } catch (e) {
-      if (this.resyncTries < RESYNC_RETRY_MS.length) {
-        this.resyncTimer = setTimeout(() => void this.resync(), RESYNC_RETRY_MS[this.resyncTries++])
-      } else {
-        this.resyncTries = 0
-        this.stale = true
-        this.shell.toast(e instanceof Error ? e.message : String(e), 'error')
-      }
-    } finally {
-      const held = this.held
-      this.held = null
-      held.forEach(apply => apply())
-      if (this.resyncAgain) {
-        this.resyncAgain = false
-        void this.resync()
-      }
-    }
-  }
+  // ---- the session shown
 
   async select(id: string) {
     this.currentId = id
     saveLastSession(id)
-    if (!this.pages[id]) {
-      try {
-        const pages = await this.backend.pages(id)
-        this.pages[id] = pages
-        this.index[id] = Math.max(0, pages.length - 1)
-      } catch (e) {
-        this.shell.toast(String(e), 'error')
-      }
+    try {
+      await this.client.session(id).load()
+    } catch (e) {
+      this.shell.toast(String(e), 'error')
     }
     if (this.outline.open) void this.refreshArtifacts(id)
     void this.loadCommands(id)
@@ -282,9 +233,45 @@ export class AppStore {
   async openFromNotification(id: string) {
     if (!id || !this.sessions.some(s => s.id === id)) return
     await this.select(id)
-    const n = this.pages[id]?.length ?? 0
-    if (n > 0) this.index[id] = n - 1
+    this.client.session(id).showLatest()
   }
+
+  // openHit shows a search result: its session, its page, and (via reveal)
+  // the first block with a match, scrolled into view.
+  async openHit(hit: SearchHit, terms: string[]) {
+    if (this.currentId !== hit.sessionId || !this.pages[hit.sessionId]) await this.select(hit.sessionId)
+    await this.client.session(hit.sessionId).show(hit.pageId)
+    this.reveal = { pageId: hit.pageId, terms }
+  }
+
+  // openPin shows a pinned page in its session.
+  async openPin(pin: PinnedPage) {
+    if (this.currentId !== pin.sessionId || !this.pages[pin.sessionId]) await this.select(pin.sessionId)
+    await this.client.session(pin.sessionId).show(pin.pageId)
+  }
+
+  goTo(i: number) {
+    if (this.currentId) this.client.session(this.currentId).goTo(i)
+  }
+
+  async send(text: string, attachments: AttachmentRef[] = []) {
+    if (this.currentId) await this.client.session(this.currentId).send(text, attachments)
+  }
+
+  async toggleBookmark() {
+    if (this.currentId) await this.client.session(this.currentId).toggleBookmark()
+  }
+
+  // togglePin pins or unpins the page shown (P).
+  async togglePin() {
+    if (this.currentId) await this.client.session(this.currentId).togglePin()
+  }
+
+  async setPinned(sessionId: string, pageId: string, on: boolean) {
+    await this.client.session(sessionId).setPinned(pageId, on)
+  }
+
+  // ---- dialogs and layout
 
   // openSettings opens Settings, at a section if one is given.
   openSettings(section = '') {
@@ -345,55 +332,18 @@ export class AppStore {
   // openArtifact shows an artifact (a path in the artifacts folder) on the
   // Artifacts tab.
   openArtifact(sessionId: string, path: string) {
-    this.artifactSel[sessionId] = path
+    this.client.session(sessionId).selectArtifact(path)
     this.setTab('artifacts')
     if (!this.outline.open) this.togglePanel()
     else void this.refreshArtifacts(sessionId)
   }
 
-  // MCP sign-in (decision 0020). mcpSignIn opens the server's sign-in in
-  // the browser; a connector of the provider's own is signed in on its
-  // site, and the backend reconnects it until it connects (MCPServer.site).
-  // A server the user acted on gets a toast when it connects.
-  mcpSignIn = async (sessionId: string, server: string) => {
-    const key = `${sessionId}:${server}`
+  // refreshArtifacts reads what is in a session's artifacts folder now.
+  async refreshArtifacts(sessionId: string) {
     try {
-      this.mcpActed.add(key)
-      const r = await this.backend.mcpSignIn(sessionId, server)
-      if (r.url) {
-        this.mcpLinks[key] = r.url
-        await this.backend.openURL(r.url)
-      }
-    } catch (e) {
-      this.mcpActed.delete(key)
-      this.shell.toast(String(e), 'error')
-    }
-  }
-
-  mcpReconnect = async (sessionId: string, server: string) => {
-    const key = `${sessionId}:${server}`
-    this.mcpActed.add(key)
-    await this.backend.mcpReconnect(sessionId, server).catch(e => this.shell.toast(String(e), 'error'))
-  }
-
-  mcpSignOut = async (sessionId: string, server: string) => {
-    await this.backend.mcpSignOut(sessionId, server).catch(e => this.shell.toast(String(e), 'error'))
-  }
-
-  mcpCancel = async (sessionId: string, server: string) => {
-    const key = `${sessionId}:${server}`
-    this.mcpActed.delete(key)
-    await this.backend.mcpCancel(sessionId, server).catch(e => this.shell.toast(String(e), 'error'))
-  }
-
-  // mcpPaste hands on the address the browser ended up on.
-  mcpPaste = async (sessionId: string, server: string, url: string): Promise<boolean> => {
-    try {
-      await this.backend.mcpCallback(sessionId, server, url.trim())
-      return true
+      await this.client.session(sessionId).refreshArtifacts()
     } catch (e) {
       this.shell.toast(String(e), 'error')
-      return false
     }
   }
 
@@ -429,16 +379,6 @@ export class AppStore {
     this.fileSwitcher = true
   }
 
-  // refreshArtifacts reads what is in a session's artifacts folder now.
-  async refreshArtifacts(sessionId: string) {
-    if (!this.hasArtifacts(sessionId)) return
-    try {
-      this.artifactLive[sessionId] = await this.backend.artifactFiles(sessionId)
-    } catch (e) {
-      this.shell.toast(String(e), 'error')
-    }
-  }
-
   toggleHeaderCompact() {
     this.headerCompact = !this.headerCompact
     saveHeaderCompact(this.headerCompact)
@@ -454,183 +394,93 @@ export class AppStore {
     saveLayout(this.outline)
   }
 
-  // moveSession puts a session at a position in the list as shown (drag
-  // and drop, or Alt+arrows), saving only its new sortOrder.
-  async moveSession(id: string, to: number) {
-    const order = orderAt(this.activeSessions, id, to)
-    if (order === null) return
-    const before = this.sessions
-    this.sessions = sortSessions(this.sessions.map(s => (s.id === id ? { ...s, sortOrder: order } : s)))
+  // ---- MCP sign-in (decision 0020), with errors as toasts
+
+  mcpSignIn = (sessionId: string, server: string) => this.toasting(this.client.session(sessionId).mcpSignIn(server))
+  mcpReconnect = (sessionId: string, server: string) => this.toasting(this.client.session(sessionId).mcpReconnect(server))
+  mcpSignOut = (sessionId: string, server: string) => this.toasting(this.client.session(sessionId).mcpSignOut(server))
+  mcpCancel = (sessionId: string, server: string) => this.toasting(this.client.session(sessionId).mcpCancel(server))
+
+  // mcpPaste hands on the address the browser ended up on.
+  mcpPaste = async (sessionId: string, server: string, url: string): Promise<boolean> => {
     try {
-      this.upsertSession(await this.backend.setSortOrder(id, order))
+      await this.client.session(sessionId).mcpPaste(server, url)
+      return true
     } catch (e) {
-      this.sessions = before
       this.shell.toast(String(e), 'error')
+      return false
     }
   }
 
-  // openHit shows a search result: its session, its page, and (via reveal)
-  // the first block with a match, scrolled into view.
-  async openHit(hit: SearchHit, terms: string[]) {
-    if (this.currentId !== hit.sessionId || !this.pages[hit.sessionId]) await this.select(hit.sessionId)
-    let list = this.pages[hit.sessionId] ?? []
-    if (!list.some(p => p.id === hit.pageId)) {
-      list = this.pages[hit.sessionId] = await this.backend.pages(hit.sessionId)
-    }
-    const i = list.findIndex(p => p.id === hit.pageId)
-    if (i >= 0) this.index[hit.sessionId] = i
-    this.reveal = { pageId: hit.pageId, terms }
-  }
+  // ---- what the server's settings say
 
-  goTo(i: number) {
-    if (this.currentId) this.index[this.currentId] = i
-  }
-
-  // namesFor is what text about a session calls its AI provider (t()'s
-  // {agent}, {cli}, {account}); no adapter: the first provider.
   namesFor(adapter?: string): ProviderNames {
     return namesOf(providerOf(this.boot, adapter))
   }
 
-  // The other providers' CLIs: installed, signed in, and their models.
-  async loadProviders(fresh = false) {
-    const others = (this.boot?.providers ?? []).slice(1)
-    await Promise.all(others.map(async p => {
-      try {
-        this.providerStatus[p.id] = await this.backend.providerStatus(p.id, fresh)
-      } catch {
-        // its status stays unknown: it's offered as not set up
-      }
-    }))
-  }
-
-  // statusOf is a provider's CLI status; the first's is cli.
   statusOf(provider?: string): CLIStatus | null {
     const first = this.boot?.providers[0]?.id
     if (!provider || provider === first) return this.cli
     return this.providerStatus[provider] ?? null
   }
 
-  // modelsFor lists the models a provider's sessions can use: the first's
-  // as its CLI reported them, the others' from their sign-in check.
   modelsFor(provider?: string): ModelInfo[] | null {
     const first = this.boot?.providers[0]?.id
     if (!provider || provider === first) return this.boot?.models?.length ? this.boot.models : null
     return this.providerStatus[provider]?.models ?? []
   }
 
-  async loadContainers() {
-    try {
-      this.containers = await this.backend.containers()
-    } catch {
-      // not available here: nothing to offer
-    }
-  }
-
-  // container: a container profile to run in, '' for this machine;
-  // provider: an AI provider's id, '' for the first.
-  // shares: what it can use of the user's own; null for its type's defaults.
-  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null) {
-    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model, container, provider, shares)
-    if (this.boot) this.boot.lastNewSession = lastNewSession
-    this.upsertSession(v)
-    this.pages[v.id] = []
-    this.index[v.id] = 0
-    await this.select(v.id)
-    return v
-  }
-
-  async send(text: string, attachments: AttachmentRef[] = []) {
-    const id = this.currentId
-    if (!id) return
-    await this.backend.send(id, text, attachments)
-  }
-
-  async toggleBookmark() {
-    const p = this.currentPage
-    if (!p) return
-    const updated = await this.backend.setBookmark(p.sessionId, p.id, !p.bookmarked)
-    this.upsertPage(updated)
-  }
-
-  // togglePin pins or unpins the page shown (P).
-  async togglePin() {
-    const p = this.currentPage
-    if (!p) return
-    await this.setPinned(p.sessionId, p.id, !p.pinned)
-  }
-
-  async setPinned(sessionId: string, pageId: string, on: boolean) {
-    this.upsertPage(await this.backend.setPinned(sessionId, pageId, on))
-    await this.refreshPins()
-  }
-
-  // takesSlash: the session's CLI takes slash commands.
   takesSlash(session: SessionView): boolean {
     const caps = providerOf(this.boot, session.adapter)?.capabilities ?? this.boot?.capabilities
     return !!caps?.slashPassthrough
   }
 
-  // loadCommands fetches the slash commands a session's CLI takes.
-  // None known yet means the backend has started the CLI to report them:
-  // they come with a 'commands' event (pending until then, or 20 s).
-  async loadCommands(id: string) {
-    try {
-      const list = await this.backend.commands(id)
-      this.commands[id] = list
-      const s = this.sessions.find(x => x.id === id)
-      if (list.length === 0 && s && this.takesSlash(s)) {
-        if (!this.commandsPending[id]) {
-          this.commandsPending[id] = true
-          setTimeout(() => (this.commandsPending[id] = false), 20000)
-        }
-      } else {
-        this.commandsPending[id] = false
-      }
-    } catch {
-      this.commandsPending[id] = false // none offered; typing a command still works
-    }
+  loadProviders(fresh = false) {
+    return this.client.loadProviders(fresh)
   }
 
-  async refreshPins() {
-    try {
-      this.pins = await this.backend.pinned()
-    } catch (e) {
-      this.shell.toast(String(e), 'error')
-    }
+  loadContainers() {
+    return this.client.loadContainers()
   }
 
-  // pinsFollowPage and pinsFollowSession keep the Pinned group current when
-  // a page is pinned, or a pinned page's session renamed or archived, from
-  // another client (a phone, decision 0021) or another part of the app.
-  private pinsFollowPage(p: Page) {
-    if (p.pinned !== this.pins.some(x => x.pageId === p.id)) void this.refreshPins()
+  loadCommands(id: string) {
+    return this.client.session(id).loadCommands()
   }
 
-  private pinsFollowSession(v: SessionView) {
-    const pin = this.pins.find(x => x.sessionId === v.id)
-    if (pin && (pin.sessionTitle !== v.title || pin.archived !== v.archived)) void this.refreshPins()
-  }
+  // ---- sessions
 
-  // openPin shows a pinned page in its session.
-  async openPin(pin: PinnedPage) {
-    if (this.currentId !== pin.sessionId || !this.pages[pin.sessionId]) await this.select(pin.sessionId)
-    let list = this.pages[pin.sessionId] ?? []
-    if (!list.some(p => p.id === pin.pageId)) list = this.pages[pin.sessionId] = await this.backend.pages(pin.sessionId)
-    const i = list.findIndex(p => p.id === pin.pageId)
-    if (i >= 0) this.index[pin.sessionId] = i
+  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null) {
+    const v = await this.client.createSession(profileId, workdir, model, container, provider, shares)
+    await this.select(v.id)
+    return v
   }
 
   // importTranscript imports a saved CLI conversation and opens it on its
   // latest page.
   async importTranscript(id: string, profileId: string) {
-    const r = await this.backend.importTranscript(id, profileId)
-    this.upsertSession(r.session)
-    delete this.pages[r.session.id] // load them fresh
+    const r = await this.client.importTranscript(id, profileId)
     await this.select(r.session.id)
-    this.index[r.session.id] = Math.max(0, (this.pages[r.session.id]?.length ?? 1) - 1)
+    this.client.session(r.session.id).showLatest()
     this.shell.toast(t(r.folderGone ? 'import.doneGone' : 'import.done', { n: r.pagesLoaded }), r.folderGone ? 'info' : 'success')
     return r
+  }
+
+  // moveSession puts a session at a position in the list as shown (drag
+  // and drop, or Alt+arrows).
+  async moveSession(id: string, to: number) {
+    try {
+      await this.client.moveSession(id, to)
+    } catch (e) {
+      this.shell.toast(String(e), 'error')
+    }
+  }
+
+  async refreshPins() {
+    try {
+      await this.client.refreshPins()
+    } catch (e) {
+      this.shell.toast(String(e), 'error')
+    }
   }
 
   // restart stops a session's CLI and starts it again on its conversation
@@ -642,18 +492,41 @@ export class AppStore {
     const names = this.namesFor(s.adapter)
     if (s.busy && !(await this.shell.confirm({ title: t('restart.title'), message: t('restart.busy', names), confirmLabel: t('restart.label'), danger: true }))) return
     try {
-      delete this.live[id]
-      this.upsertSession(await this.backend.restart(id))
+      await this.client.session(id).restart()
       this.shell.toast(t('restart.done', names), 'success')
     } catch (e) {
       this.shell.toast(String(e), 'error')
     }
   }
 
+  // archive archives a session (stopping its CLI) or restores it.
+  archive(id: string, on: boolean) {
+    return this.client.archive(id, on)
+  }
+
+  async remove(id: string) {
+    await this.client.remove(id)
+    if (this.currentId === id) {
+      this.currentId = null
+      const next = this.activeSessions[0]
+      if (next) await this.select(next.id)
+    }
+  }
+
+  upsertSession(v: SessionView) {
+    this.client.upsertSession(v)
+  }
+
+  upsertPage(p: Page) {
+    this.client.upsertPage(p)
+  }
+
+  // ---- updates (decision 0025)
+
   // checkForUpdates looks for a newer release now (Settings → Updates).
   async checkForUpdates() {
     try {
-      this.update = await this.backend.checkForUpdates()
+      this.client.patch({ update: await this.backend.checkForUpdates() })
     } catch (e) {
       this.shell.toast(String(e), 'error')
     }
@@ -672,52 +545,19 @@ export class AppStore {
       danger: busy,
     }))) return
     try {
-      this.update = await this.backend.installUpdate()
+      this.client.patch({ update: await this.backend.installUpdate() })
     } catch (e) {
       this.shell.toast(String(e), 'error')
     }
   }
 
-  // archive archives a session (stopping its CLI) or restores it.
-  async archive(id: string, on: boolean) {
-    this.upsertSession(await this.backend.archive(id, on))
-    void this.refreshPins()
-  }
-
-  async remove(id: string) {
-    await this.backend.remove(id)
-    this.sessions = this.sessions.filter(s => s.id !== id)
-    this.pins = this.pins.filter(p => p.sessionId !== id)
-    delete this.pages[id]
-    delete this.index[id]
-    delete this.live[id]
-    if (this.currentId === id) {
-      this.currentId = null
-      const next = this.activeSessions[0]
-      if (next) await this.select(next.id)
-    }
-  }
-
-  upsertSession(v: SessionView) {
-    const i = this.sessions.findIndex(s => s.id === v.id)
-    for (const sv of connectedNow(v.id, this.sessions[i]?.mcp, v.mcp, this.mcpActed)) {
-      this.mcpActed.delete(`${v.id}:${sv.name}`)
-      this.shell.toast(t(sv.tools === 1 ? 'mcp.connectedOne' : 'mcp.connected', { name: sv.name, n: sv.tools }), 'success')
-    }
-    if (i < 0) {
-      this.sessions = sortSessions([v, ...this.sessions])
-    } else if (this.sessions[i]?.sortOrder !== v.sortOrder) {
-      this.sessions = sortSessions(this.sessions.map(s => (s.id === v.id ? v : s)))
-    } else {
-      this.sessions[i] = v
-    }
-  }
+  // ---- the outline and summaries
 
   // outlineFor is what the outline shows for a page: the summary when there
   // is one (unless the user switched to headings), else the headings. The
   // answer's margin marks the same entries.
   outlineFor(page: Page) {
-    const blocks = toBlocks(displayAnswer(page, this.live[page.sessionId]))
+    const blocks = toBlocks(display(page, this.chat.dataOf(page.sessionId).live))
     const headings = outlineOf(blocks)
     const summary = page.outline ? summaryEntries(page.outline.sections, blocks) : []
     const showingSummary = summary.length > 0 && !(this.preferHeadings[page.id] && headings.length > 0)
@@ -729,13 +569,10 @@ export class AppStore {
   async summarise(page: Page) {
     if (this.summarising[page.id] || page.status === 'open') return
     delete this.preferHeadings[page.id] // show the summary when it arrives
-    this.summarising[page.id] = true
     try {
-      this.upsertPage(await this.backend.summarisePage(page.sessionId, page.id, summaryBlocks(toBlocks(page.answerMd))))
+      await this.client.session(page.sessionId).summarise(page.id, summaryBlocks(toBlocks(page.answerMd)))
     } catch (e) {
       this.shell.toast(String(e), 'error')
-    } finally {
-      delete this.summarising[page.id]
     }
   }
 
@@ -749,65 +586,16 @@ export class AppStore {
     void this.summarise(page)
   }
 
-  upsertPage(p: Page) {
-    const list = (this.pages[p.sessionId] ??= [])
-    const i = list.findIndex(x => x.id === p.id)
-    if (i >= 0) {
-      const before = list[i]
-      list[i] = p
-      const live = this.live[p.sessionId]
-      if (live && live.seq === p.seq && before && before.answerMd !== p.answerMd) live.text = ''
-      // As soon as an answer finishes, wherever the user is looking.
-      if (before?.status !== 'done' && p.status === 'done') this.autoSummarise(p)
-      return
-    }
-    list.push(p)
-    list.sort((a, b) => a.seq - b.seq)
-    // A new page (just sent) becomes the one shown.
-    if (p.status === 'open') this.index[p.sessionId] = list.length - 1
-  }
-
-  private onEvent({ sessionId, event }: SessionEventMsg) {
-    switch (event.kind) {
-      case 'text_delta': {
-        const d = event.data as TextDelta
-        const cur = this.live[sessionId]
-        if (cur && cur.seq === event.turnSeq) cur.text += d.text
-        else this.live[sessionId] = { seq: event.turnSeq, text: d.text, thinkingTokens: 0 }
-        break
-      }
-      case 'thinking': {
-        const d = event.data as ThinkingData
-        const cur = this.live[sessionId]
-        if (cur && cur.seq === event.turnSeq) cur.thinkingTokens = d.estimatedTokens ?? cur.thinkingTokens
-        else this.live[sessionId] = { seq: event.turnSeq, text: '', thinkingTokens: d.estimatedTokens ?? 0 }
-        break
-      }
-      case 'text_block': {
-        const cur = this.live[sessionId]
-        if (cur) cur.text = ''
-        break
-      }
-      case 'commands':
-        void this.loadCommands(sessionId)
-        break
-      case 'turn_result':
-        delete this.live[sessionId]
-        if (this.outline.open && sessionId === this.currentId) void this.refreshArtifacts(sessionId)
-        break
-      case 'usage_limit':
-        this.usage = event.data as UsageLimit
-        break
+  private async toasting(p: Promise<unknown>) {
+    try {
+      await p
+    } catch (e) {
+      this.shell.toast(String(e), 'error')
     }
   }
-}
-
-function sortSessions(list: SessionView[]): SessionView[] {
-  return [...list].sort((a, b) => b.sortOrder - a.sortOrder || b.createdAt - a.createdAt)
 }
 
 // The answer to show for a page: what's stored plus any block still streaming.
 export function displayAnswer(page: Page, live: Live | undefined): string {
-  if (!live || live.seq !== page.seq || !live.text) return page.answerMd
-  return page.answerMd ? `${page.answerMd}\n\n${live.text}` : live.text
+  return display(page, live)
 }

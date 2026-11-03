@@ -27,7 +27,7 @@
   $effect(() => {
     app.backend.editors().then(e => {
       editors = e
-      if (app.boot) app.boot.editors = e
+      app.patchBoot({ editors: e })
     }).catch(() => {})
   })
 
