@@ -3,7 +3,9 @@
   import { hold } from '../lib/backguard'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // A session header's title: click it to rename the session in place
   // (Enter or leaving the box saves, Escape cancels), as the pencil in the
@@ -36,7 +38,7 @@
     try {
       app.upsertSession(await app.backend.rename(session.id, title))
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

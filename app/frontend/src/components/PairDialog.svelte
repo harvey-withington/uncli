@@ -4,10 +4,12 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { countdown } from '../lib/remote'
-  import { showToast } from '../lib/toasts.svelte'
   import CopyButton from './CopyButton.svelte'
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Pair a device (decision 0022): a QR code and a link carrying a code
   // that works once, for a few minutes. When the device asks, the window's
@@ -29,7 +31,7 @@
       pairing = await app.backend.startPairing()
       now = Date.now()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
       onclose()
     }
   }

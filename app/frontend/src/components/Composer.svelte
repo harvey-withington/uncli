@@ -7,9 +7,11 @@
   import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/drops'
   import { loadDraft, saveDraft } from '../lib/keep'
   import { atServer } from '../lib/remoteonly'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import SlashMenu from './SlashMenu.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   interface Props {
     session: SessionView
@@ -69,7 +71,7 @@
       drafts.delete(session.id)
       saveDraft(session.id, '')
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       sending = false
       queueMicrotask(() => input?.focus())
@@ -80,7 +82,7 @@
     try {
       await app.backend.interrupt(session.id)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -93,7 +95,7 @@
     try {
       infos = await app.backend.describeAttachments(paths)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
       return
     }
     const known = new Set((id === shownFor ? attachments : drafts.get(id) ?? []).map(a => a.path))
@@ -103,7 +105,7 @@
     if (rest.length > 0) {
       input?.dispatchEvent(new CustomEvent(INSERT_EVENT, { detail: rest.map(i => quotePath(i.path)).join(' ') }))
       const r = rest[0]
-      if (r) showToast(t(rest.length === 1 ? 'composer.notAttached' : 'composer.notAttachedMany', { name: r.name, reason: r.reason ?? '', n: rest.length }), 'info')
+      if (r) shell.toast(t(rest.length === 1 ? 'composer.notAttached' : 'composer.notAttachedMany', { name: r.name, reason: r.reason ?? '', n: rest.length }), 'info')
     }
   }
 
@@ -116,13 +118,13 @@
         const name = body === file ? file.name : file.name.replace(/\.\w+$/, '') + '.jpg'
         const up = await app.backend.upload(body, name)
         if (up.kind === 'folder' || up.kind === 'unsupported') {
-          showToast(t('composer.notAttached', { name: up.name, reason: up.reason ?? '' }), 'info')
+          shell.toast(t('composer.notAttached', { name: up.name, reason: up.reason ?? '' }), 'info')
           continue
         }
         const preview = up.kind === 'image' ? URL.createObjectURL(body) : undefined
         attach(id, [{ key: pendingKey(), name: up.name, size: up.size, kind: up.kind, upload: up.id, mediaType: up.mediaType, preview }])
       } catch (e) {
-        showToast(String(e), 'error')
+        shell.toast(String(e), 'error')
       } finally {
         uploading--
       }
@@ -189,7 +191,7 @@
           const read = await Promise.all(images.map((f, i) => readImage(f, images.length > 1 ? t('composer.pastedImageN', { n: i + 1 }) : t('composer.pastedImage'))))
           attachments = [...attachments, ...read]
         } catch (err) {
-          showToast(String(err), 'error')
+          shell.toast(String(err), 'error')
         }
       } else if (pasted) {
         el.dispatchEvent(new CustomEvent(INSERT_EVENT, { detail: pasted }))

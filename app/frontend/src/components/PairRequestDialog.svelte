@@ -2,8 +2,10 @@
   import type { PairRequest } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Modal from './Modal.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // "Allow <name>?" (decision 0022): a device opened a pairing code and
   // waits for the user at the server. The name is only what the device
@@ -28,7 +30,7 @@
     const timer = setTimeout(() => {
       if (app.pairRequest?.id !== r.id) return
       app.pairRequest = null
-      showToast(t('pair.askExpired', { name: r.name }))
+      shell.toast(t('pair.askExpired', { name: r.name }))
     }, Math.max(0, left))
     return () => clearTimeout(timer)
   })
@@ -39,9 +41,9 @@
     busy = true
     try {
       await app.backend.answerPairing(r.id, allow)
-      if (allow) showToast(t('pair.allowed', { name: r.name }))
+      if (allow) shell.toast(t('pair.allowed', { name: r.name }))
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       busy = false
       app.pairRequest = null

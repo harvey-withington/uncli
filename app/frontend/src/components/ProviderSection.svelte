@@ -1,13 +1,14 @@
 <script lang="ts">
   import type { CLIStatus, Provider } from '../lib/api'
-  import { confirm } from '../lib/confirm.svelte'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { namesOf } from '../lib/providers'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import CodeSignIn from './CodeSignIn.svelte'
   import LinkSignIn from './LinkSignIn.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Settings → AI Providers: one of these per CLI sessions can run on. Its
   // version (anything but the pinned one is at the user's own risk), the
@@ -56,7 +57,7 @@
     try {
       await f()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -66,7 +67,7 @@
       const st = first ? await app.backend.setCLIVersion(v) : await app.backend.setProviderVersion(provider.id, v)
       update(st)
       version = st.version
-      showToast(t('settings.switched', { ...names, version: st.version }), 'success')
+      shell.toast(t('settings.switched', { ...names, version: st.version }), 'success')
     })
     busy = false
   }
@@ -84,7 +85,7 @@
   async function enable() {
     const p = provider.plugin
     if (!p?.hash) return
-    const ok = await confirm({
+    const ok = await shell.confirm({
       title: t('plugin.enableTitle', names),
       message: t(p.bypasses ? 'plugin.enableBypasses' : 'plugin.enableMessage', names),
       confirmLabel: t('plugin.enable', names),

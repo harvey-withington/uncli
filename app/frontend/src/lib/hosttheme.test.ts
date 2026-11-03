@@ -4,10 +4,10 @@ import doc from '../../../../docs/UI-CONVENTIONS.md?raw'
 import { applyThemeFile, themeCSS, THEME_TOKENS } from './hosttheme'
 
 // ?raw gives an empty stylesheet under vitest, so read it from disk.
-const css = readFileSync('src/app.css', 'utf8')
+const css = readFileSync('src/styles/theme.css', 'utf8')
 
 describe('theme contract', () => {
-  it('app.css reads exactly the public tokens', () => {
+  it('the theme reads exactly the public tokens', () => {
     const read = new Set([...css.matchAll(/var\(--uncli-([a-z0-9-]+)/g)].map(m => m[1]))
     expect([...read].sort()).toEqual([...THEME_TOKENS].sort())
   })

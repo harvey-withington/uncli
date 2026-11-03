@@ -5,8 +5,10 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { sharesNote, toggled } from '../lib/shares'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // What an isolated session can use of the user's own (decision 0016):
   // a quiet note in the header that opens the same checkboxes as the
@@ -28,7 +30,7 @@
     try {
       app.upsertSession(await app.backend.setShares(session.id, toggled(shares, share, on)))
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       saving = false
     }

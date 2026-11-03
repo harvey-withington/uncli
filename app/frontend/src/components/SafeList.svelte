@@ -4,8 +4,10 @@
   import { classLabel, scopeOf } from '../lib/approvals'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // The safe list: the user's corrections to what UNCLI counts as safe,
   // for the current session's project and all projects. Each entry's
@@ -32,7 +34,7 @@
       loading = true
       Promise.all([app.backend.safeList(id), app.backend.knownTools(id)]).then(
         ([list, known]) => { entries = list; tools = known; loading = false },
-        e => { showToast(String(e), 'error'); loading = false },
+        e => { shell.toast(String(e), 'error'); loading = false },
       )
     })
   })
@@ -41,7 +43,7 @@
     try {
       entries = await f()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
   const key = (e: SafeEntry) => `${e.folder ?? ''}|${e.kind}|${e.words}|${e.flags ?? ''}`
@@ -89,7 +91,7 @@
       try {
         preview = await app.backend.previewClasses(sessionId, text)
       } catch (e) {
-        showToast(String(e), 'error')
+        shell.toast(String(e), 'error')
       }
     }, 250)
   }
@@ -102,7 +104,7 @@
       example = ''
       preview = []
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

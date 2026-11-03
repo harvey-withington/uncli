@@ -1,9 +1,22 @@
-// Shared DOM behaviours as Svelte actions.
+// Shared DOM behaviours as Svelte actions. They work in the window's app
+// and inside an embedded element's shadow root (decision 0026): nothing
+// here assumes the node lives in the document itself.
 
-// clickOutside calls fn when a pointer goes down outside the node.
+// rootOf is where a node's UNCLI lives: the document in the app, an
+// element's shadow root when embedded. Floating things (a drag's ghost) go
+// in place, and state classes (grabbing, resizing) go on host.
+export function rootOf(node: Node): { root: Document | ShadowRoot; place: ParentNode; host: HTMLElement } {
+  const r = node.getRootNode()
+  if (r instanceof ShadowRoot) return { root: r, place: r, host: r.host as HTMLElement }
+  return { root: document, place: document.body, host: document.body }
+}
+
+// clickOutside calls fn when a pointer goes down outside the node. The
+// event's path, not its target: in a shadow root the target seen from the
+// document is the host.
 export function clickOutside(node: HTMLElement, fn: () => void) {
   const handler = (e: PointerEvent) => {
-    if (!node.contains(e.target as Node)) fn()
+    if (!e.composedPath().includes(node)) fn()
   }
   document.addEventListener('pointerdown', handler, true)
   return {
@@ -24,10 +37,11 @@ export function focusTrap(node: HTMLElement) {
     if (f.length === 0) return
     const first = f[0] as HTMLElement
     const last = f[f.length - 1] as HTMLElement
-    if (e.shiftKey && document.activeElement === first) {
+    const active = rootOf(node).root.activeElement
+    if (e.shiftKey && active === first) {
       e.preventDefault()
       last.focus()
-    } else if (!e.shiftKey && document.activeElement === last) {
+    } else if (!e.shiftKey && active === last) {
       e.preventDefault()
       first.focus()
     }
@@ -101,10 +115,10 @@ export function dragSort(node: HTMLElement, opts: DragSortOptions) {
       ghost.setAttribute('aria-hidden', 'true')
       // Inline, so the item's own positioning can't override it.
       Object.assign(ghost.style, { position: 'fixed', zIndex: '1000', margin: '0', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` })
-      document.body.appendChild(ghost)
+      rootOf(node).place.appendChild(ghost)
       item.classList.add('dragging')
       node.classList.add('sorting')
-      document.body.classList.add('grabbing') // grab cursor, no text selection while dragging
+      rootOf(node).host.classList.add('grabbing') // grab cursor, no text selection while dragging
       document.addEventListener('keydown', onkey, true)
     }
 
@@ -163,7 +177,7 @@ export function dragSort(node: HTMLElement, opts: DragSortOptions) {
       document.removeEventListener('pointercancel', oncancel)
       document.removeEventListener('keydown', onkey, true)
       scroller?.removeEventListener('scroll', onscroll)
-      document.body.classList.remove('grabbing')
+      rootOf(node).host.classList.remove('grabbing')
     }
 
     // The ghost glides into the slot (or home), then the list is put back

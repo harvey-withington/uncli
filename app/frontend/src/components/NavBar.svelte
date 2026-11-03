@@ -2,8 +2,10 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { back, forward, nextBookmark, prevBookmark } from '../lib/nav'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Page controls floating on the line between the answer and the composer:
   // separate rounded buttons, icons only; each has a label and tooltip.
@@ -17,7 +19,7 @@
     try {
       await app.toggleBookmark()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -25,7 +27,7 @@
     try {
       await app.togglePin()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

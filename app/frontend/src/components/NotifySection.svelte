@@ -2,8 +2,10 @@
   import type { NotifySetting, Preferences } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Settings → Notifications: which desktop notifications to show when a
   // session you aren't looking at finishes or needs approval, and a button
@@ -25,7 +27,7 @@
     try {
       await app.backend.testNotification()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       testing = false
     }

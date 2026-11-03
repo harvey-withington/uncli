@@ -3,8 +3,10 @@
   import { answersFor, pick, questionsOf } from '../lib/asks'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // A question the model asks (Approval.ask "question"): each question with
   // its options as buttons (one, or several where it allows), and Other to
@@ -29,7 +31,7 @@
     try {
       await app.backend.answerAsk(session.id, approval.requestId, allow, allow ? answers : null, '')
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       busy = false
     }

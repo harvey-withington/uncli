@@ -1,8 +1,10 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   interface Props {
     text: string
@@ -22,7 +24,7 @@
       clearTimeout(timer)
       timer = setTimeout(() => (copied = false), 1400)
     } catch (err) {
-      showToast(t('copy.failed', { error: String(err) }), 'error')
+      shell.toast(t('copy.failed', { error: String(err) }), 'error')
     }
   }
 </script>

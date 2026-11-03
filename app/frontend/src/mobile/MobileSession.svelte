@@ -14,8 +14,10 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
-  import { showToast } from '../lib/toasts.svelte'
   import { wide } from './wide.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // A session on the phone, from the window's own components in a compact
   // layout: a header with Back, the page and its controls, the approval
@@ -44,7 +46,7 @@
     try {
       app.upsertSession(await app.backend.setUnattended(session.id, !session.unattended))
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -52,7 +54,7 @@
     try {
       await app.archive(session.id, false)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

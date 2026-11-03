@@ -7,8 +7,10 @@
   import { canOpenDefault, editorLabel, HOW_ICON, moveLabel, relPath, splitByMove, splitPath } from '../lib/files'
   import { t } from '../lib/i18n.svelte'
   import { atServer, serverTitle } from '../lib/remoteonly'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // The files a page's turn changed: one row per file, relative to the
   // session folder, with how it changed (created, edited at a line, changed
@@ -50,7 +52,7 @@
     try {
       await p
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

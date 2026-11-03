@@ -82,15 +82,9 @@
     line-height: 1.6;
     background: transparent !important;
   }
+  /* The scheme in effect (the theme sets color-scheme), wherever UNCLI's
+     root is: the window, or an embedded element's shadow root. */
   .shiki-wrap :global(span) {
-    color: var(--shiki-light);
-  }
-  :global(:root[data-uncli-scheme='dark']) .shiki-wrap :global(span) {
-    color: var(--shiki-dark);
-  }
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-uncli-scheme='light'])) .shiki-wrap :global(span) {
-      color: var(--shiki-dark);
-    }
+    color: light-dark(var(--shiki-light), var(--shiki-dark));
   }
 </style>

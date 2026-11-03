@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { PairedDevice } from '../lib/api'
-  import { confirm } from '../lib/confirm.svelte'
   import { useApp } from '../lib/context'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Settings → Remote access → Paired devices (decision 0022): each device
   // with when it paired and was last seen, and Revoke, which shuts it out
@@ -17,18 +18,18 @@
     try {
       app.devices = await app.backend.pairedDevices()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   })
 
   async function revoke(d: PairedDevice) {
-    const ok = await confirm({ title: t('devices.revokeTitle', { name: d.name }), message: t('devices.revokeBody'), confirmLabel: t('devices.revoke'), danger: true })
+    const ok = await shell.confirm({ title: t('devices.revokeTitle', { name: d.name }), message: t('devices.revokeBody'), confirmLabel: t('devices.revoke'), danger: true })
     if (!ok) return
     try {
       await app.backend.revokeDevice(d.id)
       app.devices = app.devices.filter(x => x.id !== d.id)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

@@ -3,10 +3,12 @@
   import { useApp } from '../lib/context'
   import { relativeTime } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import { tintStyle } from '../lib/tint'
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Import: conversations the CLI saved, from the terminal or a UNCLI
   // session that was deleted (its transcript outlives it), newest first.
@@ -40,7 +42,7 @@
       await app.importTranscript(e.id, types[e.id] ?? e.profile)
       app.importOpen = false
     } catch (err) {
-      showToast(String(err), 'error')
+      shell.toast(String(err), 'error')
     } finally {
       busy = null
     }

@@ -3,7 +3,9 @@
   import { allowLabel } from '../lib/approvals'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // What the session's type allows without a rule of the user's
   // (allowed_tools in profiles.yaml). UNCLI applies it in Ask mode, after
@@ -23,7 +25,7 @@
     untrack(() => {
       app.backend.sessionAllowlist(id).then(
         list => (entries = list),
-        e => showToast(String(e), 'error'),
+        e => shell.toast(String(e), 'error'),
       )
     })
   })

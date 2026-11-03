@@ -5,8 +5,10 @@
   import { reveal } from '../lib/scrollmemory'
   import { groupHits, RANGE_DAYS, snippetParts, type SearchRange } from '../lib/search'
   import { tintStyle } from '../lib/tint'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Search across sessions: the box at the top of the sidebar (Ctrl+K), and
   // while it has text, results in place of the session list, grouped by
@@ -91,7 +93,7 @@
           app.search.active = 0
         }
       } catch (e) {
-        if (seq === requests) showToast(String(e), 'error')
+        if (seq === requests) shell.toast(String(e), 'error')
       }
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)

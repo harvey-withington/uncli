@@ -1,0 +1,284 @@
+/* UNCLI's theme: its tokens, both schemes, and the shared controls. Keyed
+   on :root here; an embedded element adopts the same rules with :root
+   read as :host (decision 0026). Nothing here may assume the document. */
+
+/* Design tokens. Components never hardcode a colour or size; see
+   docs/UI-CONVENTIONS.md. Light is the default; dark follows the system
+   unless the user picks a theme. UNCLI always sets the scheme it resolved as
+   data-uncli-scheme on <html>. Hosts and theme files override the public
+   --uncli-* tokens (docs/decisions/0010); the rest are UNCLI's own. */
+:root {
+  color-scheme: light;
+  --bg: var(--uncli-bg, #f7f6f3);
+  --surface: var(--uncli-surface, #ffffff);
+  --surface-2: var(--uncli-surface-2, #f1efea);
+  --surface-3: var(--uncli-surface-3, #e8e5df);
+  --text: var(--uncli-text, #1d1b18);
+  --text-muted: var(--uncli-text-muted, #6d6962);
+  --text-faint: var(--uncli-text-faint, #9c978e);
+  --border: var(--uncli-border, #e4e0d8);
+  --border-strong: var(--uncli-border-strong, #d3cec4);
+  --accent: var(--uncli-accent, #4f46e5);
+  --accent-hover: var(--uncli-accent-hover, #4338ca);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, transparent);
+  --accent-text: var(--uncli-accent-text, #ffffff);
+  --danger: var(--uncli-danger, #c2410c);
+  --danger-soft: color-mix(in srgb, var(--danger) 9%, transparent);
+  --warning: var(--uncli-warning, #a16207);
+  --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+  --success-soft: color-mix(in srgb, var(--success) 12%, transparent);
+  --success: var(--uncli-success, #15803d);
+  --qr-ground: #ffffff; /* QR codes scan only on a light ground, in either theme */
+  --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(29, 27, 24, 0.06));
+  --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(29, 27, 24, 0.08), 0 1px 3px rgba(29, 27, 24, 0.06));
+  --shadow-lg: var(--uncli-shadow-lg, 0 18px 50px rgba(29, 27, 24, 0.18));
+  --scrim: var(--uncli-scrim, rgba(29, 27, 24, 0.32));
+
+  /* Section kinds in the outline: full saturation (HSL 100%), off-primary
+     hues, mid-dark lightness, nudged per hue so they read evenly bright.
+     Dark themes use lighter versions of the same hues. */
+  /* Type colours (session types): a hue from the profile at 100%
+     saturation and this lightness (lib/tint.ts). */
+  --tint-l: 40%;
+  --kind-overview: #008c99;
+  --kind-commentary: #0047d6;
+  --kind-analysis: #6000e6;
+  --kind-steps: #009431;
+  --kind-code: #006eb3;
+  --kind-data: #b37100;
+  --kind-example: #c20091;
+  --kind-tip: #809400;
+  --kind-warning: #cc2200;
+  --kind-conclusion: #cc003d;
+
+  /* A command on an approval card, coloured by what UNCLI makes of each
+     part. Aliases, so they follow the theme. */
+  --cmd-sep: var(--kind-example);
+  --cmd-read: var(--kind-overview);
+  --cmd-safe: var(--success);
+  --cmd-judged: var(--accent);
+  --cmd-unsafe: var(--warning);
+  --cmd-blocked: var(--danger);
+  --cmd-rest: var(--text-faint);
+  /* Charts (usage dashboard): one series hue, checked with the dataviz
+     validator against each theme's surface (lightness band, 3:1 contrast). */
+  --chart-bar: var(--uncli-chart-bar, #4f46e5);
+
+  --font: var(--uncli-font, 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif);
+  --mono: var(--uncli-mono, 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', Consolas, monospace);
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-md: 14px;
+  --text-lg: 15.5px;
+  --text-xl: 20px;
+  --radius-sm: var(--uncli-radius-sm, 6px);
+  --radius: var(--uncli-radius, 10px);
+  --radius-lg: var(--uncli-radius-lg, 14px);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --reading-width: 760px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fast: 120ms;
+  --normal: 200ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-uncli-scheme='light']) {
+    color-scheme: dark;
+    --bg: var(--uncli-bg, #111113);
+    --surface: var(--uncli-surface, #18181b);
+    --surface-2: var(--uncli-surface-2, #202024);
+    --surface-3: var(--uncli-surface-3, #2a2a2f);
+    --text: var(--uncli-text, #ececef);
+    --text-muted: var(--uncli-text-muted, #a1a1aa);
+    --text-faint: var(--uncli-text-faint, #71717a);
+    --border: var(--uncli-border, #29292e);
+    --border-strong: var(--uncli-border-strong, #3a3a40);
+    --accent: var(--uncli-accent, #8b8cf8);
+    --chart-bar: var(--uncli-chart-bar, #7f80f4);
+    --accent-hover: var(--uncli-accent-hover, #a5a6fa);
+    --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+    --accent-text: var(--uncli-accent-text, #111113);
+    --danger: var(--uncli-danger, #fb923c);
+    --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+    --warning: var(--uncli-warning, #facc15);
+    --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+    --success-soft: color-mix(in srgb, var(--success) 12%, transparent);
+    --success: var(--uncli-success, #4ade80);
+    --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.4));
+    --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.35));
+    --shadow-lg: var(--uncli-shadow-lg, 0 18px 50px rgba(0, 0, 0, 0.55));
+    --scrim: var(--uncli-scrim, rgba(0, 0, 0, 0.55));
+
+    --tint-l: 62%;
+
+    --kind-overview: #00d2e6;
+    --kind-commentary: #3d7eff;
+    --kind-analysis: #9a52ff;
+    --kind-steps: #00d647;
+    --kind-code: #0aa1ff;
+    --kind-data: #ffa100;
+    --kind-example: #ff3dcf;
+    --kind-tip: #bad600;
+    --kind-warning: #ff5533;
+    --kind-conclusion: #ff3d77;
+  }
+}
+
+:root[data-uncli-scheme='dark'] {
+  color-scheme: dark;
+  --bg: var(--uncli-bg, #111113);
+  --surface: var(--uncli-surface, #18181b);
+  --surface-2: var(--uncli-surface-2, #202024);
+  --surface-3: var(--uncli-surface-3, #2a2a2f);
+  --text: var(--uncli-text, #ececef);
+  --text-muted: var(--uncli-text-muted, #a1a1aa);
+  --text-faint: var(--uncli-text-faint, #71717a);
+  --border: var(--uncli-border, #29292e);
+  --border-strong: var(--uncli-border-strong, #3a3a40);
+  --accent: var(--uncli-accent, #8b8cf8);
+  --chart-bar: var(--uncli-chart-bar, #7f80f4);
+  --accent-hover: var(--uncli-accent-hover, #a5a6fa);
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --accent-text: var(--uncli-accent-text, #111113);
+  --danger: var(--uncli-danger, #fb923c);
+  --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+  --warning: var(--uncli-warning, #facc15);
+  --warning-soft: color-mix(in srgb, var(--warning) 10%, transparent);
+  --success-soft: color-mix(in srgb, var(--success) 12%, transparent);
+  --success: var(--uncli-success, #4ade80);
+  --shadow-sm: var(--uncli-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.4));
+  --shadow-md: var(--uncli-shadow-md, 0 4px 16px rgba(0, 0, 0, 0.35));
+  --shadow-lg: var(--uncli-shadow-lg, 0 18px 50px rgba(0, 0, 0, 0.55));
+  --scrim: var(--uncli-scrim, rgba(0, 0, 0, 0.55));
+
+  --tint-l: 62%;
+
+  --kind-overview: #00d2e6;
+  --kind-commentary: #3d7eff;
+  --kind-analysis: #9a52ff;
+  --kind-steps: #00d647;
+  --kind-code: #0aa1ff;
+  --kind-data: #ffa100;
+  --kind-example: #ff3dcf;
+  --kind-tip: #bad600;
+  --kind-warning: #ff5533;
+  --kind-conclusion: #ff3d77;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+button { cursor: pointer; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+::selection { background: var(--accent-soft); }
+
+/* No ligatures in code: what you see is what you copy. */
+code, pre, kbd { font-family: var(--mono); font-size: 0.9em; font-variant-ligatures: none; }
+
+/* Shared controls */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-strong); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+.btn.ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.btn.danger { color: var(--danger); }
+.btn.icon { width: 32px; padding: 0; justify-content: center; }
+.btn.small { height: 26px; padding: 0 var(--space-2); font-size: var(--text-xs); }
+.btn.small.icon { width: 26px; }
+
+.input, .select {
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+/* Dropdown lists take the theme's colours: options otherwise inherit a
+   transparent select's light text over the system's white popup. */
+option, optgroup { background-color: var(--surface); color: var(--text); }
+.input:focus, .select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* A block opened from search, highlighted for a moment. */
+.search-flash {
+  animation: search-flash 1.6s var(--ease);
+}
+@keyframes search-flash {
+  0%, 30% { background: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); }
+  100% { background: transparent; box-shadow: 0 0 0 6px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-flash { animation: none; outline: 2px solid var(--accent-soft); }
+}
+
+/* The lifted copy that follows the pointer while a list item is dragged
+   (lib/actions.ts dragSort); it settles into its slot on release.
+   !important: it must look lifted whatever state the item was in. */
+.drag-ghost {
+  list-style: none;
+  pointer-events: none;
+  background: var(--surface) !important;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border) !important;
+  scale: 1.03;
+  opacity: 0.97;
+}
+.drag-ghost.settling {
+  scale: 1;
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--border) !important;
+  transition: transform 170ms var(--ease), scale 170ms var(--ease), box-shadow 170ms var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .drag-ghost.settling { transition: none; }
+}
+
+/* While a list item is being dragged (lib/actions.ts dragSort). */
+.grabbing,
+.grabbing * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

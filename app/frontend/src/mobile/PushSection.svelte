@@ -4,8 +4,10 @@
   import type { NotifySetting, PushState } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import { disablePush, enablePush, pushEnv, pushSupport, type PushEnv } from './push'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // The phone's notifications (decision 0021): turned on in this browser,
   // then which to get (as the desktop's setting: all, approvals only, off),
@@ -27,7 +29,7 @@
     try {
       info = await app.backend.pushState()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
   onMount(load)
@@ -37,7 +39,7 @@
     try {
       await f()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       busy = false
       await load()
@@ -45,7 +47,7 @@
   }
 
   const turnOn = () => run(async () => {
-    if (!(await enablePush(app.backend))) showToast(t('push.refused'), 'info')
+    if (!(await enablePush(app.backend))) shell.toast(t('push.refused'), 'info')
   })
 </script>
 

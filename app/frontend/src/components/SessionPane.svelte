@@ -3,7 +3,6 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
-  import { showToast } from '../lib/toasts.svelte'
   import { blockMatching } from '../lib/search'
   import ApprovalCard from './ApprovalCard.svelte'
   import ActivityBadge from './ActivityBadge.svelte'
@@ -20,6 +19,9 @@
   import PageView from './PageView.svelte'
   import SidePanel from './SidePanel.svelte'
   import Toolbar from './Toolbar.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   interface Props {
     session: SessionView
@@ -62,7 +64,7 @@
     try {
       app.upsertSession(await app.backend.setUnattended(session.id, !session.unattended))
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -70,7 +72,7 @@
     try {
       await app.archive(session.id, false)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 

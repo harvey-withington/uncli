@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { rootOf } from '../lib/actions'
+
   // A drag handle on one edge of a panel. Drag it, or focus it and use the
   // arrow keys (Shift for bigger steps). edge is the panel side it sits on:
   // on a right edge, dragging right widens; on a left edge, dragging left does.
@@ -25,14 +27,15 @@
     const startW = width
     let w = width
     dragging = true
-    document.body.classList.add('resizing')
+    const { host } = rootOf(handle)
+    host.classList.add('resizing')
     const move = (ev: PointerEvent) => {
       w = clamp(startW + sign * (ev.clientX - startX))
       onresize(w)
     }
     const up = () => {
       dragging = false
-      document.body.classList.remove('resizing')
+      host.classList.remove('resizing')
       handle.removeEventListener('pointermove', move)
       handle.removeEventListener('pointerup', up)
       handle.removeEventListener('pointercancel', up)
@@ -93,7 +96,7 @@
     background: var(--accent);
   }
   /* No text selection or I-beam flicker while dragging. */
-  :global(body.resizing) {
+  :global(.resizing) {
     cursor: col-resize;
     user-select: none;
   }

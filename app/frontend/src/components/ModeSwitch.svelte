@@ -3,8 +3,10 @@
   import { MODES, modeOf } from '../lib/approvals'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import CycleButton from './CycleButton.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // When the CLI stops to prompt the user (Always / When unsafe / Never),
   // applied by the backend to the next tool use and to any already waiting.
@@ -25,7 +27,7 @@
     try {
       app.upsertSession(await app.backend.setMode(session.id, m as SessionMode))
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

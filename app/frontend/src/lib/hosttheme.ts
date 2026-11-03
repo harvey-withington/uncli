@@ -4,7 +4,7 @@
 // supplies values only: unknown names are skipped and a value that could add
 // rules or fetch anything is refused.
 
-// The public tokens, without the --uncli- prefix. app.css reads each one
+// The public tokens, without the --uncli- prefix. styles/theme.css reads each one
 // and docs/UI-CONVENTIONS.md lists them; a test keeps the three in step.
 export const THEME_TOKENS = [
   'bg', 'surface', 'surface-2', 'surface-3',

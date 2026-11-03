@@ -3,8 +3,10 @@
   import type { DecisionModel, DecisionTest, Preferences } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Settings → "Decision model": what answers "is this safe?" for what
   // UNCLI can't place. The quick-task model by default; or a System One
@@ -57,9 +59,9 @@
       await app.backend.setDecisionKey(key)
       keySaved = key.trim() !== ''
       key = ''
-      showToast(t(keySaved ? 'decider.keySaved' : 'decider.keyRemoved'), 'success')
+      shell.toast(t(keySaved ? 'decider.keySaved' : 'decider.keyRemoved'), 'success')
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -69,7 +71,7 @@
     try {
       result = await app.backend.testDecisionModel()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       testing = false
     }

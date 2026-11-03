@@ -3,13 +3,15 @@
   import { t } from '../lib/i18n.svelte'
   import { linkTarget } from '../lib/links'
   import { atServer } from '../lib/remoteonly'
-  import { showToast } from '../lib/toasts.svelte'
   import type { OutlineEntry } from '../lib/outline'
   import { toBlocks } from '../lib/render/markdown'
   import { KIND_ICONS } from '../lib/sections'
   import CodeBlock from './CodeBlock.svelte'
   import CopyButton from './CopyButton.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   interface Props {
     markdown: string
@@ -33,8 +35,8 @@
     if (target?.kind === 'web') void app.backend.openURL(target.url)
     else if (target?.kind === 'file' && session) {
       // Files open on the server's screen; a remote client says so.
-      if (!atServer(app.backend)) showToast(t('remote.onlyAtServerFor', { what: target.path }), 'info')
-      else app.backend.openPath(session.id, target.path, target.line).catch(err => showToast(String(err), 'error'))
+      if (!atServer(app.backend)) shell.toast(t('remote.onlyAtServerFor', { what: target.path }), 'info')
+      else app.backend.openPath(session.id, target.path, target.line).catch(err => shell.toast(String(err), 'error'))
     }
   }
 </script>

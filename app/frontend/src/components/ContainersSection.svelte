@@ -1,12 +1,13 @@
 <script lang="ts">
   import type { ContainerInfo } from '../lib/api'
-  import { confirm } from '../lib/confirm.svelte'
   import { useApp } from '../lib/context'
   import { i18n, t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import { blank, idFor, profileOf } from '../lib/containers'
   import ContainerEditor from './ContainerEditor.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Settings → Containers (decision 0011): sessions can run in a WSL
   // distro UNCLI builds and locks down. This tab turns WSL on and builds or
@@ -32,7 +33,7 @@
       const cur = app.containers?.containers.find(x => x.id === c.id)
       if (cur && !cur.step) cur.step = 'download'
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       starting[c.id] = false
     }
@@ -48,14 +49,14 @@
     try {
       await f()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
   let restarting = $state(false)
 
   async function stopAll() {
-    const ok = await confirm({
+    const ok = await shell.confirm({
       title: t('containers.stopTitle'),
       message: t('containers.stopMessage'),
       confirmLabel: t('containers.stop'),
@@ -74,13 +75,13 @@
     installing = true
     await run(async () => {
       await app.backend.installWSL()
-      showToast(t('containers.restart'))
+      shell.toast(t('containers.restart'))
     })
     installing = false
   }
 
   async function remove(c: ContainerInfo) {
-    const ok = await confirm({
+    const ok = await shell.confirm({
       title: t('containers.removeTitle', { label: c.label }),
       message: t('containers.removeMessage'),
       confirmLabel: t('containers.remove'),

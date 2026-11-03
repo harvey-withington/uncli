@@ -4,9 +4,11 @@
   import { t } from '../lib/i18n.svelte'
   import { providerOf } from '../lib/providers'
   import { errorDetail, resend } from '../lib/signin'
-  import { showToast } from '../lib/toasts.svelte'
   import CodeSignIn from './CodeSignIn.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // A turn the provider refused because the CLI's sign-in failed or expired
   // (often when the connection changes while it's renewed). The session has
@@ -34,7 +36,7 @@
     try {
       await app.backend.send(page.sessionId, text, refs)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       sending = false
     }

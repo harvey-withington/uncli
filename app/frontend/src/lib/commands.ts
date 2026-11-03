@@ -6,7 +6,6 @@ import type { SessionMode } from './api'
 import { back, forward, nextBookmark, prevBookmark } from './nav'
 import { t } from './i18n.svelte'
 import { cycleTheme } from './theme.svelte'
-import { showToast } from './toasts.svelte'
 import type { AppStore } from '../stores/app.svelte'
 
 export type Group = 'session' | 'page' | 'panel' | 'prompt' | 'model' | 'app'
@@ -49,12 +48,11 @@ export const SHORTCUTS: { id: string; group: Group; label: string; keys: Key[] }
 
 const keysOf = (id: string) => SHORTCUTS.find(x => x.id === id)?.keys
 
-const run = (p: unknown) => {
-  if (p instanceof Promise) p.catch(e => showToast(String(e), 'error'))
-}
-
 // commands lists what can run now, in a stable order (group, then as written).
 export function commands(app: AppStore): Command[] {
+  const run = (p: unknown) => {
+    if (p instanceof Promise) p.catch(e => app.shell.toast(String(e), 'error'))
+  }
   const out: Command[] = []
   const add = (c: Command) => out.push(c)
   const ready = app.cliReady

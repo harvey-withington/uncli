@@ -3,8 +3,10 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // The sidebar's Pinned group: pages pinned in any session, newest first.
   // Bookmarks mark places within a session for paging; pins keep answers
@@ -21,7 +23,7 @@
     try {
       await app.setPinned(p.sessionId, p.pageId, false)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

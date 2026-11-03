@@ -1,13 +1,14 @@
 <script lang="ts">
   import type { ContainerBase, ContainerInfo, ContainerProfile } from '../lib/api'
-  import { confirm } from '../lib/confirm.svelte'
   import { untrack } from 'svelte'
   import { addPackages, idFor, MAX_STEP, problems, same, tidy, validPackage } from '../lib/containers'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import ContainerFolders from './ContainerFolders.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Edits one container in the user's containers.yaml (Settings →
   // Containers): its name, base, packages, setup steps and what it shares.
@@ -65,10 +66,10 @@
     try {
       await app.backend.saveContainer(tidy($state.snapshot(draft) as ContainerProfile))
       await app.loadContainers()
-      showToast(t(container?.built ? 'containerEdit.savedBuilt' : 'containerEdit.saved', { label: draft.label.trim() }))
+      shell.toast(t(container?.built ? 'containerEdit.savedBuilt' : 'containerEdit.saved', { label: draft.label.trim() }))
       onclose()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       saving = false
     }
@@ -77,7 +78,7 @@
   async function removeConfig() {
     if (!container) return
     const builtin = container.builtin
-    const ok = await confirm({
+    const ok = await shell.confirm({
       title: t(builtin ? 'containerEdit.resetTitle' : 'containerEdit.deleteTitle', { label: container.label }),
       message: t(builtin ? 'containerEdit.resetMessage' : 'containerEdit.deleteMessage'),
       confirmLabel: t(builtin ? 'containerEdit.reset' : 'containerEdit.delete'),
@@ -89,7 +90,7 @@
       await app.loadContainers()
       onclose()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

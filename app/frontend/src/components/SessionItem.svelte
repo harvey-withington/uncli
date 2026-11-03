@@ -1,13 +1,15 @@
 <script lang="ts">
   import type { SessionView } from '../lib/api'
   import { hold } from '../lib/backguard'
-  import { confirm } from '../lib/confirm.svelte'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
-  import { showToast } from '../lib/toasts.svelte'
   import ActivityBadge from './ActivityBadge.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+  import { rootOf } from '../lib/actions'
+
+  const shell = useShell()
 
   interface Props {
     session: SessionView
@@ -38,7 +40,7 @@
     try {
       app.upsertSession(await app.backend.rename(session.id, title))
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -46,9 +48,10 @@
   function moveWithKeys(e: KeyboardEvent) {
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
     e.preventDefault()
+    const { root } = rootOf(e.currentTarget as Node)
     const from = app.activeSessions.findIndex(s => s.id === session.id)
     app.moveSession(session.id, e.key === 'ArrowUp' ? from - 1 : from + 2).then(() => {
-      document.querySelector<HTMLElement>(`[data-id="${session.id}"] .main`)?.focus()
+      root.querySelector<HTMLElement>(`[data-id="${session.id}"] .main`)?.focus()
     })
   }
 
@@ -56,15 +59,15 @@
     e.stopPropagation()
     try {
       await app.archive(session.id, on)
-      showToast(t(on ? 'archive.done' : 'archive.restored', { title: session.title || t('session.untitled') }), 'success')
+      shell.toast(t(on ? 'archive.done' : 'archive.restored', { title: session.title || t('session.untitled') }), 'success')
     } catch (err) {
-      showToast(String(err), 'error')
+      shell.toast(String(err), 'error')
     }
   }
 
   async function remove(e: MouseEvent) {
     e.stopPropagation()
-    const ok = await confirm({
+    const ok = await shell.confirm({
       title: t('session.deleteTitle'),
       message: t('session.deleteMessage', { title: session.title || t('session.untitled') }),
       confirmLabel: t('session.delete'),
@@ -74,7 +77,7 @@
     try {
       await app.remove(session.id)
     } catch (err) {
-      showToast(String(err), 'error')
+      shell.toast(String(err), 'error')
     }
   }
 </script>

@@ -1,16 +1,19 @@
 <script lang="ts">
   import { fly } from 'svelte/transition'
   import { t } from '../lib/i18n.svelte'
-  import { dismissToast, toasts } from '../lib/toasts.svelte'
+  import { useShell } from '../lib/shell.svelte'
   import Icon from './Icon.svelte'
+
+  // This root's toasts (lib/shell).
+  const shell = useShell()
 </script>
 
 <div class="toasts" aria-live="polite">
-  {#each toasts.list as toast (toast.id)}
+  {#each shell.toasts as toast (toast.id)}
     <div class="toast {toast.kind}" role={toast.kind === 'error' ? 'alert' : 'status'} transition:fly={{ y: -8, duration: 160 }}>
       {#if toast.kind === 'error'}<Icon name="circle-alert" />{/if}
       <span>{toast.message}</span>
-      <button class="btn ghost small icon" onclick={() => dismissToast(toast.id)} aria-label={t('common.dismiss')}><Icon name="x" size={14} /></button>
+      <button class="btn ghost small icon" onclick={() => shell.dismiss(toast.id)} aria-label={t('common.dismiss')}><Icon name="x" size={14} /></button>
     </div>
   {/each}
 </div>

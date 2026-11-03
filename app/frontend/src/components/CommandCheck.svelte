@@ -2,9 +2,11 @@
   import type { Explanation } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import ReasonList from './ReasonList.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // "Check a command": what the session would do if Claude ran it now
   // (run it, ask, or refuse) and why for each part, so the user can see
@@ -26,7 +28,7 @@
       result = await app.backend.explainCommand(sessionId, c)
       checked = c
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 

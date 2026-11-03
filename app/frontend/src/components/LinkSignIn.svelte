@@ -1,8 +1,10 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // A sign-in by link and code (containers: decision 0011): the CLI offers
   // a link, the user approves it on any device, then pastes back the code
@@ -31,7 +33,7 @@
     try {
       await f()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -50,7 +52,7 @@
       await finish(code.trim())
       link = ''
       code = ''
-      showToast(t('containers.signedIn'))
+      shell.toast(t('containers.signedIn'))
     })
     busy = false
   }

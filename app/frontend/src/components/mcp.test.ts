@@ -5,7 +5,6 @@ import type { MCPServer } from '../lib/api'
 import { commands } from '../lib/commands'
 import { APP_CONTEXT } from '../lib/context'
 import { connectedNow, needOf, statusKey } from '../lib/mcp'
-import { toasts } from '../lib/toasts.svelte'
 import { AppStore } from '../stores/app.svelte'
 import SessionPane from './SessionPane.svelte'
 
@@ -68,7 +67,7 @@ describe('MCP sign-in', () => {
     await waitFor(() => expect(s.current?.mcp?.find(x => x.name === 'BRUV')?.status).toBe('connected'), { timeout: 3000 })
     await rerender({ session: s.current! })
     expect(within(row('BRUV')).getByText('connected, 12 tools')).toBeInTheDocument()
-    expect(toasts.list.map(t => t.message)).toContain('BRUV connected: 12 tools')
+    expect(s.shell.toasts.map(t => t.message)).toContain('BRUV connected: 12 tools')
   })
 
   it('takes the address pasted from the browser', async () => {
@@ -100,7 +99,7 @@ describe('MCP sign-in', () => {
     expect(within(line).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     expect(within(line).queryByRole('button', { name: 'Paste the address' })).toBeNull()
     await waitFor(() => expect(s.current?.mcp?.find(x => x.name === 'Google Drive')?.status).toBe('connected'), { timeout: 3000 })
-    expect(toasts.list.map(t => t.message)).toContain('Google Drive connected: 5 tools')
+    expect(s.shell.toasts.map(t => t.message)).toContain('Google Drive connected: 5 tools')
   })
 
   it('lists every server in the popover and the palette, with what can be done', async () => {

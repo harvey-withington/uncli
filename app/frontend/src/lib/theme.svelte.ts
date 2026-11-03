@@ -1,6 +1,6 @@
 // Theme: follow the system by default; the user can pin light or dark.
 // Whatever the choice, the scheme it resolves to is set on <html> as
-// data-uncli-scheme, which app.css and theme files key on.
+// data-uncli-scheme, which styles/theme.css and theme files key on.
 export type Theme = 'system' | 'light' | 'dark'
 export type Scheme = 'light' | 'dark'
 

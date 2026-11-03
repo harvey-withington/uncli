@@ -2,9 +2,11 @@
   import AppearanceSection from '../components/AppearanceSection.svelte'
   import Modal from '../components/Modal.svelte'
   import UpdateSection from '../components/UpdateSection.svelte'
-  import { confirm } from '../lib/confirm.svelte'
   import { t } from '../lib/i18n.svelte'
   import type { Snippet } from 'svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // The phone's Settings: this device and the server it's paired with,
   // its look, what it's told about (notifications, from the slot), the
@@ -27,7 +29,7 @@
   let { server, nickname, onrename, deviceName, version, onforget, onclose, notifications }: Props = $props()
 
   async function forget() {
-    const ok = await confirm({ title: t('mobile.forgetTitle'), message: t('mobile.forgetBody', { server: nickname || server }), confirmLabel: t('mobile.forget'), danger: true })
+    const ok = await shell.confirm({ title: t('mobile.forgetTitle'), message: t('mobile.forgetBody', { server: nickname || server }), confirmLabel: t('mobile.forget'), danger: true })
     if (ok) onforget()
   }
 </script>

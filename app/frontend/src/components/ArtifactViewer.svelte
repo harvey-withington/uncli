@@ -7,11 +7,13 @@
   import { t } from '../lib/i18n.svelte'
   import { atServer, serverTitle } from '../lib/remoteonly'
   import { keepScroll } from '../lib/scrollmemory'
-  import { showToast } from '../lib/toasts.svelte'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import CodeBlock from './CodeBlock.svelte'
   import CopyButton from './CopyButton.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // One artifact, shown by kind. HTML runs in an iframe with an opaque
   // origin (sandbox without allow-same-origin) and a policy that allows no
@@ -77,7 +79,7 @@
     try {
       return await app.backend.artifactPath(sessionId, entry.path)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
       return null
     }
   }
@@ -88,16 +90,16 @@
       try {
         await app.backend.openURL(await app.backend.artifactLink(sessionId, entry.hash ? { hash: entry.hash } : { path: entry.path }))
       } catch (e) {
-        showToast(String(e), 'error')
+        shell.toast(String(e), 'error')
       }
       return
     }
     const p = await onDisk()
-    if (p) app.backend.openFile(sessionId, p, 0).catch(e => showToast(String(e), 'error'))
+    if (p) app.backend.openFile(sessionId, p, 0).catch(e => shell.toast(String(e), 'error'))
   }
   async function reveal() {
     const p = await onDisk()
-    if (p) app.backend.revealFile(p).catch(e => showToast(String(e), 'error'))
+    if (p) app.backend.revealFile(p).catch(e => shell.toast(String(e), 'error'))
   }
 </script>
 

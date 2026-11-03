@@ -6,10 +6,12 @@
   import { atServer, onlyAtServer } from '../lib/remoteonly'
   import { arrange, choicesOf, chosenIn } from '../lib/modifiers'
   import { modelOptions } from '../lib/models'
-  import { showToast } from '../lib/toasts.svelte'
   import Icon from './Icon.svelte'
   import CycleButton from './CycleButton.svelte'
   import UsagePopover from './UsagePopover.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   interface Props {
     session: SessionView
@@ -32,7 +34,7 @@
     try {
       await fn()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 

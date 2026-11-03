@@ -14,8 +14,7 @@ import { orderAt } from '../lib/reorder'
 import type { SearchRange } from '../lib/search'
 import { setNames, t } from '../lib/i18n.svelte'
 import { namesOf, providerOf, type ProviderNames } from '../lib/providers'
-import { showToast } from '../lib/toasts.svelte'
-import { confirm } from '../lib/confirm.svelte'
+import { Shell } from '../lib/shell.svelte'
 import { applyThemeFile } from '../lib/hosttheme'
 import { settingsAttention } from '../lib/attention'
 
@@ -113,9 +112,14 @@ export class AppStore {
   // starts on its session list instead.
   private openLast: boolean
 
-  constructor(backend: Backend, opts: { openLast?: boolean } = {}) {
+  // This root's toasts and confirm dialog (lib/shell): the store's own
+  // unless the root passes one.
+  readonly shell: Shell
+
+  constructor(backend: Backend, opts: { openLast?: boolean; shell?: Shell } = {}) {
     this.backend = backend
     this.openLast = opts.openLast ?? true
+    this.shell = opts.shell ?? new Shell()
   }
 
   // The session list shows active sessions; archived ones are listed apart.
@@ -133,11 +137,11 @@ export class AppStore {
     try {
       const file = await this.backend.theme()
       const warnings = applyThemeFile(file.found ? { light: file.light ?? undefined, dark: file.dark ?? undefined } : null)
-      if (warnings.length) showToast(t('theme.file.warnings', { n: warnings.length, first: warnings[0] ?? '' }), 'error')
-      else if (announce) showToast(file.found ? t('theme.file.loaded') : t('theme.file.none', { path: file.path }))
+      if (warnings.length) this.shell.toast(t('theme.file.warnings', { n: warnings.length, first: warnings[0] ?? '' }), 'error')
+      else if (announce) this.shell.toast(file.found ? t('theme.file.loaded') : t('theme.file.none', { path: file.path }))
     } catch (e) {
       applyThemeFile(null)
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     }
   }
 
@@ -243,7 +247,7 @@ export class AppStore {
       } else {
         this.resyncTries = 0
         this.stale = true
-        showToast(e instanceof Error ? e.message : String(e), 'error')
+        this.shell.toast(e instanceof Error ? e.message : String(e), 'error')
       }
     } finally {
       const held = this.held
@@ -265,7 +269,7 @@ export class AppStore {
         this.pages[id] = pages
         this.index[id] = Math.max(0, pages.length - 1)
       } catch (e) {
-        showToast(String(e), 'error')
+        this.shell.toast(String(e), 'error')
       }
     }
     if (this.outline.open) void this.refreshArtifacts(id)
@@ -362,24 +366,24 @@ export class AppStore {
       }
     } catch (e) {
       this.mcpActed.delete(key)
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     }
   }
 
   mcpReconnect = async (sessionId: string, server: string) => {
     const key = `${sessionId}:${server}`
     this.mcpActed.add(key)
-    await this.backend.mcpReconnect(sessionId, server).catch(e => showToast(String(e), 'error'))
+    await this.backend.mcpReconnect(sessionId, server).catch(e => this.shell.toast(String(e), 'error'))
   }
 
   mcpSignOut = async (sessionId: string, server: string) => {
-    await this.backend.mcpSignOut(sessionId, server).catch(e => showToast(String(e), 'error'))
+    await this.backend.mcpSignOut(sessionId, server).catch(e => this.shell.toast(String(e), 'error'))
   }
 
   mcpCancel = async (sessionId: string, server: string) => {
     const key = `${sessionId}:${server}`
     this.mcpActed.delete(key)
-    await this.backend.mcpCancel(sessionId, server).catch(e => showToast(String(e), 'error'))
+    await this.backend.mcpCancel(sessionId, server).catch(e => this.shell.toast(String(e), 'error'))
   }
 
   // mcpPaste hands on the address the browser ended up on.
@@ -388,7 +392,7 @@ export class AppStore {
       await this.backend.mcpCallback(sessionId, server, url.trim())
       return true
     } catch (e) {
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
       return false
     }
   }
@@ -431,7 +435,7 @@ export class AppStore {
     try {
       this.artifactLive[sessionId] = await this.backend.artifactFiles(sessionId)
     } catch (e) {
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     }
   }
 
@@ -461,7 +465,7 @@ export class AppStore {
       this.upsertSession(await this.backend.setSortOrder(id, order))
     } catch (e) {
       this.sessions = before
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     }
   }
 
@@ -592,7 +596,7 @@ export class AppStore {
     try {
       this.pins = await this.backend.pinned()
     } catch (e) {
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     }
   }
 
@@ -625,7 +629,7 @@ export class AppStore {
     delete this.pages[r.session.id] // load them fresh
     await this.select(r.session.id)
     this.index[r.session.id] = Math.max(0, (this.pages[r.session.id]?.length ?? 1) - 1)
-    showToast(t(r.folderGone ? 'import.doneGone' : 'import.done', { n: r.pagesLoaded }), r.folderGone ? 'info' : 'success')
+    this.shell.toast(t(r.folderGone ? 'import.doneGone' : 'import.done', { n: r.pagesLoaded }), r.folderGone ? 'info' : 'success')
     return r
   }
 
@@ -636,13 +640,13 @@ export class AppStore {
     const s = this.sessions.find(x => x.id === id)
     if (!s || s.archived) return
     const names = this.namesFor(s.adapter)
-    if (s.busy && !(await confirm({ title: t('restart.title'), message: t('restart.busy', names), confirmLabel: t('restart.label'), danger: true }))) return
+    if (s.busy && !(await this.shell.confirm({ title: t('restart.title'), message: t('restart.busy', names), confirmLabel: t('restart.label'), danger: true }))) return
     try {
       delete this.live[id]
       this.upsertSession(await this.backend.restart(id))
-      showToast(t('restart.done', names), 'success')
+      this.shell.toast(t('restart.done', names), 'success')
     } catch (e) {
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     }
   }
 
@@ -651,7 +655,7 @@ export class AppStore {
     try {
       this.update = await this.backend.checkForUpdates()
     } catch (e) {
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     }
   }
 
@@ -661,7 +665,7 @@ export class AppStore {
   async installUpdate() {
     const v = this.update?.latest?.version ?? ''
     const busy = this.sessions.some(s => s.busy)
-    if (!(await confirm({
+    if (!(await this.shell.confirm({
       title: t('update.confirmTitle', { version: v }),
       message: t(busy ? 'update.confirmBusy' : 'update.confirmBody'),
       confirmLabel: t('update.now'),
@@ -670,7 +674,7 @@ export class AppStore {
     try {
       this.update = await this.backend.installUpdate()
     } catch (e) {
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     }
   }
 
@@ -698,7 +702,7 @@ export class AppStore {
     const i = this.sessions.findIndex(s => s.id === v.id)
     for (const sv of connectedNow(v.id, this.sessions[i]?.mcp, v.mcp, this.mcpActed)) {
       this.mcpActed.delete(`${v.id}:${sv.name}`)
-      showToast(t(sv.tools === 1 ? 'mcp.connectedOne' : 'mcp.connected', { name: sv.name, n: sv.tools }), 'success')
+      this.shell.toast(t(sv.tools === 1 ? 'mcp.connectedOne' : 'mcp.connected', { name: sv.name, n: sv.tools }), 'success')
     }
     if (i < 0) {
       this.sessions = sortSessions([v, ...this.sessions])
@@ -729,7 +733,7 @@ export class AppStore {
     try {
       this.upsertPage(await this.backend.summarisePage(page.sessionId, page.id, summaryBlocks(toBlocks(page.answerMd))))
     } catch (e) {
-      showToast(String(e), 'error')
+      this.shell.toast(String(e), 'error')
     } finally {
       delete this.summarising[page.id]
     }

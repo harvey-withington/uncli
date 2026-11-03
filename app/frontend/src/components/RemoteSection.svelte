@@ -3,11 +3,13 @@
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
   import { remoteLine, validPort } from '../lib/remote'
-  import { showToast } from '../lib/toasts.svelte'
   import CopyButton from './CopyButton.svelte'
   import DeviceList from './DeviceList.svelte'
   import Icon from './Icon.svelte'
   import PairDialog from './PairDialog.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Settings → Remote access (decision 0021): serve this PC's sessions to
   // paired devices over Tailscale. The switch, the port, and the state: the
@@ -26,7 +28,7 @@
       app.remote = await app.backend.remoteStatus()
       port = String(app.remote.port)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   })
 
@@ -39,7 +41,7 @@
     try {
       app.remote = await app.backend.setRemoteAccess(on, p)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       busy = false
     }

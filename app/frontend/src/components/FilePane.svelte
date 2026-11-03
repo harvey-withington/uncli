@@ -7,7 +7,6 @@
   import { t } from '../lib/i18n.svelte'
   import { atServer, serverTitle } from '../lib/remoteonly'
   import { keepScroll } from '../lib/scrollmemory'
-  import { showToast } from '../lib/toasts.svelte'
   import { sandboxDoc, svgDoc } from '../lib/artifacts'
   import { forget, isMarkdown, langOf, pageKind, pick, toggleStar } from '../lib/watched'
   import AnswerBlocks from './AnswerBlocks.svelte'
@@ -15,6 +14,9 @@
   import CopyButton from './CopyButton.svelte'
   import FileSwitcher from './FileSwitcher.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // The File tab: one text file from the session folder, read again about
   // once a second while it shows, so it follows the agent's edits (a TODO
@@ -133,7 +135,7 @@
     try {
       await p
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 </script>

@@ -2,7 +2,6 @@
   import { tick } from 'svelte'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import Modal from './Modal.svelte'
   import AppearanceSection from './AppearanceSection.svelte'
   import CacheSection from './CacheSection.svelte'
@@ -18,6 +17,9 @@
   import UpdateSection from './UpdateSection.svelte'
   import type { Preferences } from '../lib/api'
   import { loadSettingsTab, nextTab, saveSettingsTab, tabOf, tabsFor, type SettingsTab } from '../lib/settings'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // Settings, in tabs down the left (lib/settings.ts): General (appearance,
   // notifications, tray and startup, editor, quick tasks), Approvals (safe and unsafe, the
@@ -63,7 +65,7 @@
       if (app.boot) app.boot.preferences = saved
       return true
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
       return false
     }
   }

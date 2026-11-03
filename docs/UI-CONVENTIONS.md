@@ -10,17 +10,24 @@ with the code.
   never `any`.
 - Every user-visible string goes through `t('key')`; keys live in
   `locales/en.json`. A test fails if a static key is missing.
-- Colours and sizes are CSS custom properties in `app.css`, defined for
-  light and dark. Components never hardcode a colour, and colour is never
+- Colours and sizes are CSS custom properties in `styles/theme.css`, defined
+  for light and dark. Components never hardcode a colour, and colour is never
   the only signal (activity states always have a text label).
 - No component over about 300 lines; extract a child when one grows.
 - Errors the user should know about are shown (toast or inline), never only
   logged. No `alert()` or `confirm()`: destructive actions go through
-  `ConfirmDialog` via `confirm()` in `lib/confirm.svelte.ts`.
+  `ConfirmDialog` via `shell.confirm()`. Toasts and the confirm dialog
+  belong to their root's shell (`lib/shell.svelte.ts`, decision 0026):
+  components take it with `useShell()`, store code uses `app.shell`, so
+  two embedded chats on one page never show each other's.
 - Keyed `{#each}` blocks use stable ids, never the index (toolbar items,
   which have no ids and never reorder, are the one exception).
 - Shared DOM behaviours (click-outside, focus trap, autosize, drag) are
-  actions in `lib/actions.ts`.
+  actions in `lib/actions.ts`. Code that may end up in an embedded element
+  never assumes the document: it finds UNCLI's root with `rootOf(node)`
+  (the document, or an element's shadow root), reads clicks from the
+  event's composed path, and puts state classes on the root's host, not
+  `body`.
 - **Drag and drop wherever it makes sense.** Lists the user orders are
   reordered by dragging (`dragSort`: a few pixels of movement starts it; a
   lifted ghost follows the pointer while the others slide aside to open the
@@ -116,7 +123,7 @@ with the code.
 | `--reading-width` | 760 px (the sidebar and outline widths are user-resizable, see `ResizeHandle`) |
 | `--ease`, `--fast`, `--normal` | Motion curve and durations |
 
-Shared control classes in `app.css`: `.btn` with `primary`, `ghost`,
+Shared control classes in `styles/theme.css`: `.btn` with `primary`, `ghost`,
 `danger`, `icon`, `small`; `.input`; `.select`; `.visually-hidden`.
 
 ## Theme override
@@ -166,8 +173,8 @@ values. Skipped entries show in a toast.
 |---|---|---|
 | `Modal` | `title`, `width?`, `onclose`, `children`, `footer?` | Focus trap; `data-autofocus` picks the first focus; Escape closes; click on the scrim closes. Up to 600 px wide (a phone) it's a sheet along the bottom, the screen's width, its footer wrapping |
 | `FolderBrowser` | `title`, `start?`, `onpick`, `onclose` | Picks a folder on the server by browsing it (`Backend.listFolder`), for a remote client, which can't open the server's folder dialog: Up (44 px) and the current path in monospace ("This PC" at the top: home and drives), then a row per subfolder (44 px tall; folders only, hidden ones left out), tapping one opens it; "Use this folder" picks the one shown. A folder that's gone falls back to the top |
-| `ConfirmDialog` | none; driven by `confirm({title, message, confirmLabel, danger?})` | Resolves `true`/`false`; Enter confirms, Escape cancels |
-| `Toasts` | none; driven by `showToast(message, kind)` | Top right, never over the message box; errors stay until dismissed, except "Couldn’t reach the server…" (a passing network blip the connection banner already shows), which fades after 6 s; others fade after 3.5 s. The error’s type name ("RPCError:", "TypeError:") is left off |
+| `ConfirmDialog` | none; driven by its root's `shell.confirm({title, message, confirmLabel, danger?})` | Resolves `true`/`false`; Enter confirms, Escape cancels |
+| `Toasts` | none; driven by its root's `shell.toast(message, kind)` | Top right, never over the message box; errors stay until dismissed, except "Couldn’t reach the server…" (a passing network blip the connection banner already shows), which fades after 6 s; others fade after 3.5 s. The error’s type name ("RPCError:", "TypeError:") is left off |
 | `CopyButton` | `text`, `label?` | Copies through the backend; shows a check for 1.4 s |
 | `ActivityBadge` | `state`, `showIdle?` | Dot plus label; pulses while busy |
 | `ResizeHandle` | `edge`, `width`, `min`, `max`, `label`, `onresize`, `oncommit` | A separator on a panel edge: drag, or arrow keys when focused (Shift for bigger steps). Used by the sidebar (200–440 px) and the side panel (240–960 px, one width for both tabs); widths kept in localStorage. Every scroller is positioned (`position: relative`) so absolutely positioned descendants such as `.visually-hidden` labels are clipped there, and `html` never scrolls |

@@ -3,11 +3,13 @@
   import { cardNotes, classLabel, describeApproval, fixedReason, isShell, loadScope, modeOf, saveScope } from '../lib/approvals'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import CommandView from './CommandView.svelte'
   import Icon from './Icon.svelte'
   import PlanCard from './PlanCard.svelte'
   import QuestionCard from './QuestionCard.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // A tool use waiting for the user's answer: what Claude wants to do (a
   // command coloured part by part, CommandView), a line on why when the
@@ -42,7 +44,7 @@
     try {
       await f()
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       busy = false
     }

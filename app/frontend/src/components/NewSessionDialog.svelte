@@ -3,7 +3,6 @@
   import type { Profile, Share } from '../lib/api'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import FolderBrowser from './FolderBrowser.svelte'
   import Icon from './Icon.svelte'
   import Modal from './Modal.svelte'
@@ -12,6 +11,9 @@
   import { tintStyle } from '../lib/tint'
   import { providerOf } from '../lib/providers'
   import { SHARES, shareableFor, startingShares, toggled } from '../lib/shares'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   const app = useApp()
   const profiles = $derived(app.boot?.profiles ?? [])
@@ -100,7 +102,7 @@
       const dir = await app.backend.pickFolder(pickTitle)
       if (dir) await picked(dir)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -123,7 +125,7 @@
       await app.createSession(profile.id, needsFolder ? folder : '', model, container, isFirst ? '' : provider, shareable.length ? shares.filter(s => shareable.includes(s)) : null)
       app.newSessionOpen = false
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       creating = false
     }

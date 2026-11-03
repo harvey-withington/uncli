@@ -3,9 +3,11 @@
   import { planOf } from '../lib/asks'
   import { useApp } from '../lib/context'
   import { t } from '../lib/i18n.svelte'
-  import { showToast } from '../lib/toasts.svelte'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import Icon from './Icon.svelte'
+  import { useShell } from '../lib/shell.svelte'
+
+  const shell = useShell()
 
   // A plan the model wants approved before it acts (Approval.ask "plan"):
   // the plan as formatted text, then Approve to let it go ahead, or Keep
@@ -28,7 +30,7 @@
     try {
       await app.backend.answerAsk(session.id, approval.requestId, allow, null, allow ? '' : note)
     } catch (e) {
-      showToast(String(e), 'error')
+      shell.toast(String(e), 'error')
     } finally {
       busy = false
     }
