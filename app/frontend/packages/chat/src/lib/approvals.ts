@@ -1,6 +1,6 @@
 // Approval cards and the safe list in plain words: what a tool use will
 // do, why it prompts, and what an entry covers.
-import type { Approval, Approver, Risk, SafeClass, SafeEntry, Scope, SessionMode, SessionView, ToolRule, TraceReason } from './api'
+import type { Approval, Approver, ProviderNames, Risk, SafeClass, SafeEntry, Scope, SessionMode, SessionView, ToolRule, TraceReason } from './api'
 import { t } from './i18n.svelte'
 import { store } from './storage'
 
@@ -123,7 +123,8 @@ export const riskLabel = (risk: Risk | undefined) => t(`risk.${risk ?? 'system'}
 
 // reasonLabel says why one part of a command (or a tool use) ran, prompted
 // or was blocked. A judgement by the quick-task model adds its reason.
-export function reasonLabel(r: TraceReason): string {
+// names: the session's provider's, for the reasons that name it.
+export function reasonLabel(r: TraceReason, names?: ProviderNames): string {
   const rule = r.rule ? ruleLabel(r.rule) : ''
   const scope = r.entry ? scopeLabel(r.entry) : ''
   let text: string
@@ -142,7 +143,7 @@ export function reasonLabel(r: TraceReason): string {
     case 'deny': text = t('why.deny', { rule }); break
     case 'ask': text = t('why.ask', { rule }); break
     case 'risky': text = t('why.risky', { risk: riskLabel(r.risk) }); break
-    default: text = t(`why.${r.by}`)
+    default: text = t(`why.${r.by}`, names)
   }
   return r.judged && r.note ? t('why.judged', { text, note: r.note, model: r.judged }) : text
 }
@@ -208,7 +209,7 @@ const SEP = /(&&|\|\||;|\|)/
 // commandLines colours a command by its reasons. Each part is found in the
 // command in order; a part that can't be found (rewritten by the reader)
 // stays plain. With short, long quoted text is shortened first.
-export function commandLines(cmd: string, why: TraceReason[], short: boolean): CommandSeg[][] {
+export function commandLines(cmd: string, why: TraceReason[], short: boolean, names?: ProviderNames): CommandSeg[][] {
   const fit = (s: string) => (short ? shortCommand(s) : s)
   const text = fit(cmd)
   const lines: CommandSeg[][] = [[]]
@@ -234,7 +235,7 @@ export function commandLines(cmd: string, why: TraceReason[], short: boolean): C
     const i = text.indexOf(p, at)
     if (i < 0) continue
     gap(text.slice(at, i))
-    partSegments(p, r).forEach(push)
+    partSegments(p, r, names).forEach(push)
     at = i + p.length
   }
   gap(text.slice(at))
@@ -244,7 +245,7 @@ export function commandLines(cmd: string, why: TraceReason[], short: boolean): C
 // partSegments colours one part: its class words (and risk flags) in its
 // tone, in order, and everything else quiet. A part with no class has its
 // first word coloured.
-function partSegments(part: string, r: TraceReason): CommandSeg[] {
+function partSegments(part: string, r: TraceReason, names?: ProviderNames): CommandSeg[] {
   const tone = reasonTone(r)
   const want = (r.class?.words ?? '').split(' ').filter(w => w && !w.includes(':'))
   const flags = new Set((r.class?.flags ?? '').split(' ').filter(Boolean).map(f => f.toLowerCase()))
@@ -263,7 +264,7 @@ function partSegments(part: string, r: TraceReason): CommandSeg[] {
     if (isClass) next++
     first = false
     const cls = isClass || flags.has(tok.toLowerCase())
-    out.push({ text: tok, kind: cls ? 'class' : 'rest', tone, title: cls ? reasonLabel(r) : undefined })
+    out.push({ text: tok, kind: cls ? 'class' : 'rest', tone, title: cls ? reasonLabel(r, names) : undefined })
   }
   return out
 }

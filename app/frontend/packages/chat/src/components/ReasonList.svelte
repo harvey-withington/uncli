@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TraceReason } from '../lib/api'
   import { promptable, reasonLabel, reasonTone } from '../lib/approvals'
+  import { useChat } from '../lib/chatcontext'
   import ShouldPrompt from './ShouldPrompt.svelte'
 
   // The reason for each part of a command (or a whole tool use), coloured
@@ -14,13 +15,16 @@
   }
 
   let { reasons, label, sessionId }: Props = $props()
+  const chat = useChat()
+  // The session's provider names the reasons that say who asks.
+  const names = $derived(chat.namesFor(chat.sessions.find(s => s.id === sessionId)?.adapter))
 </script>
 
 <ul class="parts" aria-label={label}>
   {#each reasons as r, i (i)}
     {@const teach = sessionId ? promptable([r]) : []}
     <li class="tone-{reasonTone(r)}" data-by={r.by}>
-      {#if r.part}<code>{r.part}</code>{/if}<span class="why">{reasonLabel(r)}</span>
+      {#if r.part}<code>{r.part}</code>{/if}<span class="why">{reasonLabel(r, names)}</span>
       {#if sessionId && teach.length > 0}<ShouldPrompt {sessionId} classes={teach} />{/if}
     </li>
   {/each}

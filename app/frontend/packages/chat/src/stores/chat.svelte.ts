@@ -16,7 +16,7 @@ import type { PanelLayout, PanelTab } from '../lib/panels'
 import { appMemory, type LayoutMemory } from '../lib/layoutmemory'
 import { loadWatched, pick, saveWatched, type Watched } from '../lib/watched'
 import { toBlocks } from '../lib/render/markdown'
-import { setNames, t } from '../lib/i18n.svelte'
+import { t } from '../lib/i18n.svelte'
 import { namesOf, providerOf } from '../lib/api'
 import { Shell } from '../lib/shell.svelte'
 
@@ -130,9 +130,10 @@ export class ChatStore {
     await this.loaded()
   }
 
-  // loaded follows the first state: the provider's names for text.
+  // loaded follows the first state. Text about a session names its
+  // provider with that session's names (namesFor), so two chats on servers
+  // with different providers each say their own.
   protected async loaded() {
-    setNames(namesOf(providerOf(this.boot)))
     this.ready = true
   }
 

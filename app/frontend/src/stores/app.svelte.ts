@@ -3,11 +3,11 @@
 // session; this adds what only the app has: dialogs, search, the sidebar
 // and its pinned pages, Settings, updates, the theme file, and starting on
 // the session open last time.
-import type { Backend, CLIStatus, Notice, PinnedPage, SearchHit, SearchResult, Share, Bootstrap } from '@uncli/chat/lib/api'
+import { namesOf, providerOf, type Backend, type CLIStatus, type Notice, type PinnedPage, type SearchHit, type SearchResult, type Share, type Bootstrap } from '@uncli/chat/lib/api'
 import { loadSidebarWidth, saveSidebarWidth } from '@uncli/chat/lib/panels'
 import { loadLastSession, saveLastSession } from '@uncli/chat/lib/keep'
 import type { SearchRange } from '@uncli/chat/lib/search'
-import { t } from '@uncli/chat/lib/i18n.svelte'
+import { setNames, t } from '@uncli/chat/lib/i18n.svelte'
 import { applyThemeFile } from '../lib/hosttheme'
 import { settingsAttention } from '../lib/attention'
 import { ChatStore, type ChatStoreOptions } from '@uncli/chat/stores/chat.svelte'
@@ -81,6 +81,9 @@ export class AppStore extends ChatStore {
   // loaded follows the first state: the theme file, then (the window) the
   // session open last time, else the first.
   protected override async loaded() {
+    // The app's own screens (setup, import) talk to its one server: its
+    // provider's names are their default.
+    setNames(namesOf(providerOf(this.boot)))
     await super.loaded()
     void this.loadThemeFile(false)
     if (!this.openLast) return

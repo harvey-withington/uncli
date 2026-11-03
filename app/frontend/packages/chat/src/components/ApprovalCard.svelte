@@ -72,7 +72,7 @@
   {/if}
   <div class="what" id="approval-{approval.requestId}">
     {#if view.target}
-      <CommandView command={view.target} why={approval.why} shell={isShell(approval.tool)} note={view.note} />
+      <CommandView command={view.target} why={approval.why} shell={isShell(approval.tool)} note={view.note} {names} />
     {:else if view.note}<span class="note">{view.note}</span>{/if}
     {#if view.body}
       {#if view.bodyLabel}<span class="label">{view.bodyLabel}</span>{/if}

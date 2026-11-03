@@ -57,7 +57,7 @@
         {#each session.shareable as s (s)}
           <label class="check">
             <input type="checkbox" checked={shares.includes(s)} disabled={saving} onchange={e => set(s, e.currentTarget.checked)} />
-            {t(`shares.${s}`)}
+            {t(`shares.${s}`, names)}
           </label>
         {/each}
         <p class="applies">{t('shares.applies', names)}</p>

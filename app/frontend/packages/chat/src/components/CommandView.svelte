@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TraceReason } from '../lib/api'
+  import type { ProviderNames, TraceReason } from '../lib/api'
   import { commandLines, shortCommand } from '../lib/approvals'
   import { t } from '../lib/i18n.svelte'
 
@@ -14,12 +14,13 @@
     why?: TraceReason[]
     shell: boolean
     note?: string
+    names?: ProviderNames // the session's provider's, for reasons that name it
   }
 
-  let { command, why = [], shell, note }: Props = $props()
+  let { command, why = [], shell, note, names }: Props = $props()
   let whole = $state(false)
   const shortened = $derived(shortCommand(command) !== command)
-  const lines = $derived(shell && why.some(r => r.part) ? commandLines(command, why, shortened && !whole) : null)
+  const lines = $derived(shell && why.some(r => r.part) ? commandLines(command, why, shortened && !whole, names) : null)
 </script>
 
 <div class="box">
