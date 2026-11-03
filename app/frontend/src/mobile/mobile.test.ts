@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { serverKey, withServer } from '../lib/api'
+import { serverKey, withServer } from '@uncli/chat/lib/api'
 import { mockBackend } from '@uncli/client/mock'
-import type { Backend, Handlers } from '../lib/api'
+import type { Backend, Handlers } from '@uncli/chat/lib/api'
 import MobileApp from './MobileApp.svelte'
 
 const SERVER = serverKey(location.origin) // the app is this page's server's

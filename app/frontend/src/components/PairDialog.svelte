@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte'
-  import type { Pairing } from '../lib/api'
+  import type { Pairing } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import { countdown } from '../lib/remote'
-  import CopyButton from './CopyButton.svelte'
-  import Icon from './Icon.svelte'
-  import Modal from './Modal.svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { countdown } from '@uncli/chat/lib/remote'
+  import CopyButton from '@uncli/chat/components/CopyButton.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import Modal from '@uncli/chat/components/Modal.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

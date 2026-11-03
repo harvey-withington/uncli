@@ -23,9 +23,11 @@ break (`internal/core/seams_test.go` enforces the first two):
   `internal/app`, which a different bridge (an HTTP server, say) can reuse.
 - The UI never parses provider JSON: it sees UNCLI's events and pages
   through the `Backend` interface in `@uncli/client`
-  (`frontend/packages/client`, decision 0026), which the app imports via
-  `frontend/src/lib/api`. Provider details stay in the adapter. The client
-  imports nothing from the app and no Svelte.
+  (`frontend/packages/client`, decision 0026), which the chat
+  (`frontend/packages/chat`) and the app import through the chat's
+  `lib/api`. Provider details stay in the adapter. The client imports
+  nothing from the app and no Svelte; the chat imports nothing from the
+  app.
 - Fixtures are the contract. A new CLI behaviour gets a recorded stream in
   `app/testdata/streams/<provider>/<version>/` and a parser test before
   anything depends on it. Moving to a new CLI version means recording
@@ -37,7 +39,8 @@ break (`internal/core/seams_test.go` enforces the first two):
   answers nonsense blocks the call, with a test for each (decision 0012).
 - Config over code: profiles, modifiers and the toolbar are YAML in
   `app/config/defaults/`, overridable by `id` from the user's config folder.
-- Pure logic lives in Go packages and `frontend/src/lib/`, with unit tests;
+- Pure logic lives in Go packages and the frontend's `lib/` folders (the
+  app's `src/lib/`, the packages' `src/lib/`), with unit tests;
   components get plain values from the store.
 
 ## Frontend

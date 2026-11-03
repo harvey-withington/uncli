@@ -2,7 +2,7 @@
 // notifications from UNCLI, and turning them on and off. The browser's
 // subscription goes to the server, which pushes to it when a session
 // needs approval or finishes; the service worker (m/public/sw.js) shows it.
-import type { Backend, PushSubscriptionInfo } from '../lib/api'
+import type { Backend, PushSubscriptionInfo } from '@uncli/chat/lib/api'
 
 export type PushSupport = 'ok' | 'insecure' | 'unsupported' | 'denied'
 

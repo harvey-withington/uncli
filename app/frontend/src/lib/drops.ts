@@ -5,7 +5,7 @@
 // - anywhere else: the first folder (or the first file's folder) starts a
 //   new session there, in the last type used that works on a folder.
 import type { AppStore } from '../stores/app.svelte'
-import { ATTACH_EVENT, INSERT_EVENT, quotePath } from './composerevents'
+import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '@uncli/chat/lib/composerevents'
 
 export { ATTACH_EVENT, INSERT_EVENT, quotePath }
 

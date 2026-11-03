@@ -2,12 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
 import { mockBackend } from '@uncli/client/mock'
-import type { Handlers } from '../lib/api'
+import type { Handlers } from '@uncli/chat/lib/api'
 import { AppStore } from '../stores/app.svelte'
-import { atServer } from '../lib/remoteonly'
+import { atServer } from '@uncli/chat/lib/remoteonly'
 import { APP_CONTEXT } from '../lib/context'
-import Composer from './Composer.svelte'
-import SessionPane from './SessionPane.svelte'
+import Composer from '@uncli/chat/components/Composer.svelte'
+import SessionPane from '@uncli/chat/components/SessionPane.svelte'
 
 async function openRemote(backend = mockBackend()) {
   render(App, { props: { backend } })

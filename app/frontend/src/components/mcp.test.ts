@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { describe, expect, it, vi } from 'vitest'
 import { mockBackend } from '@uncli/client/mock'
-import type { MCPServer } from '../lib/api'
+import type { MCPServer } from '@uncli/chat/lib/api'
 import { commands } from '../lib/commands'
 import { APP_CONTEXT } from '../lib/context'
-import { connectedNow, needOf, statusKey } from '../lib/mcp'
+import { connectedNow, needOf, statusKey } from '@uncli/chat/lib/mcp'
 import { AppStore } from '../stores/app.svelte'
-import SessionPane from './SessionPane.svelte'
+import SessionPane from '@uncli/chat/components/SessionPane.svelte'
 
 async function code(opts: Parameters<typeof mockBackend>[0] = {}) {
   localStorage.clear()

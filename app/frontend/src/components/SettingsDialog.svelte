@@ -1,8 +1,8 @@
 <script lang="ts">
   import { tick } from 'svelte'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import Modal from './Modal.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import Modal from '@uncli/chat/components/Modal.svelte'
   import AppearanceSection from './AppearanceSection.svelte'
   import CacheSection from './CacheSection.svelte'
   import ContainersSection from './ContainersSection.svelte'
@@ -15,9 +15,9 @@
   import SafeSection from './SafeSection.svelte'
   import StartupSection from './StartupSection.svelte'
   import UpdateSection from './UpdateSection.svelte'
-  import type { Preferences } from '../lib/api'
+  import type { Preferences } from '@uncli/chat/lib/api'
   import { loadSettingsTab, nextTab, saveSettingsTab, tabOf, tabsFor, type SettingsTab } from '../lib/settings'
-  import { useShell } from '../lib/shell.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

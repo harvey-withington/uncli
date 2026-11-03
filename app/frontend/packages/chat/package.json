@@ -1,0 +1,28 @@
+{
+  "name": "@uncli/chat",
+  "version": "0.6.2-alpha",
+  "description": "UNCLI's chat: the Svelte components, the <uncli-chat> and <uncli-session-list> elements, and the ChatStore they run on.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "**/*.css",
+    "./src/embed/index.ts",
+    "./src/lib/api/index.ts"
+  ],
+  "exports": {
+    "./embed": "./src/embed/index.ts",
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "@uncli/client": "*",
+    "dompurify": "^3.4.17",
+    "lucide-svelte": "^1.0.1",
+    "markdown-it": "^15.0.2",
+    "mermaid": "^11.17.2",
+    "shiki": "^4.4.3"
+  },
+  "peerDependencies": {
+    "svelte": "^5.57.1"
+  }
+}

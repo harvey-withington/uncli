@@ -1,17 +1,17 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte'
-  import type { Profile, Share } from '../lib/api'
+  import type { Profile, Share } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
   import FolderBrowser from './FolderBrowser.svelte'
-  import Icon from './Icon.svelte'
-  import Modal from './Modal.svelte'
-  import { atServer, onlyAtServer } from '../lib/remoteonly'
-  import { modelOptions } from '../lib/models'
-  import { tintStyle } from '../lib/tint'
-  import { providerOf } from '../lib/api'
-  import { SHARES, shareableFor, startingShares, toggled } from '../lib/shares'
-  import { useShell } from '../lib/shell.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import Modal from '@uncli/chat/components/Modal.svelte'
+  import { atServer, onlyAtServer } from '@uncli/chat/lib/remoteonly'
+  import { modelOptions } from '@uncli/chat/lib/models'
+  import { tintStyle } from '@uncli/chat/lib/tint'
+  import { providerOf } from '@uncli/chat/lib/api'
+  import { SHARES, shareableFor, startingShares, toggled } from '@uncli/chat/lib/shares'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

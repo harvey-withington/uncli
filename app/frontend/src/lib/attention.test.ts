@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ContainerInfo, ContainersInfo } from './api'
+import type { ContainerInfo, ContainersInfo } from '@uncli/chat/lib/api'
 import { needsAttention, settingsAttention } from './attention'
 
 const box = (over: Partial<ContainerInfo> = {}): ContainerInfo => ({

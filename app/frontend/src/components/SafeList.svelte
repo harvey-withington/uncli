@@ -1,11 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import type { ClassPreview, SafeClass, SafeEntry, Scope, Verdict } from '../lib/api'
-  import { classLabel, scopeOf } from '../lib/approvals'
+  import type { ClassPreview, SafeClass, SafeEntry, Scope, Verdict } from '@uncli/chat/lib/api'
+  import { classLabel, scopeOf } from '@uncli/chat/lib/approvals'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import Icon from './Icon.svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

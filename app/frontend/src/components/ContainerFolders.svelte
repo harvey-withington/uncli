@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ContainerFolder } from '../lib/api'
+  import type { ContainerFolder } from '@uncli/chat/lib/api'
   import { folderNameFor, folderProblem } from '../lib/containers'
-  import { t } from '../lib/i18n.svelte'
-  import Icon from './Icon.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
 
   // The container editor's Folders: more Windows folders the container
   // mounts at /home/uncli/<name> (decision 0017), read-only unless set to

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { AutoSummary, Preferences } from '../lib/api'
+  import type { AutoSummary, Preferences } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import { modelOptions } from '../lib/models'
-  import { AUTO_SUMMARY_MIN_WORDS } from '../lib/outline'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { modelOptions } from '@uncli/chat/lib/models'
+  import { AUTO_SUMMARY_MIN_WORDS } from '@uncli/chat/lib/outline'
 
   // Settings → General → Quick tasks: one provider and model for small jobs
   // outside sessions (titles, page summaries), and when pages are

@@ -2,7 +2,7 @@
 // on the tab says so (docs/UI-CONVENTIONS.md). Only what UNCLI can't fix by
 // itself counts: a container to rebuild, a failed build, a sign-in that
 // containers need, WSL not answering.
-import type { ContainersInfo } from './api'
+import type { ContainersInfo } from '@uncli/chat/lib/api'
 import type { SettingsTab } from './settings'
 
 export type Attention = Partial<Record<SettingsTab, string[]>> // tab -> i18n keys of what needs doing

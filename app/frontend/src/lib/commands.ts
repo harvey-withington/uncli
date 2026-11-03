@@ -2,9 +2,9 @@
 // them, the keyboard map shows their shortcuts, and the window's key handler
 // runs them. A command is only in the list while it can run (no page, no
 // bookmark commands), so none of the three ever offers a dead action.
-import type { SessionMode } from './api'
-import { back, forward, nextBookmark, prevBookmark } from './nav'
-import { t } from './i18n.svelte'
+import type { SessionMode } from '@uncli/chat/lib/api'
+import { back, forward, nextBookmark, prevBookmark } from '@uncli/chat/lib/nav'
+import { t } from '@uncli/chat/lib/i18n.svelte'
 import { cycleTheme } from './theme.svelte'
 import type { AppStore } from '../stores/app.svelte'
 

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { GROUPS, keyLabel, LOCAL_KEYS, SHORTCUTS } from '../lib/commands'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import Modal from './Modal.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import Modal from '@uncli/chat/components/Modal.svelte'
 
   // Every shortcut, grouped: the registry's table (lib/commands.ts, which
   // the key handler runs from, so the map can't drift from what keys do),

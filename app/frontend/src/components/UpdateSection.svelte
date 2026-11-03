@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { Preferences } from '../lib/api'
+  import type { Preferences } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { relativeTime } from '../lib/format'
-  import { t } from '../lib/i18n.svelte'
-  import Icon from './Icon.svelte'
+  import { relativeTime } from '@uncli/chat/lib/format'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
 
   // Settings → Updates (decision 0025): the version this is, whether it
   // looks for newer releases by itself, Check now, and Update now when

@@ -1,7 +1,7 @@
 @import '@fontsource-variable/inter';
 @import '@fontsource-variable/jetbrains-mono';
 
-@import './styles/theme.css';
+@import '@uncli/chat/styles/theme.css';
 
 /* The window's own page: no margins, no scrolling of its own. */
 html, body {

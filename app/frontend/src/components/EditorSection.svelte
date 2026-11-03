@@ -1,8 +1,8 @@
 <script lang="ts">
   import { untrack } from 'svelte'
-  import type { Editor, Preferences } from '../lib/api'
+  import type { Editor, Preferences } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
 
   // Settings → Editor: where Code sessions open the files a page lists, at
   // the line: the first editor installed (auto), a particular one, or the

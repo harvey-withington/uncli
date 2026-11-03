@@ -14,7 +14,7 @@ describe('shadowCss', () => {
   })
 
   it('leaves no :root in UNCLI’s real theme, and keeps every public token', () => {
-    const theme = readFileSync('src/styles/theme.css', 'utf8')
+    const theme = readFileSync('packages/chat/src/styles/theme.css', 'utf8')
     const css = shadowCss(theme)
     expect(css).not.toMatch(/:root/)
     for (const token of theme.match(/--uncli-[a-z0-9-]+/g) ?? []) expect(css).toContain(token)

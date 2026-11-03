@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { describe, expect, it } from 'vitest'
 import App from '../App.svelte'
 import { mockBackend } from '@uncli/client/mock'
-import { duration } from '../lib/format'
+import { duration } from '@uncli/chat/lib/format'
 
 describe('Usage dashboard', () => {
   it('opens from the Usage popover, totals the period, and switches measure, period and table', async () => {

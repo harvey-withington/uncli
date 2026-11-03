@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import Icon from '../components/Icon.svelte'
-  import type { NotifySetting, PushState } from '../lib/api'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import type { NotifySetting, PushState } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
   import { disablePush, enablePush, pushEnv, pushSupport, type PushEnv } from './push'
-  import { useShell } from '../lib/shell.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

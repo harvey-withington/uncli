@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import en from '../locales/en.json'
-import { t } from './i18n.svelte'
-import { SECTION_KINDS } from './sections'
+import en from '@uncli/chat/locales/en.json'
+import { t } from '@uncli/chat/lib/i18n.svelte'
+import { SECTION_KINDS } from '@uncli/chat/lib/sections'
 
-// Every key the source uses must exist in en.json.
-const sources = import.meta.glob('../**/*.{svelte,ts}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+// Every key the source uses must exist in en.json: the app's and the
+// chat package's (decision 0026), which share its strings.
+const sources = import.meta.glob(['/src/**/*.{svelte,ts}', '/packages/chat/src/**/*.{svelte,ts}'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 
 describe('i18n', () => {
   const dict = en as Record<string, string>
@@ -21,6 +22,12 @@ describe('i18n', () => {
     expect(t('approval.waiting')).not.toContain('{agent}')
     expect(t('approval.waiting', { agent: 'Gemini', cli: 'Gemini CLI', account: 'Google' })).toBe('Gemini is waiting for you')
     expect(t('setup.download.title', { agent: 'Codex', cli: 'Codex CLI', account: 'ChatGPT' })).toBe('Download Codex CLI')
+  })
+
+  it('reads both the app’s source and the chat package’s', () => {
+    const files = Object.keys(sources)
+    expect(files.some(f => f.startsWith('/src/components/'))).toBe(true)
+    expect(files.some(f => f.startsWith('/packages/chat/src/components/'))).toBe(true)
   })
 
   it('has every static key used in the source', () => {

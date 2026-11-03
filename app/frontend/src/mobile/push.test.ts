@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { mockBackend } from '@uncli/client/mock'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
-import type { Backend } from '../lib/api'
+import type { Backend } from '@uncli/chat/lib/api'
 import { keyBytes, pushSupport, type PushEnv } from './push'
 import PushSection from './PushSection.svelte'
 

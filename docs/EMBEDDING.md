@@ -11,7 +11,7 @@ authors. It covers what exists today and says what doesn't yet.
 |---|---|
 | **Status** | Alpha. It's built on the `feat/packages` branch and not published. |
 | **Build** | `npm --prefix app/frontend run build:embed` writes the element to `app/frontend/dist-embed/lib/uncli-chat.js`, and a sample host page on UNCLI's mock to `dist-embed/sample/`. |
-| **Client library** | `@uncli/client` (`app/frontend/packages/client`) is the library underneath. It isn't published either. |
+| **Packages** | The elements and the Svelte components are `@uncli/chat` (`app/frontend/packages/chat`); a Svelte host can use the components directly. `@uncli/client` (`app/frontend/packages/client`) is the library underneath. Neither is published yet. |
 
 ## Showing a chat
 

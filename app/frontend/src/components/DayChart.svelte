@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { UsageRow } from '../lib/api'
-  import { t } from '../lib/i18n.svelte'
+  import type { UsageRow } from '@uncli/chat/lib/api'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
   import { compact, measureOf, money, niceMax, type Measure } from '../lib/usage'
 
   // One column per day (a single series, so no legend: the dashboard's

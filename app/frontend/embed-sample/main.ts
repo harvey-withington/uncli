@@ -2,8 +2,8 @@
 // <uncli-chat> elements on UNCLI's mock backend, sharing it, the list
 // driving the first chat, and the events they send the page.
 import { mockBackend } from '@uncli/client/mock'
-import '../src/embed'
-import type { UncliChat, UncliSessionList } from '../src/embed'
+import '@uncli/chat/embed'
+import type { UncliChat, UncliSessionList } from '@uncli/chat/embed'
 
 const backend = mockBackend()
 for (const el of document.querySelectorAll<UncliChat | UncliSessionList>('uncli-chat, uncli-session-list')) el.backend = backend

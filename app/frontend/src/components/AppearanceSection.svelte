@@ -1,9 +1,9 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import { atServer, onlyAtServer } from '../lib/remoteonly'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { atServer, onlyAtServer } from '@uncli/chat/lib/remoteonly'
   import { setTheme, theme, type Theme } from '../lib/theme.svelte'
-  import Icon from './Icon.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
 
   // Settings → General → Appearance: the theme (the sidebar's toggle cycles
   // the same setting) and the theme file, which restyles UNCLI (decision

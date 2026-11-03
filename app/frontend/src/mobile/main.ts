@@ -1,6 +1,6 @@
 import { mount } from 'svelte'
 import '../app.css'
-import { serverKey, withServer } from '../lib/api'
+import { serverKey, withServer } from '@uncli/chat/lib/api'
 import { mockBackend } from '@uncli/client/mock'
 import { applyTheme } from '../lib/theme.svelte'
 import MobileApp from './MobileApp.svelte'

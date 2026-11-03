@@ -4,8 +4,8 @@ import App from '../App.svelte'
 import { mockBackend } from '@uncli/client/mock'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
-import SessionPane from './SessionPane.svelte'
-import SessionStatus from './SessionStatus.svelte'
+import SessionPane from '@uncli/chat/components/SessionPane.svelte'
+import SessionStatus from '@uncli/chat/components/SessionStatus.svelte'
 
 describe('Session header', () => {
   it('collapses to two lines: the folder after the title, no status lines; remembered', async () => {

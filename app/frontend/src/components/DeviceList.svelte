@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { PairedDevice } from '../lib/api'
+  import type { PairedDevice } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { relativeTime } from '../lib/format'
-  import { t } from '../lib/i18n.svelte'
-  import Icon from './Icon.svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import { relativeTime } from '@uncli/chat/lib/format'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

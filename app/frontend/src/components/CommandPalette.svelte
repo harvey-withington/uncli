@@ -1,12 +1,12 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { fade, fly } from 'svelte/transition'
-  import { focusTrap } from '../lib/actions'
+  import { focusTrap } from '@uncli/chat/lib/actions'
   import { commands, keyLabel, loadRecent, rank, saveRecent, type Command } from '../lib/commands'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import { reveal } from '../lib/scrollmemory'
-  import Icon from './Icon.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { reveal } from '@uncli/chat/lib/scrollmemory'
+  import Icon from '@uncli/chat/components/Icon.svelte'
 
   // The command palette (Ctrl+Shift+P, F1): every action that can run now,
   // filtered as you type (each word a prefix of a word, in order; or the

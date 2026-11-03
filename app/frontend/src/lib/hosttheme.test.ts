@@ -4,7 +4,7 @@ import doc from '../../../../docs/UI-CONVENTIONS.md?raw'
 import { applyThemeFile, themeCSS, THEME_TOKENS } from './hosttheme'
 
 // ?raw gives an empty stylesheet under vitest, so read it from disk.
-const css = readFileSync('src/styles/theme.css', 'utf8')
+const css = readFileSync('packages/chat/src/styles/theme.css', 'utf8')
 
 describe('theme contract', () => {
   it('the theme reads exactly the public tokens', () => {

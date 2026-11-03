@@ -1,15 +1,15 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
   import { theme, cycleTheme } from '../lib/theme.svelte'
-  import Icon from './Icon.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
   import PinnedList from './PinnedList.svelte'
-  import ResizeHandle from './ResizeHandle.svelte'
+  import ResizeHandle from '@uncli/chat/components/ResizeHandle.svelte'
   import SearchPanel from './SearchPanel.svelte'
-  import SessionItem from './SessionItem.svelte'
+  import SessionItem from '@uncli/chat/components/SessionItem.svelte'
   import UpdateNotice from './UpdateNotice.svelte'
-  import { SIDEBAR_MAX, SIDEBAR_MIN } from '../lib/panels'
-  import { dragSort } from '../lib/actions'
+  import { SIDEBAR_MAX, SIDEBAR_MIN } from '@uncli/chat/lib/panels'
+  import { dragSort } from '@uncli/chat/lib/actions'
 
   const app = useApp()
   // The tab that needs the user, if any: the dot opens Settings there.

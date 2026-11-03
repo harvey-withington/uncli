@@ -3,16 +3,16 @@
 // session; this adds what only the app has: dialogs, search, the sidebar
 // and its pinned pages, Settings, updates, the theme file, and starting on
 // the session open last time.
-import type { Backend, CLIStatus, Notice, PinnedPage, SearchHit, SearchResult, Share, Bootstrap } from '../lib/api'
-import { loadSidebarWidth, saveSidebarWidth } from '../lib/panels'
-import { loadLastSession, saveLastSession } from '../lib/keep'
-import type { SearchRange } from '../lib/search'
-import { t } from '../lib/i18n.svelte'
+import type { Backend, CLIStatus, Notice, PinnedPage, SearchHit, SearchResult, Share, Bootstrap } from '@uncli/chat/lib/api'
+import { loadSidebarWidth, saveSidebarWidth } from '@uncli/chat/lib/panels'
+import { loadLastSession, saveLastSession } from '@uncli/chat/lib/keep'
+import type { SearchRange } from '@uncli/chat/lib/search'
+import { t } from '@uncli/chat/lib/i18n.svelte'
 import { applyThemeFile } from '../lib/hosttheme'
 import { settingsAttention } from '../lib/attention'
-import { ChatStore, type ChatStoreOptions } from './chat.svelte'
+import { ChatStore, type ChatStoreOptions } from '@uncli/chat/stores/chat.svelte'
 
-export { displayAnswer, type Live } from './chat.svelte'
+export { displayAnswer, type Live } from '@uncli/chat/stores/chat.svelte'
 
 export class AppStore extends ChatStore {
   newSessionOpen = $state(false)

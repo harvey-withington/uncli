@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Preferences, Scope, UnknownCommands } from '../lib/api'
+  import type { Preferences, Scope, UnknownCommands } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
   import CommandCheck from './CommandCheck.svelte'
   import SafeList from './SafeList.svelte'
   import SessionTypeAllowlist from './SessionTypeAllowlist.svelte'

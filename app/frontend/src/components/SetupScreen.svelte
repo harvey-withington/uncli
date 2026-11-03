@@ -1,8 +1,8 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
-  import { bytes } from '../lib/format'
-  import { t } from '../lib/i18n.svelte'
-  import Icon from './Icon.svelte'
+  import { bytes } from '@uncli/chat/lib/format'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
 
   // First run: download UNCLI's own copy of the Claude CLI, then sign in.
   // No terminal at any point.

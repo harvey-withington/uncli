@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import Icon from './Icon.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
 
   // A newer UNCLI release (decision 0025), above the sidebar's footer on
   // the PC and atop the session list on the phone: Update now, and what's

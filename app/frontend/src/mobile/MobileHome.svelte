@@ -1,9 +1,9 @@
 <script lang="ts">
-  import Icon from '../components/Icon.svelte'
-  import SessionItem from '../components/SessionItem.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import SessionItem from '@uncli/chat/components/SessionItem.svelte'
   import UpdateNotice from '../components/UpdateNotice.svelte'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
 
   // The phone's first screen: the server's sessions, newest activity
   // first as on the desktop, a button for a new one, and Settings. Tapping

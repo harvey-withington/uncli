@@ -1,10 +1,10 @@
 <script lang="ts">
   import AppearanceSection from '../components/AppearanceSection.svelte'
-  import Modal from '../components/Modal.svelte'
+  import Modal from '@uncli/chat/components/Modal.svelte'
   import UpdateSection from '../components/UpdateSection.svelte'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
   import type { Snippet } from 'svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

@@ -1,7 +1,7 @@
 // The usage dashboard's logic: periods, a day for every date in the period
 // (days without turns are zero, not missing), the chart's measure and its
 // axis.
-import { dayKey, startOfDay, type UsageRow, type UsageTotals } from './api'
+import { dayKey, startOfDay, type UsageRow, type UsageTotals } from '@uncli/chat/lib/api'
 
 export { dayKey, startOfDay }
 

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { PinnedPage } from '../lib/api'
+  import type { PinnedPage } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import { tintStyle } from '../lib/tint'
-  import Icon from './Icon.svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { tintStyle } from '@uncli/chat/lib/tint'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

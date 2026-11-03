@@ -1,7 +1,7 @@
 // The container editor's rules (Settings → Containers). They mirror the
 // backend's (internal/app/containers.go validProfile), so a mistake shows
 // as it's typed; the backend still checks everything it saves.
-import type { ContainerFolder, ContainerInfo, ContainerProfile } from './api'
+import type { ContainerFolder, ContainerInfo, ContainerProfile } from '@uncli/chat/lib/api'
 
 const ID = /^[a-z0-9][a-z0-9-]{0,40}$/
 const PACKAGE = /^[a-z0-9][a-z0-9.+_-]{0,63}$/

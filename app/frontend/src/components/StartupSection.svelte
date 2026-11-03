@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Preferences } from '../lib/api'
+  import type { Preferences } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
 
   // Settings → Tray and startup: closing the window keeps UNCLI running in
   // the tray (Open and Quit on its icon), and it can start with Windows,

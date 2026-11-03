@@ -14,6 +14,8 @@ const keepDist = (): Plugin => ({
 
 export default defineConfig({
   plugins: [svelte(), keepDist()],
+  // The chat's package, from its source (decision 0026).
+  resolve: { alias: { '@uncli/chat': resolve(__dirname, 'packages/chat/src') } },
   server: {
     watch: { ignored: ['**/wailsjs/**'] },
   },

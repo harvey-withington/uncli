@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import { remoteLine, validPort } from '../lib/remote'
-  import CopyButton from './CopyButton.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { remoteLine, validPort } from '@uncli/chat/lib/remote'
+  import CopyButton from '@uncli/chat/components/CopyButton.svelte'
   import DeviceList from './DeviceList.svelte'
-  import Icon from './Icon.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
   import PairDialog from './PairDialog.svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

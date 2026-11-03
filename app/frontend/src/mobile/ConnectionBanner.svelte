@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
-  import Icon from '../components/Icon.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
   import { useApp } from '../lib/context'
-  import { relativeTime } from '../lib/format'
-  import { t } from '../lib/i18n.svelte'
+  import { relativeTime } from '@uncli/chat/lib/format'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
 
   // When the server can't be reached: which, why, when it last connected,
   // and that it keeps trying (lib/api/http.ts reconnects by itself). A

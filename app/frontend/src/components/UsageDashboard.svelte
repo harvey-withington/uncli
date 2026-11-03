@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { UsageReport, UsageRow } from '../lib/api'
+  import type { UsageReport, UsageRow } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { duration } from '../lib/format'
-  import { t } from '../lib/i18n.svelte'
-  import { modelLabel } from '../lib/models'
-  import { tintStyle } from '../lib/tint'
+  import { duration } from '@uncli/chat/lib/format'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { modelLabel } from '@uncli/chat/lib/models'
+  import { tintStyle } from '@uncli/chat/lib/tint'
   import { allTokens, compact, fillDays, measureOf, money, periodSince, startOfDay, type Measure, type Period } from '../lib/usage'
   import DayChart from './DayChart.svelte'
-  import Icon from './Icon.svelte'
-  import Modal from './Modal.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import Modal from '@uncli/chat/components/Modal.svelte'
   import UsageBreakdown from './UsageBreakdown.svelte'
 
   // The usage dashboard: what this computer's pages recorded, summed over a

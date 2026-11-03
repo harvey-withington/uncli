@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Icon from '../components/Icon.svelte'
-  import { t } from '../lib/i18n.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
   import { onMount } from 'svelte'
   import { PairError, claimPair, guessDeviceName, loadDeviceName, loadPending, normaliseCode, requestPair, saveDeviceName, type Paired } from './pairing'
 

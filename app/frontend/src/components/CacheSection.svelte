@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Preferences, PromptCache } from '../lib/api'
+  import type { Preferences, PromptCache } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
 
   // Settings → AI Providers → Conversation cache: how long a session's
   // conversation stays cached after its last message. Takes effect at each

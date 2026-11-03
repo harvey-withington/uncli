@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { UsageRow } from '../lib/api'
+  import type { UsageRow } from '@uncli/chat/lib/api'
   import { compact, measureOf, money, type Measure } from '../lib/usage'
-  import Icon from './Icon.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
 
   // A ranked breakdown: each row's name, a magnitude bar (one hue, relative
   // to the largest row) and its value in text, so the bar is never the only

@@ -11,21 +11,24 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 // sample host page (embed-sample/) on the mock instead.
 export default defineConfig(({ mode }) => {
   const plugins = [svelte({ compilerOptions: { css: 'injected' }, emitCss: false })]
+  const alias = { '@uncli/chat': resolve(__dirname, 'packages/chat/src') }
   if (mode === 'sample') {
     return {
       root: resolve(__dirname, 'embed-sample'),
       plugins,
+      resolve: { alias },
       server: { fs: { allow: [resolve(__dirname)] } },
       build: { outDir: resolve(__dirname, 'dist-embed/sample'), emptyOutDir: true, chunkSizeWarningLimit: 3000 },
     }
   }
   return {
     plugins,
+    resolve: { alias },
     build: {
       outDir: resolve(__dirname, 'dist-embed/lib'),
       emptyOutDir: true,
       chunkSizeWarningLimit: 3000,
-      lib: { entry: resolve(__dirname, 'src/embed/index.ts'), formats: ['es'], fileName: () => 'uncli-chat.js' },
+      lib: { entry: resolve(__dirname, 'packages/chat/src/embed/index.ts'), formats: ['es'], fileName: () => 'uncli-chat.js' },
     },
   }
 })

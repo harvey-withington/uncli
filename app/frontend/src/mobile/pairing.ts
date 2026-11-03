@@ -2,7 +2,7 @@
 // link's fragment (#pair=CODE), the phone asks with its name and waits for
 // Allow on the server, then keeps its own token. The token stays in this
 // origin's storage and only ever goes in an Authorization header.
-import { t } from '../lib/i18n.svelte'
+import { t } from '@uncli/chat/lib/i18n.svelte'
 
 const TOKEN_KEY = 'uncli-device-token'
 const NAME_KEY = 'uncli-device-name'

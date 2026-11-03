@@ -9,6 +9,7 @@ export default defineConfig({
   root: resolve(__dirname, 'm'),
   base: '/m/',
   plugins: [svelte()],
+  resolve: { alias: { '@uncli/chat': resolve(__dirname, 'packages/chat/src') } },
   // The build's id: the page registers the service worker with it, so a new
   // build replaces the old cache (m/public/sw.js).
   define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },

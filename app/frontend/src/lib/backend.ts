@@ -3,7 +3,7 @@
 // ?mock=signin, ?mock=empty, ?mock=unattended, ?mock=always or
 // ?mock=never pick a starting scenario for the mock.
 import { mockBackend } from '@uncli/client/mock'
-import type { Backend } from './api'
+import type { Backend } from '@uncli/chat/lib/api'
 import { hasWails, wailsBackend } from './wails'
 
 export function createBackend(): Backend {

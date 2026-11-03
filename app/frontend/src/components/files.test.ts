@@ -2,10 +2,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
 import { mockBackend } from '@uncli/client/mock'
-import type { Page } from '../lib/api'
+import type { Page } from '@uncli/chat/lib/api'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
-import PageView from './PageView.svelte'
+import PageView from '@uncli/chat/components/PageView.svelte'
 
 const ctx = (s: AppStore) => new Map([[APP_CONTEXT, s]])
 

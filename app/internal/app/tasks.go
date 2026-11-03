@@ -240,7 +240,7 @@ func (s *Service) RunTextTask(ctx context.Context, t core.TextTask) (core.TextRe
 
 // sectionKinds is what a section of an answer can be; the outline shows
 // an icon for each. Kept in step with SECTION_KINDS in
-// frontend/src/lib/sections.ts (a test checks).
+// frontend/packages/client/src/sections.ts (a test checks).
 var sectionKinds = []struct{ ID, Meaning string }{
 	{"overview", "introduces the topic or sets the context"},
 	{"commentary", "general explanation or discussion"},

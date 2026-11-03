@@ -4,10 +4,10 @@ import { tick } from 'svelte'
 import { mockBackend } from '@uncli/client/mock'
 import { commands } from '../lib/commands'
 import { APP_CONTEXT } from '../lib/context'
-import { loadWatched } from '../lib/watched'
+import { loadWatched } from '@uncli/chat/lib/watched'
 import { AppStore } from '../stores/app.svelte'
-import FilesStrip from './FilesStrip.svelte'
-import SessionPane from './SessionPane.svelte'
+import FilesStrip from '@uncli/chat/components/FilesStrip.svelte'
+import SessionPane from '@uncli/chat/components/SessionPane.svelte'
 
 type Writer = { writeWatched(sid: string, path: string, text: string | null): void }
 

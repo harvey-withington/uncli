@@ -2,12 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
 import { mockBackend } from '@uncli/client/mock'
-import type { Page } from '../lib/api'
+import type { Page } from '@uncli/chat/lib/api'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
-import NavBar from './NavBar.svelte'
-import OutlinePanel from './OutlinePanel.svelte'
-import PageView from './PageView.svelte'
+import NavBar from '@uncli/chat/components/NavBar.svelte'
+import OutlinePanel from '@uncli/chat/components/OutlinePanel.svelte'
+import PageView from '@uncli/chat/components/PageView.svelte'
 import Sidebar from './Sidebar.svelte'
 
 async function store() {

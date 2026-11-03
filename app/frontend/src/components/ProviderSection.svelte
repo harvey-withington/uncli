@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { CLIStatus, Provider } from '../lib/api'
+  import type { CLIStatus, Provider } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import { namesOf } from '../lib/api'
-  import Icon from './Icon.svelte'
-  import CodeSignIn from './CodeSignIn.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { namesOf } from '@uncli/chat/lib/api'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import CodeSignIn from '@uncli/chat/components/CodeSignIn.svelte'
   import LinkSignIn from './LinkSignIn.svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

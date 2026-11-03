@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { SearchHit, SearchQuery } from '../lib/api'
+  import type { SearchHit, SearchQuery } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
-  import { reveal } from '../lib/scrollmemory'
-  import { groupHits, RANGE_DAYS, snippetParts, type SearchRange } from '../lib/search'
-  import { tintStyle } from '../lib/tint'
-  import Icon from './Icon.svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { reveal } from '@uncli/chat/lib/scrollmemory'
+  import { groupHits, RANGE_DAYS, snippetParts, type SearchRange } from '@uncli/chat/lib/search'
+  import { tintStyle } from '@uncli/chat/lib/tint'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 

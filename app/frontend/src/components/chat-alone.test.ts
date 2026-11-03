@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/sve
 import { describe, expect, it, vi } from 'vitest'
 import { mockBackend } from '@uncli/client/mock'
 import { CHAT_CONTEXT } from '../lib/context'
-import { ChatStore } from '../stores/chat.svelte'
-import SessionPane from './SessionPane.svelte'
+import { ChatStore } from '@uncli/chat/stores/chat.svelte'
+import SessionPane from '@uncli/chat/components/SessionPane.svelte'
 
 // The chat without the app (decision 0026): a session view with only a
 // ChatStore, as an embedded element will have.

@@ -4,7 +4,7 @@ import { tick } from 'svelte'
 import { mockBackend } from '@uncli/client/mock'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
-import SessionPane from './SessionPane.svelte'
+import SessionPane from '@uncli/chat/components/SessionPane.svelte'
 
 async function chat() {
   localStorage.clear()

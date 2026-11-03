@@ -4,6 +4,12 @@ This is a contract. Update it in the same change as any shared component,
 token or pattern, and keep the prop tables and keyboard behaviour in step
 with the code.
 
+The frontend is two places (decision 0026):
+- `app/frontend/packages/chat/src` is `@uncli/chat`: the chat's components, the elements, `ChatStore`, the theme, the strings, and the `lib/` they use.
+- `app/frontend/src` is the app: the window's and the phone's shell, Settings, and dialogs. It imports the chat as `@uncli/chat/...`.
+
+A path below (`lib/actions.ts`, `styles/theme.css`) is in whichever of the two holds it. The chat never imports the app, and a test keeps it that way.
+
 ## Ground rules
 
 - Svelte 5 runes, typed props via `interface Props`, strict TypeScript,

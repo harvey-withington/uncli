@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { ContainerBase, ContainerInfo, ContainerProfile } from '../lib/api'
+  import type { ContainerBase, ContainerInfo, ContainerProfile } from '@uncli/chat/lib/api'
   import { untrack } from 'svelte'
   import { addPackages, idFor, MAX_STEP, problems, same, tidy, validPackage } from '../lib/containers'
   import { useApp } from '../lib/context'
-  import { t } from '../lib/i18n.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
   import ContainerFolders from './ContainerFolders.svelte'
-  import Icon from './Icon.svelte'
-  import { useShell } from '../lib/shell.svelte'
+  import Icon from '@uncli/chat/components/Icon.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 
