@@ -49,8 +49,10 @@
     return scroller?.querySelector<HTMLElement>(`[data-block="${i}"]`) ?? null
   }
 
+  // track runs from a scroll or a queued task: the page may have gone
+  // (another one shown, the panel closing) before the panel did.
   function track() {
-    if (!scroller) return
+    if (!scroller || !page) return
     const top = scroller.getBoundingClientRect().top
     const tops = entries.map(e => (blockEl(e.block)?.getBoundingClientRect().top ?? Infinity) - top)
     active = activeEntry(tops, headerHeight() + 24)
@@ -60,9 +62,15 @@
     const el = scroller
     void entries // re-track when the entries change (streaming, new page, summary)
     if (!el) return
-    queueMicrotask(track)
+    // Once the effect is cleaned up (another page, or the panel closed),
+    // the queued track must not run: its page may be gone.
+    let current = true
+    queueMicrotask(() => current && track())
     el.addEventListener('scroll', track, { passive: true })
-    return () => el.removeEventListener('scroll', track)
+    return () => {
+      current = false
+      el.removeEventListener('scroll', track)
+    }
   })
 
   const smooth = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
