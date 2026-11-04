@@ -3,12 +3,15 @@ package uncli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/harvey-withington/uncli/app/internal/datadir"
 )
 
 const hostOrigin = "https://bruv.example"
@@ -65,6 +68,50 @@ func TestStartNeedsAFolder(t *testing.T) {
 	if _, err := Start(Options{}); err == nil {
 		t.Fatal("started without a data folder")
 	}
+}
+
+func TestOneUNCLIOnAFolderAtATime(t *testing.T) {
+	dir := t.TempDir()
+	c := start(t, Options{DataDir: dir, Name: "BRUV"})
+	if _, err := Start(Options{DataDir: dir, Name: "BRUV"}); !errors.Is(err, datadir.ErrInUse) {
+		t.Fatalf("a second UNCLI started on the folder: %v", err)
+	}
+	c.Close()
+	again, err := Start(Options{DataDir: dir, Name: "BRUV"})
+	if err != nil {
+		t.Fatalf("the folder wasn't freed: %v", err)
+	}
+	again.Close()
+	// Another app can't take it over.
+	if _, err := Start(Options{DataDir: dir, Name: "Another app"}); !errors.Is(err, datadir.ErrNotYours) {
+		t.Fatalf("another app started on BRUV's folder: %v", err)
+	}
+}
+
+func TestNeverTheDesktopAppsFolders(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	home := t.TempDir()
+	t.Setenv("AppData", filepath.Join(home, "Roaming"))
+	t.Setenv("LocalAppData", filepath.Join(home, "Local"))
+	t.Setenv("UNCLI_DATA_DIR", "")
+	for _, dir := range []string{
+		filepath.Join(home, "Roaming", "uncli"),
+		filepath.Join(home, "Roaming", "uncli", "bruv"),
+		filepath.Join(home, "Local", "uncli"),
+	} {
+		if c, err := Start(Options{DataDir: dir, Name: "BRUV"}); !errors.Is(err, datadir.ErrNotYours) {
+			if c != nil {
+				c.Close()
+			}
+			t.Errorf("%s: %v", dir, err)
+		}
+	}
+	// A folder of the host's own beside them is fine.
+	c, err := Start(Options{DataDir: filepath.Join(home, "Roaming", "bruv", "uncli"), Name: "BRUV"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
 }
 
 func TestEverythingStaysInTheHostsFolder(t *testing.T) {

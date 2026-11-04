@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ import (
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/datadir"
 	"github.com/harvey-withington/uncli/app/internal/notify"
 	"github.com/harvey-withington/uncli/app/internal/push"
 	"github.com/harvey-withington/uncli/app/internal/remote"
@@ -82,6 +84,16 @@ type Options struct {
 func Run(assets fs.FS, opts Options) error {
 	paths, err := app.DefaultPaths()
 	if err != nil {
+		return err
+	}
+	// The data folder is this UNCLI's while it runs (decision 0027): a host's
+	// own UNCLI can't start on it. In use already means this is a second
+	// copy of the app, which hands over to the first below and quits.
+	release, err := datadir.Claim(paths.Config, datadir.Owner{Kind: datadir.KindDesktop})
+	switch {
+	case err == nil:
+		defer release()
+	case !errors.Is(err, datadir.ErrInUse):
 		return err
 	}
 	a := &App{}

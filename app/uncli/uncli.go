@@ -20,11 +20,14 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/datadir"
 	"github.com/harvey-withington/uncli/app/internal/hook"
 	"github.com/harvey-withington/uncli/app/internal/remote"
 )
@@ -55,10 +58,12 @@ type Options struct {
 
 // Core is a running UNCLI of the host's own.
 type Core struct {
-	svc    *app.Service
-	server *remote.Server
-	key    string
-	routes http.Handler
+	svc     *app.Service
+	server  *remote.Server
+	key     string
+	routes  http.Handler
+	release func() // frees the data folder
+	closed  sync.Once
 }
 
 // HookArg is the argument the host's program is started with when a CLI
@@ -83,6 +88,24 @@ func Start(o Options) (*Core, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := notTheDesktopApps(dir); err != nil {
+		return nil, err
+	}
+	name := o.Name
+	if name == "" {
+		name = "Host"
+	}
+	// One UNCLI at a time on the folder, and only the host it was made for.
+	release, err := datadir.Claim(dir, datadir.Owner{Kind: datadir.KindHost, Name: name})
+	if err != nil {
+		return nil, err
+	}
+	started := false
+	defer func() {
+		if !started {
+			release()
+		}
+	}()
 	if !o.UserCLIConfig {
 		// The CLIs keep their sign-in and settings in the host's data, not
 		// the user's home. Every part of UNCLI that looks for them, and the
@@ -107,10 +130,6 @@ func Start(o Options) (*Core, error) {
 		}
 		hookCmd = `"` + exe + `" ` + HookArg
 	}
-	name := o.Name
-	if name == "" {
-		name = "Host"
-	}
 	hub := remote.NewHub()
 	paths := app.Paths{Config: dir, Cache: filepath.Join(dir, "cache"), Scratch: filepath.Join(dir, "scratch")}
 	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd})
@@ -119,7 +138,29 @@ func Start(o Options) (*Core, error) {
 	}
 	server := remote.New(remote.Config{API: app.NewAPI(svc, nil), Service: svc, Hub: hub,
 		Auth: keyAuth{key: key, device: remote.Device{ID: "host", Name: name}}, Methods: remote.EmbeddedMethods()})
-	return &Core{svc: svc, server: server, key: key, routes: server.EmbeddedHandler(o.Origins)}, nil
+	started = true
+	return &Core{svc: svc, server: server, key: key, routes: server.EmbeddedHandler(o.Origins), release: release}, nil
+}
+
+// notTheDesktopApps refuses UNCLI's own folders: a host's UNCLI shares
+// nothing with the user's (decision 0027).
+func notTheDesktopApps(dir string) error {
+	var mine []string
+	if cfg, err := os.UserConfigDir(); err == nil {
+		mine = append(mine, filepath.Join(cfg, "uncli"))
+	}
+	if cache, err := os.UserCacheDir(); err == nil {
+		mine = append(mine, filepath.Join(cache, "uncli"))
+	}
+	if p, err := app.DefaultPaths(); err == nil { // UNCLI_DATA_DIR, when set
+		mine = append(mine, p.Config)
+	}
+	for _, m := range mine {
+		if datadir.Inside(dir, m) {
+			return fmt.Errorf("%w: %s is UNCLI's own (%s). Give this app a folder of its own", datadir.ErrNotYours, dir, m)
+		}
+	}
+	return nil
 }
 
 // Handler is UNCLI's routes, for mounting on the host's own server behind
@@ -137,10 +178,14 @@ func (c *Core) Handler() http.Handler {
 // proxy adding the key.
 func (c *Core) KeyedHandler() http.Handler { return c.routes }
 
-// Close stops the sessions and the CLIs they run.
+// Close stops the sessions and the CLIs they run, and frees the folder.
+// Closing again does nothing.
 func (c *Core) Close() {
-	c.server.Close()
-	c.svc.Close()
+	c.closed.Do(func() {
+		c.server.Close()
+		c.svc.Close()
+		c.release()
+	})
 }
 
 // keyAuth accepts only the host's key, as the host.

@@ -71,6 +71,13 @@ uncli-core --data <folder> --origin https://app.example --name "My app"   (the k
 
 Your users sign in to the CLIs once for your app, and your app doesn't see their personal CLI setup. `UserCLIConfig` (`--user-cli-config`) uses the user's own CLI config instead, shared with everything else on the machine that uses those CLIs.
 
+**The data folder is your app's alone.**
+- One UNCLI at a time: a second one started on the same folder is refused while the first runs, the desktop app included.
+- The first start marks the folder with your app's `Name`. Another name is refused, so two apps can't share a folder by mistake. If your app is renamed, delete `uncli-owner.json` in the folder.
+- UNCLI's own folders (`%AppData%\uncli`, `%LocalAppData%\uncli`, and anything inside them) are always refused.
+
+These checks catch mistakes, not malice. Your UNCLI is as trusted as your app: a program running as your user can read any folder of that user's without UNCLI. So keep `--key-file` somewhere only your user can read, or pass the key in `UNCLI_CORE_KEY`.
+
 **Setting up the CLI.** Until your UNCLI has its CLI downloaded and signed in, `<uncli-chat>` shows the steps in its place:
 1. Download: UNCLI's pinned copy, checked against its published checksum, into your data folder.
 2. Sign in: the sign-in page opens in your user's browser, and they paste the code it shows.
