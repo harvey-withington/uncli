@@ -21,4 +21,13 @@ describe('what wants attention in a folded header', () => {
       ),
     ).toBe(3)
   })
+
+  it('counts each approval card waiting for the user, a host’s too, not one still being judged', () => {
+    const approvals = [
+      { requestId: 'a', tool: 'Bash', learn: [], askedAt: 1 },
+      { requestId: 'b', tool: 'mcp__board__update_checklist', learn: [], askedAt: 2, host: { title: "Update checklist 'Preparation to Leave'" } },
+      { requestId: 'c', tool: 'Bash', learn: [], askedAt: 3, judging: true },
+    ] as SessionView['approvals']
+    expect(attentionCount(session({ approvals }))).toBe(2)
+  })
 })

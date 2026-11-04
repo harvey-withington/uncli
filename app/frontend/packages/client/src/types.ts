@@ -313,6 +313,16 @@ export interface Approval {
   // question: the model asks the user something (QuestionCard); plan: it
   // wants a plan approved (PlanCard). Absent for an ordinary tool use.
   ask?: 'question' | 'plan'
+  // An embedding host's words for the card (its HostToolPolicy asked, decision
+  // 0027): shown in place of the tool's name and arguments.
+  host?: HostPrompt
+}
+
+// What a host's approval card says: what the call does, and what it changes
+// (plain text, line breaks kept).
+export interface HostPrompt {
+  title: string
+  detail?: string
 }
 
 // allow: this once; safe: and remember it as safe (with a scope); deny.

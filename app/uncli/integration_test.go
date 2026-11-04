@@ -5,6 +5,7 @@ package uncli
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -205,13 +206,13 @@ func TestHostMCPServersReachTheCLI(t *testing.T) {
 
 // One turn on a host's UNCLI: the answer, and the tools it asked the user
 // about (allowed, so the turn can finish).
-func turn(t *testing.T, c *Core, id, text string) (string, []string) {
+func turn(t *testing.T, c *Core, id, text string) (string, []session.Approval) {
 	t.Helper()
 	sessions := c.svc.Sessions
 	if err := sessions.Send(context.Background(), id, text); err != nil {
 		t.Fatal(err)
 	}
-	var asked []string
+	var asked []session.Approval
 	start := time.Now()
 	for {
 		if time.Since(start) > 3*time.Minute {
@@ -224,7 +225,7 @@ func turn(t *testing.T, c *Core, id, text string) (string, []string) {
 			}
 		}
 		for _, a := range cur.Approvals {
-			asked = append(asked, a.Tool)
+			asked = append(asked, a)
 			_ = sessions.Answer(id, a.RequestID, answerFor(a.Tool), "")
 		}
 		if !cur.Busy && len(cur.Approvals) == 0 && time.Since(start) > 2*time.Second {
@@ -239,10 +240,11 @@ func turn(t *testing.T, c *Core, id, text string) (string, []string) {
 	return pages[len(pages)-1].AnswerMD, asked
 }
 
-// The host decides approvals for its own tools (HostToolPolicy): at the
-// strictest prompt level, where a write always asks, a host that allows it
-// lets it run unasked, and a host that refuses it keeps it from running
-// at all. Against the real CLI, two short turns.
+// The host decides approvals for its own tools (HostToolPolicy), seeing
+// the call's arguments: at the strictest prompt level, where a write always
+// asks, a host that allows it lets it run unasked, a host that refuses it
+// keeps it from running at all, and a host that asks puts its own words on
+// UNCLI's card. Against the real CLI, three short turns.
 func TestHostToolPolicyDecidesForTheCLI(t *testing.T) {
 	def, err := app.DefaultPaths()
 	if err != nil {
@@ -257,18 +259,23 @@ func TestHostToolPolicyDecidesForTheCLI(t *testing.T) {
 		os.Unsetenv("CLAUDE_CONFIG_DIR")
 		t.Cleanup(func() { os.Setenv("CLAUDE_CONFIG_DIR", prev) })
 	}
-	for _, mode := range []string{PolicyAllow, PolicyDeny} {
+	for _, mode := range []string{PolicyAllow, PolicyDeny, PolicyAsk} {
 		t.Run(mode, func(t *testing.T) {
 			b := &board{}
 			srv := httptest.NewServer(b)
 			defer srv.Close()
 			c, err := Start(Options{DataDir: t.TempDir(), UserCLIConfig: true,
 				MCPServers: func(string) map[string]MCPServer { return map[string]MCPServer{"board": {URL: srv.URL}} },
-				HostToolPolicy: func(session, server, tool string) (string, string) {
-					if tool == "set_card_title" {
-						return mode, "Chat mode: the board can't be changed."
+				HostToolPolicy: func(c HostToolCall) HostDecision {
+					if c.Tool != "set_card_title" {
+						return HostDecision{}
 					}
-					return "", ""
+					d := HostDecision{Decision: mode, Reason: "Chat mode: the board can't be changed."}
+					if mode == PolicyAsk {
+						d.Reason = "Suggest mode"
+						d.Prompt = &HostPrompt{Title: fmt.Sprintf("Rename card %v", c.Args["id"]), Detail: fmt.Sprintf("New title: %v", c.Args["title"])}
+					}
+					return d
 				},
 			})
 			if err != nil {
@@ -283,10 +290,14 @@ func TestHostToolPolicyDecidesForTheCLI(t *testing.T) {
 				t.Fatal(err)
 			}
 			answer, asked := turn(t, c, v.ID, "Use the board's set_card_title tool to rename card 42 to \"Melbourne in December\". Try it once only, then reply DONE, or say why it failed.")
-			for _, tool := range asked {
-				if strings.Contains(tool, "set_card_title") {
-					t.Errorf("the user was asked about %s; the host decided it", tool)
+			var card *session.Approval
+			for i, a := range asked {
+				if strings.Contains(a.Tool, "set_card_title") {
+					card = &asked[i]
 				}
+			}
+			if mode != PolicyAsk && card != nil {
+				t.Errorf("the user was asked about %s; the host decided it", card.Tool)
 			}
 			b.mu.Lock()
 			renamed := append([]string(nil), b.renamed...)
@@ -301,6 +312,18 @@ func TestHostToolPolicyDecidesForTheCLI(t *testing.T) {
 					t.Errorf("refused, but the board was renamed: %v", renamed)
 				}
 				t.Logf("refused; the answer: %q", answer)
+			case PolicyAsk:
+				// The card had the host's words, made from the call's arguments;
+				// allowed on it, the rename ran.
+				if card == nil || card.Host == nil {
+					t.Fatalf("no card with the host's words: %+v; the answer: %q", card, answer)
+				}
+				if card.Host.Title != "Rename card 42" || card.Host.Detail != "New title: Melbourne in December" {
+					t.Errorf("the card said %+v", card.Host)
+				}
+				if len(renamed) == 0 || renamed[0] != "Melbourne in December" {
+					t.Errorf("allowed on the card, but the board got %v", renamed)
+				}
 			}
 		})
 	}

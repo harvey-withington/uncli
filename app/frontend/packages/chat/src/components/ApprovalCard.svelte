@@ -71,6 +71,9 @@
     <p class="asking" aria-label={t('asking.title', names)}><Icon name="triangle-alert" size={13} /><span>{notes.join(' ')}</span></p>
   {/if}
   <div class="what" id="approval-{approval.requestId}">
+    {#if view.detail}
+      <p class="detail">{view.detail}</p>
+    {/if}
     {#if view.target}
       <CommandView command={view.target} why={approval.why} shell={isShell(approval.tool)} note={view.note} {names} />
     {:else if view.note}<span class="note">{view.note}</span>{/if}
@@ -116,6 +119,13 @@
     border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--warning-soft) 60%, var(--surface));
     box-shadow: var(--shadow-md);
+  }
+  /* A host's words for what changes (decision 0027), as written. */
+  .detail {
+    margin: 0;
+    white-space: pre-line;
+    font-size: var(--text-sm);
+    color: var(--text);
   }
   .head {
     display: flex;

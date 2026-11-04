@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/harvey-withington/uncli/app/internal/datadir"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 const hostOrigin = "https://bruv.example"
@@ -235,30 +236,46 @@ func TestNotAsAServiceAccount(t *testing.T) {
 // The host's policy is asked only about the servers it gave the session,
 // and only its three decisions count.
 func TestHostToolPolicyOnlyForTheHostsServers(t *testing.T) {
+	var seen HostToolCall
 	o := Options{
 		MCPServers: func(string) map[string]MCPServer {
 			return map[string]MCPServer{"board": {URL: "http://127.0.0.1:1/mcp"}}
 		},
-		HostToolPolicy: func(session, server, tool string) (string, string) {
-			if tool == "odd" {
-				return "maybe", ""
+		HostToolPolicy: func(c HostToolCall) HostDecision {
+			seen = c
+			switch c.Tool {
+			case "odd":
+				return HostDecision{Decision: "maybe"}
+			case "update_checklist":
+				return HostDecision{Decision: PolicyAsk, Reason: "Suggest mode", Prompt: &HostPrompt{Title: "Update checklist 'Preparation to Leave'", Detail: "Adds: Passport"}}
 			}
-			return PolicyDeny, "no"
+			return HostDecision{Decision: PolicyDeny, Reason: "no", Prompt: &HostPrompt{Title: "ignored: only asks show a prompt"}}
 		},
 	}
 	h := &hostTools{o: o, servers: map[string]map[string]bool{}}
 	h.mcp("s1")
-	if d, r := h.decide("s1", "board", "update_card"); d != PolicyDeny || r != "no" {
-		t.Errorf("the host's server: %q %q", d, r)
+	call := func(sess, server, tool, input string) session.HostDecision {
+		return h.decide(session.HostToolCall{SessionID: sess, Server: server, Tool: tool, Input: json.RawMessage(input)})
 	}
-	if d, _ := h.decide("s1", "github", "create_issue"); d != "" {
-		t.Errorf("the user's own server went to the host: %q", d)
+	if d := call("s1", "board", "update_card", `{"id":"42","title":"Melbourne"}`); d.Decision != PolicyDeny || d.Reason != "no" || d.Prompt != nil {
+		t.Errorf("the host's server: %+v", d)
 	}
-	if d, _ := h.decide("s2", "board", "update_card"); d != "" {
-		t.Errorf("a session the host gave no servers: %q", d)
+	// The host sees the call's arguments as a map.
+	if seen.Session != "s1" || seen.Server != "board" || seen.Args["id"] != "42" || seen.Args["title"] != "Melbourne" {
+		t.Errorf("the host saw %+v", seen)
 	}
-	if d, _ := h.decide("s1", "board", "odd"); d != "" {
-		t.Errorf("an unknown decision counted: %q", d)
+	d := call("s1", "board", "update_checklist", `{}`)
+	if d.Decision != PolicyAsk || d.Prompt == nil || d.Prompt.Title != "Update checklist 'Preparation to Leave'" || d.Prompt.Detail != "Adds: Passport" {
+		t.Errorf("an ask with a prompt: %+v", d)
+	}
+	if d := call("s1", "github", "create_issue", `{}`); d.Decision != "" {
+		t.Errorf("the user's own server went to the host: %+v", d)
+	}
+	if d := call("s2", "board", "update_card", `{}`); d.Decision != "" {
+		t.Errorf("a session the host gave no servers: %+v", d)
+	}
+	if d := call("s1", "board", "odd", `{}`); d.Decision != "" {
+		t.Errorf("an unknown decision counted: %+v", d)
 	}
 }
 

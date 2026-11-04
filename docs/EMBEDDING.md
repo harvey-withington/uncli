@@ -225,24 +225,37 @@ core, err := uncli.Start(uncli.Options{
 - **Approvals.** By default, calls to your tools are approved like any MCP server's. A tool marked read-only in its MCP annotations (`readOnlyHint`) runs without asking under the default prompt level; others ask in the chat, where your user can allow them once or always.
 - **Not yet in `uncli-core`.** For now, `MCPServers` is only available to Go hosts.
 
-**Your own approvals for your own tools.** `HostToolPolicy` lets your app decide instead, such as a Chat / Suggest / Edit mode of its own. It's asked at each call, so a mode switch takes effect at once:
+**Your own approvals for your own tools.** `HostToolPolicy` lets your app decide instead, such as a Chat / Suggest / Edit mode of its own. It's asked at each call, with the call's arguments, so a mode switch takes effect at once and you can say what this particular call does:
 
 ```go
-HostToolPolicy: func(session, server, tool string) (decision, reason string) {
-	if writes(tool) && modeOf(session) == "chat" {
-		return uncli.PolicyDeny, "Chat mode: the board can't be changed."
+HostToolPolicy: func(call uncli.HostToolCall) uncli.HostDecision {
+	// call.Session, call.Server, call.Tool, and call.Args (the arguments, as a map)
+	if !writes(call.Tool) {
+		return uncli.HostDecision{} // UNCLI's own rules
 	}
-	if writes(tool) && modeOf(session) == "edit" {
-		return uncli.PolicyAllow, "Edit mode"
+	switch modeOf(call.Session) {
+	case "chat":
+		return uncli.HostDecision{Decision: uncli.PolicyDeny, Reason: "Chat mode: the board can't be changed."}
+	case "suggest":
+		return uncli.HostDecision{Decision: uncli.PolicyAsk, Reason: "Suggest mode", Prompt: &uncli.HostPrompt{
+			Title:  fmt.Sprintf("Update checklist '%v'", call.Args["checklist"]),
+			Detail: describeChanges(call.Args), // "Adds: Passport\nTicks: Book taxi"
+		}}
 	}
-	return "", "" // UNCLI's own rules
+	return uncli.HostDecision{Decision: uncli.PolicyAllow, Reason: "Edit mode"}
 },
 ```
 
 - **`PolicyAllow`** runs the tool without asking, even at the strictest prompt level.
-- **`PolicyDeny`** refuses it, and the model is told your reason.
-- **`PolicyAsk`** asks the user in the chat, even where UNCLI wouldn't.
+- **`PolicyDeny`** refuses it, and the model is told your `Reason`.
+- **`PolicyAsk`** asks the user on UNCLI's approval card, even where UNCLI wouldn't. With a `Prompt`, the card shows your `Title` in place of the tool's name and arguments, and your `Detail` under it (plain text, line breaks kept). Without one, it shows the tool as UNCLI would.
 - **`""`** leaves it to UNCLI's rules.
+
+**Your prompt on the card.** It's an approval like any other:
+- It shows in both layouts.
+- It sends `uncli-needs-approval`, and counts towards the folded header's attention dot.
+- Allow once runs the tool, and Deny refuses it.
+- "This is safe" remembers the tool, in UNCLI's scope (this project or all of them). From then on the tool runs without you being asked, since the user chose "always". `PolicyDeny` still wins.
 
 Only your own servers' tools are asked about: those `MCPServers` gave the session. The CLI's own tools and the user's own MCP servers keep UNCLI's rules, so your app can't loosen their safety. The chat's trace shows "allowed by the app", with your reason.
 

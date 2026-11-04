@@ -49,7 +49,10 @@ type Approval struct {
 	// there before (prior).
 	Marked      bool   `json:"marked,omitempty"`
 	MarkedScope string `json:"markedScope,omitempty"`
-	prior       []priorEntry
+	// Host is an embedding host's words for the card, in place of the tool's
+	// name and arguments, when the host asked (Deps.HostTool).
+	Host  *HostPrompt `json:"host,omitempty"`
+	prior []priorEntry
 }
 
 // priorEntry is what the safe list held for a class before a card marked
@@ -122,16 +125,20 @@ const hostRefused = "Refused by the app this chat runs in."
 // one of its own MCP servers when it gives one (Deps.HostTool), else
 // UNCLI's own rules.
 func (s *Session) verdictLocked(p policy, a core.ToolAction) verdict {
-	if v, ok := s.hostVerdict(a); ok {
+	if v, ok := s.hostVerdict(p, a); ok {
 		return v
 	}
 	return p.judge(a)
 }
 
-// hostVerdict asks the host about an MCP tool; ok is false when the host
-// leaves it to UNCLI. The trace says the host decided ("host"), with its
-// reason.
-func (s *Session) hostVerdict(a core.ToolAction) (verdict, bool) {
+// hostVerdict asks the host about an MCP tool, with the call's arguments;
+// ok is false when the host leaves it to UNCLI. The trace says the host
+// decided ("host"), with its reason. When the host asks, the card shows
+// its prompt, and "This is safe" puts the tool on the user's safe list as
+// for any card; a tool the user has listed safe then runs without the host
+// asking again (the user's own "always" beats a host's ask, never its
+// refusal).
+func (s *Session) hostVerdict(p policy, a core.ToolAction) (verdict, bool) {
 	if s.m.d.HostTool == nil || a.Kind != core.ActMCP {
 		return verdict{}, false
 	}
@@ -139,18 +146,28 @@ func (s *Session) hostVerdict(a core.ToolAction) (verdict, bool) {
 	if !ok {
 		return verdict{}, false
 	}
-	decision, reason := s.m.d.HostTool(s.rec.ID, server, tool)
-	why := []store.TraceReason{{By: "host", Note: reason}}
-	switch decision {
+	d := s.m.d.HostTool(HostToolCall{SessionID: s.rec.ID, Server: server, Tool: tool, Input: a.Input})
+	why := []store.TraceReason{{By: "host", Note: d.Reason}}
+	switch d.Decision {
 	case actionRun:
 		return verdict{action: actionRun, by: "host", why: why}, true
 	case actionBlock:
+		reason := d.Reason
 		if reason == "" {
 			reason = hostRefused
 		}
 		return verdict{action: actionBlock, reason: reason, why: why}, true
 	case actionPrompt:
-		return verdict{action: actionPrompt, why: why}, true
+		own := p.judge(a)
+		if own.action == actionRun && own.by == "listed" {
+			return own, true
+		}
+		why[0].Class = &store.SafeClass{Kind: store.KindTool, Words: a.Tool}
+		var prompt *HostPrompt
+		if d.Prompt != nil && strings.TrimSpace(d.Prompt.Title) != "" {
+			prompt = &HostPrompt{Title: strings.TrimSpace(d.Prompt.Title), Detail: strings.TrimSpace(d.Prompt.Detail)}
+		}
+		return verdict{action: actionPrompt, class: own.class, why: why, host: prompt}, true
 	}
 	return verdict{}, false
 }
@@ -199,7 +216,7 @@ func (s *Session) askLocked(a core.ApprovalAsked) bool {
 
 // update takes a fresh verdict for a waiting request.
 func (a *Approval) update(v verdict) {
-	a.Class, a.Why, a.Judging = v.class, v.why, v.action == actionJudge
+	a.Class, a.Why, a.Judging, a.Host = v.class, v.why, v.action == actionJudge, v.host
 	a.Learn, _ = learnable(v.why)
 	if a.Learn == nil {
 		a.Learn = []store.SafeClass{}

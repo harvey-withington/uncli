@@ -11,6 +11,7 @@ export interface ApprovalView {
   body?: string // content to show below, already trimmed
   bodyLabel?: string
   lang?: string // for code-looking bodies
+  detail?: string // an embedding host's words for what changes: plain text, line breaks kept
 }
 
 const PREVIEW_LINES = 12
@@ -36,6 +37,8 @@ export function mcpName(tool: string): { server: string; name: string } | null {
 }
 
 export function describeApproval(a: Approval): ApprovalView {
+  // A host that asked says what it is in its own words (decision 0027).
+  if (a.host?.title) return { title: a.host.title, detail: a.host.detail || undefined }
   const input = (a.input ?? {}) as Record<string, unknown>
   switch (a.tool) {
     case 'Bash':

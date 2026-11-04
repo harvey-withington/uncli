@@ -78,7 +78,7 @@ type Options struct {
 	HostMCP func(sessionID string) []string
 	// HostTool is the host's decision on its own MCP servers' tools
 	// (session.Deps.HostTool).
-	HostTool func(sessionID, server, tool string) (decision, reason string)
+	HostTool func(session.HostToolCall) session.HostDecision
 }
 
 // errEmbedded refuses what only the desktop app does.

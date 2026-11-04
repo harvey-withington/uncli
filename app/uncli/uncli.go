@@ -32,6 +32,7 @@ import (
 	"github.com/harvey-withington/uncli/app/internal/datadir"
 	"github.com/harvey-withington/uncli/app/internal/hook"
 	"github.com/harvey-withington/uncli/app/internal/remote"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // Options are how a host runs its UNCLI.
@@ -81,15 +82,41 @@ type Options struct {
 }
 
 // HostToolPolicy decides approvals for the tools of the host's own MCP
-// servers (those MCPServers gave the session), asked at each call, so a
-// mode switch on the host's side (BRUV's Chat / Suggest / Edit) takes
-// effect at once. Its decision: PolicyAllow runs the tool without asking;
-// PolicyDeny refuses it, and reason is told to the model; PolicyAsk asks
-// the user in the chat even where UNCLI wouldn't; "" leaves it to UNCLI's
-// rules (annotations, the prompt level, the safe list). Tools of any other
-// server, and the CLI's own tools, are never asked about: a host can't
-// loosen those. The trace says the host decided, with its reason.
-type HostToolPolicy func(session, server, tool string) (decision, reason string)
+// servers (those MCPServers gave the session), asked at each call with its
+// arguments, so a mode switch on the host's side (BRUV's Chat / Suggest /
+// Edit) takes effect at once. Tools of any other server, and the CLI's own
+// tools, are never asked about: a host can't loosen those.
+type HostToolPolicy func(HostToolCall) HostDecision
+
+// HostToolCall is one call of a tool of the host's own server.
+type HostToolCall struct {
+	Session string         // the session's id (newSession's; SessionMeta says what it's for)
+	Server  string         // the server's name, as MCPServers gave it
+	Tool    string         // the tool's name
+	Args    map[string]any // the call's arguments, as the model gave them (nil if it gave none)
+}
+
+// HostDecision is the host's word on a call. Decision: PolicyAllow runs it
+// without asking; PolicyDeny refuses it, and Reason is told to the model;
+// PolicyAsk asks the user on UNCLI's approval card, which shows Prompt (in
+// the host's words) in place of the tool's name and arguments; "" leaves
+// it to UNCLI's rules (annotations, the prompt level, the safe list). The
+// trace says the host decided, with Reason. On a card the host asked for,
+// "This is safe" puts the tool on the user's safe list, in UNCLI's scope,
+// and from then on it runs without the host asking; a refusal still wins.
+type HostDecision struct {
+	Decision string
+	Reason   string
+	Prompt   *HostPrompt // with PolicyAsk; nil shows the tool as UNCLI would
+}
+
+// HostPrompt is what the approval card says: Title in place of the tool's
+// name ("Update checklist 'Preparation to Leave'"), Detail under it (what
+// changes; plain text, line breaks kept).
+type HostPrompt struct {
+	Title  string
+	Detail string
+}
 
 // HostToolPolicy's decisions.
 const (
@@ -118,19 +145,29 @@ func (h *hostTools) mcp(session string) []string {
 	return mcpConfig(servers)
 }
 
-func (h *hostTools) decide(session, server, tool string) (string, string) {
+func (h *hostTools) decide(call session.HostToolCall) session.HostDecision {
 	h.mu.Lock()
-	own := h.servers[session][server]
+	own := h.servers[call.SessionID][call.Server]
 	h.mu.Unlock()
 	if !own {
-		return "", ""
+		return session.HostDecision{}
 	}
-	d, reason := h.o.HostToolPolicy(session, server, tool)
-	switch d {
-	case PolicyAllow, PolicyDeny, PolicyAsk:
-		return d, reason
+	var args map[string]any
+	if len(call.Input) > 0 {
+		_ = json.Unmarshal(call.Input, &args)
 	}
-	return "", ""
+	d := h.o.HostToolPolicy(HostToolCall{Session: call.SessionID, Server: call.Server, Tool: call.Tool, Args: args})
+	switch d.Decision {
+	case PolicyAllow, PolicyDeny:
+		return session.HostDecision{Decision: d.Decision, Reason: d.Reason}
+	case PolicyAsk:
+		out := session.HostDecision{Decision: d.Decision, Reason: d.Reason}
+		if d.Prompt != nil {
+			out.Prompt = &session.HostPrompt{Title: d.Prompt.Title, Detail: d.Prompt.Detail}
+		}
+		return out
+	}
+	return session.HostDecision{}
 }
 
 // MCPServer is an MCP server of the host's, reached over HTTP.
@@ -274,7 +311,7 @@ func Start(o Options) (*Core, error) {
 	if o.MCPServers != nil {
 		hostMCP = host.mcp
 	}
-	var hostTool func(string, string, string) (string, string)
+	var hostTool func(session.HostToolCall) session.HostDecision
 	if o.MCPServers != nil && o.HostToolPolicy != nil {
 		hostTool = host.decide
 	}

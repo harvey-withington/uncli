@@ -114,6 +114,54 @@ describe('the chat’s own life in a host', () => {
   })
 })
 
+describe('a host’s own approval prompts', () => {
+  // HostToolPolicy asked, with its words for the card (decision 0027).
+  const hostCard = {
+    requestId: 'h1',
+    tool: 'mcp__board__update_checklist',
+    input: { checklist: 'Preparation to Leave', add: ['Passport'] },
+    learn: [{ kind: 'tool', words: 'mcp__board__update_checklist' }],
+    why: [{ by: 'host', note: 'Suggest mode' }],
+    askedAt: Date.now(),
+    host: { title: "Update checklist 'Preparation to Leave'", detail: 'Adds: Passport\nTicks: Book taxi' },
+  }
+
+  for (const compact of ['false', '']) {
+    it(`shows the host’s words on the card in the ${compact === '' ? 'compact' : 'desktop'} layout, and answers it like any card`, async () => {
+      const backend = mockBackend()
+      const answer = vi.spyOn(backend, 'answerApproval')
+      const needs = vi.fn()
+      document.addEventListener('uncli-needs-approval', needs)
+      try {
+        const el = chat(backend, { compact })
+        await inside(el).findByText(QUESTION)
+        const client = chatClient(backend)
+        const view = client.session('s-code').snapshot().view!
+        client.upsertSession({ ...view, approvals: [hostCard] as unknown as typeof view.approvals })
+        const card = await inside(el).findByRole('alertdialog', { name: "Update checklist 'Preparation to Leave'" })
+        expect(card.textContent).toContain('Adds: Passport')
+        expect(card.textContent).toContain('Ticks: Book taxi')
+        // What it does is in the host's words, not the tool's raw name and
+        // arguments; "This is safe" still says what it would remember, in
+        // UNCLI's scoping.
+        const what = card.querySelector('.what')!.textContent ?? ''
+        expect(what).not.toContain('update_checklist')
+        expect(what).not.toContain('{')
+        expect(card.textContent).toContain('Will remember as safe: update_checklist (board)')
+        await waitFor(() => expect(needs).toHaveBeenCalled())
+        if (compact === '') {
+          // The folded header counts it.
+          expect(inside(el).getByRole('button', { name: /^Options \(\d+ needs? attention\)$/ })).toBeInTheDocument()
+        }
+        await fireEvent.click(within(card).getByRole('button', { name: /Allow once/ }))
+        expect(answer).toHaveBeenCalledWith('s-code', 'h1', 'allow')
+      } finally {
+        document.removeEventListener('uncli-needs-approval', needs)
+      }
+    })
+  }
+})
+
 describe('a host’s controls in the message box', () => {
   const modes = [
     { id: 'chat', label: 'Chat', icon: 'message-circle', tone: 'success' as const, hint: "Can't change the board" },

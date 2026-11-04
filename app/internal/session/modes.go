@@ -95,6 +95,7 @@ type verdict struct {
 	why    []store.TraceReason
 	class  Class
 	judge  []JudgeQuery // what the model must judge first (actionJudge)
+	host   *HostPrompt  // the host's words for its card (actionPrompt from Deps.HostTool)
 }
 
 // JudgeQuery is something for the quick-task model to judge: one part of a
@@ -317,7 +318,7 @@ func combine(why []store.TraceReason, cls Class) verdict {
 func learnable(why []store.TraceReason) (classes []store.SafeClass, ok bool) {
 	for _, r := range why {
 		switch r.By {
-		case "unsafe", "unknown", "always":
+		case "unsafe", "unknown", "always", "host":
 			if r.Class == nil {
 				return nil, false
 			}

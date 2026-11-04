@@ -77,11 +77,32 @@ type Deps struct {
 	HostMCP func(sessionID string) []string
 	// HostTool is an embedding host's own decision on a tool of one of its
 	// MCP servers (decision 0027), asked at each call so a mode switch on
-	// the host's side takes effect at once: actionRun (run it), actionBlock
-	// (refuse it, reason told to the model), actionPrompt (ask the user even
-	// where UNCLI wouldn't), or "" to leave it to UNCLI. The host checks the
-	// server is its own; UNCLI asks only about MCP tools. nil: never asked.
-	HostTool func(sessionID, server, tool string) (decision, reason string)
+	// the host's side takes effect at once. The host checks the server is
+	// its own; UNCLI asks only about MCP tools. nil: never asked.
+	HostTool func(HostToolCall) HostDecision
+}
+
+// HostToolCall is one call of an MCP tool, put to the host (Deps.HostTool).
+type HostToolCall struct {
+	SessionID, Server, Tool string
+	Input                   json.RawMessage // the call's arguments, as the CLI gave them
+}
+
+// HostDecision is the host's word on a call: Decision is actionRun (run
+// it), actionBlock (refuse it, Reason told to the model), actionPrompt (ask
+// the user even where UNCLI wouldn't, the card showing Prompt when given),
+// or "" to leave it to UNCLI.
+type HostDecision struct {
+	Decision, Reason string
+	Prompt           *HostPrompt
+}
+
+// HostPrompt is what a host's approval card says, in the host's words, in
+// place of the tool's name and arguments: what the call does ("Update
+// checklist 'Preparation to Leave'") and what it changes.
+type HostPrompt struct {
+	Title  string `json:"title"`
+	Detail string `json:"detail,omitempty"`
 }
 
 // RuntimeWSL is the runtime of sessions in a container (a WSL distro).
