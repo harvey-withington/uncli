@@ -11,6 +11,7 @@
   import Icon from './Icon.svelte'
   import SlashMenu from './SlashMenu.svelte'
   import MentionMenu from './MentionMenu.svelte'
+  import ComposerControls from './ComposerControls.svelte'
   import { useShell } from '../lib/shell.svelte'
 
   const shell = useShell()
@@ -258,6 +259,7 @@
       {onkeydown}
       {onpaste}
     ></textarea>
+    <ComposerControls />
   </div>
   {#if remote}
     <input bind:this={picker} type="file" multiple accept="image/*,application/pdf,text/*,.md,.json,.txt" class="visually-hidden" tabindex="-1" aria-hidden="true" onchange={e => upload(e.currentTarget.files)} />
@@ -298,6 +300,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+    container: composer / inline-size; /* a host's controls drop their labels when it's narrow */
   }
   .attachments {
     display: flex;

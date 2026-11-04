@@ -20,6 +20,7 @@ import { t } from '../lib/i18n.svelte'
 import { namesOf, providerOf } from '../lib/api'
 import { Shell } from '../lib/shell.svelte'
 import type { EnterKey } from '../lib/enterkey.svelte'
+import type { ComposerControl } from '../lib/composercontrols'
 
 export type { Live }
 
@@ -86,6 +87,11 @@ export class ChatStore {
   // its header (deleted). Unset in the app, which has its sidebar.
   newChat: (() => void) | undefined = undefined
   deleted: ((id: string) => void) | undefined = undefined
+  // An embedding host's own controls in the message box
+  // (lib/composercontrols.ts), and whether it put anything in the
+  // composer-controls slot.
+  composerControls = $state.raw<ComposerControl[]>([])
+  composerSlot = $state(false)
 
   constructor(backend: Backend, opts: ChatStoreOptions = {}) {
     this.client = opts.client ?? new ChatClient(backend)

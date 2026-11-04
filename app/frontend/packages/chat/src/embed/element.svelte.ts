@@ -35,6 +35,7 @@ import { keepInMemory } from '../lib/storage'
 import { allowLinkSchemes } from '../lib/render/markdown'
 import { ChatStore, type Mention } from '../stores/chat.svelte'
 import type { EnterKey } from '../lib/enterkey.svelte'
+import type { ComposerControl } from '../lib/composercontrols'
 import { applyScheme, hostFont, shadowFor, srcBackend } from './root'
 
 // What a host can do for the chat (decision 0026).
@@ -56,6 +57,11 @@ export interface ChatHost {
   // chat: "send" (Shift+Enter for a new line) or "newline" (Ctrl+Enter
   // sends). Left out: the viewer's setting, or a new line on touch screens.
   enter?: EnterKey
+  // composerControls: the host's own controls in the message box (buttons,
+  // toggles, drop-downs; lib/composercontrols.ts), drawn by UNCLI. Set host
+  // again with new values to change them. Anything else goes in the
+  // composer-controls slot.
+  composerControls?: ComposerControl[]
 }
 
 export class UncliChat extends HTMLElement {
@@ -89,7 +95,10 @@ export class UncliChat extends HTMLElement {
     this.#host = h
     setHostText(h?.t ? (key, params) => h.t?.(key, params) : null)
     setHostHeaders(h?.headers ? () => h.headers?.() : null)
-    if (this.#props) this.#props.store.enterKey = h?.enter
+    if (this.#props) {
+      this.#props.store.enterKey = h?.enter
+      this.#props.store.composerControls = h?.composerControls ?? []
+    }
   }
 
   // The session shown (the session attribute).
@@ -119,11 +128,22 @@ export class UncliChat extends HTMLElement {
     applyScheme(this)
     this.#linkSchemes()
     this.shadowRoot?.addEventListener('keydown', this.#keys, true)
+    // The host may put its own controls in the composer-controls slot later.
+    this.#children.observe(this, { childList: true })
     this.#mount()
+  }
+
+  #children = new MutationObserver(() => {
+    if (this.#props) this.#props.store.composerSlot = this.#hasComposerSlot()
+  })
+
+  #hasComposerSlot(): boolean {
+    return [...this.children].some(c => c.getAttribute('slot') === 'composer-controls')
   }
 
   disconnectedCallback() {
     this.shadowRoot?.removeEventListener('keydown', this.#keys, true)
+    this.#children.disconnect()
     this.#unmount()
   }
 
@@ -185,6 +205,8 @@ export class UncliChat extends HTMLElement {
     store.turnContext = () => this.#host?.turnContext?.()
     store.complete = query => this.#host?.complete?.(query) ?? []
     store.enterKey = this.#host?.enter
+    store.composerControls = this.#host?.composerControls ?? []
+    store.composerSlot = this.#hasComposerSlot()
     store.embedded = true
     store.newChat = () => void this.#newChat()
     store.deleted = id => this.#emitFor('uncli-deleted', { session: id })

@@ -7,7 +7,7 @@
     id: string
     label: string
     icon?: string
-    tone?: '' | 'success' | 'warning' | 'accent'
+    tone?: '' | 'success' | 'warning' | 'accent' | 'danger' | 'muted'
     hint?: string // what it does, in the tooltip
   }
 
@@ -116,9 +116,18 @@
     background: var(--accent-soft);
     color: var(--accent);
   }
+  .danger {
+    border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+  .muted {
+    color: var(--text-muted);
+  }
   .success .what,
   .warning .what,
-  .accent .what {
+  .accent .what,
+  .danger .what {
     color: inherit;
     opacity: 0.75;
   }

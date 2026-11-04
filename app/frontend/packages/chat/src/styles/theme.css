@@ -211,6 +211,19 @@ code, pre, kbd { font-family: var(--mono); font-size: 0.9em; font-variant-ligatu
 .btn.ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .btn.danger { color: var(--danger); }
 .btn.icon { width: 32px; padding: 0; justify-content: center; }
+
+/* A host's controls in the message box (lib/composercontrols.ts): the
+   prompt level's look (CycleButton), worn by buttons and drop-downs, in a
+   tone drawn from the colours a host themes. */
+.ctl { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; font-size: var(--text-xs); font-weight: 560; white-space: nowrap; cursor: pointer; transition: background var(--fast) var(--ease), color var(--fast) var(--ease), border-color var(--fast) var(--ease); }
+.ctl:hover:not(:disabled) { border-color: var(--text-faint); }
+.ctl:disabled { opacity: 0.5; cursor: default; }
+.ctl:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ctl.success { border-color: color-mix(in srgb, var(--success) 35%, var(--border)); background: var(--success-soft); color: var(--success); }
+.ctl.warning { border-color: color-mix(in srgb, var(--warning) 40%, var(--border)); background: var(--warning-soft); color: var(--warning); }
+.ctl.danger { border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); background: var(--danger-soft); color: var(--danger); }
+.ctl.accent { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--accent-soft); color: var(--accent); }
+.ctl.muted { color: var(--text-muted); }
 .btn.small { height: 26px; padding: 0 var(--space-2); font-size: var(--text-xs); }
 .btn.small.icon { width: 26px; }
 

@@ -94,6 +94,7 @@
   import Star from 'lucide-svelte/icons/star'
   import Scale from 'lucide-svelte/icons/scale'
   import TableOfContents from 'lucide-svelte/icons/table-of-contents'
+  import PencilLine from 'lucide-svelte/icons/pencil-line'
 
   // Icon names as used in YAML config (Lucide's kebab-case), plus a few
   // the app uses itself. Unknown names fall back to a neutral glyph.
@@ -103,7 +104,7 @@
     'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code, coffee: Coffee,
     copy: Copy, download: Download, file: File, 'file-text': FileText, image: ImageIcon, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,
     'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, 'qr-code': QrCode, smartphone: Smartphone, 'arrow-left': ArrowLeft, folder: Folder, paperclip: Paperclip, 'wifi-off': WifiOff, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,
-    plus: Plus, play: Play, rewind: Rewind, search: Search, plug: Plug, unplug: Unplug, 'key-round': KeyRound, 'list-checks': ListChecks, 'message-circle-question': MessageCircleQuestion, 'rotate-ccw': RotateCcw, shield: Shield, 'fast-forward': FastForward, settings: Settings, 'shield-check': ShieldCheck, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
+    plus: Plus, play: Play, rewind: Rewind, search: Search, plug: Plug, unplug: Unplug, 'key-round': KeyRound, 'list-checks': ListChecks, 'pencil-line': PencilLine, 'message-circle-question': MessageCircleQuestion, 'rotate-ccw': RotateCcw, shield: Shield, 'fast-forward': FastForward, settings: Settings, 'shield-check': ShieldCheck, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
     sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
     eye: Eye, 'globe-lock': GlobeLock, hand: Hand, zap: Zap,

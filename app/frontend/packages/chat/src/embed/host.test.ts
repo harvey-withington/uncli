@@ -114,6 +114,68 @@ describe('the chat’s own life in a host', () => {
   })
 })
 
+describe('a host’s controls in the message box', () => {
+  const modes = [
+    { id: 'chat', label: 'Chat', icon: 'message-circle', tone: 'success' as const, hint: "Can't change the board" },
+    { id: 'suggest', label: 'Suggest', icon: 'list-checks', tone: 'warning' as const },
+    { id: 'edit', label: 'Edit', icon: 'pencil-line', tone: 'danger' as const },
+  ]
+
+  it('draws a drop-down for several options, and tells the host the pick', async () => {
+    const el = chat()
+    const onChange = vi.fn()
+    el.host = { composerControls: [{ id: 'mode', label: 'Mode', value: 'chat', options: modes, onChange }] }
+    await inside(el).findByText(QUESTION)
+    const button = inside(el).getByRole('button', { name: 'Mode: Chat' })
+    expect(button).toHaveAttribute('aria-haspopup', 'menu')
+    await fireEvent.click(button)
+    await fireEvent.click(inside(el).getByRole('menuitemradio', { name: /Edit/ }))
+    expect(onChange).toHaveBeenCalledWith('edit')
+    // The host owns the value: it shows once the host sets it.
+    el.host = { composerControls: [{ id: 'mode', label: 'Mode', value: 'edit', options: modes, onChange }] }
+    expect(await inside(el).findByRole('button', { name: 'Mode: Edit' })).toBeInTheDocument()
+  })
+
+  it('moves a toggle to its next state on each click', async () => {
+    const el = chat()
+    const onChange = vi.fn()
+    el.host = { composerControls: [{ kind: 'toggle', id: 'mode', label: 'Mode', value: 'suggest', states: modes, onChange }] }
+    await inside(el).findByText(QUESTION)
+    await fireEvent.click(inside(el).getByRole('button', { name: 'Mode: Suggest' }))
+    expect(onChange).toHaveBeenCalledWith('edit')
+  })
+
+  it('draws a single option, or a plain action, as a button with no drop-down', async () => {
+    const el = chat()
+    const onChange = vi.fn()
+    const onClick = vi.fn()
+    el.host = {
+      composerControls: [
+        { id: 'mode', options: modes.slice(0, 1), onChange },
+        { id: 'review', label: 'Review edits', icon: 'list-checks', onClick },
+      ],
+    }
+    await inside(el).findByText(QUESTION)
+    const only = inside(el).getByRole('button', { name: 'Chat' })
+    expect(only).not.toHaveAttribute('aria-haspopup')
+    await fireEvent.click(only)
+    expect(onChange).toHaveBeenCalledWith('chat')
+    await fireEvent.click(inside(el).getByRole('button', { name: 'Review edits' }))
+    expect(onClick).toHaveBeenCalled()
+  })
+
+  it('makes room for anything the host puts in the composer-controls slot', async () => {
+    const el = chat()
+    await inside(el).findByText(QUESTION)
+    expect(el.shadowRoot!.querySelector('slot[name="composer-controls"]')).toBeNull()
+    const mine = document.createElement('button')
+    mine.slot = 'composer-controls'
+    mine.textContent = 'My own'
+    el.append(mine)
+    await waitFor(() => expect(el.shadowRoot!.querySelector('slot[name="composer-controls"]')).not.toBeNull())
+  })
+})
+
 describe('the folded header', () => {
   it('marks Options when something inside wants the user, and says so', async () => {
     const el = chat(mockBackend({ unattended: true }), { compact: '' })
