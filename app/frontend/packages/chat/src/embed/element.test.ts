@@ -64,7 +64,8 @@ describe('<uncli-chat>', () => {
     expect(el.shadowRoot!.querySelector('section.session')).not.toBeNull()
     expect(el.shadowRoot!.querySelector('section.pane')).toBeNull()
     expect(inside(el).queryByRole('button', { name: 'Back' })).toBeNull()
-    expect(inside(el).getByRole('button', { name: 'Options' })).toBeInTheDocument()
+    // Named with what needs attention, when something does (the mock's MCP servers).
+    expect(inside(el).getByRole('button', { name: /^Options/ })).toBeInTheDocument()
     el.setAttribute('compact', 'false')
     await waitFor(() => expect(el.shadowRoot!.querySelector('section.pane')).not.toBeNull())
   })

@@ -12,7 +12,10 @@
     "./src/lib/api/index.ts"
   ],
   "exports": {
-    "./element": "./dist/uncli-chat.js",
+    "./element": {
+      "types": "./element.d.ts",
+      "default": "./dist/uncli-chat.js"
+    },
     "./embed": "./src/embed/index.ts",
     "./*": "./src/*"
   },
@@ -30,6 +33,7 @@
   "files": [
     "src",
     "dist",
+    "element.d.ts",
     "!**/*.test.ts"
   ]
 }

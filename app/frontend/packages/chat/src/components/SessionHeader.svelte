@@ -116,14 +116,15 @@
   {#if chat.embedded}<svelte:element this={'slot'} name="header-end" />{/if}
 {/snippet}
 
-{#snippet chatActions(small: boolean)}
-  <!-- In a host's page, where there may be no session list. -->
+{#snippet chatActions(labelled: boolean)}
+  <!-- In a host's page, where there may be no session list: words in the
+       compact Options, where there's room; icons on the desktop's title line. -->
   {#if chat.newChat}
     {@const start = chat.newChat}
-    <button class="btn ghost icon" class:small class:touch={!small} onclick={() => start()} aria-label={t('chat.new')} title={t('chat.new')}><Icon name="plus" /></button>
+    <button class="btn ghost small" class:icon={!labelled} onclick={() => start()} aria-label={t('chat.new')} title={t('chat.new')}><Icon name="plus" size={labelled ? 15 : 16} />{#if labelled}{t('chat.new')}{/if}</button>
   {/if}
   {#if chat.deleted}
-    <button class="btn ghost icon" class:small class:touch={!small} onclick={removeChat} aria-label={t('chat.delete')} title={t('chat.delete')}><Icon name="trash" /></button>
+    <button class="btn ghost small" class:icon={!labelled} onclick={removeChat} aria-label={t('chat.delete')} title={t('chat.delete')}><Icon name="trash" size={labelled ? 15 : 16} />{#if labelled}{t('chat.delete')}{/if}</button>
   {/if}
 {/snippet}
 
@@ -187,7 +188,7 @@
           <Icon name="shield" />
         </button>
       {/if}
-      {@render chatActions(true)}
+      {@render chatActions(false)}
       <button
         class="btn ghost small icon"
         onclick={() => chat.togglePanel()}

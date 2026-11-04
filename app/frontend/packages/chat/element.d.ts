@@ -1,0 +1,117 @@
+// Types for @uncli/chat/element, the built <uncli-chat> and
+// <uncli-session-list> (decisions 0026 and 0027), for TypeScript hosts. The
+// element is plain JavaScript with Svelte inside; these describe only what
+// a host uses. Kept in step with src/embed by embed/types.test.ts.
+import type { Backend, ChatClient } from '@uncli/client'
+
+// A host's own controls in the message box (src/lib/composercontrols.ts).
+export type Tone = 'accent' | 'success' | 'warning' | 'danger' | 'muted'
+
+export interface ControlItem {
+  id: string
+  label: string
+  icon?: string // a Lucide name from UNCLI's set
+  tone?: Tone
+  hint?: string
+}
+
+// One click: an action, or one option alone.
+export interface ButtonControl extends Partial<ControlItem> {
+  kind?: 'button'
+  id: string
+  label: string
+  onClick?: () => void
+  disabled?: boolean
+}
+
+// Each click moves to the next state (Shift+click back), wrapping round.
+export interface ToggleControl {
+  kind: 'toggle'
+  id: string
+  label?: string
+  value: string
+  states: ControlItem[]
+  onChange: (id: string) => void
+}
+
+// One of several, from a drop-down.
+export interface MenuControl {
+  kind?: 'menu'
+  id: string
+  label?: string
+  value?: string
+  options: ControlItem[]
+  onChange: (id: string) => void
+}
+
+export type ComposerControl = ButtonControl | ToggleControl | MenuControl
+
+// An @mention the host offers: label and detail in the menu, insert in the message.
+export interface Mention {
+  label: string
+  detail?: string
+  insert: string
+}
+
+// What a host does for the chat (the element's host property).
+export interface ChatHost {
+  // Every link clicked in an answer comes here first: true when the host took it.
+  openLink?(href: string): boolean
+  // The host's text for one of UNCLI's strings, or nothing to keep UNCLI's.
+  t?(key: string, params?: Record<string, string | number>): string | undefined | null
+  // @mentions: what matches the word typed after an @.
+  complete?(query: string): Promise<Mention[]> | Mention[]
+  // What the user has in front of them now, sent (hidden) with each turn.
+  turnContext?(): string | undefined | null
+  // The host's own sign-in, sent with every request to src.
+  headers?(): Record<string, string> | undefined | null
+  // What Enter does in the message box; left out: the viewer's, or a new line on touch screens.
+  enter?: 'send' | 'newline'
+  // The host's own controls in the message box, drawn by UNCLI.
+  composerControls?: ComposerControl[]
+}
+
+export declare class UncliChat extends HTMLElement {
+  backend: Backend | null
+  host: ChatHost | null
+  session: string
+  // Starts a session and shows it; meta is the host's word on what it's for.
+  newSession(profile?: string, workdir?: string, model?: string, opts?: { meta?: string }): Promise<string>
+}
+
+export declare class UncliSessionList extends HTMLElement {
+  backend: Backend | null
+  selected: string
+}
+
+export declare function defineUncliChat(name?: string): void
+export declare function defineUncliSessionList(name?: string): void
+
+// The client the elements use, from the same bundle (one connection).
+export declare function chatClient(backend: Backend): ChatClient
+export declare function mountedBackend(src: string): Backend
+export declare function setHostHeaders(headers: (() => Record<string, string> | null | undefined) | null): void
+
+// The events the elements send: detail { session } (uncli-new-session and
+// uncli-select add to it).
+export interface UncliEventMap {
+  'uncli-ready': CustomEvent<{ session: string }>
+  'uncli-busy': CustomEvent<{ session: string }>
+  'uncli-idle': CustomEvent<{ session: string }>
+  'uncli-needs-approval': CustomEvent<{ session: string }>
+  'uncli-missing': CustomEvent<{ session: string }>
+  'uncli-deleted': CustomEvent<{ session: string }>
+  'uncli-new-chat': CustomEvent<{ session: string }>
+  'uncli-new-session': CustomEvent<{ session: string; previous: string }>
+  'uncli-select': CustomEvent<{ session: string }>
+  'uncli-escape': CustomEvent<{ session: string }>
+  'uncli-submit': CustomEvent<{ session: string }>
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'uncli-chat': UncliChat
+    'uncli-session-list': UncliSessionList
+  }
+  interface HTMLElementEventMap extends UncliEventMap {}
+}

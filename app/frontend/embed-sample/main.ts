@@ -4,7 +4,7 @@
 // ?src=/uncli (by uncli-sample-host, say), they use the host's own UNCLI
 // at that path instead (decision 0027), and New chat starts a session.
 import { mockBackend } from '@uncli/client/mock'
-import { mountedBackend, type UncliChat, type UncliSessionList } from '@uncli/chat/embed'
+import { mountedBackend, type ChatHost, type UncliChat, type UncliSessionList } from '@uncli/chat/embed'
 
 const src = new URLSearchParams(location.search).get('src')
 const backend = src ? mountedBackend(src) : mockBackend()
@@ -31,7 +31,7 @@ list.addEventListener('uncli-select', e => {
 })
 
 const log = document.getElementById('log') as HTMLElement
-for (const type of ['uncli-ready', 'uncli-select', 'uncli-busy', 'uncli-idle', 'uncli-needs-approval']) {
+for (const type of ['uncli-ready', 'uncli-select', 'uncli-busy', 'uncli-idle', 'uncli-needs-approval', 'uncli-missing', 'uncli-deleted', 'uncli-new-session']) {
   document.addEventListener(type, e => {
     const detail = (e as CustomEvent<{ session: string }>).detail
     log.textContent += `${type} ${detail.session}\n`
@@ -47,11 +47,36 @@ const things = [
   { label: 'Packing list', detail: 'card', insert: '[Packing list](sample:card:2)' },
 ]
 second.setAttribute('link-schemes', 'sample')
-second.host = {
+// Its own controls in the message box: a mode, picked from a drop-down,
+// and a switch that moves on each click. The host owns the values, so it
+// sets host again when one changes.
+let mode = 'chat'
+let length = 'brief'
+const modes = [
+  { id: 'chat', label: 'Chat', icon: 'message-circle', tone: 'success' as const, hint: "Can't change the board" },
+  { id: 'suggest', label: 'Suggest', icon: 'list-checks', tone: 'warning' as const, hint: 'Changes wait for your review' },
+  { id: 'edit', label: 'Edit', icon: 'pencil-line', tone: 'danger' as const, hint: 'Changes apply at once' },
+]
+const host = (): ChatHost => ({
   complete: query => things.filter(x => x.label.toLowerCase().includes(query.toLowerCase())),
-  turnContext: () => 'The user has the card "Lisbon trip" open.',
+  turnContext: () => `The user has the card "Lisbon trip" open, in ${mode} mode.`,
   openLink: href => {
     log.textContent += `host opens ${href}\n`
     return href.startsWith('sample:')
   },
-}
+  composerControls: [
+    { id: 'mode', label: 'Mode', value: mode, options: modes, onChange: id => ((mode = id), (second.host = host())) },
+    {
+      kind: 'toggle',
+      id: 'length',
+      label: 'Answers',
+      value: length,
+      states: [
+        { id: 'brief', label: 'Brief', icon: 'shrink' },
+        { id: 'full', label: 'In full', icon: 'list-checks', tone: 'accent' as const },
+      ],
+      onChange: id => ((length = id), (second.host = host())),
+    },
+  ],
+})
+second.host = host()

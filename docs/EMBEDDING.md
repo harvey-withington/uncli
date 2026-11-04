@@ -22,7 +22,8 @@ what exists today and says what doesn't yet.
 | **Status** | Alpha, on the `feat/embed` branch. Not published to a registry yet. Windows only, like UNCLI. |
 | **The core, for Go** | `github.com/harvey-withington/uncli/app/uncli` (the `app/uncli` folder). |
 | **The core, for anything else** | `uncli-core.exe`: `go build ./cmd/uncli-core` in `app/`. Releases will carry it too, as `uncli-core-<version>-windows-x64.exe` with its checksum in `SHA256SUMS.txt`. |
-| **Packages** | `@uncli/chat` (`app/frontend/packages/chat`): the elements, built, as `@uncli/chat/element`, and the Svelte components as source. `@uncli/client` (`app/frontend/packages/client`): the client underneath, and its mock as `@uncli/client/mock`. |
+| **Packages** | `@uncli/chat` (`app/frontend/packages/chat`): the elements, built, as `@uncli/chat/element`, with TypeScript types (`element.d.ts`), and the Svelte components as source. `@uncli/client` (`app/frontend/packages/client`): the client underneath, and its mock as `@uncli/client/mock`. |
+| **Go dependencies** | Importing `app/uncli` needs Go 1.26, and brings UNCLI's own dependencies in as indirect ones, Tailscale's client among them, with newer `golang.org/x/*` than you may have. |
 | **Getting them** | `npm --prefix app/frontend run pack:packages` builds the element and packs both packages as tarballs into `app/frontend/dist-embed/packs/`. A host installs the two tarballs (`npm install <path>/uncli-client-….tgz <path>/uncli-chat-….tgz`). |
 | **Samples** | `npm --prefix app/frontend run build:embed` builds a sample host page into `dist-embed/sample/`. On its own it runs on UNCLI's mock. Served by a host, opened with `?src=/uncli`, it uses that host's UNCLI: `app/cmd/uncli-sample-host` is one in Go, `app/frontend/embed-sample/node-host.mjs` one in Node. |
 
@@ -62,7 +63,11 @@ uncli-core --data <folder> --origin https://app.example --name "My app"   (the k
 
 **Who can use it is your business.** Anyone you let reach `/uncli/` can make the CLIs run tools as your server's user, on its machine. Put your own sign-in in front of it. Approvals, prompt levels and the safe list apply as they do in UNCLI.
 
-**Run as a person, not a service account.** The CLIs run tools as the account your server runs as. UNCLI refuses to start as one of Windows' service accounts (LocalSystem, LocalService, NetworkService): LocalSystem can do anything on the machine. If your server is a Windows service, set its *Log on as* to a person's account. `AllowServiceAccount` (`--allow-service-account`) overrides this, if you really mean it.
+**Run as a person, not a service account.** The CLIs run tools as the account your server runs as. UNCLI refuses to start as one of Windows' service accounts (LocalSystem, LocalService, NetworkService): LocalSystem can do anything on the machine.
+- If your server is a Windows service, set its *Log on as* to a person's account.
+- Check your installer and updates keep that account. One that deletes and recreates the service puts it back on LocalSystem.
+- `Start` then returns an error that `errors.Is(err, uncli.ErrServiceAccount)` finds; `errors.As` gives a `*uncli.ServiceAccountError` with the account's name, for your own message.
+- `AllowServiceAccount` (`--allow-service-account`) overrides the refusal, if you really mean it.
 
 **Your sign-in, cookie or token.** UNCLI sets no cookies and needs none.
 - **Cookie sign-in:** the browser sends your cookie with the chat's requests by itself.
@@ -73,7 +78,7 @@ uncli-core --data <folder> --origin https://app.example --name "My app"   (the k
 - give `src` your server's full address, e.g. `src="https://app.example:9870/uncli"`;
 - list the page's origin in `Origins`.
 
-UNCLI answers the browser's preflight for those origins and lets them read its replies. It never allows credentials (cookies), so send your sign-in with `host.headers`. If your sign-in sits in front of `/uncli/`, let `OPTIONS` requests through to UNCLI, or answer CORS yourself.
+UNCLI answers the browser's preflight for those origins and lets them read its replies. It never allows credentials (cookies), so send your sign-in with `host.headers`. If your sign-in sits in front of `/uncli/`, let `OPTIONS` requests through to UNCLI, or answer CORS yourself. If you answer it yourself, allow the `Authorization`, `Content-Type` and `Last-Event-ID` headers: the event stream resumes with `Last-Event-ID`, so without it a reconnect fails its preflight.
 
 **Other sites can't drive it.** A request a page sends from an origin not in `Origins` (`--origin`) is refused before it runs, so another site can't use your users' cookies for your app to reach it. Requests without an `Origin`, such as your server's own, pass. A server reached by several names (an address, a tailnet name, dev ports) can decide in Go with `AllowOrigin: func(origin string, r *http.Request) bool`, such as "the origin's host is the request's own, or a loopback dev port". Answer no to anything you don't recognise.
 
@@ -125,7 +130,8 @@ It's built already, Svelte inside, so your bundler needs nothing special and you
 - **`src`** is the path your server forwards to your UNCLI. Every element with the same `src` shares one client: one event stream, one copy of the core's state. The page sends no key; your server adds it.
 - **`backend`** (property) instead takes any object implementing `Backend`, such as `@uncli/client/mock` to build against without a core.
 - **`session`** (attribute or property) is the session to show. Changing it shows another.
-- **`newSession(profile?, workdir?, model?)`** starts a session and shows it, returning its id. The profiles are `chat` (the default: a fresh folder each time), and `cowork` and `code`, which work in the `workdir` you give.
+- **`newSession(profile?, workdir?, model?, { meta? })`** starts a session and shows it, returning its id. The profiles are `chat` (the default: a fresh folder each time), and `cowork` and `code`, which work in the `workdir` you give. `meta` is your own word on what the session is for, such as `card:42`. Your server reads it back with `core.SessionMeta(id)`, from the session's very first start, before you've recorded anything yourself; that's what `MCPServers` needs. It's kept while your UNCLI runs.
+- **When it connects.** A moment after it gets `src` or `backend`, so a `host` you set in the same go (with your sign-in headers) is in place for the first request.
 - **The client** the elements use is exported from `@uncli/chat/element` too (`chatClient`, `mountedBackend`). Import it from there, not from `@uncli/client`, so your code shares the elements' connection rather than opening its own.
 - **`scheme`** is `light` or `dark`. Leave it out to follow the system.
 - **`compact`** shows the phone's compact layout, and `compact="false"` the desktop's. Leave it out and the element picks by its own width: compact below 720 px.
@@ -163,6 +169,14 @@ The element sends these events. They bubble and are composed, so you can listen 
 | `uncli-busy` | The session started answering |
 | `uncli-idle` | It finished |
 | `uncli-needs-approval` | A tool call is waiting for the user |
+| `uncli-missing` | The session you gave isn't on this UNCLI (deleted, say): start a new one |
+| `uncli-deleted` | The user deleted the chat from its header |
+| `uncli-new-chat` | The user chose New chat in its header. Cancelable: cancel it and call `newSession` yourself, with your `meta`; otherwise the chat starts a new session of the same type itself |
+| `uncli-new-session` | It started that new session and shows it; `detail` is `{ session, previous }` |
+
+In a host's page, the chat's header has **New chat** and **Delete chat**, since your page may show no session list. Delete asks first.
+
+With TypeScript, `@uncli/chat/element`'s types name each event in `HTMLElementEventMap`, so `addEventListener('uncli-new-session', e => e.detail.previous)` is typed.
 
 ## Looking like your app
 
@@ -207,8 +221,30 @@ core, err := uncli.Start(uncli.Options{
 
 - **When it's asked.** Each time a session's CLI starts, with the session's id (what `newSession()` returned). So each session can have the servers for what it's about, with a token that's current then.
 - **Every session type.** It works for chats, cowork and code sessions alike, beside whatever servers the session type shares of the user's own.
-- **Approvals.** Calls to your tools are approved like any MCP server's. A tool marked read-only in its MCP annotations (`readOnlyHint`) runs without asking under the default prompt level; others ask in the chat, where your user can allow them once or always.
+- **What the session is for.** For a session made with `newSession(…, { meta })`, `core.SessionMeta(session)` tells you, from its very first start.
+- **Approvals.** By default, calls to your tools are approved like any MCP server's. A tool marked read-only in its MCP annotations (`readOnlyHint`) runs without asking under the default prompt level; others ask in the chat, where your user can allow them once or always.
 - **Not yet in `uncli-core`.** For now, `MCPServers` is only available to Go hosts.
+
+**Your own approvals for your own tools.** `HostToolPolicy` lets your app decide instead, such as a Chat / Suggest / Edit mode of its own. It's asked at each call, so a mode switch takes effect at once:
+
+```go
+HostToolPolicy: func(session, server, tool string) (decision, reason string) {
+	if writes(tool) && modeOf(session) == "chat" {
+		return uncli.PolicyDeny, "Chat mode: the board can't be changed."
+	}
+	if writes(tool) && modeOf(session) == "edit" {
+		return uncli.PolicyAllow, "Edit mode"
+	}
+	return "", "" // UNCLI's own rules
+},
+```
+
+- **`PolicyAllow`** runs the tool without asking, even at the strictest prompt level.
+- **`PolicyDeny`** refuses it, and the model is told your reason.
+- **`PolicyAsk`** asks the user in the chat, even where UNCLI wouldn't.
+- **`""`** leaves it to UNCLI's rules.
+
+Only your own servers' tools are asked about: those `MCPServers` gave the session. The CLI's own tools and the user's own MCP servers keep UNCLI's rules, so your app can't loosen their safety. The chat's trace shows "allowed by the app", with your reason.
 
 ## Your links, strings, mentions and context, and your keys
 
@@ -234,8 +270,39 @@ chat.host = {
   // (Shift+Enter for a new line) or "newline" (Ctrl+Enter sends). Left out:
   // the viewer's choice, or a new line on touch screens.
   enter: "newline",
+  // Your own controls in the message box, drawn by UNCLI (below).
+  composerControls: [/* … */],
 }
 ```
+
+**Your controls in the message box.** `composerControls` puts controls of your own at the bottom left of the message box, drawn in UNCLI's style so they fit it on a phone and the desktop alike:
+
+```js
+chat.host = {
+  …,
+  composerControls: [
+    // Pick one of several: a drop-down showing the current one.
+    { id: 'mode', label: 'Mode', value: mode, onChange: setMode, options: [
+      { id: 'chat',    label: 'Chat',    icon: 'message-circle', tone: 'success', hint: "Can't change the board" },
+      { id: 'suggest', label: 'Suggest', icon: 'list-checks',    tone: 'warning', hint: 'Changes wait for your review' },
+      { id: 'edit',    label: 'Edit',    icon: 'pencil-line',    tone: 'danger',  hint: 'Changes apply at once' },
+    ] },
+    // A toggle: each click moves to the next state (Shift+click back); two states are on/off.
+    { kind: 'toggle', id: 'length', label: 'Answers', value: length, onChange: setLength, states: [
+      { id: 'brief', label: 'Brief', icon: 'shrink' },
+      { id: 'full',  label: 'In full', icon: 'list-checks', tone: 'accent' },
+    ] },
+    // A single click: an action (or an options list of one).
+    { id: 'review', label: 'Review edits', icon: 'list-checks', onClick: openReview },
+  ],
+}
+```
+
+- **Each item:** a `label`, an `icon` (a Lucide name from UNCLI's set; unknown names show a neutral icon), a `tone` (`accent`, `success`, `warning`, `danger` or `muted`, from the colours you theme) and a `hint`, shown as the tooltip.
+- **Kind:** several `options` make a drop-down and one makes a plain button; `kind: 'toggle'` makes a toggle.
+- **Values are yours.** `onChange` tells you what was picked. Set `host` again with the new `value` to show it, or don't, to refuse.
+- **Narrow boxes:** below about 240 px, buttons and drop-downs show their icons only, with the label still as their name and tooltip.
+- **Anything else** goes in the `composer-controls` slot, in the same place, with your own markup and styles.
 
 - **Link schemes.** Links in answers keep only `http(s)`, `mailto`, `tel` and `file` targets unless `link-schemes` names your own. Schemes that can run code or carry content (`javascript`, `data` and the like) are never kept.
 - **Links you don't take.** They open as in UNCLI: web links in the browser, and file links at the server's screen.
@@ -251,7 +318,10 @@ chat.host = {
 
 | Slot | Where |
 |---|---|
+| `header-start` | At the start of the header's top line |
+| `header-end` | At the end of the header's top line (your close button, say), so your header and the chat's can be one |
 | `header-extra` | Under the chat's header (a pending-edits banner, say) |
+| `composer-controls` | Inside the message box, at its bottom left, after any `composerControls` |
 | `below-composer` | Under the message box |
 
 ```html

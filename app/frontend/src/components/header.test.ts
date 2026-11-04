@@ -24,13 +24,13 @@ describe('Session header', () => {
     expect(header.querySelector('.workdir')).toBeNull()
     expect(header.querySelector('.title-row .path')).toHaveTextContent(/Code · C:.Users.you.code/)
     expect(screen.queryByText(/Claude prompts you before anything unsafe/)).not.toBeInTheDocument()
-    const expand = screen.getByRole('button', { name: 'Show the whole header' })
+    const expand = screen.getByRole('button', { name: /^Show the whole header/ })
     expect(header.querySelector('.title-row')?.lastElementChild).toBe(expand)
     unmount()
 
     render(App, { props: { backend: mockBackend() } })
     await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
-    expect(screen.getByRole('button', { name: 'Show the whole header' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: /^Show the whole header/ })).toHaveAttribute('aria-expanded', 'false')
   })
 })
 

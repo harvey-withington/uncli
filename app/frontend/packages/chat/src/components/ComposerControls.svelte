@@ -41,7 +41,7 @@
     padding: 0 var(--space-3) var(--space-2);
   }
   /* A narrow box: icons only. */
-  @container composer (max-width: 340px) {
+  @container composer (max-width: 240px) {
     .controls :global(.label) {
       display: none;
     }

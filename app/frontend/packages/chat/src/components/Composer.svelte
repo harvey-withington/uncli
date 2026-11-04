@@ -301,6 +301,10 @@
     display: flex;
     flex-direction: column;
     container: composer / inline-size; /* a host's controls drop their labels when it's narrow */
+    /* A container is its own stacking context, so a host's drop-down inside
+       it can only rise above the answer if the box itself does. */
+    position: relative;
+    z-index: 4;
   }
   .attachments {
     display: flex;
