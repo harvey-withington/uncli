@@ -21,7 +21,7 @@ what exists today and says what doesn't yet.
 |---|---|
 | **Status** | Alpha, on the `feat/embed` branch. Not published to a registry yet. Windows only, like UNCLI. |
 | **The core, for Go** | `github.com/harvey-withington/uncli/app/uncli` (the `app/uncli` folder). |
-| **The core, for anything else** | `uncli-core.exe`: `go build ./cmd/uncli-core` in `app/`. |
+| **The core, for anything else** | `uncli-core.exe`: `go build ./cmd/uncli-core` in `app/`. Releases will carry it too, as `uncli-core-<version>-windows-x64.exe` with its checksum in `SHA256SUMS.txt`. |
 | **Packages** | `@uncli/chat` (`app/frontend/packages/chat`): the elements, built, as `@uncli/chat/element`, and the Svelte components as source. `@uncli/client` (`app/frontend/packages/client`): the client underneath, and its mock as `@uncli/client/mock`. |
 | **Getting them** | `npm --prefix app/frontend run pack:packages` builds the element and packs both packages as tarballs into `app/frontend/dist-embed/packs/`. A host installs the two tarballs (`npm install <path>/uncli-client-….tgz <path>/uncli-chat-….tgz`). |
 | **Samples** | `npm --prefix app/frontend run build:embed` builds a sample host page into `dist-embed/sample/`. On its own it runs on UNCLI's mock. Served by a host, opened with `?src=/uncli`, it uses that host's UNCLI: `app/cmd/uncli-sample-host` is one in Go, `app/frontend/embed-sample/node-host.mjs` one in Node. |

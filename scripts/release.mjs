@@ -1,7 +1,8 @@
 // Builds a release into dist/ for the Release workflow to publish:
 //
 //   dist/uncli-<version>-windows-x64-setup.exe   the installer
-//   dist/SHA256SUMS.txt                          its checksum
+//   dist/uncli-core-<version>-windows-x64.exe    a host's own UNCLI, for embedding (decision 0027)
+//   dist/SHA256SUMS.txt                          their checksums
 //   dist/LICENSE.txt, dist/THIRD-PARTY-NOTICES.md
 //   release-notes.md                             CHANGELOG.md's section for this version
 //
@@ -67,8 +68,14 @@ const setup = `uncli-${version}-windows-x64-setup.exe`
 copyFileSync(join(appDir, 'build', 'bin', 'uncli-amd64-installer.exe'), join(dist, setup))
 copyFileSync(join(root, 'LICENSE'), join(dist, 'LICENSE.txt'))
 copyFileSync(join(root, 'THIRD-PARTY-NOTICES.md'), join(dist, 'THIRD-PARTY-NOTICES.md'))
+// uncli-core: a host's own UNCLI as a program, for hosts not written in Go
+// (decision 0027), stamped with the same version.
+const core = `uncli-core-${version}-windows-x64.exe`
+execFileSync('go', ['build', '-trimpath', '-ldflags', `-s -w -X github.com/harvey-withington/uncli/app/internal/buildinfo.Version=${version}`, '-o', join(dist, core), './cmd/uncli-core'],
+  { cwd: appDir, stdio: 'inherit', env: { ...process.env, GOOS: 'windows', GOARCH: 'amd64' } })
 const sha = createHash('sha256').update(readFileSync(join(dist, setup))).digest('hex')
-writeFileSync(join(dist, 'SHA256SUMS.txt'), `${sha}  ${setup}\n`)
+const coreSha = createHash('sha256').update(readFileSync(join(dist, core))).digest('hex')
+writeFileSync(join(dist, 'SHA256SUMS.txt'), `${sha}  ${setup}\n${coreSha}  ${core}\n`)
 
 const body = notes +`\n\n**SHA-256** of \`${setup}\`: \`${sha}\`\n`
 writeFileSync(join(root, 'release-notes.md'), body)
