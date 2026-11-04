@@ -259,8 +259,12 @@
       {onkeydown}
       {onpaste}
     ></textarea>
-    <ComposerControls />
   </div>
+  <!-- The right-hand column: a host's own controls above Attach and Send,
+       so the text keeps all the room there is. -->
+  <div class="side">
+    <ComposerControls />
+    <div class="buttons">
   {#if remote}
     <input bind:this={picker} type="file" multiple accept="image/*,application/pdf,text/*,.md,.json,.txt" class="visually-hidden" tabindex="-1" aria-hidden="true" onchange={e => upload(e.currentTarget.files)} />
     <button class="btn ghost icon attach" onclick={() => picker?.click()} disabled={uploading > 0} aria-label={t('composer.attach')} title={t('composer.attach')}>
@@ -276,6 +280,8 @@
       <Icon name="arrow-up" />
     </button>
   {/if}
+    </div>
+  </div>
 </div>
 
 <style>
@@ -290,6 +296,22 @@
     background: var(--surface);
     box-shadow: var(--shadow-sm);
     transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+    container: composer / inline-size; /* a host's controls drop their labels when it's narrow */
+    /* A container is its own stacking context, so a host's drop-down inside
+       it can only rise above the answer if the box itself does. */
+    z-index: 4;
+  }
+  .side {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-2);
+  }
+  .buttons {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-2);
   }
   .composer:focus-within {
     border-color: var(--accent);
@@ -300,11 +322,6 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    container: composer / inline-size; /* a host's controls drop their labels when it's narrow */
-    /* A container is its own stacking context, so a host's drop-down inside
-       it can only rise above the answer if the box itself does. */
-    position: relative;
-    z-index: 4;
   }
   .attachments {
     display: flex;

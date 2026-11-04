@@ -5,7 +5,7 @@
 
   // One of several, as a button showing the current one (icon, label, its
   // tone) that opens a menu of them all: icon, label and hint each. It
-  // opens upward, as it sits at the bottom of the message box. Up and Down
+  // opens upward and leftward, from the message box's bottom right. Up and Down
   // move, Enter or Space picks, Escape or a click elsewhere closes, and
   // the focus goes back to the button.
   interface Props {
@@ -88,7 +88,7 @@
   .menu {
     position: absolute;
     bottom: calc(100% + 6px);
-    left: 0;
+    right: 0; /* it sits at the message box's right edge */
     z-index: 30;
     min-width: 220px;
     max-width: min(320px, 80vw);

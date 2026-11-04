@@ -5,7 +5,8 @@
   import CycleButton from './CycleButton.svelte'
   import Icon from './Icon.svelte'
 
-  // A host's own controls at the bottom left of the message box (decision
+  // A host's own controls in the message box's right-hand column, above
+  // Attach and Send, so the text keeps its room (decision
   // 0026, lib/composercontrols.ts): buttons, toggles and drop-downs drawn
   // here, then whatever the host puts in the composer-controls slot. When
   // the box is narrow, buttons and drop-downs drop their labels to their
@@ -36,12 +37,12 @@
   .controls {
     display: flex;
     flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
     gap: 6px;
-    padding: 0 var(--space-3) var(--space-2);
   }
   /* A narrow box: icons only. */
-  @container composer (max-width: 240px) {
+  @container composer (max-width: 300px) {
     .controls :global(.label) {
       display: none;
     }

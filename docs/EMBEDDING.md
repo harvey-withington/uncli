@@ -275,7 +275,7 @@ chat.host = {
 }
 ```
 
-**Your controls in the message box.** `composerControls` puts controls of your own at the bottom left of the message box, drawn in UNCLI's style so they fit it on a phone and the desktop alike:
+**Your controls in the message box.** `composerControls` puts controls of your own in the message box's right-hand column, above Attach and Send, so the text keeps its full height. They're drawn in UNCLI's style so they fit it on a phone and the desktop alike:
 
 ```js
 chat.host = {
@@ -301,7 +301,7 @@ chat.host = {
 - **Each item:** a `label`, an `icon` (a Lucide name from UNCLI's set; unknown names show a neutral icon), a `tone` (`accent`, `success`, `warning`, `danger` or `muted`, from the colours you theme) and a `hint`, shown as the tooltip.
 - **Kind:** several `options` make a drop-down and one makes a plain button; `kind: 'toggle'` makes a toggle.
 - **Values are yours.** `onChange` tells you what was picked. Set `host` again with the new `value` to show it, or don't, to refuse.
-- **Narrow boxes:** below about 240 px, buttons and drop-downs show their icons only, with the label still as their name and tooltip.
+- **Narrow boxes:** in a message box below about 300 px, buttons and drop-downs show their icons only, with the label still as their name and tooltip.
 - **Anything else** goes in the `composer-controls` slot, in the same place, with your own markup and styles.
 
 - **Link schemes.** Links in answers keep only `http(s)`, `mailto`, `tel` and `file` targets unless `link-schemes` names your own. Schemes that can run code or carry content (`javascript`, `data` and the like) are never kept.
@@ -321,7 +321,7 @@ chat.host = {
 | `header-start` | At the start of the header's top line |
 | `header-end` | At the end of the header's top line (your close button, say), so your header and the chat's can be one |
 | `header-extra` | Under the chat's header (a pending-edits banner, say) |
-| `composer-controls` | Inside the message box, at its bottom left, after any `composerControls` |
+| `composer-controls` | Inside the message box, above Attach and Send, after any `composerControls` |
 | `below-composer` | Under the message box |
 
 ```html
