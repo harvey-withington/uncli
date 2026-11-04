@@ -19,6 +19,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -65,6 +66,38 @@ type Options struct {
 	// machine. Run the host as a person's account instead (a service's
 	// "Log on as") unless you really mean it.
 	AllowServiceAccount bool
+	// MCPServers gives a session the host's own MCP servers, by name: the
+	// tools that work on the host's things (BRUV's board tools, say). It's
+	// asked each time a session's CLI starts, with the session's id (as
+	// newSession returned it), so a host can give each session the servers
+	// for what it's about, with a current token. Their tool calls are
+	// approved as any MCP server's are: by their annotations, the prompt
+	// level and the safe list. nil: none.
+	MCPServers func(session string) map[string]MCPServer
+}
+
+// MCPServer is an MCP server of the host's, reached over HTTP.
+type MCPServer struct {
+	URL     string            // its MCP endpoint, http(s)://…
+	Headers map[string]string // sent with each request: the host's own token, say
+}
+
+// hostMCP turns the host's servers for a session into the CLI's
+// --mcp-config.
+func (o Options) hostMCP(session string) []string {
+	servers := o.MCPServers(session)
+	if len(servers) == 0 {
+		return nil
+	}
+	cfg := map[string]any{}
+	for name, s := range servers {
+		cfg[name] = map[string]any{"type": "http", "url": s.URL, "headers": s.Headers}
+	}
+	b, err := json.Marshal(map[string]any{"mcpServers": cfg})
+	if err != nil {
+		return nil
+	}
+	return []string{string(b)}
 }
 
 // errServiceAccount: the host runs as a service account (AllowServiceAccount).
@@ -159,7 +192,11 @@ func Start(o Options) (*Core, error) {
 	}
 	hub := remote.NewHub()
 	paths := app.Paths{Config: dir, Cache: filepath.Join(dir, "cache"), Scratch: filepath.Join(dir, "scratch")}
-	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd, CLIConfigDir: cliConfig})
+	var hostMCP func(string) []string
+	if o.MCPServers != nil {
+		hostMCP = o.hostMCP
+	}
+	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd, CLIConfigDir: cliConfig, HostMCP: hostMCP})
 	if err != nil {
 		return nil, err
 	}

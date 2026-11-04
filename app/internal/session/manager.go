@@ -70,6 +70,11 @@ type Deps struct {
 	// PromptCache is the user's conversation cache lifetime for the next
 	// launch ("" = provider default, "5m", "1h"); nil: provider default.
 	PromptCache func() string
+	// HostMCP is a host's own MCP servers for a session (decision 0027),
+	// as --mcp-config values, asked for each time its CLI starts: a host
+	// can give each session the servers for what it's about, with a
+	// current token. nil: none.
+	HostMCP func(sessionID string) []string
 }
 
 // RuntimeWSL is the runtime of sessions in a container (a WSL distro).

@@ -226,6 +226,38 @@ func TestNotAsAServiceAccount(t *testing.T) {
 	start(t, Options{AllowServiceAccount: true})
 }
 
+// The host's MCP servers become the CLI's --mcp-config: HTTP servers, with
+// the host's headers; none when the host gives none.
+func TestHostMCPConfig(t *testing.T) {
+	o := Options{MCPServers: func(id string) map[string]MCPServer {
+		if id != "s1" {
+			return nil
+		}
+		return map[string]MCPServer{"board": {URL: "http://127.0.0.1:9870/repos/r1/mcp", Headers: map[string]string{"Authorization": "Bearer t"}}}
+	}}
+	got := o.hostMCP("s1")
+	if len(got) != 1 {
+		t.Fatalf("config = %q", got)
+	}
+	var cfg struct {
+		MCPServers map[string]struct {
+			Type    string            `json:"type"`
+			URL     string            `json:"url"`
+			Headers map[string]string `json:"headers"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal([]byte(got[0]), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	b := cfg.MCPServers["board"]
+	if b.Type != "http" || b.URL != "http://127.0.0.1:9870/repos/r1/mcp" || b.Headers["Authorization"] != "Bearer t" {
+		t.Errorf("board = %+v", b)
+	}
+	if o.hostMCP("s2") != nil {
+		t.Error("a session the host gives no servers got some")
+	}
+}
+
 // A server reached by several names checks origins itself.
 func TestAllowOriginAdmitsWhatTheListCant(t *testing.T) {
 	c := start(t, Options{AllowOrigin: func(origin string, r *http.Request) bool {

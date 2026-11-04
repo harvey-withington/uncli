@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -274,6 +275,9 @@ func (s *Session) launchSpecLocked() (core.LaunchSpec, error) {
 	}
 	if s.m.d.PromptCache != nil {
 		spec.PromptCache = s.m.d.PromptCache()
+	}
+	if s.m.d.HostMCP != nil {
+		spec.MCPConfig = append(slices.Clone(spec.MCPConfig), s.m.d.HostMCP(s.rec.ID)...)
 	}
 	return spec, nil
 }

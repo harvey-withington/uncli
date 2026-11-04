@@ -188,6 +188,27 @@ The element is one ES module, with Svelte and UNCLI's client inside it. Code hig
 - **Measured size** (2026-11-03): about 218 KB gzipped as built, and about 184 KB once your bundler minifies it.
 - **Load it lazily:** a dynamic `import()` when a chat first opens.
 
+## Your own tools for the AI
+
+Give your sessions your app's own tools, so the AI can work on your things, such as cards on a board. Serve them as an MCP server over HTTP (your server's own route is fine) and name them in `MCPServers`:
+
+```go
+core, err := uncli.Start(uncli.Options{
+	…
+	MCPServers: func(session string) map[string]uncli.MCPServer {
+		board := boardOf(session) // which of your things this session is about
+		return map[string]uncli.MCPServer{
+			"board": {URL: "http://127.0.0.1:9870/repos/" + board + "/mcp", Headers: map[string]string{"Authorization": "Bearer " + tokenFor(board)}},
+		}
+	},
+})
+```
+
+- **When it's asked.** Each time a session's CLI starts, with the session's id (what `newSession()` returned). So each session can have the servers for what it's about, with a token that's current then.
+- **Every session type.** It works for chats, cowork and code sessions alike, beside whatever servers the session type shares of the user's own.
+- **Approvals.** Calls to your tools are approved like any MCP server's. A tool marked read-only in its MCP annotations (`readOnlyHint`) runs without asking under the default prompt level; others ask in the chat, where your user can allow them once or always.
+- **Not yet in `uncli-core`.** For now, `MCPServers` is only available to Go hosts.
+
 ## Your links, strings, mentions and context, and your keys
 
 The `host` property is what your page does for the chat:

@@ -73,6 +73,9 @@ type Options struct {
 	// to the CLIs it starts, never set in this process's environment.
 	// Empty: the user's own.
 	CLIConfigDir string
+	// HostMCP is a host's own MCP servers for a session, as --mcp-config
+	// values, asked for each time its CLI starts (session.Deps.HostMCP).
+	HostMCP func(sessionID string) []string
 }
 
 // errEmbedded refuses what only the desktop app does.
@@ -219,7 +222,7 @@ func NewWith(paths Paths, emit Emitter, opts Options) (*Service, error) {
 		Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,
 		Binary: s.binaryOf, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
 		Judge: s.judgeCommand, JudgeTools: s.judgeTools, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
-		Online: netcheck.Online, PromptCache: func() string { return s.Preferences().PromptCacheTTL() },
+		Online: netcheck.Online, PromptCache: func() string { return s.Preferences().PromptCacheTTL() }, HostMCP: opts.HostMCP,
 	})
 	if err != nil {
 		db.Close()
