@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // The Agent Client Protocol (decision 0014): JSON-RPC 2.0 over stdio, with

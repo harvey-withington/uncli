@@ -4,7 +4,7 @@ import (
 	"io/fs"
 	"testing"
 
-	"uncli/config"
+	"github.com/harvey-withington/uncli/app/config"
 )
 
 func TestProvidersHaveNames(t *testing.T) {

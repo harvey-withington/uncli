@@ -3,7 +3,7 @@ package session
 import (
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // Tool classes: whether a tool use only looks or changes something, may

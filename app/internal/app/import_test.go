@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"uncli/internal/adapter/claude"
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // A fixture transcript copied into a temp config folder, its recorded

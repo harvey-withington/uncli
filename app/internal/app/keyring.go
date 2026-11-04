@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"uncli/internal/secrets"
+	"github.com/harvey-withington/uncli/app/internal/secrets"
 )
 
 // keyring keeps the app's secrets: the OS credential store where there is

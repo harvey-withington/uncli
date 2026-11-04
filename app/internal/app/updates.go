@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/buildinfo"
-	"uncli/internal/update"
+	"github.com/harvey-withington/uncli/app/internal/buildinfo"
+	"github.com/harvey-withington/uncli/app/internal/update"
 )
 
 // Updates (decision 0025): a release build checks GitHub for a newer

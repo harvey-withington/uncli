@@ -5,7 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 
-	"uncli/internal/artifacts"
+	"github.com/harvey-withington/uncli/app/internal/artifacts"
 )
 
 // The artifact pane reads artifacts two ways: a version a page recorded

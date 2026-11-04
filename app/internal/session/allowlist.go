@@ -6,7 +6,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"uncli/internal/core"
+
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // The profile's allowlist (allowed_tools), in the CLI's own syntax. When

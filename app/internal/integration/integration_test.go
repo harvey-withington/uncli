@@ -26,9 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/app"
-	"uncli/internal/session"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 type recorder struct {

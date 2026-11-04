@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // Claude Code saves each conversation as JSON lines in

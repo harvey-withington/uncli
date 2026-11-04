@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Judging: in Ask mode, with the UnknownModel setting, a command UNCLI

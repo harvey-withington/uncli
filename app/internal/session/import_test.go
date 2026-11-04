@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/adapter/claude"
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 func fixtureTranscript(t *testing.T) core.Transcript {

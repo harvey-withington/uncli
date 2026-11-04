@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
 )
 
 func editService(t *testing.T) *Service {

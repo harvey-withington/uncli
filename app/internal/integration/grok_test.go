@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/app"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // Grok Build as a provider plugin speaking ACP (decisions 0013, 0014),

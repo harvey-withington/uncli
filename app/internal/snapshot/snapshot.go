@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
 )
 
 // Limit is the most files a snapshot records; a bigger folder isn't

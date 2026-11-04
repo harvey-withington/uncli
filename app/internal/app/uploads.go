@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"uncli/internal/attach"
+	"github.com/harvey-withington/uncli/app/internal/attach"
 )
 
 // Uploads are files a remote client sends to attach to a turn (a photo

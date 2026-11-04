@@ -4,14 +4,14 @@ import (
 	"context"
 	"time"
 
-	"uncli/internal/artifacts"
-	"uncli/internal/attach"
-	"uncli/internal/clipfiles"
-	"uncli/internal/core"
-	"uncli/internal/ide"
-	"uncli/internal/session"
-	"uncli/internal/store"
-	filewatch "uncli/internal/watch"
+	"github.com/harvey-withington/uncli/app/internal/artifacts"
+	"github.com/harvey-withington/uncli/app/internal/attach"
+	"github.com/harvey-withington/uncli/app/internal/clipfiles"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/ide"
+	"github.com/harvey-withington/uncli/app/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/store"
+	filewatch "github.com/harvey-withington/uncli/app/internal/watch"
 )
 
 // API is everything the UI calls, as methods with plain arguments and

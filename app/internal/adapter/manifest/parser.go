@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // parser applies the manifest's event rules to each output line. Its

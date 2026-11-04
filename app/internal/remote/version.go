@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"uncli/internal/buildinfo"
+	"github.com/harvey-withington/uncli/app/internal/buildinfo"
 )
 
 // GET /version needs no token: a client checks it before pairing and on

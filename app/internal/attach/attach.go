@@ -16,7 +16,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // Kinds of attachment, and what can't be attached.

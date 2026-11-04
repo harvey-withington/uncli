@@ -11,11 +11,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"uncli/internal/core"
-	"uncli/internal/ide"
-	"uncli/internal/runtime/local"
-	"uncli/internal/session"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/ide"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Quick tasks are one-off text jobs outside any session: page summaries

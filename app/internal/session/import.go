@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"uncli/internal/core"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Importing a conversation the CLI saved (core.TranscriptReader): it

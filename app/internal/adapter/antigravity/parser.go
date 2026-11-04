@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // The stream (CLI 1.3.1, testdata/streams/antigravity/1.3.1):

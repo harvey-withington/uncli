@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
 )
 
 // Exe is wsl.exe.

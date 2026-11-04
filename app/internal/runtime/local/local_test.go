@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 func TestEnvDropsAndOverrides(t *testing.T) {

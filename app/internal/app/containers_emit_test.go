@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"uncli/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
 )
 
 type recEmitter struct {

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/artifacts"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/artifacts"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 func TestMergeTouched(t *testing.T) {

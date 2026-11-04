@@ -12,9 +12,9 @@ import (
 	"testing/fstest"
 	"time"
 
-	"uncli/internal/app"
-	"uncli/internal/notify"
-	"uncli/internal/push"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/notify"
+	"github.com/harvey-withington/uncli/app/internal/push"
 )
 
 // The app installed from each PC is named for it, from the name the phone

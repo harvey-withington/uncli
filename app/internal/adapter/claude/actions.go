@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // What Claude Code's tools do, as provider-neutral actions (core.ToolAction).

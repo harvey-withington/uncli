@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/adapter/claude"
-	"uncli/internal/runtime/wsl"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // TestRealContainerAccount signs a container in to the user's whole account

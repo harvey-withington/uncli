@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"uncli/config"
-	"uncli/internal/adapter/antigravity"
-	"uncli/internal/adapter/claude"
-	"uncli/internal/core"
-	"uncli/internal/hook"
-	"uncli/internal/profile"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/config"
+	"github.com/harvey-withington/uncli/app/internal/adapter/antigravity"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/hook"
+	"github.com/harvey-withington/uncli/app/internal/profile"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 const agyFixtures = "../../testdata/streams/antigravity/" + antigravity.PinnedVersion

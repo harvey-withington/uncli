@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/runtime/local"
-	"uncli/internal/runtime/wsl"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // Containers that share the user's claude.ai connectors (Jira, Office…) sign

@@ -56,7 +56,7 @@ writeFileSync(wailsJson, JSON.stringify(config, null, 2) + '\n')
 try {
   // The full version (pre-release part and all) goes into the app, which
   // reports it and checks it against newer releases (decision 0025).
-  execFileSync('wails', ['build', '-clean', '-nsis', '-platform', 'windows/amd64', '-ldflags', `"-X uncli/internal/buildinfo.Version=${version}"`], { cwd: appDir, stdio: 'inherit', shell: true })
+  execFileSync('wails', ['build', '-clean', '-nsis', '-platform', 'windows/amd64', '-ldflags', `"-X github.com/harvey-withington/uncli/app/internal/buildinfo.Version=${version}"`], { cwd: appDir, stdio: 'inherit', shell: true })
 } finally {
   writeFileSync(wailsJson, original)
 }

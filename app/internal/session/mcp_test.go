@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // written: a line containing all of want was written to a CLI.

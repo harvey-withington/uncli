@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io/fs"
 
-	"uncli/internal/adapter/manifest"
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/adapter/manifest"
+	"github.com/harvey-withington/uncli/app/internal/core"
 
 	"gopkg.in/yaml.v3"
 )

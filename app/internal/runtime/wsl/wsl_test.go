@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // fake is wsl.exe: it records each call and answers from a table keyed by

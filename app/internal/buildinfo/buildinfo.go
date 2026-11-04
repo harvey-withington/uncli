@@ -1,5 +1,5 @@
 // Package buildinfo is what a build knows about itself: its version, which
-// release builds stamp (-ldflags "-X uncli/internal/buildinfo.Version=0.4.0"),
+// release builds stamp (-ldflags "-X github.com/harvey-withington/uncli/app/internal/buildinfo.Version=0.4.0"),
 // and the commit it was built from. Test builds (publish-build) carry the
 // last release's version with +dev.<build>; anything else is a development
 // build.

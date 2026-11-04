@@ -1,6 +1,6 @@
 package session
 
-import "uncli/internal/core"
+import "github.com/harvey-withington/uncli/app/internal/core"
 
 // A CLI process is read by its adapter's parser and written to with its
 // adapter's encoders, unless the adapter gives each process a driver

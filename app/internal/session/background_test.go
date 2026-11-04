@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // A background sub-agent finishes after the turn that started it: the CLI

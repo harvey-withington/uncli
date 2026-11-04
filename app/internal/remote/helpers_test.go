@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/app"
 )
 
 // A paired device for tests: one token, one device.

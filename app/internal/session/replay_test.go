@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/config"
-	"uncli/internal/profile"
+	"github.com/harvey-withington/uncli/app/config"
+	"github.com/harvey-withington/uncli/app/internal/profile"
 )
 
 // TestReplayPrompts measures how often each prompt level would prompt on

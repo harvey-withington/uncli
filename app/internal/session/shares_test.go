@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/profile"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/profile"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // A chat starts with its type's shares or the ones chosen, keeps the

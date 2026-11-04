@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/secrets"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/secrets"
 )
 
 // TestRealDistro builds a distro with real WSL, mounts a folder and runs

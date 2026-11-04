@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
-	"uncli/internal/profile"
-	"uncli/internal/session"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/profile"
+	"github.com/harvey-withington/uncli/app/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 func TestLoginProblem(t *testing.T) {

@@ -16,10 +16,10 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/artifacts"
-	"uncli/internal/core"
-	"uncli/internal/profile"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/artifacts"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/profile"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // BinaryFunc resolves a provider's CLI binary to run and its version.

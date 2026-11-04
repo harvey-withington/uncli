@@ -4,8 +4,8 @@ import (
 	"sort"
 	"strings"
 
-	"uncli/internal/core"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // When to prompt and the safe list (modes.go, class.go), as the UI sees them.

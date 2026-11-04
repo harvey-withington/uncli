@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"uncli/internal/ide"
+	"github.com/harvey-withington/uncli/app/internal/ide"
 )
 
 // Some CLIs sign in only in their own terminal interface (Provider.SignIn

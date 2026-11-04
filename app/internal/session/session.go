@@ -13,11 +13,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"uncli/internal/artifacts"
-	"uncli/internal/core"
-	"uncli/internal/oauthcatch"
-	"uncli/internal/profile"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/artifacts"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/oauthcatch"
+	"github.com/harvey-withington/uncli/app/internal/profile"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 type Session struct {

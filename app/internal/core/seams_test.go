@@ -37,7 +37,7 @@ func TestSeams(t *testing.T) {
 		rel = filepath.ToSlash(rel)
 		for _, imp := range f.Imports {
 			p, _ := strconv.Unquote(imp.Path.Value)
-			if strings.HasPrefix(rel, "internal/core/") && strings.HasPrefix(p, "uncli/") {
+			if strings.HasPrefix(rel, "internal/core/") && strings.HasPrefix(p, "github.com/harvey-withington/uncli/app/") {
 				t.Errorf("%s: core must not import %s", rel, p)
 			}
 			if strings.HasPrefix(p, "github.com/wailsapp/") && !strings.HasPrefix(rel, "internal/bridge/") {

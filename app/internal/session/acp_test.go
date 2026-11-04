@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"uncli/config"
-	"uncli/internal/adapter/claude"
-	"uncli/internal/adapter/manifest"
-	"uncli/internal/core"
-	"uncli/internal/profile"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/config"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/adapter/manifest"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/profile"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // An ACP provider (decision 0014) through the session: a fake agent that

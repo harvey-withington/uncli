@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/adapter/claude"
-	"uncli/internal/core"
-	"uncli/internal/runtime/local"
-	"uncli/internal/runtime/wsl"
-	"uncli/internal/secrets"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/secrets"
 )
 
 // TestRealCoexist checks UNCLI leaves other WSL users alone. WSL distros

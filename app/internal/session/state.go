@@ -1,8 +1,8 @@
 package session
 
 import (
-	"uncli/internal/core"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // State is a session's activity, as shown in the sidebar.

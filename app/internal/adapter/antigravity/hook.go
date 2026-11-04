@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // The CLI's hook calls (recorded in testdata/streams/antigravity/<version>/

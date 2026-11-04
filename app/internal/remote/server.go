@@ -18,9 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/app"
-	"uncli/internal/notify"
-	"uncli/internal/push"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/notify"
+	"github.com/harvey-withington/uncli/app/internal/push"
 )
 
 // Device is a paired device.

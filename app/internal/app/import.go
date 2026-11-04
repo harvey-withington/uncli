@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"uncli/internal/core"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // Importing conversations the CLI saved: from the terminal, or a UNCLI

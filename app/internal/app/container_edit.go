@@ -12,9 +12,9 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"uncli/config"
-	"uncli/internal/runtime/wsl"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/config"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // Settings → Containers edits the user's containers.yaml: a container saved

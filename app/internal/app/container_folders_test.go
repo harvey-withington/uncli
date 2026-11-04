@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/config"
-	"uncli/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/config"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
 )
 
 // home sets up a user profile in a temp folder, as Windows lays it out.

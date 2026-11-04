@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // A session whose conversation the CLI no longer has (fixture resume-lost:

@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // maxToolOutput caps tool output kept in events; the trace strip only

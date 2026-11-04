@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"uncli/internal/core"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // When to prompt: the session's level decides UNCLI's answer to each tool

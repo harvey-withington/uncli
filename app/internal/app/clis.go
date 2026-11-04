@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/runtime/local"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // Every AI provider's CLI: its adapter and installer, the version the user

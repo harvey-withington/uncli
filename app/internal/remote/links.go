@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/app"
 )
 
 // Signed links let a device's browser open an artifact or an upload

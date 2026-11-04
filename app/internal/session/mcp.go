@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/oauthcatch"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/oauthcatch"
 )
 
 // MCP sign-in (decision 0020). A session keeps what its CLI says about its

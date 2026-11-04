@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"strings"
 
-	"uncli/internal/snapshot"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/snapshot"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Files a turn changed. Tools that write report their file once they

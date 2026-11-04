@@ -3,8 +3,8 @@ package session
 import (
 	"encoding/json"
 
-	"uncli/internal/adapter/claude"
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // Tests speak Claude Code's tool names; the Claude adapter turns them into

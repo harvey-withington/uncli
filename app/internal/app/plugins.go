@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"uncli/internal/adapter/manifest"
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/adapter/manifest"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // Provider plugins (decision 0013): a CLI described by a provider.yaml in

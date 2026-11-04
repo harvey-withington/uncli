@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/app"
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // MCP sign-in against the real CLI (decision 0020): a local MCP server that

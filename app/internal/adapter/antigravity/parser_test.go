@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 const fixtures = "../../../testdata/streams/antigravity/" + PinnedVersion

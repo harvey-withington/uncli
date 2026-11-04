@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/runtime/wsl"
-	"uncli/internal/secrets"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/secrets"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // timedEmitter logs each containers update with when it came.

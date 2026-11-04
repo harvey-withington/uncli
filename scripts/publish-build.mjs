@@ -81,7 +81,7 @@ const version = `${lastTag.replace(/^v/, '')}+${branch || 'dev'}.${seq}`
 // No -clean: it would delete build/bin, which fails while `npm run dev` runs.
 // --skip-build keeps whatever build/bin holds, stamped or not.
 if (!skipBuild) {
-  execFileSync('wails', ['build', '-nsis', '-platform', 'windows/amd64', '-ldflags', `"-X uncli/internal/buildinfo.Version=${version}"`], { cwd: appDir, stdio: 'inherit', shell: true })
+  execFileSync('wails', ['build', '-nsis', '-platform', 'windows/amd64', '-ldflags', `"-X github.com/harvey-withington/uncli/app/internal/buildinfo.Version=${version}"`], { cwd: appDir, stdio: 'inherit', shell: true })
 }
 
 const data = readFileSync(installer)

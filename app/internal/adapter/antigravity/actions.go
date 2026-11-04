@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // What the Antigravity CLI's tools do, as provider-neutral actions

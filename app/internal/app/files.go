@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"uncli/internal/ide"
-	watched "uncli/internal/watch"
+	"github.com/harvey-withington/uncli/app/internal/ide"
+	watched "github.com/harvey-withington/uncli/app/internal/watch"
 )
 
 // Opening the files a page lists: sessions whose type links to an IDE

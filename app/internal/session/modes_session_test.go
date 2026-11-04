@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // hintsLine is the CLI's answer to mcp_status for the notes server of the

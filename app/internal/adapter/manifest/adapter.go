@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	"uncli/internal/core"
-	"uncli/internal/hook"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/hook"
 )
 
 // Adapter runs a CLI from its manifest (decision 0013).

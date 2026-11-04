@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // Hook approvals (decision 0012): a CLI with HookApprovals asks about each

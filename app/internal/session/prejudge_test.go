@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // batchJudge records each server batch and judges every tool safe.

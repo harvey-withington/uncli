@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"uncli/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
 )
 
 // Device sign-in (decision 0014): a CLI that prints a link and a code,

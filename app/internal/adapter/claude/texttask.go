@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // TextTaskCommand runs a single isolated turn: no tools, no user settings,

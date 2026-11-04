@@ -6,7 +6,7 @@ package main
 import (
 	"os"
 
-	"uncli/internal/hook"
+	"github.com/harvey-withington/uncli/app/internal/hook"
 )
 
 func main() {

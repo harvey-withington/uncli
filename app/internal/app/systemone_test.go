@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // A fake System One server, answering as Kev's README says Kev does.

@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"strings"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // PinnedVersion is the Antigravity CLI release this build of UNCLI is tested with.

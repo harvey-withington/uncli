@@ -18,11 +18,11 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"uncli/config"
-	"uncli/internal/adapter/claude"
-	"uncli/internal/core"
-	"uncli/internal/runtime/wsl"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/config"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // Containers are WSL distros UNCLI builds from container profiles

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/adapter/manifest"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/adapter/manifest"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 const agyPlugin = "../../testdata/providers/antigravity/" + manifest.File

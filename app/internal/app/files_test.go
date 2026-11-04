@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/ide"
+	"github.com/harvey-withington/uncli/app/internal/ide"
 )
 
 func TestEditorPreference(t *testing.T) {

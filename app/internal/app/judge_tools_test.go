@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // toolDecider answers by tool: "read_*" reads, "delete_*" is risky, the

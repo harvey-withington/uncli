@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/runtime/local"
-	"uncli/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
 )
 
 // Containers sign in with a long-lived token from `claude setup-token`, run

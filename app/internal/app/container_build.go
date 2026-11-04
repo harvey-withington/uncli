@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"uncli/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
 )
 
 // A container is built from its profile's packages and base, a CLI

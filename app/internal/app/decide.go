@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // Deciding: an app-level decision model answers fixed-answer questions,

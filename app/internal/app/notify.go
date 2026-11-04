@@ -5,10 +5,10 @@ import (
 	"sync"
 	"testing"
 
-	"uncli/internal/core"
-	"uncli/internal/notify"
-	"uncli/internal/session"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/notify"
+	"github.com/harvey-withington/uncli/app/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Desktop notifications: when a session the user isn't looking at (another

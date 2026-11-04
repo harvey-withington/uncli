@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Scripted CLI output for approvals: what the CLI prints around a

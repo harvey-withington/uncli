@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/adapter/antigravity"
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/adapter/antigravity"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // The engine is proven against a built-in (decision 0013): the Antigravity

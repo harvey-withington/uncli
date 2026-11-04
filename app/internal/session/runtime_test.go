@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // otherRuntime is the fake runtime under another id (a container).

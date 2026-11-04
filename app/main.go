@@ -7,9 +7,9 @@ import (
 	"os"
 	"slices"
 
-	"uncli/internal/app"
-	"uncli/internal/bridge"
-	"uncli/internal/hook"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/bridge"
+	"github.com/harvey-withington/uncli/app/internal/hook"
 )
 
 //go:embed all:frontend/dist

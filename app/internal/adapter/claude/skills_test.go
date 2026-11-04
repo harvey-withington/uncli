@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 func skill(t *testing.T, dir, name string) string {

@@ -1,4 +1,4 @@
-module uncli
+module github.com/harvey-withington/uncli/app
 
 go 1.26.0
 

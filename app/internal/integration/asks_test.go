@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // The model asks a question with its question tool; the user answers on

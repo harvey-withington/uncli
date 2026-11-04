@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/adapter/claude"
-	"uncli/internal/runtime/wsl"
-	"uncli/internal/secrets"
-	"uncli/internal/session"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/secrets"
+	"github.com/harvey-withington/uncli/app/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // TestRealContainerSession goes the whole way with real WSL: a container

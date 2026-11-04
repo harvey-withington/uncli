@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // A decider on the System One wire (POST /v1/systemone): hosted Jev, or a

@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 func TestEncodeTurnMatchesRecordedInput(t *testing.T) {

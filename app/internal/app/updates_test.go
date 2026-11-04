@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/buildinfo"
+	"github.com/harvey-withington/uncli/app/internal/buildinfo"
 )
 
 // releaseServer is a fake GitHub with one release, 0.4.0-alpha.

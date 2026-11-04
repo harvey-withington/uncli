@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"uncli/internal/adapter/antigravity"
-	"uncli/internal/app"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/adapter/antigravity"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // The Antigravity CLI through UNCLI (decision 0012): the pinned download,

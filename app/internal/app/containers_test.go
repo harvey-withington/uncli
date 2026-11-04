@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/config"
+	"github.com/harvey-withington/uncli/app/config"
 )
 
 func TestContainerProfiles(t *testing.T) {

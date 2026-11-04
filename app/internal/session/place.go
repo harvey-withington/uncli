@@ -4,8 +4,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"uncli/internal/artifacts"
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/artifacts"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // placed is a runtime whose CLI sees the session folder at another path: a

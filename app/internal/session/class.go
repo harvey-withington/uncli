@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"uncli/internal/core"
 
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Command classes: what one "This is safe" (or "This should prompt")

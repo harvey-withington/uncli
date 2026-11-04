@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"uncli/internal/adapter/claude"
-	"uncli/internal/core"
-	"uncli/internal/runtime/local"
-	"uncli/internal/runtime/wsl"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/runtime/local"
+	"github.com/harvey-withington/uncli/app/internal/runtime/wsl"
 )
 
 // prepareContainer is a container's Prepare (decision 0011), run before

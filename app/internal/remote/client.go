@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"uncli/internal/app"
-	"uncli/internal/push"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/push"
 )
 
 // client is what one paired device's RPC calls run on: the app's API, with

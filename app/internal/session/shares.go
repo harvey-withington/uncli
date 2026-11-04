@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"slices"
 
-	"uncli/internal/core"
-	"uncli/internal/profile"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/profile"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // What an isolated session shares of the user's own: their MCP servers and

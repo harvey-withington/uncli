@@ -21,10 +21,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"uncli/internal/app"
-	"uncli/internal/notify"
-	"uncli/internal/push"
-	"uncli/internal/remote"
+	"github.com/harvey-withington/uncli/app/internal/app"
+	"github.com/harvey-withington/uncli/app/internal/notify"
+	"github.com/harvey-withington/uncli/app/internal/push"
+	"github.com/harvey-withington/uncli/app/internal/remote"
 )
 
 // App is bound to the frontend as window.go.bridge.App: the app's API

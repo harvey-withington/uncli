@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"uncli/config"
-	"uncli/internal/adapter/claude"
-	"uncli/internal/core"
-	"uncli/internal/profile"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/config"
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/profile"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 const fixtures = "../../testdata/streams/claude/" + claude.PinnedVersion

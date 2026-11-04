@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"uncli/internal/core"
-	"uncli/internal/session"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Judging commands UNCLI can't place: with the "model" setting, the

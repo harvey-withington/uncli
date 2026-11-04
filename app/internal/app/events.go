@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"uncli/internal/core"
-	"uncli/internal/session"
-	"uncli/internal/store"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
 // Event names the frontend subscribes to.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // The ACP driver against Grok's recorded conversations (testdata/streams/

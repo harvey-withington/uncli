@@ -5,7 +5,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"uncli/internal/core"
+
+	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
 // Risk: Ask mode asks only about what could do real harm, so the user

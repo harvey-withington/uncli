@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"uncli/internal/core"
-	"uncli/internal/session"
+	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
 // The quick-task model as a decider: one structured call per round, the
