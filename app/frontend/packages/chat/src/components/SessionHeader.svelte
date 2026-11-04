@@ -2,6 +2,7 @@
   import type { SessionView } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
+  import { attentionCount } from '../lib/attention'
   import { useShell } from '../lib/shell.svelte'
   import { tintStyle } from '../lib/tint'
   import ActivityBadge from './ActivityBadge.svelte'
@@ -42,6 +43,10 @@
   // (compact) is collapsed; an error still shows.
   const quiet = $derived(compact ? chat.questionCompact : chat.headerCompact)
   let options = $state(false)
+  // A dot on what opens a folded header when something in it wants the
+  // user (lib/attention.ts).
+  const attention = $derived(attentionCount(session))
+  const attentionLabel = (what: string) => (attention === 0 ? what : attention === 1 ? t('header.attentionOne', { what }) : t('header.attentionMany', { what, n: attention }))
 
   // In a host's page, with no session list to delete it from: Delete chat
   // here, confirmed, and the host told (it may keep its own record).
@@ -135,7 +140,7 @@
         <h1><SessionTitle {session} /></h1>
         <ActivityBadge state={session.state} />
       </div>
-      <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="sliders-horizontal" /></button>
+      <button class="btn ghost icon touch dotted" onclick={() => (options = !options)} aria-expanded={options} aria-label={options ? t('mobile.options') : attentionLabel(t('mobile.options'))} title={options ? t('mobile.options') : attentionLabel(t('mobile.options'))}><Icon name="sliders-horizontal" />{#if !options && attention}<span class="dot" aria-hidden="true"></span>{/if}</button>
       <button class="btn ghost icon touch" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>
       {@render hostEnd()}
     </header>
@@ -194,13 +199,14 @@
       </button>
       <!-- Always last on the line, expanded or collapsed. -->
       <button
-        class="btn ghost small icon h-toggle"
+        class="btn ghost small icon h-toggle dotted"
         onclick={() => chat.toggleHeaderCompact()}
         aria-expanded={!chat.headerCompact}
-        aria-label={t(chat.headerCompact ? 'header.expand' : 'header.collapse')}
-        title={t(chat.headerCompact ? 'header.expand' : 'header.collapse')}
+        aria-label={chat.headerCompact ? attentionLabel(t('header.expand')) : t('header.collapse')}
+        title={chat.headerCompact ? attentionLabel(t('header.expand')) : t('header.collapse')}
       >
         <Icon name={chat.headerCompact ? 'chevron-down' : 'chevron-up'} size={14} />
+        {#if chat.headerCompact && attention}<span class="dot" aria-hidden="true"></span>{/if}
       </button>
       {@render hostEnd()}
     </div>
@@ -383,6 +389,20 @@
   /* The toolbar wraps here, so a divider between groups would end a line. */
   .options :global(.sep) {
     display: none;
+  }
+  /* The attention dot: small, top right of the button, in the warning tone. */
+  .dotted {
+    position: relative;
+  }
+  .dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--warning);
+    box-shadow: 0 0 0 2px var(--surface);
   }
   .chat-actions {
     display: flex;

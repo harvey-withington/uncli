@@ -114,6 +114,19 @@ describe('the chat’s own life in a host', () => {
   })
 })
 
+describe('the folded header', () => {
+  it('marks Options when something inside wants the user, and says so', async () => {
+    const el = chat(mockBackend({ unattended: true }), { compact: '' })
+    await inside(el).findByText(QUESTION)
+    // Unattended, and the mock's MCP servers that need signing in.
+    const options = inside(el).getByRole('button', { name: /^Options \(\d+ needs? attention\)$/ })
+    expect(options.querySelector('.dot')).not.toBeNull()
+    await fireEvent.click(options)
+    // Open, the option shows for itself.
+    expect(inside(el).getByRole('button', { name: 'Options' }).querySelector('.dot')).toBeNull()
+  })
+})
+
 describe('setting up the CLI', () => {
   it('shows the setup steps instead of the chat until the CLI is installed and signed in', async () => {
     const backend = mockBackend({ cli: { installed: false, loggedIn: false } })
