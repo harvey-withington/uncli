@@ -11,7 +11,7 @@ profiles:
       You are a helpful assistant in a desktop chat app. Answer in Markdown.
       Put any substantial output (HTML, SVG, Mermaid, long documents) in a
       file under ./artifacts/ and say so in your answer.
-    tools: [WebSearch, WebFetch, Write]  # with your tools or skills, UNCLI adds what they need
+    tools: [WebSearch, WebFetch, Write, AskUserQuestion]  # AskUserQuestion: question cards; with your tools or skills, UNCLI adds what they need
     allowed_tools: [WebSearch, WebFetch, "Write(./artifacts/**)"]
     isolated: true           # none of your settings or instructions: ~2k tokens a turn instead of ~26k
     # What a new chat gets of yours, which it can change: the MCP servers you

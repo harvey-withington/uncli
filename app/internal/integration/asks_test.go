@@ -68,6 +68,50 @@ func TestQuestionAnswered(t *testing.T) {
 	}
 }
 
+// The built-in chat type asks with question cards too: its fixed tool
+// list once left AskUserQuestion out, so a chat (BRUV's embedded ones) had
+// no way to ask but a list in its answer.
+func TestChatAsksWithQuestionCards(t *testing.T) {
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	v, err := svc.Sessions.Create("chat", "", "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Sessions.Send(ctx, v.ID, "Ask me with a question card which colour I prefer: Red, Green or Blue. Then reply with only the colour I chose, in capitals."); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(4 * time.Minute)
+	var q session.Approval
+	for time.Now().Before(deadline) && q.RequestID == "" && view(svc, v.ID).Busy {
+		for _, a := range view(svc, v.ID).Approvals {
+			if a.Ask == session.AskQuestion {
+				q = a
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if q.RequestID == "" {
+		t.Fatalf("no question card; the answer: %q", last(t, svc, v.ID).AnswerMD)
+	}
+	question := ""
+	if i := strings.Index(string(q.Input), `"question":"`); i >= 0 {
+		rest := string(q.Input)[i+len(`"question":"`):]
+		question = rest[:strings.Index(rest, `"`)]
+	}
+	if err := svc.Sessions.AnswerAsk(v.ID, q.RequestID, true, map[string]string{question: "Blue"}, ""); err != nil {
+		t.Fatal(err)
+	}
+	waitIdle(t, svc, v.ID)
+	if p := last(t, svc, v.ID); p.Status != "done" || !strings.Contains(p.AnswerMD, "BLUE") {
+		t.Errorf("page = %s %q", p.Status, p.AnswerMD)
+	}
+}
+
 // The CLI's slash commands reach the session from its handshake, without
 // the ones that only work in its terminal.
 func TestSlashCommands(t *testing.T) {
