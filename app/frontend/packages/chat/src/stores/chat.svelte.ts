@@ -19,6 +19,7 @@ import { toBlocks } from '../lib/render/markdown'
 import { t } from '../lib/i18n.svelte'
 import { namesOf, providerOf } from '../lib/api'
 import { Shell } from '../lib/shell.svelte'
+import type { EnterKey } from '../lib/enterkey.svelte'
 
 export type { Live }
 
@@ -77,6 +78,9 @@ export class ChatStore {
   turnContext: (() => string | null | undefined) | undefined = undefined
   // An embedding host's @mentions: what matches what's typed after an @.
   complete: ((query: string) => Promise<Mention[]> | Mention[]) | undefined = undefined
+  // An embedding host's word on what Enter does in the message box
+  // (lib/enterkey.svelte.ts); undefined: the viewer's setting, or the device.
+  enterKey = $state<EnterKey | undefined>(undefined)
 
   constructor(backend: Backend, opts: ChatStoreOptions = {}) {
     this.client = opts.client ?? new ChatClient(backend)

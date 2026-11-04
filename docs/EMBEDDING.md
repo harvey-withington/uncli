@@ -171,7 +171,8 @@ The chat lives in a shadow root:
 - Two names can still be the same (`--bg`, `.btn`) without clashing.
 
 You theme it through UNCLI's public tokens (decision 0010):
-- Set any `--uncli-*` custom property on the element, usually as a reference to your own tokens: `uncli-chat { --uncli-accent: var(--brand); }`.
+- Set any `--uncli-*` custom property on the element, usually as a reference to your own tokens: `uncli-chat { --uncli-accent: var(--brand); }`. Your tokens may share UNCLI's working names (`--uncli-accent: var(--accent)` is fine).
+- When you set `--uncli-accent`, set `--uncli-accent-text` too: the colour of text and icons on it, such as the Send arrow. UNCLI's own is near-black on its light accent, which is unreadable on a dark one.
 - The list of tokens is in `docs/UI-CONVENTIONS.md`.
 
 **Fonts.**
@@ -229,6 +230,10 @@ chat.host = {
   // Your own sign-in, sent with every request to src, when it's a token
   // rather than a cookie.
   headers: () => ({ Authorization: `Bearer ${myToken()}` }),
+  // What Enter does in the message box, to match your own chat: "send"
+  // (Shift+Enter for a new line) or "newline" (Ctrl+Enter sends). Left out:
+  // the viewer's choice, or a new line on touch screens.
+  enter: "newline",
 }
 ```
 

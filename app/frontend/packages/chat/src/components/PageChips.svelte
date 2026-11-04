@@ -56,8 +56,12 @@
     background: var(--accent-soft);
     color: var(--accent);
   }
+  /* The turn's figures: read-only, so a soft fill and no border, apart
+     from the model's outlined chip (a dashed border turned loud wherever a
+     host's border colour is bright). */
   .num {
     font-variant-numeric: tabular-nums;
-    border-style: dashed;
+    border-color: transparent;
+    background: var(--surface-2);
   }
 </style>

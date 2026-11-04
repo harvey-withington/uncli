@@ -124,7 +124,9 @@
     {:else if item.kind === 'native'}
       {@const away = item.action === 'open_workdir' && !atServer(chat.backend)}
       <span class="native">
-        <button class="btn small ghost" onclick={() => native(item)} disabled={away} title={away ? onlyAtServer() : undefined} aria-expanded={item.action === 'usage' ? usageOpen : undefined}>
+        <!-- Away from the server's screen it looks disabled but still takes a
+             tap, which says why: a phone shows no tooltip. -->
+        <button class="btn small ghost" class:away onclick={() => (away ? shell.toast(onlyAtServer()) : native(item))} aria-disabled={away || undefined} title={away ? onlyAtServer() : undefined} aria-expanded={item.action === 'usage' ? usageOpen : undefined}>
           <Icon name={item.icon ?? 'sparkles'} size={13} />{item.label}
         </button>
         {#if item.action === 'usage' && usageOpen}
@@ -137,6 +139,10 @@
 </div>
 
 <style>
+  /* Looks disabled (.btn:disabled) but answers a tap with why. */
+  .away {
+    opacity: 0.5;
+  }
   .toolbar {
     display: flex;
     align-items: center;

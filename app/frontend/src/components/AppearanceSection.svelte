@@ -3,15 +3,19 @@
   import { t } from '@uncli/chat/lib/i18n.svelte'
   import { atServer, onlyAtServer } from '@uncli/chat/lib/remoteonly'
   import { setTheme, theme, type Theme } from '../lib/theme.svelte'
+  import { enterSetting, setEnterSetting, type EnterSetting } from '@uncli/chat/lib/enterkey.svelte'
   import Icon from '@uncli/chat/components/Icon.svelte'
 
   // Settings → General → Appearance: the theme (the sidebar's toggle cycles
-  // the same setting) and the theme file, which restyles UNCLI (decision
-  // 0010), with where UNCLI looks for it and a reload.
+  // the same setting), what Enter does in the message box (for this
+  // viewer), and the theme file, which restyles UNCLI (decision 0010), with
+  // where UNCLI looks for it and a reload.
   const app = useApp()
   // The theme file is the server's; a remote client keeps its own look.
   const here = $derived(atServer(app.backend))
   const themes: Theme[] = ['system', 'light', 'dark']
+  // What Enter does in the message box, for this viewer.
+  const enterChoices: EnterSetting[] = ['device', 'send', 'newline']
   let file = $state<{ path: string; found: boolean } | null>(null)
   let reloading = $state(false)
 
@@ -43,6 +47,12 @@
     <select id="theme" class="select" value={theme.value} onchange={e => setTheme(e.currentTarget.value as Theme)}>
       {#each themes as v (v)}
         <option value={v}>{t(`settings.theme.${v}`)}</option>
+      {/each}
+    </select>
+    <label for="enter-key">{t('settings.enterKey')}</label>
+    <select id="enter-key" class="select" value={enterSetting.value} onchange={e => setEnterSetting(e.currentTarget.value as EnterSetting)}>
+      {#each enterChoices as v (v)}
+        <option value={v}>{t(`settings.enterKey.${v}`)}</option>
       {/each}
     </select>
     <span>{t('settings.themeFile')}</span>

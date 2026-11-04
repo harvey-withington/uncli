@@ -17,7 +17,7 @@
 // for UNCLI's, or nothing to keep UNCLI's; complete(query) offers
 // @mentions; turnContext() says what the user has in front of them, sent
 // (hidden) with each turn; headers() is the host's own sign-in, sent with
-// every request to src.
+// every request to src; enter says what Enter does in the message box.
 // Events (composed, so they cross into the host's page): uncli-ready,
 // uncli-busy, uncli-idle, uncli-needs-approval; detail: { session }. Before
 // the chat acts on Escape or Ctrl+Enter, uncli-escape and uncli-submit go
@@ -30,6 +30,7 @@ import { keyedMemory } from '../lib/layoutmemory'
 import { keepInMemory } from '../lib/storage'
 import { allowLinkSchemes } from '../lib/render/markdown'
 import { ChatStore, type Mention } from '../stores/chat.svelte'
+import type { EnterKey } from '../lib/enterkey.svelte'
 import { applyScheme, hostFont, shadowFor, srcBackend } from './root'
 
 // What a host can do for the chat (decision 0026).
@@ -47,6 +48,10 @@ export interface ChatHost {
   // sign-in (Authorization: Bearer <token>), for a host that doesn't sign in
   // with a cookie. Asked for on every request.
   headers?(): Record<string, string> | undefined | null
+  // enter: what Enter does in the message box, to match the host's own
+  // chat: "send" (Shift+Enter for a new line) or "newline" (Ctrl+Enter
+  // sends). Left out: the viewer's setting, or a new line on touch screens.
+  enter?: EnterKey
 }
 
 export class UncliChat extends HTMLElement {
@@ -80,6 +85,7 @@ export class UncliChat extends HTMLElement {
     this.#host = h
     setHostText(h?.t ? (key, params) => h.t?.(key, params) : null)
     setHostHeaders(h?.headers ? () => h.headers?.() : null)
+    if (this.#props) this.#props.store.enterKey = h?.enter
   }
 
   // The session shown (the session attribute).
@@ -156,6 +162,7 @@ export class UncliChat extends HTMLElement {
     store.openLink = href => this.#host?.openLink?.(href) ?? false
     store.turnContext = () => this.#host?.turnContext?.()
     store.complete = query => this.#host?.complete?.(query) ?? []
+    store.enterKey = this.#host?.enter
     store.embedded = true
     const target = document.createElement('div')
     target.className = 'uncli-root'

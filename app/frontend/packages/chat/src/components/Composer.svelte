@@ -7,6 +7,7 @@
   import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/composerevents'
   import { loadDraft, saveDraft } from '../lib/keep'
   import { atServer } from '../lib/remoteonly'
+  import { enterSetting, resolveEnter, touchScreen } from '../lib/enterkey.svelte'
   import Icon from './Icon.svelte'
   import SlashMenu from './SlashMenu.svelte'
   import MentionMenu from './MentionMenu.svelte'
@@ -205,9 +206,20 @@
     )
   }
 
+  // What Enter does (lib/enterkey.svelte.ts): sends, with Shift+Enter for a
+  // new line; or a new line, with Ctrl+Enter (or Send) to send. On a touch
+  // screen, a new line unless the host or the viewer says otherwise.
+  const touch = touchScreen()
+  const enter = $derived(resolveEnter(chat.enterKey, enterSetting.value, touch))
+  const placeholder = $derived(
+    session.busy ? t('composer.waiting') : touch ? t('composer.placeholderShort') : enter === 'send' ? t('composer.placeholder') : t('composer.placeholderNewline'),
+  )
+
   function onkeydown(e: KeyboardEvent) {
     if (menu?.onkey(e) || mentions?.onkey(e)) return
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    if (e.key !== 'Enter' || e.isComposing) return
+    const sends = enter === 'send' ? !e.shiftKey : e.ctrlKey || e.metaKey
+    if (sends) {
       e.preventDefault()
       send()
     }
@@ -241,7 +253,7 @@
       bind:value={text}
       use:autosize={240}
       rows="2"
-      placeholder={session.busy ? t('composer.waiting') : t('composer.placeholder')}
+      {placeholder}
       aria-label={t('composer.label')}
       {onkeydown}
       {onpaste}
@@ -258,7 +270,7 @@
       <Icon name="square" size={13} />{t('composer.stop')}
     </button>
   {:else}
-    <button class="btn primary icon send" onclick={send} disabled={!canSend} aria-label={t('composer.send')} title={t('composer.sendHint')}>
+    <button class="btn primary icon send" onclick={send} disabled={!canSend} aria-label={t('composer.send')} title={enter === 'send' ? t('composer.sendHint') : t('composer.sendHintCtrl')}>
       <Icon name="arrow-up" />
     </button>
   {/if}

@@ -139,6 +139,21 @@ describe('the host adapter', () => {
     expect(inside(el).queryByRole('option', { name: /Offline cards/ })).toBeNull()
   })
 
+  it('lets the host say Enter starts a new line, with Ctrl+Enter to send', async () => {
+    const backend = mockBackend()
+    const send = vi.spyOn(backend, 'send')
+    const el = chat(backend)
+    el.host = { enter: 'newline' }
+    await inside(el).findByText(QUESTION)
+    const box = el.shadowRoot!.querySelector('textarea')!
+    expect(box).toHaveAttribute('placeholder', 'Ask anything. Ctrl+Enter to send')
+    await fireEvent.input(box, { target: { value: 'Two lines' } })
+    await fireEvent.keyDown(box, { key: 'Enter' })
+    expect(send).not.toHaveBeenCalled()
+    await fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
+    await waitFor(() => expect(send).toHaveBeenCalledWith('s-code', 'Two lines', []))
+  })
+
   it('asks the host first about Escape and Ctrl+Enter; a host that cancels keeps the key', async () => {
     const el = chat()
     await inside(el).findByText(QUESTION)

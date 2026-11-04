@@ -314,7 +314,12 @@
   .bar h1 {
     font-size: var(--text-md);
   }
+  /* At most a third of the screen, scrolling past that, so the answer
+     keeps most of a phone even with Options open. */
   .options {
+    max-height: 33vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: var(--space-2) var(--space-3);
     border-top: 1px solid var(--border);
   }
