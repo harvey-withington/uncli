@@ -56,7 +56,7 @@ that host and only that.
 - **Remote access is the host's choice.** A host that wants a phone app
   switches it on for its own core. It's the same remote server as the
   standalone app's.
-- **The Go side ships as `app/embed`,** a public package in UNCLI's module:
+- **The Go side ships as `app/uncli`** (package `uncli`; not `embed`, which would clash with Go's own `embed` that hosts use for their assets), a public package in UNCLI's module:
   - `Start`, `Handler`, `Close`, and an optional `EnableRemote`;
   - `uncli-core` is a small program over it.
 - **Helpers for other server stacks are optional.** Most set up a reverse
@@ -74,7 +74,7 @@ credentials of UNCLI's beyond the key their own core is given.
   questions reduce to the host's own sign-in and the core's origin check.
 - **What has to be built:**
   - A real Go module path, replacing `uncli`.
-  - `app/embed`.
+  - `app/uncli`.
   - Links that resolve against the mount path, and Host and Origin checks
     that take the host's values.
   - `<uncli-chat src>`, and `<uncli-setup>` for installing and signing in

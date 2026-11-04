@@ -158,7 +158,7 @@ The part names are part of the contract; the structure inside them isn't.
 
 - **React, Vue and Angular wrappers,** generated from a Custom Elements Manifest.
 - **Your own UNCLI** (decision 0027). Your app runs a UNCLI core of its own, private to your app, with nothing shared with other apps or an installed UNCLI.
-  - A Go server mounts it in-process (`app/embed`). Any other stack starts the `uncli-core` program and forwards a path to it.
+  - A Go server mounts it in-process (`app/uncli`). Any other stack starts the `uncli-core` program and forwards a path to it.
   - The page then shows `<uncli-chat src="/uncli">`.
   - `<uncli-setup>` lets your users install and sign in to the CLIs.
 

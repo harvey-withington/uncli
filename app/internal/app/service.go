@@ -57,6 +57,22 @@ func hookCommand() string {
 	return `"` + exe + `" hook`
 }
 
+// Options change how the service runs. The zero value is the desktop app.
+type Options struct {
+	// Embedded runs a host's own UNCLI (decision 0027): no tray or desktop
+	// notifications, no start-with-Windows, no self-update and no
+	// containers. The host does those, or goes without.
+	Embedded bool
+	// HookCommand is the command line that runs UNCLI's hook (decision
+	// 0012). Empty: this program with "hook" (main.go), except when
+	// embedded, where this program is the host's: there, empty means no
+	// hook, and Antigravity's sessions don't start.
+	HookCommand string
+}
+
+// errEmbedded refuses what only the desktop app does.
+var errEmbedded = errors.New("this UNCLI runs inside another app, which takes care of that")
+
 type Paths struct {
 	Config  string // db and user YAML
 	Cache   string // downloaded CLIs
@@ -105,6 +121,7 @@ type Service struct {
 	ShowWindow func()
 	Quit       func()
 
+	embedded      bool // a host's own UNCLI (Options.Embedded)
 	emit          Emitter
 	notifier      notify.Notifier
 	remoteMu      sync.Mutex
@@ -125,7 +142,15 @@ type Service struct {
 	login   *local.Interactive
 }
 
-func New(paths Paths, emit Emitter) (*Service, error) {
+// New starts the desktop app's service.
+func New(paths Paths, emit Emitter) (*Service, error) { return NewWith(paths, emit, Options{}) }
+
+// NewWith starts a service run as opts says.
+func NewWith(paths Paths, emit Emitter, opts Options) (*Service, error) {
+	hookCmd := opts.HookCommand
+	if hookCmd == "" && !opts.Embedded {
+		hookCmd = hookCommand()
+	}
 	for _, d := range []string{paths.Config, paths.Cache, paths.Scratch} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			return nil, err
@@ -142,10 +167,10 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		return nil, err
 	}
 	inst := claude.NewInstaller(filepath.Join(paths.Cache, "cli", "claude"))
-	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst).WithSkills(filepath.Join(paths.Cache, "skills", "claude")), emit: emit}
+	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst).WithSkills(filepath.Join(paths.Cache, "skills", "claude")), emit: emit, embedded: opts.Embedded}
 	s.life, s.endLife = context.WithCancel(context.Background())
 	agyInst := antigravity.NewInstaller(filepath.Join(paths.Cache, "cli", "antigravity"))
-	agy := antigravity.New(agyInst, filepath.Join(paths.Config, "agy"), hookCommand())
+	agy := antigravity.New(agyInst, filepath.Join(paths.Config, "agy"), hookCmd)
 	s.clis = []*cliProvider{
 		{adapter: s.Adapter, installer: inst, binEnv: "UNCLI_CLAUDE_BIN"},
 		{adapter: agy, installer: agyInst, binEnv: "UNCLI_AGY_BIN"},
@@ -160,7 +185,11 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 		db.Close()
 		return nil, err
 	}
-	s.notifier = newNotifier(notify.Handlers{Click: s.notifyClicked, Quit: s.quitClicked})
+	if opts.Embedded {
+		s.notifier = notify.None{}
+	} else {
+		s.notifier = newNotifier(notify.Handlers{Click: s.notifyClicked, Quit: s.quitClicked})
+	}
 	s.containers.cfg, s.containers.err = loadContainers(defaults, paths.Config)
 	if s.providers, err = loadProviders(defaults); err != nil {
 		db.Close()
@@ -170,9 +199,11 @@ func New(paths Paths, emit Emitter) (*Service, error) {
 	s.containers.percent = map[string]int{}
 	s.artifactStore = artifacts.NewStore(filepath.Join(paths.Config, "artifact-store"))
 	go s.clearOldUploads()
-	s.refreshStartup()
 	s.initUpdates()
-	go s.watchUpdates()
+	if !opts.Embedded {
+		s.refreshStartup()
+		go s.watchUpdates()
+	}
 	sink := newAttention(newCoalescer(emit, 50*time.Millisecond),
 		func(id string) bool { return s.Sessions != nil && s.Sessions.Focused(id) },
 		func() string { return s.Preferences().Notifications },

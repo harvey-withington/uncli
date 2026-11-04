@@ -178,6 +178,9 @@ func (s *Service) SetPreferences(p Preferences) (Preferences, error) {
 		return s.Preferences(), fmt.Errorf("unknown update check setting %q", p.UpdateCheck)
 	}
 	if p.StartWithWindows != s.Preferences().StartWithWindows {
+		if s.embedded {
+			return s.Preferences(), errEmbedded
+		}
 		if p.StartWithWindows && !StartupSupported {
 			return s.Preferences(), errors.New("starting with the system is only on Windows for now")
 		}

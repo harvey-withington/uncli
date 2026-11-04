@@ -14,6 +14,7 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -58,6 +59,9 @@ type Config struct {
 	OnStatus      func(Status)
 	OnPairRequest func(PairRequest)
 	OnDevices     func([]PairedDevice)
+	// Methods is what clients may call (nil: a paired device's,
+	// rpcMethods). A host's own UNCLI passes EmbeddedMethods.
+	Methods []string
 }
 
 // Server is the remote transport. Its zero state is off.
@@ -70,6 +74,7 @@ type Server struct {
 	auth  Authenticator
 	links *links
 	pwa   fs.FS
+	names map[string]bool // the methods clients may call
 
 	devices *Devices
 	pair    *pairing
@@ -90,7 +95,13 @@ type Server struct {
 
 func New(c Config) *Server {
 	s := &Server{api: c.API, svc: c.Service, hub: c.Hub, store: c.Store, certs: c.Certs, auth: c.Auth,
-		links: newLinks(), pwa: c.PWA, push: c.Push, onStatus: c.OnStatus, streams: map[string]int{}}
+		links: newLinks(), pwa: c.PWA, push: c.Push, onStatus: c.OnStatus, streams: map[string]int{}, names: rpcNames}
+	if c.Methods != nil {
+		s.names = map[string]bool{}
+		for _, m := range c.Methods {
+			s.names[m] = true
+		}
+	}
 	if c.Store != nil {
 		s.devices = NewDevices(c.Store)
 		if c.OnDevices != nil {
@@ -115,10 +126,23 @@ func New(c Config) *Server {
 // answers to). Requests for any other host are refused, so a web page
 // can't reach UNCLI through a DNS name it controls.
 func (s *Server) Handler(hosts func() []string) http.Handler {
+	return guard(hosts, s.routes())
+}
+
+// EmbeddedHandler is the routes of a host's own UNCLI (decision 0027),
+// which the host mounts on its own server or forwards a path to. The
+// host's server decides who gets this far; here, only pages from the
+// host's origins may send requests, so another site can't drive UNCLI
+// through the user's cookies for the host.
+func (s *Server) EmbeddedHandler(origins []string) http.Handler {
+	return embeddedGuard(origins, s.routes())
+}
+
+func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /version", serveVersion)
 	mux.Handle("POST /rpc", s.authed(func(w http.ResponseWriter, r *http.Request, d Device) {
-		serveRPC(w, r, &client{API: s.api, svc: s.svc, server: s, device: d}, rpcNames)
+		serveRPC(w, r, &client{API: s.api, svc: s.svc, server: s, device: d}, s.names)
 	}))
 	mux.Handle("GET /events", s.authed(s.serveEvents))
 	mux.Handle("POST /upload", s.authed(s.serveUploadPost))
@@ -132,7 +156,31 @@ func (s *Server) Handler(hosts func() []string) http.Handler {
 		mux.Handle("GET /m/", servePWA(s.pwa))
 		mux.Handle("GET /{$}", http.RedirectHandler("/m/", http.StatusFound))
 	}
-	return guard(hosts, mux)
+	return mux
+}
+
+// embeddedGuard is guard for a host's own UNCLI. The Host header is the
+// host's business (its server answers to its own names, and a forwarded
+// request may carry either), so only the Origin is checked: a request a
+// page sends must come from one of the host's origins. Requests without
+// one (the host's server itself, a same-origin GET) pass. The host's page
+// shares its origin, so no CORS headers are ever sent.
+func embeddedGuard(origins []string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("X-Frame-Options", "SAMEORIGIN")
+		if o := r.Header.Get("Origin"); o != "" && !slices.ContainsFunc(origins, func(a string) bool { return strings.EqualFold(strings.TrimSuffix(a, "/"), o) }) {
+			http.Error(w, "Cross-origin requests aren't allowed", http.StatusForbidden)
+			return
+		}
+		if r.Method == http.MethodOptions {
+			http.Error(w, "Cross-origin requests aren't allowed", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // guard checks the Host and Origin of every request and sets the headers

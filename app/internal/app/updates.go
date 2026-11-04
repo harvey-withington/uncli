@@ -95,6 +95,9 @@ var errDevBuild = errors.New("this is a development build: it's updated with npm
 // CheckForUpdates looks for a newer release now.
 func (s *Service) CheckForUpdates(ctx context.Context) (UpdateStatus, error) {
 	cur := s.UpdateStatus()
+	if s.embedded {
+		return cur, errEmbedded
+	}
 	if cur.Dev {
 		return cur, errDevBuild
 	}
@@ -126,6 +129,8 @@ func (s *Service) CheckForUpdates(ctx context.Context) (UpdateStatus, error) {
 func (s *Service) InstallUpdate(ctx context.Context) (UpdateStatus, error) {
 	cur := s.UpdateStatus()
 	switch {
+	case s.embedded:
+		return cur, errEmbedded
 	case cur.Dev:
 		return cur, errDevBuild
 	case cur.State == UpdateDownloading || cur.State == UpdateInstalling:

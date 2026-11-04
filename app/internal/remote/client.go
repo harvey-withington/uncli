@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"strings"
 
@@ -54,6 +55,17 @@ var rpcMethods = []string{
 	// UNCLI's own updates (decision 0025): the phone can start one, as a
 	// session on the PC could.
 	"UpdateStatus", "CheckForUpdates", "InstallUpdate",
+}
+
+// EmbeddedMethods is what a host's own UNCLI offers its page (decision
+// 0027): a paired device's methods, less push notifications (the host
+// notifies its users itself) and UNCLI's updates (the host ships its
+// UNCLI with its own releases).
+func EmbeddedMethods() []string {
+	return slices.DeleteFunc(slices.Clone(rpcMethods), func(m string) bool {
+		return strings.HasPrefix(m, "Push") || m == "SetPushNotifications" || m == "TestPush" ||
+			m == "UpdateStatus" || m == "CheckForUpdates" || m == "InstallUpdate"
+	})
 }
 
 var rpcNames = func() map[string]bool {

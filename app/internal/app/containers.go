@@ -218,6 +218,9 @@ type ContainersInfo struct {
 
 // Containers asks WSL afresh and reports it, the sign-in and each profile.
 func (s *Service) Containers(ctx context.Context) ContainersInfo {
+	if s.embedded { // WSL distros belong to the whole Windows user, not one host (decision 0027)
+		return ContainersInfo{WSL: wsl.Status{Distros: []string{}}, Containers: []ContainerInfo{}, Bases: []Base{}}
+	}
 	s.reloadContainers()
 	st, _ := checkWSL(ctx)
 	s.containers.mu.Lock()
@@ -308,6 +311,9 @@ func (s *Service) profileAndBase(id string) (ContainerProfile, Base, error) {
 // BuildContainer builds (or rebuilds) a profile's distro in the background;
 // progress and the outcome arrive as EvtContainers.
 func (s *Service) BuildContainer(id string) error {
+	if s.embedded {
+		return errEmbedded
+	}
 	p, b, err := s.profileAndBase(id)
 	if err != nil {
 		return err
@@ -465,7 +471,7 @@ func (s *Service) profile(id string) (ContainerProfile, bool) {
 // runtimeFor is session.Deps.Runtimes: the runtime of a container profile,
 // one per profile, kept while UNCLI runs.
 func (s *Service) runtimeFor(id, ref string) (core.Runtime, error) {
-	if id != session.RuntimeWSL {
+	if id != session.RuntimeWSL || s.embedded {
 		return nil, fmt.Errorf("this session runs in %s, which this UNCLI can't start", id)
 	}
 	if _, _, err := s.profileAndBase(ref); err != nil {
