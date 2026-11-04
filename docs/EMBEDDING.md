@@ -9,7 +9,7 @@ authors. It covers what exists today and says what doesn't yet.
 
 | | |
 |---|---|
-| **Status** | Alpha, on the `feat/packages` branch. Not published to a registry yet. Your page can't reach a real UNCLI yet: build against the mock (see "What's not there yet"). |
+| **Status** | Alpha, on the `feat/packages` branch. Not published to a registry yet. The UNCLI core your app will run isn't there yet, so build against the mock (see "What's not there yet"). |
 | **Packages** | `@uncli/chat` (`app/frontend/packages/chat`): the elements, built, as `@uncli/chat/element`, and the Svelte components as source. `@uncli/client` (`app/frontend/packages/client`): the client underneath, and its mock as `@uncli/client/mock`. |
 | **Getting them** | `npm --prefix app/frontend run pack:packages` builds the element and packs both packages as tarballs into `app/frontend/dist-embed/packs/`. A host installs the two tarballs (`npm install <path>/uncli-client-….tgz <path>/uncli-chat-….tgz`). |
 | **A sample** | `npm --prefix app/frontend run build:embed` also builds a sample host page on UNCLI's mock, into `dist-embed/sample/`. |
@@ -28,16 +28,17 @@ It's built already, Svelte inside, so your bundler needs nothing special and you
 <uncli-chat session="s-code" scheme="dark" storage-key="card-chat"></uncli-chat>
 <script type="module">
   import '@uncli/chat/element' // registers <uncli-chat>
-  import { httpBackend } from '@uncli/client'
+  import { mockBackend } from '@uncli/client/mock'
 
   const chat = document.querySelector('uncli-chat')
-  chat.backend = httpBackend({ base: 'https://pc.tailnet.ts.net:9871', token: () => deviceToken })
+  chat.backend = mockBackend() // your own UNCLI, once it exists (decision 0027)
 </script>
 ```
 
 - **`backend`** (property) is how the chat reaches UNCLI.
-  - `httpBackend` reaches a UNCLI over its remote access server (decision 0021), with a paired device's token. **Not from your page yet:** that server refuses requests from any page it didn't serve itself (decision 0022), so today `httpBackend` works only in UNCLI's own phone app. Host access is being designed (see "What's not there yet").
-  - Any object implementing `Backend` works, including `@uncli/client/mock`, which is what to build against for now.
+  - Your app will run its own UNCLI and forward a path of its server to it (decision 0027), and the chat will reach it there. Until that core exists, build against `@uncli/client/mock`.
+  - Your page never connects to an installed UNCLI: its remote access server serves only UNCLI's own phone app.
+  - Any object implementing `Backend` works.
   - Every element given the same backend object shares one client: one event stream, one copy of the server's state.
 - **`session`** (attribute or property) is the session to show. Changing it shows another.
 - **`scheme`** is `light` or `dark`. Leave it out to follow the system.
@@ -156,5 +157,9 @@ The part names are part of the contract; the structure inside them isn't.
 ## What's not there yet
 
 - **React, Vue and Angular wrappers,** generated from a Custom Elements Manifest.
-- **Reaching a real UNCLI from your page.** A host needs its own credentials, approved in UNCLI, and UNCLI's server has to accept requests from the host's origin. Until then, the chat runs only on the mock in your page.
-- **UNCLI inside your app,** without a separate install: a headless UNCLI your app starts itself, or links in if it's written in Go.
+- **Your own UNCLI** (decision 0027). Your app runs a UNCLI core of its own, private to your app, with nothing shared with other apps or an installed UNCLI.
+  - A Go server mounts it in-process (`app/embed`). Any other stack starts the `uncli-core` program and forwards a path to it.
+  - The page then shows `<uncli-chat src="/uncli">`.
+  - `<uncli-setup>` lets your users install and sign in to the CLIs.
+
+  Until then, the chat runs only on the mock in your page.
