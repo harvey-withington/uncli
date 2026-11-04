@@ -10,7 +10,7 @@ import { text } from './text'
 import type { Backend, Connection, Handlers, Upload } from './types'
 
 export interface HttpOptions {
-  base: string // the server's origin; '' for the page's own
+  base: string // the server's origin; '' for the page's own; a path (/uncli) for a host's own UNCLI on the page's server
   token: () => string | null
   // unauthorized: the server refused the token (revoked, or never paired).
   unauthorized?: () => void
@@ -282,9 +282,28 @@ export function httpBackend(opts: HttpOptions): Backend {
   }
 }
 
-// absolute is a server path as a full URL, to open in the browser.
-function absolute(base: string, path: string): string {
-  return new URL(path, base || globalThis.location?.origin).href
+// absolute is a server path as a full URL, to open in the browser. The
+// server's paths start at its root, which for a host's own UNCLI is the
+// path the host mounted it on (/uncli, say), so they go under base.
+export function absolute(base: string, path: string): string {
+  const under = path.startsWith('/') ? base.replace(/\/+$/, '') + path : path
+  return new URL(under, base && !base.startsWith('/') ? base : globalThis.location?.origin).href
+}
+
+const mounted = new Map<string, Backend>()
+
+// mountedBackend is a host's own UNCLI at a path of the page's own server
+// (decision 0027): <uncli-chat src="/uncli">. The host's server forwards
+// the path and adds UNCLI's key, so the page sends none. Every element
+// with the same src shares one backend, and so one client.
+export function mountedBackend(src: string): Backend {
+  const base = src.replace(/\/+$/, '')
+  let b = mounted.get(base)
+  if (!b) {
+    b = httpBackend({ base, token: () => null })
+    mounted.set(base, b)
+  }
+  return b
 }
 
 // stream keeps the event stream open: it reconnects with backoff, resumes

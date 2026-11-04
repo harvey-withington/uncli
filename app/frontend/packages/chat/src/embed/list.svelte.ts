@@ -3,11 +3,13 @@
 // archive and delete work as in UNCLI's sidebar; picking a session tells
 // the host with an uncli-select event, and the host shows it.
 //
-//   list.backend = chat.backend                  // the same backend: one client
+//   <uncli-session-list src="/uncli"></uncli-session-list>  // the chat's src: one client
 //   list.addEventListener('uncli-select', e => (chat.session = e.detail.session))
 //
-// Attributes: selected (the session the host shows, marked as current),
-// scheme ("light" or "dark"; the system's otherwise).
+// Attributes: src (the path the host's server forwards to its own UNCLI,
+// decision 0027; or set the backend property), selected (the session the
+// host shows, marked as current), scheme ("light" or "dark"; the system's
+// otherwise).
 // Events (composed): uncli-ready, uncli-select; detail: { session }.
 import { mount, unmount } from 'svelte'
 import { chatClient, type Backend } from '@uncli/client'
@@ -15,10 +17,10 @@ import SessionList from '../components/SessionList.svelte'
 import { keyedMemory } from '../lib/layoutmemory'
 import { keepInMemory } from '../lib/storage'
 import { ChatStore } from '../stores/chat.svelte'
-import { applyScheme, hostFont, shadowFor } from './root'
+import { applyScheme, hostFont, shadowFor, srcBackend } from './root'
 
 export class UncliSessionList extends HTMLElement {
-  static observedAttributes = ['selected', 'scheme']
+  static observedAttributes = ['src', 'selected', 'scheme']
 
   #backend: Backend | null = null
   #props = $state<{ store: ChatStore; selected: string; onpick: (id: string) => void } | null>(null)
@@ -56,6 +58,7 @@ export class UncliSessionList extends HTMLElement {
   }
 
   attributeChangedCallback(name: string) {
+    if (name === 'src') this.backend = srcBackend(this)
     if (name === 'scheme') applyScheme(this)
     if (name === 'selected' && this.#props) this.#props.selected = this.selected
   }

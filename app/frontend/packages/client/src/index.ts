@@ -4,7 +4,7 @@
 // ChatClient and SessionStore that hold a server's state for a UI. The
 // mock backend is @uncli/client/mock.
 export type * from './types'
-export { httpBackend, parseSSE, RemoteOnlyError, RPCError, type HttpOptions, type SSEFrame } from './http'
+export { absolute, httpBackend, mountedBackend, parseSSE, RemoteOnlyError, RPCError, type HttpOptions, type SSEFrame } from './http'
 export { LOCAL, parseRef, qualify, serverKey, SESSION_FIRST, withServer, type SessionRef } from './identity'
 export { dayKey, startOfDay } from './days'
 export { SECTION_KINDS, type SectionKind } from './sections'

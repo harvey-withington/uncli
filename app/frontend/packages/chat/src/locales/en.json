@@ -1,6 +1,7 @@
 {
   "app.loading": "Loading UNCLI",
   "chat.noSession": "This session isn’t on this UNCLI.",
+  "chat.noSessionGiven": "No chat open yet.",
   "app.tagline": "AI CLIs if you're not a CLI guy.",
   "common.cancel": "Cancel",
   "common.close": "Close",

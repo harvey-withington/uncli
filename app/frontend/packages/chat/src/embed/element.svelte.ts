@@ -4,11 +4,10 @@
 // Chat.svelte there on a ChatStore of its own. Every element given the
 // same backend shares one client (one event stream).
 //
-//   const chat = document.createElement('uncli-chat')
-//   chat.backend = httpBackend({ base, token: () => token })  // or any Backend
-//   chat.session = '<session id>'
+//   <uncli-chat src="/uncli" session="<session id>"></uncli-chat>
 //
-// Attributes: session, scheme ("light" or "dark"; the system's otherwise),
+// Attributes: src (the path the host's server forwards to its own UNCLI,
+// decision 0027; or set the backend property to any Backend), session, scheme ("light" or "dark"; the system's otherwise),
 // compact (the phone's layout; compact="false" the desktop's; by the
 // element's width when left out), storage-key (remember the side panel and
 // compact layout under it), link-schemes (the host's own link schemes kept
@@ -30,7 +29,7 @@ import { keyedMemory } from '../lib/layoutmemory'
 import { keepInMemory } from '../lib/storage'
 import { allowLinkSchemes } from '../lib/render/markdown'
 import { ChatStore, type Mention } from '../stores/chat.svelte'
-import { applyScheme, hostFont, shadowFor } from './root'
+import { applyScheme, hostFont, shadowFor, srcBackend } from './root'
 
 // What a host can do for the chat (decision 0026).
 export interface ChatHost {
@@ -46,7 +45,7 @@ export interface ChatHost {
 }
 
 export class UncliChat extends HTMLElement {
-  static observedAttributes = ['session', 'scheme', 'compact', 'link-schemes']
+  static observedAttributes = ['src', 'session', 'scheme', 'compact', 'link-schemes']
 
   #backend: Backend | null = null
   #host: ChatHost | null = null
@@ -86,6 +85,15 @@ export class UncliChat extends HTMLElement {
     this.setAttribute('session', id)
   }
 
+  // newSession starts a session on this chat's UNCLI and shows it: a chat in
+  // a fresh folder by default, or a profile's (cowork, code) in workdir.
+  async newSession(profile = 'chat', workdir = '', model = ''): Promise<string> {
+    if (!this.#backend) throw new Error('<uncli-chat> has no src or backend')
+    const v = await chatClient(this.#backend).createSession(profile, workdir, model)
+    this.session = v.id
+    return v.id
+  }
+
   connectedCallback() {
     shadowFor(this)
     hostFont(this)
@@ -101,6 +109,7 @@ export class UncliChat extends HTMLElement {
   }
 
   attributeChangedCallback(name: string) {
+    if (name === 'src') this.backend = srcBackend(this)
     if (name === 'scheme') applyScheme(this)
     if (name === 'link-schemes') this.#linkSchemes()
     if (name === 'compact' && this.#props) this.#props.compact = this.#compact()

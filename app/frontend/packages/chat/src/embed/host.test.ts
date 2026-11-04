@@ -1,10 +1,11 @@
 import { fireEvent, waitFor, within } from '@testing-library/svelte'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chatClient } from '@uncli/client'
+import { chatClient, mountedBackend } from '@uncli/client'
 import { mockBackend } from '@uncli/client/mock'
 import { setHostText } from '../lib/i18n.svelte'
 import { allowLinkSchemes } from '../lib/render/markdown'
 import { defineUncliChat, type UncliChat } from './element.svelte'
+import { defineUncliSessionList, type UncliSessionList } from './list.svelte'
 
 defineUncliChat()
 
@@ -25,6 +26,20 @@ function chat(backend = mockBackend(), attrs: Record<string, string> = {}): Uncl
   document.body.append(el)
   return el
 }
+
+describe('src', () => {
+  it('reaches the host’s own UNCLI at the path its server forwards, one client for the chat and the list', () => {
+    defineUncliSessionList()
+    const el = document.createElement('uncli-chat') as UncliChat
+    const list = document.createElement('uncli-session-list') as UncliSessionList
+    el.setAttribute('src', '/uncli')
+    list.setAttribute('src', '/uncli/')
+    expect(el.backend).toBe(mountedBackend('/uncli'))
+    expect(list.backend).toBe(el.backend)
+    el.removeAttribute('src')
+    expect(el.backend).toBeNull()
+  })
+})
 
 describe('the host adapter', () => {
   it('hands the host its own links from answers, kept by link-schemes, and opens nothing itself', async () => {

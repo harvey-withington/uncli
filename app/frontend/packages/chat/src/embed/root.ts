@@ -2,8 +2,16 @@
 // that adopts UNCLI's theme read as :host (one stylesheet shared by all of
 // them), the host page's font for UNCLI's text, and UNCLI's scheme
 // attribute from its own scheme attribute.
+import { mountedBackend, type Backend } from '@uncli/client'
 import themeCss from '../styles/theme.css?inline'
 import { shadowCss } from './shadow'
+
+// srcBackend is the backend an element's src attribute names: the path the
+// host's server forwards to its own UNCLI (decision 0027), or none.
+export function srcBackend(el: HTMLElement): Backend | null {
+  const src = el.getAttribute('src')
+  return src ? mountedBackend(src) : null
+}
 
 let sheet: CSSStyleSheet | null = null
 function stylesheet(): CSSStyleSheet | null {

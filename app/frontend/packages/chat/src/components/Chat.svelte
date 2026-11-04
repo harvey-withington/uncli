@@ -52,8 +52,10 @@
     <MobileSession session={view} wide={false} />
   {:else if view}
     <SessionPane session={view} />
-  {:else}
+  {:else if session}
     <p class="note">{t('chat.noSession')}</p>
+  {:else}
+    <p class="note">{t('chat.noSessionGiven')}</p>
   {/if}
   <Toasts />
   <ConfirmDialog />

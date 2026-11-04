@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { RemoteOnlyError, RPCError, httpBackend, parseSSE } from './http'
+import { RemoteOnlyError, RPCError, absolute, httpBackend, mountedBackend, parseSSE } from './http'
 import type { Connection, Handlers } from './types'
 
 type Call = { url: string; init: RequestInit }
@@ -104,6 +104,29 @@ describe('httpBackend', () => {
       expect(fetch.mock.calls[1]![1].signal).toBeUndefined()
     } finally {
       vi.useRealTimers()
+    }
+  })
+
+  it('puts the server’s links under the path a host mounted it on', () => {
+    const link = '/l/artifact?d=host&sig=x'
+    expect(absolute('/uncli', link)).toBe(`${location.origin}/uncli/l/artifact?d=host&sig=x`)
+    expect(absolute('/uncli/', link)).toBe(`${location.origin}/uncli/l/artifact?d=host&sig=x`)
+    expect(absolute('https://h:1', link)).toBe('https://h:1/l/artifact?d=host&sig=x')
+    expect(absolute('https://h:1/uncli', link)).toBe('https://h:1/uncli/l/artifact?d=host&sig=x')
+    expect(absolute('', link)).toBe(`${location.origin}/l/artifact?d=host&sig=x`)
+  })
+
+  it('reaches a host’s own UNCLI at a path of the page’s server, with no token, one backend per path', async () => {
+    expect(mountedBackend('/uncli')).toBe(mountedBackend('/uncli/'))
+    expect(mountedBackend('/uncli')).not.toBe(mountedBackend('/other'))
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(reply({ jsonrpc: '2.0', id: 1, result: [] }))
+    try {
+      await mountedBackend('/uncli').pages('s1')
+      const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+      expect(url).toBe('/uncli/rpc')
+      expect((init.headers as Record<string, string>).Authorization).toBeUndefined()
+    } finally {
+      fetch.mockRestore()
     }
   })
 

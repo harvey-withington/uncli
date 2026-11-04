@@ -1,12 +1,25 @@
 // The sample host (decision 0026): a <uncli-session-list> and three
 // <uncli-chat> elements on UNCLI's mock backend, sharing it, the list
-// driving the first chat, and the events they send the page.
+// driving the first chat, and the events they send the page. Opened with
+// ?src=/uncli (by uncli-sample-host, say), they use the host's own UNCLI
+// at that path instead (decision 0027), and New chat starts a session.
 import { mockBackend } from '@uncli/client/mock'
-import '@uncli/chat/embed'
-import type { UncliChat, UncliSessionList } from '@uncli/chat/embed'
+import { mountedBackend, type UncliChat, type UncliSessionList } from '@uncli/chat/embed'
 
-const backend = mockBackend()
-for (const el of document.querySelectorAll<UncliChat | UncliSessionList>('uncli-chat, uncli-session-list')) el.backend = backend
+const src = new URLSearchParams(location.search).get('src')
+const backend = src ? mountedBackend(src) : mockBackend()
+for (const el of document.querySelectorAll<UncliChat | UncliSessionList>('uncli-chat, uncli-session-list')) {
+  if (src) {
+    el.removeAttribute(el.localName === 'uncli-chat' ? 'session' : 'selected')
+    el.setAttribute('src', src)
+  } else el.backend = backend
+}
+
+const newChat = document.getElementById('new-chat') as HTMLButtonElement
+newChat.hidden = !src
+newChat.addEventListener('click', async () => {
+  list.selected = await first.newSession()
+})
 
 // The list's pick shows in the first chat.
 const list = document.getElementById('list') as UncliSessionList
