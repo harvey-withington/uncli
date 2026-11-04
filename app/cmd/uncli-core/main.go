@@ -3,7 +3,7 @@
 // prints, and forwards a path of its server (/uncli/, say) to it, adding
 // the key to each request.
 //
-//	uncli-core --data <folder> --origin https://app.example --key-file <file> [--name App] [--listen 127.0.0.1:0] [--user-cli-config]
+//	uncli-core --data <folder> --origin https://app.example --key-file <file> [--name App] [--listen 127.0.0.1:0] [--user-cli-config] [--allow-service-account]
 //
 // It listens on loopback only, and prints one JSON line once it's ready:
 // {"port":51234}. It stops when its standard input closes, so start it
@@ -42,6 +42,7 @@ func run() error {
 	name := flag.String("name", "", "the host's name, recorded on the approvals its pages answer")
 	listen := flag.String("listen", "127.0.0.1:0", "the loopback address to listen on")
 	userCLI := flag.Bool("user-cli-config", false, "use the user's own CLI config instead of one in the data folder")
+	asService := flag.Bool("allow-service-account", false, "run even as a Windows service account such as LocalSystem")
 	flag.Parse()
 
 	key := os.Getenv("UNCLI_CORE_KEY")
@@ -66,7 +67,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	core, err := uncli.Start(uncli.Options{DataDir: *data, Origins: origins, Name: *name, Key: key, Hooks: true, UserCLIConfig: *userCLI})
+	core, err := uncli.Start(uncli.Options{DataDir: *data, Origins: origins, Name: *name, Key: key, Hooks: true, UserCLIConfig: *userCLI, AllowServiceAccount: *asService})
 	if err != nil {
 		return err
 	}

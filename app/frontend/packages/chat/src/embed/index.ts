@@ -8,7 +8,7 @@ export type { Mention } from '../stores/chat.svelte'
 export { UncliSessionList, defineUncliSessionList } from './list.svelte'
 // The client the elements use, from the same bundle, so a host that needs
 // it shares their connection rather than opening a second one.
-export { chatClient, mountedBackend } from '@uncli/client'
+export { chatClient, mountedBackend, setHostHeaders } from '@uncli/client'
 
 defineUncliChat()
 defineUncliSessionList()

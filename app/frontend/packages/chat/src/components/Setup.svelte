@@ -3,12 +3,13 @@
   import { useChat } from '../lib/chatcontext'
   import { bytes } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
+  import { atServer } from '../lib/remoteonly'
   import Icon from './Icon.svelte'
 
   // First run: download UNCLI's own copy of the first provider's CLI, then
   // sign in. No terminal at any point. The app shows it until the CLI is
   // ready, and so does an embedded chat on a host's own UNCLI (decision
-  // 0027), where the sign-in link opens in the user's browser.
+  // 0027), where the user opens the sign-in link in their own browser.
   interface Props {
     mark?: string // UNCLI's mark beside the wordmark (the app's); none in a host's page
   }
@@ -58,6 +59,15 @@
       error = clean(e)
       signin = 'idle'
     }
+  }
+
+  // The app's window opens the sign-in link itself; a host's page can't
+  // after waiting for the server (the browser takes that for a popup), so
+  // it offers a button. The host's openLink sees it first (a desktop app
+  // opens it in the user's browser, not its webview).
+  const opened = $derived(atServer(app.backend))
+  function openPage() {
+    if (!app.openLink?.(url)) void app.backend.openURL(url)
   }
 
   async function submit() {
@@ -123,12 +133,19 @@
           <p>{t('setup.signin.body', names)}</p>
           {#if installed}
             {#if signin === 'code' || signin === 'verifying'}
-              <p class="opened">
-                {t('setup.signin.opened')}
-                <button class="link" onclick={() => app.backend.openURL(url)}>{t('setup.signin.openAgain')}</button>
-                ·
-                <button class="link" onclick={() => app.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
-              </p>
+              {#if opened}
+                <p class="opened">
+                  {t('setup.signin.opened')}
+                  <button class="link" onclick={openPage}>{t('setup.signin.openAgain')}</button>
+                  ·
+                  <button class="link" onclick={() => app.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
+                </p>
+              {:else}
+                <p class="opened">
+                  <button class="btn primary" onclick={openPage}><Icon name="external-link" size={14} />{t('setup.signin.openPage')}</button>
+                  <button class="link" onclick={() => app.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
+                </p>
+              {/if}
               <form class="row" onsubmit={e => { e.preventDefault(); submit() }}>
                 <!-- svelte-ignore a11y_autofocus -->
                 <input

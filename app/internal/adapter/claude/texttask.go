@@ -24,7 +24,7 @@ func (a *Adapter) TextTaskCommand(bin string, t core.TextTask) core.Command {
 	if len(t.Schema) > 0 {
 		args = append(args, "--json-schema", string(t.Schema))
 	}
-	env, drop := childEnv(nil)
+	env, drop := a.childEnv(nil)
 	return core.Command{Path: bin, Args: args, Env: env, EnvDrop: drop}
 }
 

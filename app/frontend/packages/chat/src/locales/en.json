@@ -131,6 +131,7 @@
   "setup.signin.starting": "Starting sign-in…",
   "setup.signin.opened": "Sign-in opened in your browser.",
   "setup.signin.openAgain": "Open it again",
+  "setup.signin.openPage": "Open the sign-in page",
   "setup.signin.copyLink": "Copy the link",
   "setup.signin.codeLabel": "Code from the sign-in page",
   "setup.signin.codePlaceholder": "Paste the code from the browser",

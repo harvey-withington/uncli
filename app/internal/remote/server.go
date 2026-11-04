@@ -14,7 +14,6 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -134,8 +133,8 @@ func (s *Server) Handler(hosts func() []string) http.Handler {
 // host's server decides who gets this far; here, only pages from the
 // host's origins may send requests, so another site can't drive UNCLI
 // through the user's cookies for the host.
-func (s *Server) EmbeddedHandler(origins []string) http.Handler {
-	return embeddedGuard(origins, s.routes())
+func (s *Server) EmbeddedHandler(allowed func(origin string, r *http.Request) bool) http.Handler {
+	return embeddedGuard(allowed, s.routes())
 }
 
 func (s *Server) routes() *http.ServeMux {
@@ -163,20 +162,35 @@ func (s *Server) routes() *http.ServeMux {
 // host's business (its server answers to its own names, and a forwarded
 // request may carry either), so only the Origin is checked: a request a
 // page sends must come from one of the host's origins. Requests without
-// one (the host's server itself, a same-origin GET) pass. The host's page
-// shares its origin, so no CORS headers are ever sent.
-func embeddedGuard(origins []string, next http.Handler) http.Handler {
+// one (the host's server itself, a same-origin GET) pass. A host's page
+// may come from another origin than its server (a desktop app's webview,
+// wails.localhost say), so those origins get CORS: the preflight is
+// answered, and responses may be read. Never credentials: the host signs
+// in with a header (ChatHost.headers) or, same-origin, its own cookie.
+func embeddedGuard(allowed func(origin string, r *http.Request) bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("X-Frame-Options", "SAMEORIGIN")
-		if o := r.Header.Get("Origin"); o != "" && !slices.ContainsFunc(origins, func(a string) bool { return strings.EqualFold(strings.TrimSuffix(a, "/"), o) }) {
+		o := r.Header.Get("Origin")
+		if o != "" && !allowed(o, r) {
 			http.Error(w, "Cross-origin requests aren't allowed", http.StatusForbidden)
 			return
 		}
+		if o != "" {
+			h.Set("Access-Control-Allow-Origin", o)
+			h.Add("Vary", "Origin")
+		}
 		if r.Method == http.MethodOptions {
-			http.Error(w, "Cross-origin requests aren't allowed", http.StatusForbidden)
+			if o == "" {
+				http.Error(w, "Cross-origin requests aren't allowed", http.StatusForbidden)
+				return
+			}
+			h.Set("Access-Control-Allow-Methods", "GET, POST")
+			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Last-Event-ID")
+			h.Set("Access-Control-Max-Age", "600")
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		next.ServeHTTP(w, r)

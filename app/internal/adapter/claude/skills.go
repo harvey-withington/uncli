@@ -27,7 +27,7 @@ func (a *Adapter) skillsPlugin() (string, error) {
 	if a.skillsDir == "" {
 		return "", nil
 	}
-	cfg, err := configDir()
+	cfg, err := a.ConfigDir()
 	if err != nil {
 		return "", nil
 	}

@@ -36,7 +36,7 @@ func (s *Service) transcriptReader() (core.TranscriptReader, core.TranscriptLoca
 	if err != nil {
 		return nil, core.TranscriptLocation{}, err
 	}
-	return r, core.TranscriptLocation{Home: home, ConfigDir: os.Getenv("CLAUDE_CONFIG_DIR")}, nil
+	return r, core.TranscriptLocation{Home: home, ConfigDir: s.Adapter.ConfigDirSet()}, nil
 }
 
 // Transcripts lists the conversations the CLI has saved, newest first.

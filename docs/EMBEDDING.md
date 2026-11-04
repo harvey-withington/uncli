@@ -62,14 +62,27 @@ uncli-core --data <folder> --origin https://app.example --name "My app"   (the k
 
 **Who can use it is your business.** Anyone you let reach `/uncli/` can make the CLIs run tools as your server's user, on its machine. Put your own sign-in in front of it. Approvals, prompt levels and the safe list apply as they do in UNCLI.
 
-**Other sites can't drive it.** A request a page sends from an origin not in `Origins` (`--origin`) is refused before it runs, so another site can't use your users' cookies for your app to reach it. Requests without an `Origin`, such as your server's own, pass.
+**Run as a person, not a service account.** The CLIs run tools as the account your server runs as. UNCLI refuses to start as one of Windows' service accounts (LocalSystem, LocalService, NetworkService): LocalSystem can do anything on the machine. If your server is a Windows service, set its *Log on as* to a person's account. `AllowServiceAccount` (`--allow-service-account`) overrides this, if you really mean it.
+
+**Your sign-in, cookie or token.** UNCLI sets no cookies and needs none.
+- **Cookie sign-in:** the browser sends your cookie with the chat's requests by itself.
+- **Token in a header:** give the chat a `host.headers` function (below), such as `() => ({ Authorization: 'Bearer ' + token })`. It's asked for on every request, so a renewed token is used at once. In Go, `Handler()` swaps in UNCLI's key after your middleware has checked yours. A proxy does the same.
+- **Signed links:** links to artifacts and uploads open in a new tab, which can't send headers. They're signed by UNCLI, expire, and work only on their own route, so let `/uncli/l/` through your sign-in.
+
+**Pages from another origin.** Your page may come from somewhere other than your server, such as a desktop app's webview (Wails serves from `http://wails.localhost:<port>`). Then:
+- give `src` your server's full address, e.g. `src="https://app.example:9870/uncli"`;
+- list the page's origin in `Origins`.
+
+UNCLI answers the browser's preflight for those origins and lets them read its replies. It never allows credentials (cookies), so send your sign-in with `host.headers`. If your sign-in sits in front of `/uncli/`, let `OPTIONS` requests through to UNCLI, or answer CORS yourself.
+
+**Other sites can't drive it.** A request a page sends from an origin not in `Origins` (`--origin`) is refused before it runs, so another site can't use your users' cookies for your app to reach it. Requests without an `Origin`, such as your server's own, pass. A server reached by several names (an address, a tailnet name, dev ports) can decide in Go with `AllowOrigin: func(origin string, r *http.Request) bool`, such as "the origin's host is the request's own, or a loopback dev port". Answer no to anything you don't recognise.
 
 **What stays where.** Everything the core keeps lives in its data folder:
 - its database and settings;
 - the CLIs it downloads, and their session folders;
 - the CLIs' own config: sign-in, transcripts, memory, skills, MCP servers.
 
-Your users sign in to the CLIs once for your app, and your app doesn't see their personal CLI setup. `UserCLIConfig` (`--user-cli-config`) uses the user's own CLI config instead, shared with everything else on the machine that uses those CLIs.
+Your users sign in to the CLIs once for your app, and your app doesn't see their personal CLI setup. Only the CLIs your UNCLI starts are told where that folder is: your process's environment is left alone, so a terminal, script or tool your app starts itself still uses the user's own CLI setup. `UserCLIConfig` (`--user-cli-config`) uses the user's own CLI config instead, shared with everything else on the machine that uses those CLIs.
 
 **The data folder is your app's alone.**
 - One UNCLI at a time: a second one started on the same folder is refused while the first runs, the desktop app included.
@@ -80,7 +93,7 @@ These checks catch mistakes, not malice. Your UNCLI is as trusted as your app: a
 
 **Setting up the CLI.** Until your UNCLI has its CLI downloaded and signed in, `<uncli-chat>` shows the steps in its place:
 1. Download: UNCLI's pinned copy, checked against its published checksum, into your data folder.
-2. Sign in: the sign-in page opens in your user's browser, and they paste the code it shows.
+2. Sign in: your user opens the sign-in page with a button (your `host.openLink` sees the link first, so a desktop app can open it in the system browser rather than its webview), signs in, and pastes back the code it shows.
 
 Once both are done, the chat appears. Your page needs no code for this.
 
@@ -192,6 +205,9 @@ chat.host = {
   complete: async query => (await searchCards(query)).map(c => ({ label: c.title, detail: 'card', insert: `[${c.title}](bruv:card:${c.id})` })),
   // What the user has in front of them now, asked for as each turn is sent.
   turnContext: () => describeOpenCard(),
+  // Your own sign-in, sent with every request to src, when it's a token
+  // rather than a cookie.
+  headers: () => ({ Authorization: `Bearer ${myToken()}` }),
 }
 ```
 
@@ -199,7 +215,7 @@ chat.host = {
 - **Links you don't take.** They open as in UNCLI: web links in the browser, and file links at the server's screen.
 - **Mentions.** `complete` may answer at once or with a promise. While the user types an `@` and a word, the menu shows up to eight matches; Up, Down, Tab or Enter, and Escape work as in the slash-command menu.
 - **Turn context.** `turnContext` is told to the model with that turn only, among the instructions the chat hides, quoted as what your app says the user has in front of them. The model weighs it as context, not as the user's request. Up to 8,000 characters are kept.
-- **One host per page.** The schemes and strings apply to every chat on the page.
+- **One host per page.** The schemes, strings and headers apply to every chat on the page. A page with only a `<uncli-session-list>` sets its headers with `setHostHeaders(fn)`, exported from `@uncli/chat/element`.
 
 **Keys.** Before the chat acts on Escape, or on Ctrl+Enter (Cmd+Enter), it sends `uncli-escape` or `uncli-submit`. They're cancelable: cancel one (`event.preventDefault()`) and the chat leaves that key alone, so layered dialogs of your own can decide first.
 

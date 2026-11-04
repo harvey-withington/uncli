@@ -68,6 +68,11 @@ type Options struct {
 	// embedded, where this program is the host's: there, empty means no
 	// hook, and Antigravity's sessions don't start.
 	HookCommand string
+	// CLIConfigDir keeps the first provider's CLI config (sign-in,
+	// transcripts, skills, MCP servers) in a folder of UNCLI's own: given
+	// to the CLIs it starts, never set in this process's environment.
+	// Empty: the user's own.
+	CLIConfigDir string
 }
 
 // errEmbedded refuses what only the desktop app does.
@@ -167,7 +172,7 @@ func NewWith(paths Paths, emit Emitter, opts Options) (*Service, error) {
 		return nil, err
 	}
 	inst := claude.NewInstaller(filepath.Join(paths.Cache, "cli", "claude"))
-	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst).WithSkills(filepath.Join(paths.Cache, "skills", "claude")), emit: emit, embedded: opts.Embedded}
+	s := &Service{Paths: paths, Store: db, Profiles: set, Installer: inst, Adapter: claude.New(inst).WithSkills(filepath.Join(paths.Cache, "skills", "claude")).WithConfigDir(opts.CLIConfigDir), emit: emit, embedded: opts.Embedded}
 	s.life, s.endLife = context.WithCancel(context.Background())
 	agyInst := antigravity.NewInstaller(filepath.Join(paths.Cache, "cli", "antigravity"))
 	agy := antigravity.New(agyInst, filepath.Join(paths.Config, "agy"), hookCmd)

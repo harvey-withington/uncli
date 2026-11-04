@@ -53,6 +53,22 @@ describe('setting up the CLI', () => {
     expect(el.shadowRoot!.textContent).not.toContain(QUESTION)
   })
 
+  it('on a host’s UNCLI, opens the sign-in page on a click, through the host’s openLink first', async () => {
+    const mock = mockBackend({ cli: { loggedIn: false } })
+    const backend = { ...mock, kind: 'http' as const, canSetUp: true }
+    const opened = vi.spyOn(backend, 'openURL')
+    const el = chat(backend)
+    const openLink = vi.fn(() => true)
+    el.host = { openLink }
+    const button = (name: string) => [...el.shadowRoot!.querySelectorAll('button')].find(b => b.textContent?.includes(name))
+    await waitFor(() => expect(button('Sign in')).toBeTruthy())
+    await fireEvent.click(button('Sign in')!)
+    await waitFor(() => expect(button('Open the sign-in page')).toBeTruthy())
+    await fireEvent.click(button('Open the sign-in page')!)
+    expect(openLink).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\//))
+    expect(opened).not.toHaveBeenCalled()
+  })
+
   it('is offered by a host’s own UNCLI, and never on a phone', () => {
     expect(canSetUp(mountedBackend('/uncli'))).toBe(true)
     expect(canSetUp(httpBackend({ base: 'https://pc.example:9871', token: () => 'tok' }))).toBe(false)

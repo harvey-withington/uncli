@@ -31,6 +31,36 @@ type Adapter struct {
 	// the user's skills (skills.go); empty: they can't have them.
 	skillsDir string
 	skillsMu  sync.Mutex
+	// configDir is the CLI's config folder when UNCLI keeps one of its own
+	// (a host's UNCLI, decision 0027): given to the CLIs it starts and used
+	// to read their config, never set in UNCLI's own environment, so other
+	// programs its host starts keep the user's. Empty: the user's.
+	configDir string
+}
+
+// WithConfigDir keeps the CLI's config (sign-in, transcripts, memory,
+// skills, MCP servers) in dir instead of the user's.
+func (a *Adapter) WithConfigDir(dir string) *Adapter {
+	a.configDir = dir
+	return a
+}
+
+// ConfigDir is the CLI's config folder: UNCLI's own (WithConfigDir), else
+// CLAUDE_CONFIG_DIR, else ~/.claude.
+func (a *Adapter) ConfigDir() (string, error) {
+	if a.configDir != "" {
+		return a.configDir, nil
+	}
+	return configDir()
+}
+
+// ConfigDirSet is the CLI's config folder when it's set apart from the
+// home folder (UNCLI's own, or CLAUDE_CONFIG_DIR); empty otherwise.
+func (a *Adapter) ConfigDirSet() string {
+	if a.configDir != "" {
+		return a.configDir
+	}
+	return os.Getenv("CLAUDE_CONFIG_DIR")
 }
 
 func New(installer *Installer) *Adapter { return &Adapter{installer: installer} }
@@ -50,13 +80,9 @@ func (a *Adapter) Installer() core.Installer { return a.installer }
 // per-project memory and transcripts, todo lists): writing there is its
 // bookkeeping. Its settings and credentials are not among them.
 func (a *Adapter) StatePaths() []string {
-	dir := os.Getenv("CLAUDE_CONFIG_DIR")
-	if dir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil
-		}
-		dir = filepath.Join(home, ".claude")
+	dir, err := a.ConfigDir()
+	if err != nil {
+		return nil
 	}
 	return []string{filepath.Join(dir, "plans"), filepath.Join(dir, "projects"), filepath.Join(dir, "todos")}
 }
@@ -77,6 +103,14 @@ func (a *Adapter) Capabilities() core.Capabilities {
 // break it too: VS Code's auto-attach puts NODE_OPTIONS=--require
 // bootloader.js into every terminal, and with it the CLI exits 1 and prints
 // nothing. CLAUDE_CONFIG_DIR and API keys are the user's choice and pass through.
+func (a *Adapter) childEnv(extra map[string]string) (map[string]string, []string) {
+	env, drop := childEnv(extra)
+	if a.configDir != "" {
+		env["CLAUDE_CONFIG_DIR"] = a.configDir
+	}
+	return env, drop
+}
+
 func childEnv(extra map[string]string) (map[string]string, []string) {
 	env := map[string]string{"DISABLE_AUTOUPDATER": "1"}
 	for k, v := range extra {
@@ -186,7 +220,7 @@ func (a *Adapter) BuildCommand(bin string, s core.LaunchSpec) (core.Command, err
 	for k, v := range s.Env {
 		wait[k] = v
 	}
-	env, drop := childEnv(wait)
+	env, drop := a.childEnv(wait)
 	// The main conversation's cache lifetime (CLI 2.1.242+). Unset, the CLI
 	// picks: an hour on a subscription within its plan, five minutes on an
 	// API key or once drawing on usage credits. Subagents keep their own.
@@ -206,12 +240,12 @@ func addTools(tools []string, add ...string) []string {
 }
 
 func (a *Adapter) AuthStatusCommand(bin string) core.Command {
-	env, drop := childEnv(nil)
+	env, drop := a.childEnv(nil)
 	return core.Command{Path: bin, Args: []string{"auth", "status"}, Env: env, EnvDrop: drop}
 }
 
 func (a *Adapter) LoginCommand(bin string) core.Command {
-	env, drop := childEnv(nil)
+	env, drop := a.childEnv(nil)
 	return core.Command{Path: bin, Args: []string{"auth", "login", "--claudeai"}, Env: env, EnvDrop: drop}
 }
 

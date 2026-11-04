@@ -16,13 +16,14 @@
 // first, true when the host took it; t(key, params) gives the host's text
 // for UNCLI's, or nothing to keep UNCLI's; complete(query) offers
 // @mentions; turnContext() says what the user has in front of them, sent
-// (hidden) with each turn.
+// (hidden) with each turn; headers() is the host's own sign-in, sent with
+// every request to src.
 // Events (composed, so they cross into the host's page): uncli-ready,
 // uncli-busy, uncli-idle, uncli-needs-approval; detail: { session }. Before
 // the chat acts on Escape or Ctrl+Enter, uncli-escape and uncli-submit go
 // out, cancelable: a host that cancels one keeps the key for itself.
 import { mount, unmount } from 'svelte'
-import { chatClient, type Backend, type SessionSnapshot } from '@uncli/client'
+import { chatClient, setHostHeaders, type Backend, type SessionSnapshot } from '@uncli/client'
 import Chat from '../components/Chat.svelte'
 import { setHostText } from '../lib/i18n.svelte'
 import { keyedMemory } from '../lib/layoutmemory'
@@ -42,6 +43,10 @@ export interface ChatHost {
   // turnContext: what the user has in front of them now, asked for as each
   // turn is sent and told to the model with it, hidden in the chat.
   turnContext?(): string | undefined | null
+  // headers: what the host's server needs on each request to src, its own
+  // sign-in (Authorization: Bearer <token>), for a host that doesn't sign in
+  // with a cookie. Asked for on every request.
+  headers?(): Record<string, string> | undefined | null
 }
 
 export class UncliChat extends HTMLElement {
@@ -74,6 +79,7 @@ export class UncliChat extends HTMLElement {
   set host(h: ChatHost | null) {
     this.#host = h
     setHostText(h?.t ? (key, params) => h.t?.(key, params) : null)
+    setHostHeaders(h?.headers ? () => h.headers?.() : null)
   }
 
   // The session shown (the session attribute).

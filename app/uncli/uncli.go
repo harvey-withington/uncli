@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/harvey-withington/uncli/app/internal/app"
@@ -40,6 +41,10 @@ type Options struct {
 	// Origins are the host's page origins (https://bruv.example). A request
 	// a page sends from any other origin is refused.
 	Origins []string
+	// AllowOrigin admits origins the list can't name, for a server reached
+	// by several names: true lets the page at origin, sending r, in, as if
+	// it were listed. Say no to anything you don't recognise.
+	AllowOrigin func(origin string, r *http.Request) bool
 	// Name is the host's name, recorded on the approvals its pages answer.
 	Name string
 	// Key, when set, is what KeyedHandler requires (Authorization: Bearer
@@ -54,6 +59,26 @@ type Options struct {
 	// skills, MCP servers, memory) instead of one in DataDir. It's shared
 	// with everything else on the machine that uses those CLIs.
 	UserCLIConfig bool
+	// AllowServiceAccount lets UNCLI run as one of Windows' service accounts
+	// (LocalSystem and the like), which it refuses otherwise: the CLIs would
+	// run tools as that account, and LocalSystem can do anything on the
+	// machine. Run the host as a person's account instead (a service's
+	// "Log on as") unless you really mean it.
+	AllowServiceAccount bool
+}
+
+// errServiceAccount: the host runs as a service account (AllowServiceAccount).
+var errServiceAccount = errors.New("uncli: this program runs as a Windows service account")
+
+// runningAs is serviceAccount, replaced in tests.
+var runningAs = serviceAccount
+
+// asAPerson refuses a service account unless the host allows it.
+func asAPerson(o Options) error {
+	if a := runningAs(); a != "" && !o.AllowServiceAccount {
+		return fmt.Errorf("%w (%s), so the CLIs would run tools as %s. Run it as a person's account (the service's Log on as), or set AllowServiceAccount", errServiceAccount, a, a)
+	}
+	return nil
 }
 
 // Core is a running UNCLI of the host's own.
@@ -88,6 +113,9 @@ func Start(o Options) (*Core, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := asAPerson(o); err != nil {
+		return nil, err
+	}
 	if err := notTheDesktopApps(dir); err != nil {
 		return nil, err
 	}
@@ -106,13 +134,12 @@ func Start(o Options) (*Core, error) {
 			release()
 		}
 	}()
+	// The CLIs keep their sign-in and settings in the host's data, not the
+	// user's home: told to the CLIs UNCLI starts, not set in the host's
+	// environment, so programs the host starts itself keep the user's.
+	cliConfig := ""
 	if !o.UserCLIConfig {
-		// The CLIs keep their sign-in and settings in the host's data, not
-		// the user's home. Every part of UNCLI that looks for them, and the
-		// CLIs it starts, read this variable.
-		if err := os.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(dir, "cli-config", "claude")); err != nil {
-			return nil, err
-		}
+		cliConfig = filepath.Join(dir, "cli-config", "claude")
 	}
 	key := o.Key
 	if key == "" {
@@ -132,14 +159,24 @@ func Start(o Options) (*Core, error) {
 	}
 	hub := remote.NewHub()
 	paths := app.Paths{Config: dir, Cache: filepath.Join(dir, "cache"), Scratch: filepath.Join(dir, "scratch")}
-	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd})
+	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd, CLIConfigDir: cliConfig})
 	if err != nil {
 		return nil, err
 	}
 	server := remote.New(remote.Config{API: app.NewAPI(svc, nil), Service: svc, Hub: hub,
 		Auth: keyAuth{key: key, device: remote.Device{ID: "host", Name: name}}, Methods: remote.EmbeddedMethods()})
 	started = true
-	return &Core{svc: svc, server: server, key: key, routes: server.EmbeddedHandler(o.Origins), release: release}, nil
+	return &Core{svc: svc, server: server, key: key, routes: server.EmbeddedHandler(o.allowed), release: release}, nil
+}
+
+// allowed: a listed origin, or one AllowOrigin admits.
+func (o Options) allowed(origin string, r *http.Request) bool {
+	for _, a := range o.Origins {
+		if strings.EqualFold(strings.TrimSuffix(a, "/"), origin) {
+			return true
+		}
+	}
+	return o.AllowOrigin != nil && o.AllowOrigin(origin, r)
 }
 
 // notTheDesktopApps refuses UNCLI's own folders: a host's UNCLI shares

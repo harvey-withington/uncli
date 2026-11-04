@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { RemoteOnlyError, RPCError, absolute, httpBackend, mountedBackend, parseSSE } from './http'
+import { RemoteOnlyError, RPCError, absolute, httpBackend, mountedBackend, parseSSE, setHostHeaders } from './http'
 import type { Connection, Handlers } from './types'
 
 type Call = { url: string; init: RequestInit }
@@ -130,7 +130,31 @@ describe('httpBackend', () => {
     }
   })
 
-  it('sets up the CLIs only on a host’s own UNCLI, opening the sign-in link here', async () => {
+  it('sends the host’s own sign-in with every request to its UNCLI, renewed as it changes', async () => {
+    const seen: { url: string; auth?: string }[] = []
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+      seen.push({ url: String(url), auth: (init?.headers as Record<string, string> | undefined)?.Authorization })
+      return reply({ jsonrpc: '2.0', id: 1, result: [] })
+    })
+    let token = 'first'
+    setHostHeaders(() => ({ Authorization: `Bearer ${token}` }))
+    try {
+      // A page from a desktop app's webview reaches the host's server by its full address.
+      const b = mountedBackend('https://bruv.example:9870/uncli')
+      await b.pages('s1')
+      token = 'renewed'
+      await b.upload(new Blob(['x']), 'a.txt')
+      expect(seen).toEqual([
+        { url: 'https://bruv.example:9870/uncli/rpc', auth: 'Bearer first' },
+        { url: 'https://bruv.example:9870/uncli/upload?name=a.txt', auth: 'Bearer renewed' },
+      ])
+    } finally {
+      setHostHeaders(null)
+      fetch.mockRestore()
+    }
+  })
+
+  it('sets up the CLIs only on a host’s own UNCLI, leaving the sign-in link to a click', async () => {
     const methods: string[] = []
     const fetch = vi.fn(async (_url: string, init: RequestInit) => {
       const { method } = JSON.parse(init.body as string)
@@ -143,7 +167,8 @@ describe('httpBackend', () => {
     await host.signIn()
     await host.submitLoginCode('abc')
     expect(methods).toEqual(['InstallCLI', 'SignIn', 'SubmitLoginCode'])
-    expect(opened).toHaveBeenCalledWith('https://claude.ai/oauth?x=1', '_blank', 'noopener,noreferrer')
+    // Opened after an await, a browser would block it as a popup.
+    expect(opened).not.toHaveBeenCalled()
     opened.mockRestore()
     const phone = httpBackend({ base: '', token: () => 'tok', fetch: fetch as never })
     await expect(phone.installCLI()).rejects.toBeInstanceOf(RemoteOnlyError)

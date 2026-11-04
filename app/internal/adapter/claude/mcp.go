@@ -26,8 +26,8 @@ func (a *Adapter) claudeJSON() []byte {
 	if a.userConfig != nil {
 		return a.userConfig()
 	}
-	path := filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json")
-	if os.Getenv("CLAUDE_CONFIG_DIR") == "" {
+	path := filepath.Join(a.ConfigDirSet(), ".claude.json")
+	if a.ConfigDirSet() == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return nil

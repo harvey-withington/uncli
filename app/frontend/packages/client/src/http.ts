@@ -17,6 +17,9 @@ export interface HttpOptions {
   // setup: the server is a host's own UNCLI (decision 0027), which lets its
   // page install the CLIs and sign in to them; a phone can't.
   setup?: boolean
+  // headers: what the host's server needs on every request to reach its
+  // UNCLI, its own sign-in say (Authorization: Bearer <the host's token>).
+  headers?: () => Record<string, string> | null | undefined
   fetch?: typeof fetch
 }
 
@@ -107,7 +110,7 @@ export function httpBackend(opts: HttpOptions): Backend {
   }
   const auth = (): Record<string, string> => {
     const token = opts.token()
-    return token ? { Authorization: `Bearer ${token}` } : {}
+    return { ...opts.headers?.(), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
   }
   let id = 0
 
@@ -148,28 +151,17 @@ export function httpBackend(opts: HttpOptions): Backend {
   }
 
   const only = (method: string) => () => Promise.reject(new RemoteOnlyError(method))
-  // A sign-in link opens in this browser: the server's own window would
-  // open it at the server.
-  const open = (url?: string) => {
-    if (url && /^https?:\/\//.test(url)) window.open(url, '_blank', 'noopener,noreferrer')
-  }
   // Setting up the CLIs, where the server allows it (opts.setup).
   const setup = opts.setup
     ? {
         installCLI: () => call<CLIStatus>('InstallCLI'),
-        signIn: async () => {
-          const s = await call<SignInStart>('SignIn')
-          open(s.url)
-          return s
-        },
+        // The links aren't opened here: after an await, a browser takes that
+        // for a popup. The setup screen offers them to click.
+        signIn: () => call<SignInStart>('SignIn'),
         submitLoginCode: (code: string) => call<CLIStatus>('SubmitLoginCode', code),
         cancelSignIn: () => call<void>('CancelSignIn'),
         installProvider: (pid: string) => call<CLIStatus>('InstallProvider', pid),
-        startDeviceSignIn: async (pid: string) => {
-          const d = await call<DeviceSignIn>('StartDeviceSignIn', pid)
-          open(d.url)
-          return d
-        },
+        startDeviceSignIn: (pid: string) => call<DeviceSignIn>('StartDeviceSignIn', pid),
         cancelDeviceSignIn: (pid: string) => call<void>('CancelDeviceSignIn', pid),
       }
     : {}
@@ -321,16 +313,27 @@ export function absolute(base: string, path: string): string {
 }
 
 const mounted = new Map<string, Backend>()
+let hostHeaders: (() => Record<string, string> | null | undefined) | null = null
 
-// mountedBackend is a host's own UNCLI at a path of the page's own server
-// (decision 0027): <uncli-chat src="/uncli">. The host's server forwards
-// the path and adds UNCLI's key, so the page sends none. Every element
-// with the same src shares one backend, and so one client.
+// setHostHeaders gives every mounted backend on the page what the host's
+// server needs on each request: its own sign-in, for a host that signs in
+// with a token rather than a cookie. Asked for on every request, so a
+// renewed token is used at once.
+export function setHostHeaders(h: (() => Record<string, string> | null | undefined) | null) {
+  hostHeaders = h
+}
+
+// mountedBackend is a host's own UNCLI at a path of the host's server
+// (decision 0027): <uncli-chat src="/uncli">, or a full address when the
+// page comes from elsewhere (a desktop app's webview). The host's server
+// forwards the path and adds UNCLI's key, so the page sends none; it sends
+// the host's own headers (setHostHeaders). Every element with the same src
+// shares one backend, and so one client.
 export function mountedBackend(src: string): Backend {
   const base = src.replace(/\/+$/, '')
   let b = mounted.get(base)
   if (!b) {
-    b = httpBackend({ base, token: () => null, setup: true })
+    b = httpBackend({ base, token: () => null, setup: true, headers: () => hostHeaders?.() })
     mounted.set(base, b)
   }
   return b
