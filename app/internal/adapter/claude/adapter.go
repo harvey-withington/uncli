@@ -163,7 +163,7 @@ func (a *Adapter) BuildCommand(bin string, s core.LaunchSpec) (core.Command, err
 		if plugin != "" {
 			tools = addTools(tools, "Skill", "Read")
 		}
-		if s.Isolated && (s.ShareMCP || s.ShareConnectors || len(s.MCPConfig) > 0) {
+		if s.Isolated && (s.ShareMCP || s.ShareConnectors) {
 			tools = addTools(tools, "ToolSearch")
 		}
 		args = append(args, "--tools", strings.Join(tools, ","))
