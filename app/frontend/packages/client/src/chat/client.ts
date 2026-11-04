@@ -205,8 +205,11 @@ export class ChatClient {
   // container: a container profile to run in, '' for this machine;
   // provider: an AI provider's id, '' for the first; shares: what it can
   // use of the user's own, null for its type's defaults.
-  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null) {
-    const { session: v, lastNewSession } = await this.backend.createSession(profileId, workdir, model, container, provider, shares)
+  // meta: an embedding host's word on what the session is for (CreateOptions).
+  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null, meta = '') {
+    const { session: v, lastNewSession } = meta
+      ? await this.backend.createSession(profileId, workdir, model, container, provider, shares, { meta })
+      : await this.backend.createSession(profileId, workdir, model, container, provider, shares)
     if (this.s.boot) this.set({ boot: { ...this.s.boot, lastNewSession } })
     this.upsertSession(v)
     this.setData(v.id, { pages: [], index: 0 })

@@ -43,6 +43,27 @@
   const quiet = $derived(compact ? chat.questionCompact : chat.headerCompact)
   let options = $state(false)
 
+  // In a host's page, with no session list to delete it from: Delete chat
+  // here, confirmed, and the host told (it may keep its own record).
+  async function removeChat() {
+    const ok = await shell.confirm({
+      title: t('session.deleteTitle'),
+      message: t('session.deleteMessage', { title: session.title || t('session.untitled') }),
+      confirmLabel: t('session.delete'),
+      danger: true,
+    })
+    if (!ok) return
+    // Taken now: once it's deleted, this header (and its session) goes.
+    const id = session.id
+    const told = chat.deleted
+    try {
+      await chat.remove(id)
+      told?.(id)
+    } catch (e) {
+      shell.toast(String(e), 'error')
+    }
+  }
+
   // Unattended: rules still apply, but anything that would wait for the
   // user is declined, and the agent is told the user is away.
   async function toggleUnattended() {
@@ -79,10 +100,33 @@
   {#if chat.embedded}<svelte:element this={'slot'} name="header-extra" />{/if}
 {/snippet}
 
+{#snippet hostStart()}
+  <!-- An embedding host's own controls at the start and end of the
+       header's top line (its close button, say), so its header and UNCLI's
+       can be one. -->
+  {#if chat.embedded}<svelte:element this={'slot'} name="header-start" />{/if}
+{/snippet}
+
+{#snippet hostEnd()}
+  {#if chat.embedded}<svelte:element this={'slot'} name="header-end" />{/if}
+{/snippet}
+
+{#snippet chatActions(small: boolean)}
+  <!-- In a host's page, where there may be no session list. -->
+  {#if chat.newChat}
+    {@const start = chat.newChat}
+    <button class="btn ghost icon" class:small class:touch={!small} onclick={() => start()} aria-label={t('chat.new')} title={t('chat.new')}><Icon name="plus" /></button>
+  {/if}
+  {#if chat.deleted}
+    <button class="btn ghost icon" class:small class:touch={!small} onclick={removeChat} aria-label={t('chat.delete')} title={t('chat.delete')}><Icon name="trash" /></button>
+  {/if}
+{/snippet}
+
 {#if compact}
   <!-- One panel down to the page's question bar, which sits flush under it. -->
   <div class="head" part="header">
     <header class="bar">
+      {@render hostStart()}
       <!-- Pressing Back leaves the focus where it is: a rename box losing it
            would save, where Back cancels (lib/backguard.ts). -->
       {#if onback}<button class="btn ghost icon touch" onmousedown={e => e.preventDefault()} onclick={onback} aria-label={t('mobile.back')} title={t('mobile.back')}><Icon name="arrow-left" /></button>{/if}
@@ -93,11 +137,15 @@
       </div>
       <button class="btn ghost icon touch" onclick={() => (options = !options)} aria-expanded={options} aria-label={t('mobile.options')} title={t('mobile.options')}><Icon name="sliders-horizontal" /></button>
       <button class="btn ghost icon touch" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>
+      {@render hostEnd()}
     </header>
     {@render extra()}
     {#if options}
       <div class="options">
         {@render toolbar()}
+        {#if chat.newChat || chat.deleted}
+          <p class="chat-actions">{@render chatActions(true)}</p>
+        {/if}
         {#if !session.archived}
           <p class="restart">
             <button class="btn ghost small away" onclick={() => chat.restart(session.id)}><Icon name="rotate-ccw" size={15} />{t('restart.label')}</button>
@@ -111,6 +159,7 @@
 {:else}
   <header class="top" class:collapsed={chat.headerCompact} part="header">
     <div class="title-row">
+      {@render hostStart()}
       <span class="mode" style={tintStyle(profile?.hue)}><Icon name={profile?.icon ?? 'message-circle'} size={15} /></span>
       <h1><SessionTitle {session} /></h1>
       <ActivityBadge state={session.state} />
@@ -133,6 +182,7 @@
           <Icon name="shield" />
         </button>
       {/if}
+      {@render chatActions(true)}
       <button
         class="btn ghost small icon"
         onclick={() => chat.togglePanel()}
@@ -152,6 +202,7 @@
       >
         <Icon name={chat.headerCompact ? 'chevron-down' : 'chevron-up'} size={14} />
       </button>
+      {@render hostEnd()}
     </div>
     {#if !chat.headerCompact}
       <div class="where">
@@ -332,6 +383,11 @@
   /* The toolbar wraps here, so a divider between groups would end a line. */
   .options :global(.sep) {
     display: none;
+  }
+  .chat-actions {
+    display: flex;
+    gap: var(--space-1);
+    margin: var(--space-2) 0 0;
   }
   .restart {
     display: flex;

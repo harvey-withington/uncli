@@ -100,8 +100,22 @@ func (o Options) hostMCP(session string) []string {
 	return []string{string(b)}
 }
 
-// errServiceAccount: the host runs as a service account (AllowServiceAccount).
-var errServiceAccount = errors.New("uncli: this program runs as a Windows service account")
+// ErrServiceAccount: Start refused because the host runs as a Windows
+// service account (AllowServiceAccount). errors.Is finds it; errors.As
+// gives a *ServiceAccountError, with the account's name, for the host's
+// own message.
+var ErrServiceAccount = errors.New("uncli: this program runs as a Windows service account")
+
+// ServiceAccountError is ErrServiceAccount with the account named.
+type ServiceAccountError struct {
+	Account string // LocalSystem, LocalService or NetworkService
+}
+
+func (e *ServiceAccountError) Error() string {
+	return fmt.Sprintf("%s (%s), so the CLIs would run tools as %s. Run it as a person's account (the service's Log on as), or set AllowServiceAccount", ErrServiceAccount, e.Account, e.Account)
+}
+
+func (e *ServiceAccountError) Is(target error) bool { return target == ErrServiceAccount }
 
 // runningAs is serviceAccount, replaced in tests.
 var runningAs = serviceAccount
@@ -109,7 +123,7 @@ var runningAs = serviceAccount
 // asAPerson refuses a service account unless the host allows it.
 func asAPerson(o Options) error {
 	if a := runningAs(); a != "" && !o.AllowServiceAccount {
-		return fmt.Errorf("%w (%s), so the CLIs would run tools as %s. Run it as a person's account (the service's Log on as), or set AllowServiceAccount", errServiceAccount, a, a)
+		return &ServiceAccountError{Account: a}
 	}
 	return nil
 }
@@ -251,6 +265,14 @@ func (c *Core) Handler() http.Handler {
 // others could reach them (a port on loopback, uncli-core), with the host's
 // proxy adding the key.
 func (c *Core) KeyedHandler() http.Handler { return c.routes }
+
+// SessionMeta is what the host's page said a session is for when it made
+// it (<uncli-chat>'s newSession(…, { meta })), so MCPServers can pick a
+// session's servers from its very first start, before the host has
+// recorded anything of its own. Kept while this UNCLI runs; empty for a
+// session made without it, or after a restart (by then the host has its
+// own record).
+func (c *Core) SessionMeta(session string) string { return c.svc.Sessions.Meta(session) }
 
 // Close stops the sessions and the CLIs they run, and frees the folder.
 // Closing again does nothing.

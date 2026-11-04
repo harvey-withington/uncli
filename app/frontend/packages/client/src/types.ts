@@ -580,6 +580,12 @@ export interface NewSessionChoices {
   shares?: Record<string, Share[]> // what each isolated profile's last session shared
 }
 
+// A new session's extras: an embedding host's word on what it's for (a
+// card, say), which the host's own UNCLI gives back to it (decision 0027).
+export interface CreateOptions {
+  meta?: string
+}
+
 export interface CreatedSession {
   session: SessionView
   lastNewSession: NewSessionChoices
@@ -840,7 +846,8 @@ export interface Backend {
   pickFolder(title: string): Promise<string>
   // container: a container profile id, "" for this machine; provider: an AI provider's id, "" for the first
   // shares: what it has of the user's own; null for its type's defaults.
-  createSession(profileId: string, workdir: string, model: string, container: string, provider: string, shares: Share[] | null): Promise<CreatedSession>
+  // opts: a host's meta (CreateSessionWith); left out for a plain create.
+  createSession(profileId: string, workdir: string, model: string, container: string, provider: string, shares: Share[] | null, opts?: CreateOptions): Promise<CreatedSession>
   setShares(sessionId: string, shares: Share[]): Promise<SessionView> // from the next turn
   pages(sessionId: string): Promise<Page[]>
   // opts: what comes with the turn beyond its text and files.

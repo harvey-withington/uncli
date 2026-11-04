@@ -93,6 +93,20 @@ func (a *API) CreateSession(profileID, workdir, model, container, provider strin
 	return CreatedSession{Session: v, LastNew: last}, err
 }
 
+// CreateOptions are a new session's extras beyond CreateSession's.
+type CreateOptions struct {
+	// Meta is an embedding host's word on what the session is for (a
+	// card, say), kept with it so the host knows it from the session's
+	// first start (decision 0027).
+	Meta string `json:"meta,omitempty"`
+}
+
+// CreateSessionWith is CreateSession with options: a host's meta.
+func (a *API) CreateSessionWith(profileID, workdir, model, container, provider string, shares []string, opts CreateOptions) (CreatedSession, error) {
+	v, last, err := a.svc.CreateSessionWith(session.NewSession{Profile: profileID, Workdir: workdir, Model: model, Container: container, Provider: provider, Shares: shares, Meta: opts.Meta})
+	return CreatedSession{Session: v, LastNew: last}, err
+}
+
 func (a *API) Pages(sessionID string) ([]store.Page, error) { return a.svc.Sessions.Pages(sessionID) }
 
 // Send starts a turn with the text and any attached files.

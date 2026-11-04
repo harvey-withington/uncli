@@ -63,7 +63,19 @@ export class UncliSessionList extends HTMLElement {
     if (name === 'selected' && this.#props) this.#props.selected = this.selected
   }
 
+  // Connects a moment after it has a src, as <uncli-chat> does, so headers
+  // the host sets in the same go are in place for the first request.
+  #pending: ReturnType<typeof setTimeout> | null = null
+
   #mount() {
+    if (this.#app || this.#pending || !this.isConnected || !this.#backend) return
+    this.#pending = setTimeout(() => {
+      this.#pending = null
+      this.#mountNow()
+    }, 0)
+  }
+
+  #mountNow() {
     if (this.#app || !this.isConnected || !this.#backend || !this.shadowRoot) return
     const store = new ChatStore(this.#backend, { client: chatClient(this.#backend), memory: keyedMemory(null) })
     store.embedded = true
@@ -76,6 +88,8 @@ export class UncliSessionList extends HTMLElement {
   }
 
   #unmount() {
+    if (this.#pending) clearTimeout(this.#pending)
+    this.#pending = null
     if (this.#app) void unmount(this.#app)
     this.#app = null
     this.#props?.store.destroy()

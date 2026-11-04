@@ -81,6 +81,11 @@ export class ChatStore {
   // An embedding host's word on what Enter does in the message box
   // (lib/enterkey.svelte.ts); undefined: the viewer's setting, or the device.
   enterKey = $state<EnterKey | undefined>(undefined)
+  // In a host's page, where there may be no session list: New chat in the
+  // header (newChat), and word to the host that the chat was deleted from
+  // its header (deleted). Unset in the app, which has its sidebar.
+  newChat: (() => void) | undefined = undefined
+  deleted: ((id: string) => void) | undefined = undefined
 
   constructor(backend: Backend, opts: ChatStoreOptions = {}) {
     this.client = opts.client ?? new ChatClient(backend)

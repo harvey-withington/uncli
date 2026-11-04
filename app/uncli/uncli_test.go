@@ -220,10 +220,46 @@ func TestNotAsAServiceAccount(t *testing.T) {
 	}
 	runningAs = func() string { return "LocalSystem" }
 	t.Cleanup(func() { runningAs = serviceAccount })
-	if _, err := Start(Options{DataDir: t.TempDir()}); !errors.Is(err, errServiceAccount) {
+	_, err := Start(Options{DataDir: t.TempDir()})
+	if !errors.Is(err, ErrServiceAccount) {
 		t.Fatalf("started as LocalSystem: %v", err)
 	}
+	// The host can name the account in its own message.
+	var sa *ServiceAccountError
+	if !errors.As(err, &sa) || sa.Account != "LocalSystem" {
+		t.Errorf("the error doesn't name the account: %v", err)
+	}
 	start(t, Options{AllowServiceAccount: true})
+}
+
+// A session made with the host's meta carries it from the start, so the
+// host's MCPServers knows what the session is for on its very first launch.
+func TestSessionMetaFromTheStart(t *testing.T) {
+	c := start(t, Options{})
+	srv := httptest.NewServer(c.Handler())
+	defer srv.Close()
+	body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "CreateSessionWith",
+		"params": []any{"chat", "", "", "", "", nil, map[string]any{"meta": "card:42"}}})
+	resp, err := http.Post(srv.URL+"/rpc", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var r struct {
+		Result struct {
+			Session struct{ ID string } `json:"session"`
+		}
+		Error *struct{ Message string }
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil || r.Error != nil {
+		t.Fatalf("CreateSessionWith: %v %+v", err, r.Error)
+	}
+	if got := c.SessionMeta(r.Result.Session.ID); got != "card:42" {
+		t.Errorf("meta = %q", got)
+	}
+	if got := c.SessionMeta("no-such-session"); got != "" {
+		t.Errorf("an unknown session's meta = %q", got)
+	}
 }
 
 // The host's MCP servers become the CLI's --mcp-config: HTTP servers, with

@@ -67,8 +67,12 @@ func EmbeddedMethods() []string {
 		return strings.HasPrefix(m, "Push") || m == "SetPushNotifications" || m == "TestPush" ||
 			m == "UpdateStatus" || m == "CheckForUpdates" || m == "InstallUpdate"
 	})
-	return append(m, setupMethods...)
+	return append(append(m, setupMethods...), hostMethods...)
 }
+
+// hostMethods are calls only a host's page makes: a new session with the
+// host's meta.
+var hostMethods = []string{"CreateSessionWith"}
 
 // setupMethods install the CLIs and sign in to them, for a host's own
 // UNCLI. Not SignInTerminal: it opens a terminal on the server's screen.
@@ -153,6 +157,14 @@ func (c *client) CreateSession(profileID, workdir, model, container, provider st
 		return app.CreatedSession{}, errNetworkPath
 	}
 	return c.API.CreateSession(profileID, workdir, model, container, provider, shares)
+}
+
+// CreateSessionWith is CreateSession with a host's meta (embedded only).
+func (c *client) CreateSessionWith(profileID, workdir, model, container, provider string, shares []string, opts app.CreateOptions) (app.CreatedSession, error) {
+	if networkPath(workdir) {
+		return app.CreatedSession{}, errNetworkPath
+	}
+	return c.API.CreateSessionWith(profileID, workdir, model, container, provider, shares, opts)
 }
 
 // ArtifactLink is a signed link to an artifact, to open it in the

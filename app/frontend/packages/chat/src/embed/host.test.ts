@@ -42,6 +42,78 @@ describe('src', () => {
   })
 })
 
+describe('the chat’s own life in a host', () => {
+  it('connects a moment after it gets its backend, so a host set in the same go is in place first', async () => {
+    const backend = mockBackend()
+    const boot = vi.spyOn(backend, 'bootstrap')
+    const el = document.createElement('uncli-chat') as UncliChat
+    el.session = 's-code'
+    el.backend = backend
+    document.body.append(el)
+    expect(boot).not.toHaveBeenCalled()
+    el.host = { turnContext: () => 'set after the backend' }
+    await waitFor(() => expect(boot).toHaveBeenCalled())
+  })
+
+  it('says when the session it was given isn’t there', async () => {
+    const missing = vi.fn()
+    document.addEventListener('uncli-missing', missing)
+    try {
+      const el = document.createElement('uncli-chat') as UncliChat
+      el.session = 'gone'
+      el.backend = mockBackend()
+      document.body.append(el)
+      await waitFor(() => expect(missing).toHaveBeenCalledOnce())
+      expect((missing.mock.calls[0]![0] as CustomEvent).detail).toEqual({ session: 'gone' })
+    } finally {
+      document.removeEventListener('uncli-missing', missing)
+    }
+  })
+
+  it('deletes its chat from the header, confirmed, and tells the host', async () => {
+    const backend = mockBackend()
+    const remove = vi.spyOn(backend, 'remove')
+    const deleted = vi.fn()
+    document.addEventListener('uncli-deleted', deleted)
+    try {
+      const el = chat(backend)
+      await inside(el).findByText(QUESTION)
+      await fireEvent.click(inside(el).getByRole('button', { name: 'Delete this chat' }))
+      const dialog = await inside(el).findByRole('dialog')
+      await fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+      await waitFor(() => expect(deleted).toHaveBeenCalledOnce())
+      expect(remove).toHaveBeenCalledWith('s-code')
+      expect((deleted.mock.calls[0]![0] as CustomEvent).detail).toEqual({ session: 's-code' })
+    } finally {
+      document.removeEventListener('uncli-deleted', deleted)
+    }
+  })
+
+  it('starts a new chat from the header unless the host takes it', async () => {
+    const created = vi.fn()
+    document.addEventListener('uncli-new-session', created)
+    try {
+      const el = chat()
+      await inside(el).findByText(QUESTION)
+      // A host that takes it: nothing made here.
+      const take = (e: Event) => e.preventDefault()
+      document.addEventListener('uncli-new-chat', take)
+      await fireEvent.click(inside(el).getByRole('button', { name: 'New chat' }))
+      document.removeEventListener('uncli-new-chat', take)
+      expect(created).not.toHaveBeenCalled()
+      expect(el.session).toBe('s-code')
+      // Otherwise: a new session of the same type, shown, and the host told.
+      await fireEvent.click(inside(el).getByRole('button', { name: 'New chat' }))
+      await waitFor(() => expect(created).toHaveBeenCalledOnce())
+      const detail = (created.mock.calls[0]![0] as CustomEvent).detail
+      expect(detail.previous).toBe('s-code')
+      expect(el.session).toBe(detail.session)
+    } finally {
+      document.removeEventListener('uncli-new-session', created)
+    }
+  })
+})
+
 describe('setting up the CLI', () => {
   it('shows the setup steps instead of the chat until the CLI is installed and signed in', async () => {
     const backend = mockBackend({ cli: { installed: false, loggedIn: false } })

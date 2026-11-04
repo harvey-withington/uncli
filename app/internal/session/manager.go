@@ -211,6 +211,10 @@ type NewSession struct {
 	// Shares is what it shares of the user's own (shares.go); nil: what its
 	// type does.
 	Shares []string
+	// Meta is an embedding host's own word on what the session is for (a
+	// card, say), kept with it while UNCLI runs and given back by Meta, so
+	// the host knows it from the session's first start (decision 0027).
+	Meta string
 }
 
 // CreateWith makes a new session on a provider. A profile's model is the
@@ -265,12 +269,23 @@ func (m *Manager) CreateWith(n NewSession) (View, error) {
 		return View{}, err
 	}
 	s := newSession(m, rec)
+	s.meta = n.Meta
 	m.mu.Lock()
 	m.sessions[id] = s
 	m.mu.Unlock()
 	v := s.View()
 	m.d.Sink.SessionChanged(v)
 	return v, nil
+}
+
+// Meta is what the host said the session is for when it was created
+// (NewSession.Meta); empty for any other session, or after a restart.
+func (m *Manager) Meta(id string) string {
+	s, err := m.get(id)
+	if err != nil {
+		return ""
+	}
+	return s.meta
 }
 
 // View is one session as the UI sees it.

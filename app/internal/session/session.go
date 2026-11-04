@@ -26,6 +26,7 @@ type Session struct {
 
 	mu    sync.Mutex
 	rec   store.Session
+	meta  string // the host's word on what it's for (NewSession.Meta); set once, at creation
 	state State
 	err   string
 

@@ -19,7 +19,11 @@
 // (hidden) with each turn; headers() is the host's own sign-in, sent with
 // every request to src; enter says what Enter does in the message box.
 // Events (composed, so they cross into the host's page): uncli-ready,
-// uncli-busy, uncli-idle, uncli-needs-approval; detail: { session }. Before
+// uncli-busy, uncli-idle, uncli-needs-approval, uncli-missing (no such
+// session here), uncli-deleted (deleted from the header); detail:
+// { session }. New chat in the header sends uncli-new-chat, cancelable (a
+// host that cancels makes the session itself), then uncli-new-session,
+// detail: { session, previous }. Before
 // the chat acts on Escape or Ctrl+Enter, uncli-escape and uncli-submit go
 // out, cancelable: a host that cancels one keeps the key for itself.
 import { mount, unmount } from 'svelte'
@@ -99,9 +103,12 @@ export class UncliChat extends HTMLElement {
 
   // newSession starts a session on this chat's UNCLI and shows it: a chat in
   // a fresh folder by default, or a profile's (cowork, code) in workdir.
-  async newSession(profile = 'chat', workdir = '', model = ''): Promise<string> {
+  // opts.meta is the host's word on what it's for (a card, say), which the
+  // host's server reads back with core.SessionMeta, from the session's very
+  // first start (MCPServers).
+  async newSession(profile = 'chat', workdir = '', model = '', opts: { meta?: string } = {}): Promise<string> {
     if (!this.#backend) throw new Error('<uncli-chat> has no src or backend')
-    const v = await chatClient(this.#backend).createSession(profile, workdir, model)
+    const v = await chatClient(this.#backend).createSession(profile, workdir, model, '', '', null, opts.meta ?? '')
     this.session = v.id
     return v.id
   }
@@ -128,6 +135,7 @@ export class UncliChat extends HTMLElement {
     if (name === 'session') {
       if (this.#props) this.#props.session = this.session
       this.#watch()
+      this.#checkMissing()
     }
   }
 
@@ -156,7 +164,21 @@ export class UncliChat extends HTMLElement {
     return c === null ? undefined : c !== 'false'
   }
 
+  // The chat connects a moment after it has a src (or backend), not at
+  // once: a host that sets src in its markup and host (with its sign-in
+  // headers) in its script, in the same go, gets both in place before the
+  // first request.
+  #pending: ReturnType<typeof setTimeout> | null = null
+
   #mount() {
+    if (this.#app || this.#pending || !this.isConnected || !this.#backend) return
+    this.#pending = setTimeout(() => {
+      this.#pending = null
+      this.#mountNow()
+    }, 0)
+  }
+
+  #mountNow() {
     if (this.#app || !this.isConnected || !this.#backend || !this.shadowRoot) return
     const store = new ChatStore(this.#backend, { client: chatClient(this.#backend), memory: keyedMemory(this.getAttribute('storage-key')) })
     store.openLink = href => this.#host?.openLink?.(href) ?? false
@@ -164,16 +186,46 @@ export class UncliChat extends HTMLElement {
     store.complete = query => this.#host?.complete?.(query) ?? []
     store.enterKey = this.#host?.enter
     store.embedded = true
+    store.newChat = () => void this.#newChat()
+    store.deleted = id => this.#emitFor('uncli-deleted', { session: id })
     const target = document.createElement('div')
     target.className = 'uncli-root'
     this.shadowRoot.append(target)
     this.#props = { store, session: this.session, compact: this.#compact() }
     this.#app = mount(Chat, { target, props: this.#props })
-    store.init().then(() => this.#emit('uncli-ready'), () => {})
+    store.init().then(() => {
+      this.#emit('uncli-ready')
+      this.#checkMissing()
+    }, () => {})
     this.#watch()
   }
 
+  // New chat from the header: the host may take it (cancel uncli-new-chat,
+  // then call newSession with its own meta); otherwise a new session of the
+  // same type, in the same folder unless the type makes a fresh one, shown
+  // here, and the host told with uncli-new-session.
+  async #newChat() {
+    const previous = this.session
+    if (!this.dispatchEvent(new CustomEvent('uncli-new-chat', { bubbles: true, composed: true, cancelable: true, detail: { session: previous } }))) return
+    const store = this.#props?.store
+    const cur = store?.sessions.find(s => s.id === previous)
+    const profile = cur?.profileId ?? 'chat'
+    const scratch = store?.boot?.profiles.find(p => p.id === profile)?.folder === 'scratch'
+    const id = await this.newSession(profile, scratch ? '' : (cur?.workdir ?? ''))
+    this.#emitFor('uncli-new-session', { session: id, previous })
+  }
+
+  // The host asked for a session this UNCLI doesn't have (deleted, say):
+  // uncli-missing, so the host can start a new one.
+  #checkMissing() {
+    const store = this.#props?.store
+    const id = this.session
+    if (store?.ready && id && !store.sessions.some(s => s.id === id)) this.#emit('uncli-missing')
+  }
+
   #unmount() {
+    if (this.#pending) clearTimeout(this.#pending)
+    this.#pending = null
     this.#offSession?.()
     this.#offSession = null
     if (this.#app) void unmount(this.#app)
@@ -207,7 +259,11 @@ export class UncliChat extends HTMLElement {
   }
 
   #emit(type: string) {
-    this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: true, detail: { session: this.session } }))
+    this.#emitFor(type, { session: this.session })
+  }
+
+  #emitFor(type: string, detail: Record<string, string>) {
+    this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: true, detail }))
   }
 }
 

@@ -46,6 +46,20 @@ describe('httpBackend', () => {
     expect(calls.every(c => !c.url.includes('tok'))).toBe(true)
   })
 
+  it('creates a session with a host’s meta only through CreateSessionWith', async () => {
+    const calls: { method: string; params: unknown[] }[] = []
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      calls.push(JSON.parse(init.body as string))
+      return reply({ jsonrpc: '2.0', id: 1, result: { session: {}, lastNewSession: {} } })
+    })
+    const b = httpBackend({ base: '', token: () => 'tok', fetch: fetch as never })
+    await b.createSession('chat', '', '', '', '', null)
+    await b.createSession('chat', '', '', '', '', null, { meta: 'card:42' })
+    expect(calls.map(c => c.method)).toEqual(['CreateSession', 'CreateSessionWith'])
+    expect(calls[0]!.params).toHaveLength(6)
+    expect(calls[1]!.params.at(-1)).toEqual({ meta: 'card:42' })
+  })
+
   it('sends a turn with options only through SendWith, so a plain turn works with any server', async () => {
     const methods: string[] = []
     const fetch = vi.fn(async (_url: string, init: RequestInit) => {
