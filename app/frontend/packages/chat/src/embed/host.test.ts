@@ -1,6 +1,7 @@
 import { fireEvent, waitFor, within } from '@testing-library/svelte'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chatClient, mountedBackend } from '@uncli/client'
+import { chatClient, httpBackend, mountedBackend } from '@uncli/client'
+import { canSetUp } from '../lib/remoteonly'
 import { mockBackend } from '@uncli/client/mock'
 import { setHostText } from '../lib/i18n.svelte'
 import { allowLinkSchemes } from '../lib/render/markdown'
@@ -38,6 +39,24 @@ describe('src', () => {
     expect(list.backend).toBe(el.backend)
     el.removeAttribute('src')
     expect(el.backend).toBeNull()
+  })
+})
+
+describe('setting up the CLI', () => {
+  it('shows the setup steps instead of the chat until the CLI is installed and signed in', async () => {
+    const backend = mockBackend({ cli: { installed: false, loggedIn: false } })
+    const el = chat(backend)
+    const button = (name: string) => [...el.shadowRoot!.querySelectorAll('button')].find(b => b.textContent?.includes(name))
+    await waitFor(() => expect(el.shadowRoot!.textContent).toContain("Let's get you set up"))
+    await fireEvent.click(button('Download')!)
+    await waitFor(() => expect(button('Sign in')).toBeTruthy(), { timeout: 3000 })
+    expect(el.shadowRoot!.textContent).not.toContain(QUESTION)
+  })
+
+  it('is offered by a host’s own UNCLI, and never on a phone', () => {
+    expect(canSetUp(mountedBackend('/uncli'))).toBe(true)
+    expect(canSetUp(httpBackend({ base: 'https://pc.example:9871', token: () => 'tok' }))).toBe(false)
+    expect(canSetUp(mockBackend())).toBe(true)
   })
 })
 

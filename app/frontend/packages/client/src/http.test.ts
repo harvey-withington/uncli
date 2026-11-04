@@ -130,6 +130,26 @@ describe('httpBackend', () => {
     }
   })
 
+  it('sets up the CLIs only on a host’s own UNCLI, opening the sign-in link here', async () => {
+    const methods: string[] = []
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      const { method } = JSON.parse(init.body as string)
+      methods.push(method)
+      return reply({ jsonrpc: '2.0', id: 1, result: method === 'SignIn' ? { url: 'https://claude.ai/oauth?x=1', signedIn: false, status: {} } : {} })
+    })
+    const opened = vi.spyOn(window, 'open').mockReturnValue(null)
+    const host = httpBackend({ base: '/uncli', token: () => null, setup: true, fetch: fetch as never })
+    await host.installCLI()
+    await host.signIn()
+    await host.submitLoginCode('abc')
+    expect(methods).toEqual(['InstallCLI', 'SignIn', 'SubmitLoginCode'])
+    expect(opened).toHaveBeenCalledWith('https://claude.ai/oauth?x=1', '_blank', 'noopener,noreferrer')
+    opened.mockRestore()
+    const phone = httpBackend({ base: '', token: () => 'tok', fetch: fetch as never })
+    await expect(phone.installCLI()).rejects.toBeInstanceOf(RemoteOnlyError)
+    await expect(phone.signIn()).rejects.toBeInstanceOf(RemoteOnlyError)
+  })
+
   it('refuses what only works at the server', async () => {
     const b = httpBackend({ base: '', token: () => 'tok', fetch: vi.fn() as never })
     await expect(b.openFolder('C:\\')).rejects.toBeInstanceOf(RemoteOnlyError)

@@ -71,6 +71,12 @@ uncli-core --data <folder> --origin https://app.example --name "My app"   (the k
 
 Your users sign in to the CLIs once for your app, and your app doesn't see their personal CLI setup. `UserCLIConfig` (`--user-cli-config`) uses the user's own CLI config instead, shared with everything else on the machine that uses those CLIs.
 
+**Setting up the CLI.** Until your UNCLI has its CLI downloaded and signed in, `<uncli-chat>` shows the steps in its place:
+1. Download: UNCLI's pinned copy, checked against its published checksum, into your data folder.
+2. Sign in: the sign-in page opens in your user's browser, and they paste the code it shows.
+
+Once both are done, the chat appears. Your page needs no code for this.
+
 **What the core leaves to you:**
 - notifications (listen for `uncli-needs-approval`);
 - updates: the core is the version you ship.
@@ -216,7 +222,7 @@ The part names are part of the contract; the structure inside them isn't.
 
 ## What's not there yet
 
-- **Setting up the CLIs in your page.** `<uncli-setup>` will let your users install the CLIs your UNCLI runs and sign in to them. Until then, try it with `UserCLIConfig` and a CLI you've already installed and signed in to (`UNCLI_CLAUDE_BIN` names its binary).
+- **Setting up the other providers' CLIs** in your page: the chat sets up the first one only.
 - **Remote access for your own phone app,** switched on for your UNCLI.
 - **Containers** in a host's UNCLI.
 - **React, Vue and Angular wrappers,** generated from a Custom Elements Manifest.

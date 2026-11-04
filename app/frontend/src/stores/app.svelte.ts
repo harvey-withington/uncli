@@ -58,7 +58,6 @@ export class AppStore extends ChatStore {
     }
   }
 
-  get progress() { return this.chat.progress }
   get devices() { return this.chat.devices }
   set devices(v) { this.client.patch({ devices: v }) }
   get pairRequest() { return this.chat.pairRequest }

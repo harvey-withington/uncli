@@ -60,12 +60,28 @@ var rpcMethods = []string{
 // EmbeddedMethods is what a host's own UNCLI offers its page (decision
 // 0027): a paired device's methods, less push notifications (the host
 // notifies its users itself) and UNCLI's updates (the host ships its
-// UNCLI with its own releases).
+// UNCLI with its own releases), plus setting up the CLIs: the host's page
+// is its users' only way to install and sign in to them.
 func EmbeddedMethods() []string {
-	return slices.DeleteFunc(slices.Clone(rpcMethods), func(m string) bool {
+	m := slices.DeleteFunc(slices.Clone(rpcMethods), func(m string) bool {
 		return strings.HasPrefix(m, "Push") || m == "SetPushNotifications" || m == "TestPush" ||
 			m == "UpdateStatus" || m == "CheckForUpdates" || m == "InstallUpdate"
 	})
+	return append(m, setupMethods...)
+}
+
+// setupMethods install the CLIs and sign in to them, for a host's own
+// UNCLI. Not SignInTerminal: it opens a terminal on the server's screen.
+var setupMethods = []string{"InstallCLI", "InstallProvider", "SignIn", "SubmitLoginCode", "CancelSignIn",
+	"StartDeviceSignIn", "CancelDeviceSignIn"}
+
+// SignIn starts the first provider's sign-in. The page opens the link in
+// its user's browser; the CLI waits for the code past this request.
+func (c *client) SignIn() (app.SignInStart, error) { return c.svc.SignIn(context.Background()) }
+
+// StartDeviceSignIn starts a provider's device sign-in, as SignIn does.
+func (c *client) StartDeviceSignIn(id string) (app.DeviceSignIn, error) {
+	return c.svc.StartDeviceSignIn(context.Background(), id)
 }
 
 var rpcNames = func() map[string]bool {

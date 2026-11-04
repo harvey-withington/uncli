@@ -10,7 +10,7 @@
   import SessionPane from '@uncli/chat/components/SessionPane.svelte'
   import SettingsDialog from './components/SettingsDialog.svelte'
   import UsageDashboard from './components/UsageDashboard.svelte'
-  import SetupScreen from './components/SetupScreen.svelte'
+  import Setup from '@uncli/chat/components/Setup.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import Toasts from '@uncli/chat/components/Toasts.svelte'
   import type { Backend } from '@uncli/chat/lib/api'
@@ -76,7 +76,7 @@
 {:else if !app.ready}
   <main class="center" aria-busy="true"><Icon name="loader" spin size={20} label={t('app.loading')} /></main>
 {:else if !app.cliReady}
-  <SetupScreen />
+  <Setup mark="/uncli-mark.svg" />
 {:else}
   <div class="shell">
     <Sidebar />

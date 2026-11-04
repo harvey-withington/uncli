@@ -10,6 +10,13 @@ export function atServer(backend: Pick<Backend, 'kind'>): boolean {
   return backend.kind !== 'http'
 }
 
+// canSetUp: the CLIs can be installed and signed in to through the
+// backend: the window's, the mock's, or a host's own UNCLI (decision 0027),
+// whose page is its user's way in. Not a phone's.
+export function canSetUp(backend: Pick<Backend, 'kind' | 'canSetUp'>): boolean {
+  return atServer(backend) || !!backend.canSetUp
+}
+
 // onlyAtServer is the reason shown on what a remote client can't use.
 export function onlyAtServer(): string {
   return t('remote.onlyAtServer')

@@ -77,8 +77,8 @@ credentials of UNCLI's beyond the key their own core is given.
   - `app/uncli`.
   - Links that resolve against the mount path, and Host and Origin checks
     that take the host's values.
-  - `<uncli-chat src>`, and `<uncli-setup>` for installing and signing in
-    to the CLIs.
+  - `<uncli-chat src>`, which shows the steps for installing and signing
+    in to the CLIs while they aren't ready.
   - `uncli-core`, and samples in Go and Node.
 - **The user signs in to each host's CLIs separately,** and a host doesn't
   see their personal skills, MCP servers or memory unless it opts into the

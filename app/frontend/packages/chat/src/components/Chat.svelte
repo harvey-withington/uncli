@@ -6,6 +6,8 @@
   import ConfirmDialog from './ConfirmDialog.svelte'
   import Icon from './Icon.svelte'
   import SessionPane from './SessionPane.svelte'
+  import Setup from './Setup.svelte'
+  import { canSetUp } from '../lib/remoteonly'
   import Toasts from './Toasts.svelte'
   import MobileSession from '../mobile/MobileSession.svelte'
 
@@ -14,7 +16,8 @@
   // shadow root; it shows the session given, once the store has it. Its
   // layout follows its own width, not the window's: the desktop's session
   // view when there's room, the phone's compact one below COMPACT_AT, or
-  // whichever compact says.
+  // whichever compact says. On a host's own UNCLI whose CLI isn't installed
+  // or signed in yet, it shows the setup steps instead (decision 0027).
 
   const COMPACT_AT = 720
 
@@ -48,6 +51,8 @@
     <p class="note" role="alert"><Icon name="triangle-alert" />{failed}</p>
   {:else if !store.ready}
     <p class="note" aria-busy="true"><Icon name="loader" spin size={18} label={t('app.loading')} /></p>
+  {:else if store.cli && !store.cliReady && canSetUp(store.backend)}
+    <Setup />
   {:else if view && narrow}
     <MobileSession session={view} wide={false} />
   {:else if view}

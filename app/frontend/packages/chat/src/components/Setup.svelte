@@ -1,12 +1,23 @@
 <script lang="ts">
-  import { useApp } from '../lib/context'
-  import { bytes } from '@uncli/chat/lib/format'
-  import { t } from '@uncli/chat/lib/i18n.svelte'
-  import Icon from '@uncli/chat/components/Icon.svelte'
+  import { namesOf, providerOf } from '@uncli/client'
+  import { useChat } from '../lib/chatcontext'
+  import { bytes } from '../lib/format'
+  import { t } from '../lib/i18n.svelte'
+  import Icon from './Icon.svelte'
 
-  // First run: download UNCLI's own copy of the Claude CLI, then sign in.
-  // No terminal at any point.
-  const app = useApp()
+  // First run: download UNCLI's own copy of the first provider's CLI, then
+  // sign in. No terminal at any point. The app shows it until the CLI is
+  // ready, and so does an embedded chat on a host's own UNCLI (decision
+  // 0027), where the sign-in link opens in the user's browser.
+  interface Props {
+    mark?: string // UNCLI's mark beside the wordmark (the app's); none in a host's page
+  }
+
+  let { mark }: Props = $props()
+  const app = useChat()
+  // This UNCLI's first provider's names, not the page's: a host's page may
+  // show chats on more than one.
+  const names = $derived(namesOf(providerOf(app.boot)))
   let installing = $state(false)
   // Sign-in: the CLI prints a link (opened in the browser for you) and
   // waits for the code the page shows after signing in.
@@ -81,19 +92,19 @@
 
 <main class="setup">
   <div class="card">
-    <span class="brand"><img src="/uncli-mark.svg" alt="" width="26" height="26" /><span class="wordmark">UNCLI</span></span>
+    <span class="brand">{#if mark}<img src={mark} alt="" width="26" height="26" />{/if}<span class="wordmark">UNCLI</span></span>
     <h1>{t('setup.title')}</h1>
-    <p class="lead">{t('setup.lead')}</p>
+    <p class="lead">{t('setup.lead', names)}</p>
 
     <ol class="steps">
       <li class:done={installed} class:current={!installed}>
         <span class="num">{#if installed}<Icon name="check" size={14} />{:else}1{/if}</span>
         <div class="step">
-          <h2>{t('setup.download.title')}</h2>
+          <h2>{t('setup.download.title', names)}</h2>
           <p>{t('setup.download.body', { version: app.cli?.version ?? '' })}</p>
           {#if !installed}
             {#if installing}
-              <div class="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t('setup.download.title')}>
+              <div class="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t('setup.download.title', names)}>
                 <span style:width="{pct}%"></span>
               </div>
               <p class="small">
@@ -108,8 +119,8 @@
       <li class:current={installed && !app.cli?.loggedIn} class:pending={!installed}>
         <span class="num">2</span>
         <div class="step">
-          <h2>{t('setup.signin.title')}</h2>
-          <p>{t('setup.signin.body')}</p>
+          <h2>{t('setup.signin.title', names)}</h2>
+          <p>{t('setup.signin.body', names)}</p>
           {#if installed}
             {#if signin === 'code' || signin === 'verifying'}
               <p class="opened">
@@ -157,14 +168,16 @@
 <style>
   .setup {
     display: grid;
-    place-items: center;
+    grid-template-columns: minmax(0, 540px);
+    align-content: safe center;
+    justify-content: center;
     height: 100%;
-    padding: var(--space-6);
+    overflow-y: auto;
+    padding: var(--space-6) var(--space-4);
     background: var(--bg);
   }
   .card {
-    width: 540px;
-    max-width: 100%;
+    min-width: 0;
     padding: var(--space-6) var(--space-6) var(--space-5);
     background: var(--surface);
     border: 1px solid var(--border);
@@ -246,6 +259,7 @@
   }
   .row {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
   }
   .link {
@@ -258,7 +272,7 @@
     text-underline-offset: 2px;
   }
   .code {
-    flex: 1;
+    flex: 1 1 12em; /* wraps the buttons below it when narrow */
     min-width: 0;
     font-family: var(--mono);
   }

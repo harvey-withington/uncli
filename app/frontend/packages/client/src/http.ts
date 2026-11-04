@@ -7,13 +7,16 @@
 // screen is refused here, and the UI shows it disabled with the reason
 // (lib/remoteonly.ts).
 import { text } from './text'
-import type { Backend, Connection, Handlers, Upload } from './types'
+import type { Backend, CLIStatus, Connection, DeviceSignIn, Handlers, SignInStart, Upload } from './types'
 
 export interface HttpOptions {
   base: string // the server's origin; '' for the page's own; a path (/uncli) for a host's own UNCLI on the page's server
   token: () => string | null
   // unauthorized: the server refused the token (revoked, or never paired).
   unauthorized?: () => void
+  // setup: the server is a host's own UNCLI (decision 0027), which lets its
+  // page install the CLIs and sign in to them; a phone can't.
+  setup?: boolean
   fetch?: typeof fetch
 }
 
@@ -145,9 +148,35 @@ export function httpBackend(opts: HttpOptions): Backend {
   }
 
   const only = (method: string) => () => Promise.reject(new RemoteOnlyError(method))
+  // A sign-in link opens in this browser: the server's own window would
+  // open it at the server.
+  const open = (url?: string) => {
+    if (url && /^https?:\/\//.test(url)) window.open(url, '_blank', 'noopener,noreferrer')
+  }
+  // Setting up the CLIs, where the server allows it (opts.setup).
+  const setup = opts.setup
+    ? {
+        installCLI: () => call<CLIStatus>('InstallCLI'),
+        signIn: async () => {
+          const s = await call<SignInStart>('SignIn')
+          open(s.url)
+          return s
+        },
+        submitLoginCode: (code: string) => call<CLIStatus>('SubmitLoginCode', code),
+        cancelSignIn: () => call<void>('CancelSignIn'),
+        installProvider: (pid: string) => call<CLIStatus>('InstallProvider', pid),
+        startDeviceSignIn: async (pid: string) => {
+          const d = await call<DeviceSignIn>('StartDeviceSignIn', pid)
+          open(d.url)
+          return d
+        },
+        cancelDeviceSignIn: (pid: string) => call<void>('CancelDeviceSignIn', pid),
+      }
+    : {}
 
   return {
     kind: 'http',
+    canSetUp: !!opts.setup,
     subscribe(h: Handlers) {
       return stream(opts, raw, auth, h) // its banner says it can't reach the server itself
     },
@@ -279,6 +308,7 @@ export function httpBackend(opts: HttpOptions): Backend {
     testPush: () => call('TestPush'),
     artifactLink: async (s, r) => absolute(opts.base, await call<string>('ArtifactLink', s, r)),
     uploadLink: async up => absolute(opts.base, await call<string>('UploadLink', up)),
+    ...setup,
   }
 }
 
@@ -300,7 +330,7 @@ export function mountedBackend(src: string): Backend {
   const base = src.replace(/\/+$/, '')
   let b = mounted.get(base)
   if (!b) {
-    b = httpBackend({ base, token: () => null })
+    b = httpBackend({ base, token: () => null, setup: true })
     mounted.set(base, b)
   }
   return b

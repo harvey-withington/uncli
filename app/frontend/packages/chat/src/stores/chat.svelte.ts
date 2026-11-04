@@ -98,6 +98,7 @@ export class ChatStore {
   get cli() { return this.chat.cli }
   set cli(v) { this.client.patch({ cli: v }) }
   get providerStatus() { return this.chat.providerStatus }
+  get progress() { return this.chat.progress } // a CLI download
   get containers() { return this.chat.containers }
   get remote() { return this.chat.remote }
   set remote(v) { this.client.patch({ remote: v }) }

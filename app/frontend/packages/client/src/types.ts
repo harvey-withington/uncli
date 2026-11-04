@@ -813,6 +813,9 @@ export interface RemoteStatus {
 // implements it in the app; a mock implements it in a plain browser.
 export interface Backend {
   readonly kind: 'wails' | 'mock' | 'http'
+  // canSetUp: an HTTP backend that may install the CLIs and sign in to
+  // them (a host's own UNCLI, decision 0027); a phone's may not.
+  readonly canSetUp?: boolean
   subscribe(h: Handlers): () => void
   bootstrap(): Promise<Bootstrap>
   cliStatus(fresh: boolean): Promise<CLIStatus>

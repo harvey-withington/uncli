@@ -50,6 +50,34 @@ func TestRPCMethods(t *testing.T) {
 	}
 }
 
+// A host's own UNCLI offers its page what a device may call, less push and
+// updates, plus setting up the CLIs; never what needs the server's screen.
+func TestEmbeddedMethods(t *testing.T) {
+	ct := reflect.TypeOf(&client{})
+	got := EmbeddedMethods()
+	for _, m := range got {
+		if _, ok := ct.MethodByName(m); !ok {
+			t.Errorf("%s is offered but the client has no such method", m)
+		}
+	}
+	for _, m := range []string{"InstallCLI", "SignIn", "SubmitLoginCode", "StartDeviceSignIn", "Send", "AnswerApproval"} {
+		if !slices.Contains(got, m) {
+			t.Errorf("a host's page can't call %s", m)
+		}
+	}
+	for _, m := range []string{"PushSubscribe", "TestPush", "InstallUpdate", "CheckForUpdates", "SignInTerminal", "OpenFolder", "SetPreferences", "BuildContainer"} {
+		if slices.Contains(got, m) {
+			t.Errorf("%s must not be offered to a host's page", m)
+		}
+	}
+	// Devices still can't set up the CLIs.
+	for _, m := range setupMethods {
+		if rpcNames[m] {
+			t.Errorf("%s must not be reachable from a device", m)
+		}
+	}
+}
+
 type target struct{ calls []string }
 
 func (t *target) Echo(s string, n int) (string, error) { return s + "!", nil }
