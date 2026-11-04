@@ -143,6 +143,8 @@ export function reasonLabel(r: TraceReason, names?: ProviderNames): string {
     case 'deny': text = t('why.deny', { rule }); break
     case 'ask': text = t('why.ask', { rule }); break
     case 'risky': text = t('why.risky', { risk: riskLabel(r.risk) }); break
+    // The app UNCLI is embedded in decided, for a tool of its own (decision 0027).
+    case 'host': text = r.note ? t('why.hostNote', { note: r.note }) : t('why.host'); break
     default: text = t(`why.${r.by}`, names)
   }
   return r.judged && r.note ? t('why.judged', { text, note: r.note, model: r.judged }) : text
@@ -313,7 +315,7 @@ const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 // different reasons.
 const SHORT: Partial<Record<TraceReason['by'], string>> = {
   looks: 'who.looks', safe: 'who.safe', listed: 'who.listed', builtin: 'who.profile', inside: 'who.inside', never: 'who.never',
-  rule: 'who.rule', session: 'who.session', profile: 'who.profile', routine: 'who.routine', full: 'who.full',
+  rule: 'who.rule', session: 'who.session', profile: 'who.profile', routine: 'who.routine', full: 'who.full', host: 'who.host',
 }
 
 // approvedLabel says who let a tool use run, on its trace row.

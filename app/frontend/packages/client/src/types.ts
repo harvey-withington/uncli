@@ -100,7 +100,7 @@ export interface TraceItem {
 // type's list, UNCLI judging it safe (or reading), the setting for what it
 // can't place, Run without prompting, or a mix. (Older traces also hold
 // rule, session, profile, routine, full.)
-export type Approver = 'you' | 'listed' | 'builtin' | 'safe' | 'looks' | 'inside' | 'never' | 'mixed'
+export type Approver = 'you' | 'listed' | 'builtin' | 'safe' | 'looks' | 'inside' | 'never' | 'host' | 'mixed'
   | 'rule' | 'session' | 'profile' | 'routine' | 'full'
 
 // Why one part of a command (or a whole tool use) ran, prompted or was blocked.
@@ -110,6 +110,7 @@ export interface TraceReason {
     | 'looks' | 'safe' | 'listed' | 'builtin' | 'inside' | 'never' // it ran
     | 'always' | 'unsafe' | 'unknown' | 'judging' | 'user' // it prompted (judging: the model first)
     | 'blocked' // the user's safe list blocks it
+    | 'host' // the app UNCLI is embedded in decided, for a tool of its own (note: its reason)
     | 'rule' | 'session' | 'profile' | 'routine' | 'full' | 'deny' | 'readonly' | 'outside' | 'ask' | 'risky' | 'none' | 'complex' // older traces
   entry?: SafeEntry // the safe-list entry that decided it
   allow?: string // the session type's entry that matched, as written

@@ -76,6 +76,9 @@ type Options struct {
 	// HostMCP is a host's own MCP servers for a session, as --mcp-config
 	// values, asked for each time its CLI starts (session.Deps.HostMCP).
 	HostMCP func(sessionID string) []string
+	// HostTool is the host's decision on its own MCP servers' tools
+	// (session.Deps.HostTool).
+	HostTool func(sessionID, server, tool string) (decision, reason string)
 }
 
 // errEmbedded refuses what only the desktop app does.
@@ -222,7 +225,7 @@ func NewWith(paths Paths, emit Emitter, opts Options) (*Service, error) {
 		Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,
 		Binary: s.binaryOf, Sink: sink, ScratchDir: paths.Scratch, Artifacts: s.artifactStore,
 		Judge: s.judgeCommand, JudgeTools: s.judgeTools, Unknown: func() string { return s.Preferences().UnknownCommands }, DeciderKey: s.deciderKey,
-		Online: netcheck.Online, PromptCache: func() string { return s.Preferences().PromptCacheTTL() }, HostMCP: opts.HostMCP,
+		Online: netcheck.Online, PromptCache: func() string { return s.Preferences().PromptCacheTTL() }, HostMCP: opts.HostMCP, HostTool: opts.HostTool,
 	})
 	if err != nil {
 		db.Close()

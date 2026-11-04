@@ -74,6 +74,63 @@ type Options struct {
 	// approved as any MCP server's are: by their annotations, the prompt
 	// level and the safe list. nil: none.
 	MCPServers func(session string) map[string]MCPServer
+	// HostToolPolicy, with MCPServers: the host decides approvals for its
+	// own servers' tools (see HostToolPolicy). nil: UNCLI decides, as for
+	// any MCP server.
+	HostToolPolicy HostToolPolicy
+}
+
+// HostToolPolicy decides approvals for the tools of the host's own MCP
+// servers (those MCPServers gave the session), asked at each call, so a
+// mode switch on the host's side (BRUV's Chat / Suggest / Edit) takes
+// effect at once. Its decision: PolicyAllow runs the tool without asking;
+// PolicyDeny refuses it, and reason is told to the model; PolicyAsk asks
+// the user in the chat even where UNCLI wouldn't; "" leaves it to UNCLI's
+// rules (annotations, the prompt level, the safe list). Tools of any other
+// server, and the CLI's own tools, are never asked about: a host can't
+// loosen those. The trace says the host decided, with its reason.
+type HostToolPolicy func(session, server, tool string) (decision, reason string)
+
+// HostToolPolicy's decisions.
+const (
+	PolicyAllow = "allow"
+	PolicyDeny  = "deny"
+	PolicyAsk   = "ask"
+)
+
+// hostTools keeps which of the host's servers each session was started
+// with, so only those servers' tools go to the host's policy.
+type hostTools struct {
+	o       Options
+	mu      sync.Mutex
+	servers map[string]map[string]bool
+}
+
+func (h *hostTools) mcp(session string) []string {
+	servers := h.o.MCPServers(session)
+	names := map[string]bool{}
+	for name := range servers {
+		names[name] = true
+	}
+	h.mu.Lock()
+	h.servers[session] = names
+	h.mu.Unlock()
+	return mcpConfig(servers)
+}
+
+func (h *hostTools) decide(session, server, tool string) (string, string) {
+	h.mu.Lock()
+	own := h.servers[session][server]
+	h.mu.Unlock()
+	if !own {
+		return "", ""
+	}
+	d, reason := h.o.HostToolPolicy(session, server, tool)
+	switch d {
+	case PolicyAllow, PolicyDeny, PolicyAsk:
+		return d, reason
+	}
+	return "", ""
 }
 
 // MCPServer is an MCP server of the host's, reached over HTTP.
@@ -84,14 +141,20 @@ type MCPServer struct {
 
 // hostMCP turns the host's servers for a session into the CLI's
 // --mcp-config.
-func (o Options) hostMCP(session string) []string {
-	servers := o.MCPServers(session)
+func (o Options) hostMCP(session string) []string { return mcpConfig(o.MCPServers(session)) }
+
+func mcpConfig(servers map[string]MCPServer) []string {
 	if len(servers) == 0 {
 		return nil
 	}
 	cfg := map[string]any{}
 	for name, s := range servers {
-		cfg[name] = map[string]any{"type": "http", "url": s.URL, "headers": s.Headers}
+		server := map[string]any{"type": "http", "url": s.URL}
+		// No headers, no key: the CLI drops a server whose headers are null.
+		if len(s.Headers) > 0 {
+			server["headers"] = s.Headers
+		}
+		cfg[name] = server
 	}
 	b, err := json.Marshal(map[string]any{"mcpServers": cfg})
 	if err != nil {
@@ -206,11 +269,16 @@ func Start(o Options) (*Core, error) {
 	}
 	hub := remote.NewHub()
 	paths := app.Paths{Config: dir, Cache: filepath.Join(dir, "cache"), Scratch: filepath.Join(dir, "scratch")}
+	host := &hostTools{o: o, servers: map[string]map[string]bool{}}
 	var hostMCP func(string) []string
 	if o.MCPServers != nil {
-		hostMCP = o.hostMCP
+		hostMCP = host.mcp
 	}
-	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd, CLIConfigDir: cliConfig, HostMCP: hostMCP})
+	var hostTool func(string, string, string) (string, string)
+	if o.MCPServers != nil && o.HostToolPolicy != nil {
+		hostTool = host.decide
+	}
+	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd, CLIConfigDir: cliConfig, HostMCP: hostMCP, HostTool: hostTool})
 	if err != nil {
 		return nil, err
 	}

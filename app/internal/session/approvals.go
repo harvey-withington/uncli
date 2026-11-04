@@ -114,6 +114,57 @@ func unattendedMessage(a core.ToolAction) string {
 	return unattendedDeclined
 }
 
+// hostRefused is told to the model when the host refuses a tool of its own
+// without saying why.
+const hostRefused = "Refused by the app this chat runs in."
+
+// verdictLocked is the decision on a tool use: the host's, for a tool of
+// one of its own MCP servers when it gives one (Deps.HostTool), else
+// UNCLI's own rules.
+func (s *Session) verdictLocked(p policy, a core.ToolAction) verdict {
+	if v, ok := s.hostVerdict(a); ok {
+		return v
+	}
+	return p.judge(a)
+}
+
+// hostVerdict asks the host about an MCP tool; ok is false when the host
+// leaves it to UNCLI. The trace says the host decided ("host"), with its
+// reason.
+func (s *Session) hostVerdict(a core.ToolAction) (verdict, bool) {
+	if s.m.d.HostTool == nil || a.Kind != core.ActMCP {
+		return verdict{}, false
+	}
+	server, tool, ok := mcpTool(a.Tool)
+	if !ok {
+		return verdict{}, false
+	}
+	decision, reason := s.m.d.HostTool(s.rec.ID, server, tool)
+	why := []store.TraceReason{{By: "host", Note: reason}}
+	switch decision {
+	case actionRun:
+		return verdict{action: actionRun, by: "host", why: why}, true
+	case actionBlock:
+		if reason == "" {
+			reason = hostRefused
+		}
+		return verdict{action: actionBlock, reason: reason, why: why}, true
+	case actionPrompt:
+		return verdict{action: actionPrompt, why: why}, true
+	}
+	return verdict{}, false
+}
+
+// mcpTool splits a CLI's MCP tool name, mcp__<server>__<tool>.
+func mcpTool(name string) (server, tool string, ok bool) {
+	rest, found := strings.CutPrefix(name, "mcp__")
+	if !found {
+		return "", "", false
+	}
+	server, tool, ok = strings.Cut(rest, "__")
+	return server, tool, ok && server != "" && tool != ""
+}
+
 // askLocked handles a permission request from the CLI. Caller holds s.mu.
 // It reports whether the request now waits for the user.
 func (s *Session) askLocked(a core.ApprovalAsked) bool {
@@ -131,7 +182,7 @@ func (s *Session) askLocked(a core.ApprovalAsked) bool {
 	if action.Kind == "" { // an adapter that doesn't say: nothing known about it
 		action = core.ToolAction{Kind: core.ActOther, Tool: a.Tool, Input: a.Input}
 	}
-	v := s.policyLocked().judge(action)
+	v := s.verdictLocked(s.policyLocked(), action)
 	if s.settleLocked(a.RequestID, a.ToolUseID, action, a.Input, v) {
 		return false
 	}
@@ -223,7 +274,7 @@ func (s *Session) rejudgeLocked() {
 			still = append(still, a)
 			continue
 		}
-		v := p.judge(a.Action)
+		v := s.verdictLocked(p, a.Action)
 		if !s.settleLocked(a.RequestID, a.ToolUseID, a.Action, a.Input, v) {
 			a.update(v)
 			if a.Judging {

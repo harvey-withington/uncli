@@ -232,6 +232,36 @@ func TestNotAsAServiceAccount(t *testing.T) {
 	start(t, Options{AllowServiceAccount: true})
 }
 
+// The host's policy is asked only about the servers it gave the session,
+// and only its three decisions count.
+func TestHostToolPolicyOnlyForTheHostsServers(t *testing.T) {
+	o := Options{
+		MCPServers: func(string) map[string]MCPServer {
+			return map[string]MCPServer{"board": {URL: "http://127.0.0.1:1/mcp"}}
+		},
+		HostToolPolicy: func(session, server, tool string) (string, string) {
+			if tool == "odd" {
+				return "maybe", ""
+			}
+			return PolicyDeny, "no"
+		},
+	}
+	h := &hostTools{o: o, servers: map[string]map[string]bool{}}
+	h.mcp("s1")
+	if d, r := h.decide("s1", "board", "update_card"); d != PolicyDeny || r != "no" {
+		t.Errorf("the host's server: %q %q", d, r)
+	}
+	if d, _ := h.decide("s1", "github", "create_issue"); d != "" {
+		t.Errorf("the user's own server went to the host: %q", d)
+	}
+	if d, _ := h.decide("s2", "board", "update_card"); d != "" {
+		t.Errorf("a session the host gave no servers: %q", d)
+	}
+	if d, _ := h.decide("s1", "board", "odd"); d != "" {
+		t.Errorf("an unknown decision counted: %q", d)
+	}
+}
+
 // A session made with the host's meta carries it from the start, so the
 // host's MCPServers knows what the session is for on its very first launch.
 func TestSessionMetaFromTheStart(t *testing.T) {
@@ -291,6 +321,12 @@ func TestHostMCPConfig(t *testing.T) {
 	}
 	if o.hostMCP("s2") != nil {
 		t.Error("a session the host gives no servers got some")
+	}
+	// A server without headers has no headers key: the CLI drops a server
+	// whose headers are null.
+	bare := mcpConfig(map[string]MCPServer{"board": {URL: "http://127.0.0.1:1/mcp"}})
+	if len(bare) != 1 || strings.Contains(bare[0], "headers") {
+		t.Errorf("config = %q", bare)
 	}
 }
 

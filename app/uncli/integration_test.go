@@ -18,12 +18,28 @@ import (
 	"github.com/harvey-withington/uncli/app/internal/session"
 )
 
+// isolated is a chat that shares nothing of the user's own: no MCP servers,
+// connectors or skills of theirs, so a test can only reach its stand-in
+// board, never the user's real tools.
+var isolated = session.NewSession{Profile: "chat", Model: "haiku", Shares: []string{}}
+
+// answerFor allows only the stand-in board's tools; anything else is
+// denied, so nothing of the user's can run.
+func answerFor(tool string) string {
+	if strings.HasPrefix(tool, "mcp__board__") {
+		return session.Allow
+	}
+	return session.Deny
+}
+
 // board is a host's own MCP server over HTTP, as BRUV's board tools are:
-// one read-only tool, card_title, that needs the host's token.
+// a read-only tool, card_title, that needs the host's token, and a write,
+// set_card_title.
 type board struct {
-	mu     sync.Mutex
-	tokens []string // the Authorization of each tool call
-	asked  []string // the card ids asked for
+	mu      sync.Mutex
+	tokens  []string // the Authorization of each tool call
+	asked   []string // the card ids asked for
+	renamed []string // the titles set
 }
 
 func (b *board) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -58,14 +74,27 @@ func (b *board) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"name": "card_title", "description": "The title of a card on the board, by its id.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}}, "required": []string{"id"}},
 			"annotations": map[string]any{"readOnlyHint": true, "destructiveHint": false, "openWorldHint": false},
+		}, map[string]any{
+			"name": "set_card_title", "description": "Renames a card on the board.",
+			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "string"}, "title": map[string]any{"type": "string"}}, "required": []string{"id", "title"}},
+			"annotations": map[string]any{"readOnlyHint": false, "destructiveHint": false, "openWorldHint": false},
 		}}}
 	case "tools/call":
 		var p struct {
+			Name      string `json:"name"`
 			Arguments struct {
-				ID string `json:"id"`
+				ID    string `json:"id"`
+				Title string `json:"title"`
 			} `json:"arguments"`
 		}
 		_ = json.Unmarshal(req.Params, &p)
+		if p.Name == "set_card_title" {
+			b.mu.Lock()
+			b.renamed = append(b.renamed, p.Arguments.Title)
+			b.mu.Unlock()
+			result = map[string]any{"content": []any{map[string]any{"type": "text", "text": "Renamed."}}}
+			break
+		}
 		b.mu.Lock()
 		b.tokens = append(b.tokens, r.Header.Get("Authorization"))
 		b.asked = append(b.asked, p.Arguments.ID)
@@ -118,7 +147,7 @@ func TestHostMCPServersReachTheCLI(t *testing.T) {
 	}
 	defer c.Close()
 	sessions := c.svc.Sessions
-	v, err := sessions.Create("chat", "", "haiku")
+	v, err := sessions.CreateWith(isolated)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +171,7 @@ func TestHostMCPServersReachTheCLI(t *testing.T) {
 		}
 		for _, a := range cur.Approvals {
 			t.Logf("asked about %s; allowing", a.Tool)
-			_ = sessions.Answer(v.ID, a.RequestID, session.Allow, "")
+			_ = sessions.Answer(v.ID, a.RequestID, answerFor(a.Tool), "")
 		}
 		if !cur.Busy && len(cur.Approvals) == 0 && time.Since(deadline.Add(-3*time.Minute)) > 2*time.Second {
 			break
@@ -171,5 +200,108 @@ func TestHostMCPServersReachTheCLI(t *testing.T) {
 	defer mu.Unlock()
 	if len(askedFor) == 0 || askedFor[0] != v.ID {
 		t.Errorf("the host was asked for servers for %v, not session %s", askedFor, v.ID)
+	}
+}
+
+// One turn on a host's UNCLI: the answer, and the tools it asked the user
+// about (allowed, so the turn can finish).
+func turn(t *testing.T, c *Core, id, text string) (string, []string) {
+	t.Helper()
+	sessions := c.svc.Sessions
+	if err := sessions.Send(context.Background(), id, text); err != nil {
+		t.Fatal(err)
+	}
+	var asked []string
+	start := time.Now()
+	for {
+		if time.Since(start) > 3*time.Minute {
+			t.Fatal("the turn never finished")
+		}
+		var cur session.View
+		for _, s := range sessions.List() {
+			if s.ID == id {
+				cur = s
+			}
+		}
+		for _, a := range cur.Approvals {
+			asked = append(asked, a.Tool)
+			_ = sessions.Answer(id, a.RequestID, answerFor(a.Tool), "")
+		}
+		if !cur.Busy && len(cur.Approvals) == 0 && time.Since(start) > 2*time.Second {
+			break
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	pages, err := sessions.Pages(id)
+	if err != nil || len(pages) == 0 {
+		t.Fatalf("pages: %v", err)
+	}
+	return pages[len(pages)-1].AnswerMD, asked
+}
+
+// The host decides approvals for its own tools (HostToolPolicy): at the
+// strictest prompt level, where a write always asks, a host that allows it
+// lets it run unasked, and a host that refuses it keeps it from running
+// at all. Against the real CLI, two short turns.
+func TestHostToolPolicyDecidesForTheCLI(t *testing.T) {
+	def, err := app.DefaultPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bins, _ := filepath.Glob(filepath.Join(def.Cache, "cli", "claude", "*", "claude.exe"))
+	if len(bins) == 0 {
+		t.Skip("no downloaded Claude CLI in the app's cache")
+	}
+	t.Setenv("UNCLI_CLAUDE_BIN", bins[len(bins)-1])
+	if prev, ok := os.LookupEnv("CLAUDE_CONFIG_DIR"); ok {
+		os.Unsetenv("CLAUDE_CONFIG_DIR")
+		t.Cleanup(func() { os.Setenv("CLAUDE_CONFIG_DIR", prev) })
+	}
+	for _, mode := range []string{PolicyAllow, PolicyDeny} {
+		t.Run(mode, func(t *testing.T) {
+			b := &board{}
+			srv := httptest.NewServer(b)
+			defer srv.Close()
+			c, err := Start(Options{DataDir: t.TempDir(), UserCLIConfig: true,
+				MCPServers: func(string) map[string]MCPServer { return map[string]MCPServer{"board": {URL: srv.URL}} },
+				HostToolPolicy: func(session, server, tool string) (string, string) {
+					if tool == "set_card_title" {
+						return mode, "Chat mode: the board can't be changed."
+					}
+					return "", ""
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.Close()
+			v, err := c.svc.Sessions.CreateWith(isolated)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.svc.Sessions.SetMode(v.ID, session.ModeAlways); err != nil {
+				t.Fatal(err)
+			}
+			answer, asked := turn(t, c, v.ID, "Use the board's set_card_title tool to rename card 42 to \"Melbourne in December\". Try it once only, then reply DONE, or say why it failed.")
+			for _, tool := range asked {
+				if strings.Contains(tool, "set_card_title") {
+					t.Errorf("the user was asked about %s; the host decided it", tool)
+				}
+			}
+			b.mu.Lock()
+			renamed := append([]string(nil), b.renamed...)
+			b.mu.Unlock()
+			switch mode {
+			case PolicyAllow:
+				if len(renamed) == 0 || renamed[0] != "Melbourne in December" {
+					t.Errorf("allowed, but the board got %v; the answer: %q", renamed, answer)
+				}
+			case PolicyDeny:
+				if len(renamed) != 0 {
+					t.Errorf("refused, but the board was renamed: %v", renamed)
+				}
+				t.Logf("refused; the answer: %q", answer)
+			}
+		})
 	}
 }

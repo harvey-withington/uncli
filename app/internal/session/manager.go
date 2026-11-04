@@ -75,6 +75,13 @@ type Deps struct {
 	// can give each session the servers for what it's about, with a
 	// current token. nil: none.
 	HostMCP func(sessionID string) []string
+	// HostTool is an embedding host's own decision on a tool of one of its
+	// MCP servers (decision 0027), asked at each call so a mode switch on
+	// the host's side takes effect at once: actionRun (run it), actionBlock
+	// (refuse it, reason told to the model), actionPrompt (ask the user even
+	// where UNCLI wouldn't), or "" to leave it to UNCLI. The host checks the
+	// server is its own; UNCLI asks only about MCP tools. nil: never asked.
+	HostTool func(sessionID, server, tool string) (decision, reason string)
 }
 
 // RuntimeWSL is the runtime of sessions in a container (a WSL distro).
