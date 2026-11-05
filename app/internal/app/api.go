@@ -99,11 +99,14 @@ type CreateOptions struct {
 	// card, say), kept with it so the host knows it from the session's
 	// first start (decision 0027).
 	Meta string `json:"meta,omitempty"`
+	// Title names the session from the start; the first question doesn't
+	// rename it. Blank: named by its first question.
+	Title string `json:"title,omitempty"`
 }
 
 // CreateSessionWith is CreateSession with options: a host's meta.
 func (a *API) CreateSessionWith(profileID, workdir, model, container, provider string, shares []string, opts CreateOptions) (CreatedSession, error) {
-	v, last, err := a.svc.CreateSessionWith(session.NewSession{Profile: profileID, Workdir: workdir, Model: model, Container: container, Provider: provider, Shares: shares, Meta: opts.Meta})
+	v, last, err := a.svc.CreateSessionWith(session.NewSession{Profile: profileID, Workdir: workdir, Model: model, Container: container, Provider: provider, Shares: shares, Meta: opts.Meta, Title: opts.Title})
 	return CreatedSession{Session: v, LastNew: last}, err
 }
 

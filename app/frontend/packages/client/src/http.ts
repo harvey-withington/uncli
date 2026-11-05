@@ -191,7 +191,7 @@ export function httpBackend(opts: HttpOptions): Backend {
     startDeviceSignIn: only('startDeviceSignIn'),
     cancelDeviceSignIn: async () => {},
     pickFolder: only('pickFolder'),
-    createSession: (p, d, m, c, prov, sh, o) => (o?.meta ? call('CreateSessionWith', p, d, m, c, prov, sh, o) : call('CreateSession', p, d, m, c, prov, sh)),
+    createSession: (p, d, m, c, prov, sh, o) => (o?.meta || o?.title ? call('CreateSessionWith', p, d, m, c, prov, sh, o) : call('CreateSession', p, d, m, c, prov, sh)),
     setShares: (s, sh) => call('SetShares', s, sh),
     pages: s => call('Pages', s),
     // Only a turn with options needs SendWith; Send works with any server.

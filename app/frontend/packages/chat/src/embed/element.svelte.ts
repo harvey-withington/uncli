@@ -143,9 +143,11 @@ export class UncliChat extends HTMLElement {
   // core.Providers); left out, the first. A provider that can't run now
   // (unknown, not installed, signed out) rejects the promise with an Error
   // whose message says why, in words to show, and nothing is made.
-  async newSession(profile = 'chat', workdir = '', model = '', opts: { meta?: string; provider?: string } = {}): Promise<string> {
+  // opts.title names it from the start; its first question doesn't rename
+  // it, and the user still can. Blank: named by its first question.
+  async newSession(profile = 'chat', workdir = '', model = '', opts: { meta?: string; provider?: string; title?: string } = {}): Promise<string> {
     if (!this.#backend) throw new Error('<uncli-chat> has no src or backend')
-    const v = await chatClient(this.#backend).createSession(profile, workdir, model, '', opts.provider ?? '', null, opts.meta ?? '')
+    const v = await chatClient(this.#backend).createSession(profile, workdir, model, '', opts.provider ?? '', null, opts.meta ?? '', opts.title ?? '')
     this.session = v.id
     return v.id
   }

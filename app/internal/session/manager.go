@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -251,6 +252,9 @@ type NewSession struct {
 	// card, say), kept with it while UNCLI runs and given back by Meta, so
 	// the host knows it from the session's first start (decision 0027).
 	Meta string
+	// Title names it from the start (an embedding host's own name for it);
+	// blank: the first question names it, as ever. The user can rename it.
+	Title string
 }
 
 // CreateWith makes a new session on a provider. A profile's model is the
@@ -285,7 +289,7 @@ func (m *Manager) CreateWith(n NewSession) (View, error) {
 		_ = os.MkdirAll(filepath.Join(workdir, artifacts.Folder), 0o755)
 	}
 	rec := store.Session{ID: id, Adapter: ad.ID(), Runtime: m.d.Runtime.ID(), ProfileID: p.ID,
-		Workdir: workdir, Model: model, Modifiers: append([]string{}, p.ModifiersOn...)}
+		Workdir: workdir, Model: model, Modifiers: append([]string{}, p.ModifiersOn...), Title: strings.TrimSpace(n.Title)}
 	if container != "" {
 		if m.d.Runtimes == nil {
 			return View{}, errors.New("containers aren't available here")

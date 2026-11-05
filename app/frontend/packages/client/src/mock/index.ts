@@ -560,11 +560,11 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     },
     async providerChannels(id) { return id === 'antigravity' ? { stable: '1.3.1', latest: '1.3.1' } : this.cliChannels() },
     async pickFolder() { return 'C:\\Users\\you\\projects\\demo' },
-    async createSession(profileId, workdir, model, container, provider, shares) {
+    async createSession(profileId, workdir, model, container, provider, shares, opts) {
       const p = profiles.find(x => x.id === profileId)
       const other = !!provider && provider !== 'claude'
       if (other && container) throw new Error('containers can only run claude sessions for now')
-      const s = session(newId(), profileId, '', 'idle', {
+      const s = session(newId(), profileId, opts?.title?.trim() ?? '', 'idle', {
         adapter: provider || 'claude',
         model: model || (other ? '' : p?.model || 'sonnet'), workdir: workdir || `C:\\scratch\\${idn}`, sortOrder: sessions.length + 10,
         ...(container ? { runtime: 'wsl', runtimeRef: container } : {}),

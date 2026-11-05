@@ -119,7 +119,8 @@ export declare class UncliChat extends HTMLElement {
   // provider picks the CLI (an id from the host's core.Providers()); left out, the first. One that
   // can't run now (unknown, not installed, signed out) rejects with an Error whose message says why,
   // to show as it is ("can't start a session on Claude Code: Claude Code isn't signed in"); nothing is made.
-  newSession(profile?: string, workdir?: string, model?: string, opts?: { meta?: string; provider?: string }): Promise<string>
+  // title names it from the start; its first question doesn't rename it, and the user still can. Blank: named by its first question.
+  newSession(profile?: string, workdir?: string, model?: string, opts?: { meta?: string; provider?: string; title?: string }): Promise<string>
   // The provider (CLI id) and model the shown session runs on, once known; uncli-runs-on says when it changes.
   readonly runsOn: { provider: string; model: string } | null
   // Asks the user about a batch of the host's changes on one card; aborting signal withdraws it.

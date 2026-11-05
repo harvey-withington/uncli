@@ -614,6 +614,7 @@ export interface NewSessionChoices {
 // card, say), which the host's own UNCLI gives back to it (decision 0027).
 export interface CreateOptions {
   meta?: string
+  title?: string // its name from the start; the first question doesn't rename it
 }
 
 export interface CreatedSession {

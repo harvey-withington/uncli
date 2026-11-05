@@ -185,6 +185,19 @@ describe('the CLI a host’s session runs on', () => {
     }
   })
 
+  it('names a session from the start, or leaves it to its first question', async () => {
+    const backend = mockBackend()
+    const create = vi.spyOn(backend, 'createSession')
+    const el = chat(backend)
+    await inside(el).findByText(QUESTION)
+    await el.newSession('chat', '', '', { meta: 'card:7', title: '  Trip to Lisbon ' })
+    expect(create).toHaveBeenLastCalledWith('chat', '', '', '', '', null, { meta: 'card:7', title: 'Trip to Lisbon' })
+    expect(await inside(el).findByRole('heading', { name: 'Trip to Lisbon' })).toBeInTheDocument()
+    // Blank: as before, with no title passed at all.
+    await el.newSession('chat', '', '', { title: '   ' })
+    expect(create).toHaveBeenLastCalledWith('chat', '', '', '', '', null)
+  })
+
   it('rejects with the server’s reason when the provider can’t run, and shows nothing new', async () => {
     const backend = mockBackend()
     vi.spyOn(backend, 'createSession').mockRejectedValue(new Error("can't start a session on Claude Code: Claude Code isn't signed in"))

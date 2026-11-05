@@ -459,3 +459,36 @@ func TestNewSessionOnAProviderThatIsntReady(t *testing.T) {
 		t.Errorf("no provider named: %q, %q", id, msg)
 	}
 }
+
+// A page names a session as it makes it; with no title, it's unnamed
+// until its first question.
+func TestNewSessionWithATitle(t *testing.T) {
+	c := start(t, Options{})
+	srv := httptest.NewServer(c.Handler())
+	defer srv.Close()
+	create := func(opts map[string]any) string {
+		body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "CreateSessionWith",
+			"params": []any{"chat", "", "", "", "", nil, opts}})
+		resp, err := http.Post(srv.URL+"/rpc", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var r struct {
+			Result struct {
+				Session struct{ Title string } `json:"session"`
+			}
+			Error *struct{ Message string }
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&r); err != nil || r.Error != nil {
+			t.Fatalf("CreateSessionWith: %v %+v", err, r.Error)
+		}
+		return r.Result.Session.Title
+	}
+	if got := create(map[string]any{"meta": "card:42", "title": "Trip to Lisbon"}); got != "Trip to Lisbon" {
+		t.Errorf("titled: %q", got)
+	}
+	if got := create(map[string]any{"meta": "card:43"}); got != "" {
+		t.Errorf("untitled: %q", got)
+	}
+}
