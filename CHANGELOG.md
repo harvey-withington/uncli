@@ -4,6 +4,37 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.7.0-alpha
+
+UNCLI's chat in other apps, and fixes from daily use.
+
+- **Several screenshots attach at once.** Pasting more than one file could
+  fail at Send with "it isn't there any more", when a screenshot tool keeps
+  only its latest file. Each file is now copied as it's attached, so what
+  you attached is what's sent.
+- **Turn off an MCP server.** A server you won't sign in to can be turned
+  off for the session from the plug button's list, so it stops asking and
+  leaves the warning dot. Turn on brings it back.
+- **A dot when something needs you.** With the header folded (Options
+  closed on the phone, the header collapsed on the desktop), a warning dot
+  says something inside wants you: an approval waiting, Unattended on, or
+  an MCP server that needs signing in. With Options open, the MCP servers'
+  button is there too.
+- **Chats ask with question cards.** A chat could only ask its questions
+  as a list in its answer; it now asks with the same cards as code and
+  co-work sessions.
+- **The phone names its PC.** Give the paired PC a nickname (Settings →
+  Pairing) to show instead of its address, and the installed phone app is
+  named for the PC it came from, so two PCs can be told apart.
+- **For app developers: embedding.** Other apps can show UNCLI's chat
+  with `<uncli-chat>` and run their own private UNCLI, in their own Go
+  program or as `uncli-core`, now part of each release. See
+  `docs/EMBEDDING.md`.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone.
+
 ## 0.6.2-alpha
 
 The new face, tidied.

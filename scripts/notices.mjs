@@ -64,6 +64,8 @@ function npmPackages() {
     if (!existsSync(pkgFile)) continue
     const pkg = JSON.parse(readFileSync(pkgFile, 'utf8'))
     if (dir.replace(/[\\/]$/, '') === frontendDir.replace(/[\\/]$/, '')) continue
+    // UNCLI's own packages (the npm workspace, decision 0026) aren't third party.
+    if (pkg.name.startsWith('@uncli/')) continue
     const key = `${pkg.name}@${pkg.version}`
     if (seen.has(key)) continue
     const licence = typeof pkg.license === 'string' ? pkg.license : pkg.license?.type ?? (pkg.licenses ?? []).map(l => l.type).join(' OR ')
