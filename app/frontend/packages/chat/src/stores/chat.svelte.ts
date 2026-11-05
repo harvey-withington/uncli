@@ -8,12 +8,12 @@
 import {
   ChatClient, displayAnswer as display,
   type AttachmentRef, type Backend, type CLIStatus, type ModelInfo, type Notice, type Page, type SessionView,
-  type Bootstrap, type Live, type ProviderNames,
+  type Bootstrap, type Live, type ProviderNames, type Scope,
 } from '../lib/api'
 import { ChatState, keyed } from '../lib/chat.svelte'
 import { autoSummaryFor, outlineOf, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import type { PanelLayout, PanelTab } from '../lib/panels'
-import { appMemory, type LayoutMemory } from '../lib/layoutmemory'
+import { appMemory, type ChatLayout, type LayoutMemory } from '../lib/layoutmemory'
 import { loadWatched, pick, saveWatched, type Watched } from '../lib/watched'
 import { toBlocks } from '../lib/render/markdown'
 import { t } from '../lib/i18n.svelte'
@@ -59,12 +59,15 @@ export class ChatStore {
   fileSwitcher = $state(false)
   questionCompact = $state(false) // the question header collapsed to one line
   headerCompact = $state(false) // the session header collapsed to two lines
+  optionsOpen = $state(false) // the compact header's Options showing
+  scope = $state<Scope>('project') // where "This is safe" last applied, for the next card
   reveal = $state<{ pageId: string; terms: string[] } | null>(null) // a page to scroll to a search match on
   preferHeadings = $state<Record<string, boolean>>({}) // page id → show its headings, not its summary
   private autoSummarised = new Set<string>() // tried once, so a failure isn't retried in a loop
   private offNotices: (() => void) | null = null
   private ownsClient: boolean
   private memory: LayoutMemory
+  private offMemory: (() => void) | undefined
 
   // What only an app can do; an embedded chat leaves them out, and the
   // buttons that need them don't show.
@@ -113,11 +116,18 @@ export class ChatStore {
     this.chat = new ChatState(this.client)
     this.shell = opts.shell ?? new Shell()
     this.memory = opts.memory ?? appMemory
-    const l = this.memory.load()
-    this.outline = l.outline
-    this.panel = l.panel
+    this.apply(this.memory.load())
+    // Another chat on the page with the same memory changed it.
+    this.offMemory = this.memory.follow?.(l => this.apply(l))
+  }
+
+  private apply(l: ChatLayout) {
+    this.outline = { ...l.outline }
+    this.panel = { ...l.panel }
     this.questionCompact = l.questionCompact
     this.headerCompact = l.headerCompact
+    this.optionsOpen = l.optionsOpen
+    this.scope = l.scope
   }
 
   // ---- the client's state, as runes
@@ -184,6 +194,7 @@ export class ChatStore {
 
   destroy() {
     this.offNotices?.()
+    this.offMemory?.()
     if (this.ownsClient) this.client.destroy()
     this.chat.destroy()
   }
@@ -342,6 +353,16 @@ export class ChatStore {
     this.remember()
   }
 
+  setOptionsOpen(open: boolean) {
+    this.optionsOpen = open
+    this.remember()
+  }
+
+  setScope(scope: Scope) {
+    this.scope = scope
+    this.remember()
+  }
+
   toggleQuestionCompact() {
     this.questionCompact = !this.questionCompact
     this.remember()
@@ -482,7 +503,14 @@ export class ChatStore {
 
   // remember saves the layout where this chat remembers it.
   private remember() {
-    this.memory.save({ outline: { ...this.outline }, panel: { ...this.panel }, questionCompact: this.questionCompact, headerCompact: this.headerCompact })
+    this.memory.save({
+      outline: { ...this.outline },
+      panel: { ...this.panel },
+      questionCompact: this.questionCompact,
+      headerCompact: this.headerCompact,
+      optionsOpen: this.optionsOpen,
+      scope: this.scope,
+    })
   }
 
   protected async toasting(p: Promise<unknown>) {

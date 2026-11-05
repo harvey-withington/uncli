@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SafeClass, Scope } from '../lib/api'
-  import { classLabel, loadScope, saveScope } from '../lib/approvals'
+  import { classLabel } from '../lib/approvals'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
@@ -20,7 +20,7 @@
   let { sessionId, classes }: Props = $props()
   const chat = useChat()
   const names = $derived(chat.namesFor(chat.sessions.find(s => s.id === sessionId)?.adapter))
-  let scope = $state<Scope>(loadScope())
+  let scope = $state<Scope>(chat.scope)
   let busy = $state(false)
   let done = $state(false)
 
@@ -28,7 +28,7 @@
     if (busy) return
     busy = true
     try {
-      saveScope(scope)
+      chat.setScope(scope)
       await chat.backend.teach(sessionId, classes, 'unsafe', scope)
       done = true
     } catch (e) {

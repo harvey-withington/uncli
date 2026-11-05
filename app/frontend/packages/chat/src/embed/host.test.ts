@@ -291,6 +291,46 @@ describe('a host’s controls in the message box', () => {
   })
 })
 
+describe('what the chat remembers', () => {
+  afterEach(() => localStorage.clear())
+  const optionsOf = (el: Element) => inside(el).getByRole('button', { name: /^Options/ })
+
+  it('keeps the Options open through a switch of layout and a remount', async () => {
+    const el = chat(mockBackend(), { compact: '', 'storage-key': 'host' })
+    await inside(el).findByText(QUESTION)
+    await fireEvent.click(optionsOf(el))
+    expect(optionsOf(el)).toHaveAttribute('aria-expanded', 'true')
+    // Wider, then narrow again: the header is drawn afresh each time.
+    el.setAttribute('compact', 'false')
+    await waitFor(() => expect(inside(el).queryByRole('button', { name: /^Options/ })).toBeNull())
+    el.setAttribute('compact', '')
+    await waitFor(() => expect(optionsOf(el)).toHaveAttribute('aria-expanded', 'true'))
+    // The host mounts the chat again (another card's, say).
+    el.remove()
+    const again = chat(mockBackend(), { compact: '', 'storage-key': 'host' })
+    await inside(again).findByText(QUESTION)
+    expect(optionsOf(again)).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('shares one memory between the chats on the page with the same key, and only those', async () => {
+    const one = chat(mockBackend(), { compact: '', 'storage-key': 'host' })
+    const two = chat(mockBackend(), { compact: '', 'storage-key': 'host' })
+    const other = chat(mockBackend(), { compact: '', 'storage-key': 'elsewhere' })
+    for (const el of [one, two, other]) await inside(el).findByText(QUESTION)
+    await fireEvent.click(optionsOf(one))
+    await waitFor(() => expect(optionsOf(two)).toHaveAttribute('aria-expanded', 'true'))
+    expect(optionsOf(other)).toHaveAttribute('aria-expanded', 'false')
+    expect(JSON.parse(localStorage.getItem('uncli-layout:host')!)).toMatchObject({ optionsOpen: true, scope: 'project' })
+  })
+
+  it('remembers nothing in the page’s storage without a key', async () => {
+    const el = chat(mockBackend(), { compact: '' })
+    await inside(el).findByText(QUESTION)
+    await fireEvent.click(optionsOf(el))
+    expect(Object.keys(localStorage).filter(k => k.startsWith('uncli'))).toEqual([])
+  })
+})
+
 describe('the folded header', () => {
   it('marks Options when something inside wants the user, and says so', async () => {
     const el = chat(mockBackend({ unattended: true }), { compact: '' })

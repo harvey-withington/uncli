@@ -33,6 +33,7 @@ type MCPServerView struct {
 	Signing bool   `json:"signing,omitempty"` // a sign-in is waiting for the browser
 	Site    bool   `json:"site,omitempty"`    // a sign-in on the provider's site is awaited (reconnected meanwhile)
 	Error   string `json:"error,omitempty"`   // the last sign-in, reconnect or sign-out failed
+	Off     bool   `json:"off,omitempty"`     // the user turned it off (saved, mcpoff.go); the CLI follows
 }
 
 // MCPSignIn is a sign-in under way: the link to open, and whether it's a
@@ -162,14 +163,24 @@ func (m *Manager) MCPReconnect(ctx context.Context, id, server string) error {
 	return s.mcpSend(core.Control{Kind: core.CtlMCPReconnect, Server: server}, mcpSettle)
 }
 
-// MCPToggle turns one of a session's MCP servers off, or on again: a
-// server the user won't sign in to stops asking (its status becomes
-// disabled, which needs nothing from them).
+// MCPToggle turns an MCP server off, or on again: a server the user won't
+// sign in to stops asking (its status becomes disabled, which needs nothing
+// from them). The choice is saved for this UNCLI and applies to every
+// session of the provider, now and whenever a CLI starts (mcpoff.go).
 func (m *Manager) MCPToggle(ctx context.Context, id, server string, enabled bool) error {
 	s, err := m.mcpSession(id)
 	if err != nil {
 		return err
 	}
+	// Saved first: the session's CLI may only be starting, and it turns the
+	// server off as it reports it.
+	if err := m.setMCPOff(s.ad().ID(), server, !enabled); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.changed()
+	s.mu.Unlock()
+	go m.toggleElsewhere(s, server, enabled)
 	if err := s.warm(ctx); err != nil {
 		return err
 	}
@@ -338,7 +349,10 @@ func (s *Session) mcpServersLocked(list []core.MCPServer) {
 	for _, sv := range list {
 		switch sv.Status {
 		case core.MCPConnected:
-			delete(s.mcpWatch, sv.Name)
+			// Still watched while the user's Turn off catches up (mcpoff.go).
+			if !s.shownOffLocked(sv.Name) {
+				delete(s.mcpWatch, sv.Name)
+			}
 			s.mcpErrors[sv.Name] = ""
 			if s.mcpSigning[sv.Name] || s.mcpSite[sv.Name] {
 				s.stopSigningLocked(sv.Name)
@@ -351,6 +365,7 @@ func (s *Session) mcpServersLocked(list []core.MCPServer) {
 	if !pending {
 		delete(s.mcpWatch, "")
 	}
+	s.keepOffLocked()
 	s.changed()
 }
 
@@ -379,7 +394,7 @@ func (s *Session) mcpAuthLocked(a core.MCPAuth) {
 func (s *Session) mcpViewLocked() []MCPServerView {
 	out := []MCPServerView{}
 	for _, sv := range s.mcp {
-		out = append(out, MCPServerView{MCPServer: sv, Signing: s.mcpSigning[sv.Name], Site: s.mcpSite[sv.Name], Error: s.mcpErrors[sv.Name]})
+		out = append(out, MCPServerView{MCPServer: sv, Signing: s.mcpSigning[sv.Name], Site: s.mcpSite[sv.Name], Error: s.mcpErrors[sv.Name], Off: s.shownOffLocked(sv.Name)})
 	}
 	return out
 }

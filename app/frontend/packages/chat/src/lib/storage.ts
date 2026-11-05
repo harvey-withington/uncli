@@ -1,9 +1,9 @@
 // Where the chat keeps what it remembers for the viewer between runs:
-// drafts, scroll spots, the File tab's choices, the panel layout, the
-// approval scope. In UNCLI's own app that's localStorage. An embedded
+// drafts, scroll spots, the File tab's choices, and in the app the layout
+// and preferences. In UNCLI's own app that's localStorage. An embedded
 // chat (decision 0026) keeps it in memory for the page instead, so UNCLI
 // never writes to a host's storage unasked; a host that wants the layout
-// remembered gives a storage-key (lib/layoutmemory.ts).
+// and preferences remembered gives a storage-key (lib/layoutmemory.ts).
 
 type Place = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 

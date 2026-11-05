@@ -42,7 +42,10 @@
   // The status line goes when the header (desktop) or the question
   // (compact) is collapsed; an error still shows.
   const quiet = $derived(compact ? chat.questionCompact : chat.headerCompact)
-  let options = $state(false)
+  // The compact header's Options, kept by the chat so a remount (the
+  // layout switching with the width, a host mounting the chat again)
+  // leaves them as they were.
+  const options = $derived(chat.optionsOpen)
   // A dot on what opens a folded header when something in it wants the
   // user (lib/attention.ts).
   const attention = $derived(attentionCount(session) + chat.reviewsOf(session.id).length)
@@ -151,7 +154,7 @@
           <button class="btn ghost icon touch" onclick={() => open('safe')} aria-label={t('safe.open')} title={t('safe.open')}><Icon name="shield" /></button>
         {/if}
       {/if}
-      <button class="btn ghost icon touch dotted" onclick={() => (options = !options)} aria-expanded={options} aria-label={options ? t('mobile.options') : attentionLabel(t('mobile.options'))} title={options ? t('mobile.options') : attentionLabel(t('mobile.options'))}><Icon name="sliders-horizontal" />{#if !options && attention}<span class="dot" aria-hidden="true"></span>{/if}</button>
+      <button class="btn ghost icon touch dotted" onclick={() => chat.setOptionsOpen(!options)} aria-expanded={options} aria-label={options ? t('mobile.options') : attentionLabel(t('mobile.options'))} title={options ? t('mobile.options') : attentionLabel(t('mobile.options'))}><Icon name="sliders-horizontal" />{#if !options && attention}<span class="dot" aria-hidden="true"></span>{/if}</button>
       <button class="btn ghost icon touch" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>
       {@render hostEnd()}
     </header>

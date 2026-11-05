@@ -245,3 +245,90 @@ func TestMCPStatusNotLogged(t *testing.T) {
 		t.Errorf("%d status events logged", n)
 	}
 }
+
+// toggles counts the mcp_toggle requests written for a server.
+func (h *harness) toggles(server string, enabled bool) int {
+	h.rt.mu.Lock()
+	defer h.rt.mu.Unlock()
+	n := 0
+	want := `"enabled":false`
+	if enabled {
+		want = `"enabled":true`
+	}
+	for _, l := range h.rt.stdin {
+		if strings.Contains(l, `"subtype":"mcp_toggle"`) && strings.Contains(l, `"serverName":"`+server+`"`) && strings.Contains(l, want) {
+			n++
+		}
+	}
+	return n
+}
+
+// Turn off is kept: every running session turns the server off, it shows
+// as off at once, a CLI started later turns it off as it reports it, and
+// the choice outlives the manager. Turn on undoes it everywhere.
+func TestMCPTurnOffIsKept(t *testing.T) {
+	h := newHarness(t, "single-turn")
+	a, _ := h.m.Create("chat", "", "haiku")
+	b, _ := h.m.Create("chat", "", "haiku")
+	sa, _ := h.m.get(a.ID)
+	sb, _ := h.m.get(b.ID)
+	_ = sa.warm(context.Background())
+	_ = sb.warm(context.Background())
+	drive := core.MCPServers{List: []core.MCPServer{{Name: "Drive", Status: core.MCPNeedsAuth}, {Name: "BRUV", Status: core.MCPConnected, Tools: 3}}}
+	answerAs(sa, core.EvMCPServers, drive)
+	answerAs(sb, core.EvMCPServers, drive)
+
+	if err := h.m.MCPToggle(context.Background(), a.ID, "Drive", false); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "both CLIs told", func() bool { return h.toggles("Drive", false) >= 2 })
+	for _, id := range []string{a.ID, b.ID} {
+		if sv := mcpOf(t, h, id)["Drive"]; !sv.Off {
+			t.Errorf("%s shows Drive on: %+v", id, sv)
+		}
+		if sv := mcpOf(t, h, id)["BRUV"]; sv.Off || sv.Status != core.MCPConnected {
+			t.Errorf("another server changed: %+v", sv)
+		}
+	}
+
+	// A chat started later: its CLI turns Drive off as it reports it, once.
+	c, _ := h.m.Create("chat", "", "haiku")
+	sc, _ := h.m.get(c.ID)
+	_ = sc.warm(context.Background())
+	before := h.toggles("Drive", false)
+	answerAs(sc, core.EvMCPServers, drive)
+	answerAs(sc, core.EvMCPServers, drive)
+	if n := h.toggles("Drive", false) - before; n != 1 {
+		t.Errorf("a new CLI was told %d times", n)
+	}
+	if sv := mcpOf(t, h, c.ID)["Drive"]; !sv.Off {
+		t.Errorf("the new chat shows Drive on: %+v", sv)
+	}
+	// The CLI's answer, an error or not, isn't the user's to see.
+	answerAs(sc, core.EvMCPAuth, core.MCPAuth{Server: "Drive", Step: "toggle", Error: "no such server"})
+	if sv := mcpOf(t, h, c.ID)["Drive"]; sv.Error != "" {
+		t.Errorf("a quiet toggle's error showed: %+v", sv)
+	}
+
+	// Saved: a manager started afresh on the same store knows.
+	id := sa.ad().ID()
+	m2, err := NewManager(h.m.d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m2.MCPOff(id, "Drive") || m2.MCPOff(id, "BRUV") {
+		t.Error("Turn off wasn't saved")
+	}
+
+	// Turn on: saved, and every running session told.
+	if err := h.m.MCPToggle(context.Background(), b.ID, "Drive", true); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "the CLIs told to turn it on", func() bool { return h.toggles("Drive", true) >= 3 })
+	if h.m.MCPOff(id, "Drive") {
+		t.Error("Turn on wasn't saved")
+	}
+	if sv := mcpOf(t, h, a.ID)["Drive"]; sv.Off {
+		t.Errorf("after Turn on, Drive shows off: %+v", sv)
+	}
+}

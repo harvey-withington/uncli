@@ -50,6 +50,7 @@ export interface MCPServer {
   signing?: boolean // a sign-in is waiting for the browser
   site?: boolean // a sign-in on the provider's own site is awaited; reconnected meanwhile
   error?: string // the last sign-in, reconnect or sign-out failed
+  off?: boolean // the user turned it off, in every chat (saved by UNCLI; the CLI follows)
 }
 
 // A sign-in under way (session.MCPSignIn): the link to open; a connector

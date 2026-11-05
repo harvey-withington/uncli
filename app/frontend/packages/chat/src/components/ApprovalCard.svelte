@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Approval, Scope, SessionView } from '../lib/api'
-  import { cardNotes, classLabel, describeApproval, fixedReason, isShell, loadScope, modeOf, saveScope } from '../lib/approvals'
+  import { cardNotes, classLabel, describeApproval, fixedReason, isShell, modeOf } from '../lib/approvals'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import CommandView from './CommandView.svelte'
@@ -35,7 +35,7 @@
   const learn = $derived(always ? [] : approval.learn)
   const fixed = $derived(always || learn.length > 0 ? undefined : fixedReason(approval))
   const marked = $derived(!!approval.marked)
-  let scope = $state<Scope>(loadScope())
+  let scope = $state<Scope>(chat.scope)
   let busy = $state(false)
 
   async function act(f: () => Promise<void>) {
@@ -51,7 +51,7 @@
   }
   const answer = (decision: 'allow' | 'deny') => act(() => chat.backend.answerApproval(session.id, approval.requestId, decision))
   function toggleSafe() {
-    if (!marked) saveScope(scope)
+    if (!marked) chat.setScope(scope)
     void act(() => chat.backend.markSafe(session.id, approval.requestId, !marked, scope))
   }
 </script>

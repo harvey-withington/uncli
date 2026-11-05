@@ -9,6 +9,7 @@ import type { MCPServer } from './api'
 export type MCPNeed = 'signing' | 'sign-in' | 'connector' | 'failed' | null
 
 export function needOf(sv: MCPServer): MCPNeed {
+  if (sv.off) return null
   if (sv.status === 'connected' || sv.status === 'disabled') return null
   if (sv.signing) return 'signing'
   if (sv.site) return 'connector'
@@ -19,6 +20,7 @@ export function needOf(sv: MCPServer): MCPNeed {
 
 // The status as a short phrase key (mcp.status.*).
 export function statusKey(sv: MCPServer): string {
+  if (sv.off) return 'mcp.status.disabled'
   if (sv.signing) return 'mcp.status.signing'
   if (sv.site) return 'mcp.status.site'
   return `mcp.status.${sv.status}`

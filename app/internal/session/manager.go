@@ -155,6 +155,9 @@ type Manager struct {
 	usage    *core.UsageLimit
 	judge    judging
 
+	mcpOffMu sync.Mutex
+	mcpOff   map[string][]string // MCP servers the user turned off, by provider (mcpoff.go)
+
 	// InterruptGrace is how long an interrupt waits for the CLI before the
 	// process is killed instead.
 	InterruptGrace time.Duration

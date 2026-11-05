@@ -135,7 +135,18 @@ It's built already, Svelte inside, so your bundler needs nothing special and you
 - **The client** the elements use is exported from `@uncli/chat/element` too (`chatClient`, `mountedBackend`). Import it from there, not from `@uncli/client`, so your code shares the elements' connection rather than opening its own.
 - **`scheme`** is `light` or `dark`. Leave it out to follow the system.
 - **`compact`** shows the phone's compact layout, and `compact="false"` the desktop's. Leave it out and the element picks by its own width: compact below 720 px.
-- **`storage-key`** remembers the side panel and the compact layout under `uncli-layout:<key>` in the page's local storage. That's the only thing UNCLI ever writes to your storage, and only when you ask. Everything else the chat remembers (drafts, scroll positions, the File tab, the approval scope) stays in memory for as long as the page is open. The side panel starts closed.
+- **`storage-key`** remembers the user's layout and preferences under `uncli-layout:<key>` in the page's local storage. That's the only thing UNCLI ever writes to your storage, and only when you ask. It remembers:
+  - the side panel: open or closed, its width, and its tab (On this page, Artifacts or File);
+  - the desktop header, collapsed or not;
+  - the question header, collapsed or not;
+  - the compact header's Options, open or closed;
+  - the scope "This is safe" last applied to (this project, or all of them).
+
+  Every chat on the page with the same key shares this memory. A change in one shows in the others at once, and a chat you mount later starts from it. So give all your chats one key, unless you want them to differ. It's read each time a chat mounts, so it survives your page remounting the element, and the switch between the compact and desktop layouts.
+
+  Without a key, a chat remembers these only while it's mounted.
+
+  What belongs to one chat isn't remembered here: drafts, scroll positions and the File tab's file. Those stay in memory for as long as the page is open. MCP servers the user turns off aren't remembered here either: your UNCLI saves that choice itself, for every chat (see "Your own tools for the AI"). The side panel starts closed.
 
 The element fills the box you give it, so give it a height. In a grid or flex layout, let its container shrink (`min-width: 0`).
 
@@ -222,6 +233,7 @@ core, err := uncli.Start(uncli.Options{
 - **When it's asked.** Each time a session's CLI starts, with the session's id (what `newSession()` returned). So each session can have the servers for what it's about, with a token that's current then.
 - **Every session type.** It works for chats, cowork and code sessions alike, beside whatever servers the session type shares of the user's own.
 - **What the session is for.** For a session made with `newSession(…, { meta })`, `core.SessionMeta(session)` tells you, from its very first start.
+- **Servers the user turns off.** The CLI may load MCP servers that aren't yours, such as the claude.ai connectors of the account it's signed in with. One that needs signing in shows the attention dot. The user can choose **Turn off** for it in the MCP servers list. Your UNCLI saves that in its data folder, for every chat, and turns the server off again each time a CLI starts. It shows as "off", with **Turn on** to bring it back.
 - **Approvals.** By default, calls to your tools are approved like any MCP server's. A tool marked read-only in its MCP annotations (`readOnlyHint`) runs without asking under the default prompt level; others ask in the chat, where your user can allow them once or always.
 - **Not yet in `uncli-core`.** For now, `MCPServers` is only available to Go hosts.
 
@@ -342,6 +354,18 @@ chat.host = {
 - **One host per page.** The schemes, strings and headers apply to every chat on the page. A page with only a `<uncli-session-list>` sets its headers with `setHostHeaders(fn)`, exported from `@uncli/chat/element`.
 
 **Keys.** Before the chat acts on Escape, or on Ctrl+Enter (Cmd+Enter), it sends `uncli-escape` or `uncli-submit`. They're cancelable: cancel one (`event.preventDefault()`) and the chat leaves that key alone, so layered dialogs of your own can decide first.
+
+Your own single-key shortcuts need care, because the chat lives in a shadow root. While the user types in the message box, `document.activeElement` is the `<uncli-chat>` element itself, not the text box. A check like "is an input focused?" then says no, and your shortcut takes the keystroke. Look inside the element too:
+
+```js
+function typing() {
+  let el = document.activeElement
+  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el?.isContentEditable
+}
+```
+
+Or, inside a key handler, check where the key came from: `event.composedPath()[0]` is the text box.
 
 ## Your own controls, and restyling parts
 

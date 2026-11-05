@@ -170,21 +170,40 @@ func TestMCPToggle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status := func() string {
-		view, _ := svc.Sessions.View(v.ID)
+	// status is what the session's CLI says of the server, and whether the
+	// user turned it off (saved by UNCLI).
+	status := func(id string) (string, bool) {
+		view, _ := svc.Sessions.View(id)
 		for _, s := range view.MCP {
 			if s.Name == "notes" {
-				return s.Status
+				return s.Status, s.Off
 			}
 		}
-		return ""
+		return "", false
+	}
+	is := func(id, want string, off bool) func() bool {
+		return func() bool { st, o := status(id); return st == want && o == off }
 	}
 	if err := svc.Sessions.MCPToggle(ctx, v.ID, "notes", false); err != nil {
 		t.Fatal(err)
 	}
-	waitTil(t, "notes disabled", 30*time.Second, func() bool { return status() == "disabled" })
-	if err := svc.Sessions.MCPToggle(ctx, v.ID, "notes", true); err != nil {
+	waitTil(t, "notes disabled", 30*time.Second, is(v.ID, "disabled", true))
+
+	// Turn off is kept: a session whose CLI starts afterwards has its CLI
+	// turn the server off as it reports it.
+	w, err := svc.Sessions.Create("notes", t.TempDir(), "haiku")
+	if err != nil {
 		t.Fatal(err)
 	}
-	waitTil(t, "notes connected again", 30*time.Second, func() bool { return status() == "connected" })
+	if _, err := svc.Sessions.Commands(w.ID); err != nil { // starts its CLI
+		t.Fatal(err)
+	}
+	waitTil(t, "the new CLI turning notes off", 45*time.Second, is(w.ID, "disabled", true))
+
+	// Turn on, from either: both CLIs connect it again.
+	if err := svc.Sessions.MCPToggle(ctx, w.ID, "notes", true); err != nil {
+		t.Fatal(err)
+	}
+	waitTil(t, "notes connected again", 30*time.Second, is(w.ID, "connected", false))
+	waitTil(t, "notes connected again in the first", 30*time.Second, is(v.ID, "connected", false))
 }

@@ -13,7 +13,8 @@
   // browser can open its page again or take the address the browser ended
   // up on, for when the browser can't reach the CLI. Turn off stops a
   // server the user won't sign in to from asking (and from the header's
-  // attention dot) until it's turned on again. Only for a CLI that can sign
+  // attention dot), in every chat and after a restart, until it's turned
+  // on again (saved by UNCLI, session/mcpoff.go). Only for a CLI that can sign
   // its servers in, once it has reported them.
   interface Props {
     session: SessionView
@@ -60,13 +61,15 @@
         <ul>
           {#each servers as sv (sv.name)}
             <li>
-              <span class="dotted {sv.signing || sv.site ? 'signing' : sv.status}" aria-hidden="true"></span>
+              <span class="dotted {sv.off ? 'disabled' : sv.signing || sv.site ? 'signing' : sv.status}" aria-hidden="true"></span>
               <span class="who">
                 <span class="name" title={sv.name}>{sv.name}</span>
                 <span class="status">{t(statusKey(sv), { n: sv.tools })}</span>
               </span>
               <span class="acts">
-                {#if sv.signing}
+                {#if sv.off || sv.status === 'disabled'}
+                  <button class="btn ghost small" onclick={() => chat.mcpToggle(session.id, sv.name, true)} title={t('mcp.turnOnHint', { name: sv.name })}>{t('mcp.turnOn')}</button>
+                {:else if sv.signing}
                   <button class="btn ghost small" onclick={() => chat.mcpCancel(session.id, sv.name)}>{t('common.cancel')}</button>
                 {:else if sv.site}
                   <button class="btn ghost small" onclick={() => chat.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
@@ -81,8 +84,6 @@
                   <button class="btn ghost small" onclick={() => chat.mcpReconnect(session.id, sv.name)}>{t('mcp.reconnect')}</button>
                   <button class="btn ghost small" onclick={() => chat.mcpSignOut(session.id, sv.name)}>{t('mcp.signOut')}</button>
                   {@render off(sv.name)}
-                {:else if sv.status === 'disabled'}
-                  <button class="btn ghost small" onclick={() => chat.mcpToggle(session.id, sv.name, true)}>{t('mcp.turnOn')}</button>
                 {/if}
               </span>
               {#if (sv.signing || sv.site) && (link(sv) || sv.signing)}

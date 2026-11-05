@@ -65,6 +65,25 @@ export function saveQuestionCompact(compact: boolean) {
   }
 }
 
+// Whether the compact header's Options are open.
+const OPTIONS_KEY = 'uncli-options'
+
+export function loadOptionsOpen(): boolean {
+  try {
+    return JSON.parse(store.getItem(OPTIONS_KEY) ?? 'null')?.open === true
+  } catch {
+    return false
+  }
+}
+
+export function saveOptionsOpen(open: boolean) {
+  try {
+    store.setItem(OPTIONS_KEY, JSON.stringify({ open }))
+  } catch {
+    // not persisted; still applied for this run
+  }
+}
+
 // The side panel's tabs, "On this page", "Artifacts" and "File" (a file
 // from the session folder, watched live): which one is showing. Whether the panel is open, and its width (one for both tabs),
 // are the outline layout's (lib/outline.ts).

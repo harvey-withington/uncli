@@ -61,6 +61,7 @@ type Session struct {
 	mcpTicking bool
 	mcpCatch   map[string]*oauthcatch.Catcher
 	mcpQuiet   map[string]bool
+	mcpOffSent map[string]core.Proc // servers kept off (mcpoff.go), by the run of the CLI told
 
 	page         *store.Page // the open page, nil when idle
 	closed       *store.Page // the page closed last
@@ -111,7 +112,7 @@ func (s *Session) ad() core.Adapter { return s.m.adapterOf(s.rec) }
 func newSession(m *Manager, rec store.Session) *Session {
 	s := &Session{m: m, rec: rec, state: Idle,
 		mcpSigning: map[string]bool{}, mcpSite: map[string]bool{}, mcpErrors: map[string]string{}, mcpAnswers: map[string]chan core.MCPAuth{},
-		mcpWatch: map[string]time.Time{}, mcpCatch: map[string]*oauthcatch.Catcher{}, mcpQuiet: map[string]bool{}}
+		mcpWatch: map[string]time.Time{}, mcpCatch: map[string]*oauthcatch.Catcher{}, mcpQuiet: map[string]bool{}, mcpOffSent: map[string]core.Proc{}}
 	s.toldLocked()
 	if pages, err := m.d.Store.ListPages(rec.ID); err == nil && len(pages) > 0 {
 		last := pages[len(pages)-1]

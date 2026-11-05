@@ -753,8 +753,13 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       const s = find(sid)
       const sv = (s.mcp ?? []).find(x => x.name === server)
       if (!sv) throw new Error(`Server not found: ${server}`)
-      Object.assign(sv, on ? { status: 'connected', tools: sv.tools || 3, error: undefined } : { status: 'disabled', signing: false, site: undefined, error: undefined })
-      changed(s)
+      // Saved for every session, as UNCLI does (session/mcpoff.go).
+      for (const other of sessions) {
+        const o = (other.mcp ?? []).find(x => x.name === server)
+        if (!o) continue
+        Object.assign(o, on ? { status: 'connected', tools: o.tools || 3, error: undefined, off: undefined } : { status: 'disabled', signing: false, site: undefined, error: undefined, off: true })
+        changed(other)
+      }
     },
     async mcpSignOut(sid, server) {
       const s = find(sid)
