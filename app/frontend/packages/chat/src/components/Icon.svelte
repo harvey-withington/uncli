@@ -54,6 +54,9 @@
   import Pencil from 'lucide-svelte/icons/pencil'
   import Play from 'lucide-svelte/icons/play'
   import Plus from 'lucide-svelte/icons/plus'
+  import Clock from 'lucide-svelte/icons/clock'
+  import CirclePause from 'lucide-svelte/icons/circle-pause'
+  import ListPlus from 'lucide-svelte/icons/list-plus'
   import Rewind from 'lucide-svelte/icons/rewind'
   import ScanSearch from 'lucide-svelte/icons/scan-search'
   import Search from 'lucide-svelte/icons/search'
@@ -104,7 +107,7 @@
     'chevrons-left': ChevronsLeft, 'chevrons-right': ChevronsRight, 'circle-alert': CircleAlert, code: Code, coffee: Coffee,
     copy: Copy, download: Download, file: File, 'file-text': FileText, image: ImageIcon, 'folder-open': FolderOpen, gauge: Gauge, loader: Loader, 'log-in': LogIn,
     'message-circle': MessageCircle, microscope: Microscope, monitor: Monitor, 'qr-code': QrCode, smartphone: Smartphone, 'arrow-left': ArrowLeft, folder: Folder, paperclip: Paperclip, 'wifi-off': WifiOff, moon: Moon, 'panel-right-close': PanelRightClose, 'panel-right-open': PanelRightOpen, pencil: Pencil,
-    plus: Plus, play: Play, rewind: Rewind, search: Search, plug: Plug, unplug: Unplug, 'key-round': KeyRound, 'list-checks': ListChecks, 'pencil-line': PencilLine, 'message-circle-question': MessageCircleQuestion, 'rotate-ccw': RotateCcw, shield: Shield, 'fast-forward': FastForward, settings: Settings, 'shield-check': ShieldCheck, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
+    plus: Plus, clock: Clock, 'circle-pause': CirclePause, 'list-plus': ListPlus, play: Play, rewind: Rewind, search: Search, plug: Plug, unplug: Unplug, 'key-round': KeyRound, 'list-checks': ListChecks, 'pencil-line': PencilLine, 'message-circle-question': MessageCircleQuestion, 'rotate-ccw': RotateCcw, shield: Shield, 'fast-forward': FastForward, settings: Settings, 'shield-check': ShieldCheck, 'shield-x': ShieldX, shrink: Shrink, sparkles: Sparkles, square: Square,
     sun: Sun, table: Table, trash: Trash, flag: Flag, 'flask-conical': FlaskConical, info: Info,
     lightbulb: Lightbulb, 'list-ordered': ListOrdered, 'message-square-text': MessageSquareText, 'scan-search': ScanSearch, 'triangle-alert': TriangleAlert, users: Users, wrench: Wrench, x: X,
     eye: Eye, 'globe-lock': GlobeLock, hand: Hand, zap: Zap,

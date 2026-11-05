@@ -88,6 +88,18 @@ export class SessionStore {
     else await this.client.backend.send(this.id, text, attachments)
   }
 
+  async queue(text: string, attachments: AttachmentRef[] = [], opts?: SendOptions) {
+    await this.client.backend.queue(this.id, text, attachments, opts)
+  }
+
+  unqueue() {
+    return this.client.backend.unqueue(this.id)
+  }
+
+  async sendQueued() {
+    await this.client.backend.sendQueued(this.id)
+  }
+
   async interrupt() {
     await this.client.backend.interrupt(this.id)
   }

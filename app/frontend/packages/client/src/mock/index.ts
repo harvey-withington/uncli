@@ -2,7 +2,7 @@
 // component tests). It behaves like the real one closely enough to
 // exercise streaming, states, bookmarks and errors, with canned content.
 import type {
-  ActivityState, Approval, Backend, Bootstrap, CLIStatus, Editor, Handlers, MCPServer, NewSessionChoices, Page, Preferences, Provider, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
+  ActivityState, Approval, AttachmentRef, Backend, Bootstrap, CLIStatus, Editor, Handlers, MCPServer, NewSessionChoices, Page, Preferences, Provider, SearchHit, SearchQuery, SearchResult, SafeEntry, Scope, SessionMode, SessionView, UEvent,
 } from '../types'
 import { MOCK_ALLOWLISTS, MOCK_ASKS, mockExplain, mockJudge, mockPreview, type MockAsk, type Outcome } from './access'
 import { SECTION_KINDS } from '../sections'
@@ -448,7 +448,24 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     return s
   }
 
-  return {
+  // Queued messages (session/queue.go): sent when an answer finishes, held
+  // after one that didn't.
+  const queue = new Map<string, { text: string; attachments: AttachmentRef[]; context?: string }>()
+  const showQueue = (s: SessionView, held = false) => {
+    const q = queue.get(s.id)
+    s.queued = q ? { text: q.text, files: q.attachments.map(a => a.name || (a.path ?? '').replace(/^.*[\\/]/, '') || 'file'), held: held || undefined } : undefined
+    changed(s)
+  }
+  const afterTurn = (s: SessionView, finished: boolean) => {
+    const q = queue.get(s.id)
+    if (!q) return
+    if (!finished || s.queued?.held) return showQueue(s, true)
+    queue.delete(s.id)
+    showQueue(s)
+    window.setTimeout(() => void backend.send(s.id, q.text, q.attachments, q.context ? { context: q.context } : undefined), 0)
+  }
+
+  const backend: Backend = {
     kind: 'mock',
     subscribe(handlers) {
       h = handlers
@@ -647,6 +664,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
           s.busy = false
           if (background) s.background = [{ id: 'task-1', kind: 'local_agent', description: 'Check the other test files' }]
           setState(s, 'idle')
+          afterTurn(s, true)
           if (background) ts.push(window.setTimeout(() => carryOn(s), 1500))
         }, at + 50))
         timers.set(id, ts)
@@ -664,6 +682,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       }
       s.busy = false
       setState(s, 'idle')
+      afterTurn(s, false)
     },
     async restart(id) {
       const s = find(id)
@@ -748,6 +767,36 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
         Object.assign(sv, { status: 'connected', tools: server === 'Google Drive' ? 5 : sv.tools || 3 })
         changed(s)
       }, 600)
+    },
+    async queue(id, text, attachments = [], opts) {
+      const s = find(id)
+      if (s.archived) throw new Error('this session is archived; restore it to continue')
+      const q = queue.get(id)
+      const next = q
+        ? { text: [q.text, text.trim()].filter(Boolean).join('\n\n'), attachments: [...q.attachments, ...attachments], context: opts?.context || q.context }
+        : { text: text.trim(), attachments, context: opts?.context }
+      if (!next.text && next.attachments.length === 0) throw new Error('nothing to send')
+      queue.set(id, next)
+      if (s.busy) return showQueue(s, !!s.queued?.held)
+      queue.delete(id)
+      showQueue(s)
+      await backend.send(id, next.text, next.attachments, next.context ? { context: next.context } : undefined)
+    },
+    async unqueue(id) {
+      const s = find(id)
+      const q = queue.get(id)
+      queue.delete(id)
+      showQueue(s)
+      return { text: q?.text ?? '', attachments: q?.attachments ?? [] }
+    },
+    async sendQueued(id) {
+      const s = find(id)
+      const q = queue.get(id)
+      if (!q) return
+      if (s.busy) throw new Error("this session is still answering; the message goes when it's done")
+      queue.delete(id)
+      showQueue(s)
+      await backend.send(id, q.text, q.attachments, q.context ? { context: q.context } : undefined)
     },
     async mcpToggle(sid, server, on) {
       const s = find(sid)
@@ -1015,4 +1064,5 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     async copyText(text) { await navigator.clipboard?.writeText(text) },
     async clipboardFiles() { return [] },
   }
+  return backend
 }

@@ -36,7 +36,7 @@ var rpcMethods = []string{
 	"Bootstrap", "CLIStatus", "ProviderStatus", "CLIChannels", "ProviderChannels",
 	"Containers", "Editors", "HasDecisionKey", "Usage", "UsageReport",
 	// Sessions.
-	"CreateSession", "Pages", "Send", "SendWith", "Interrupt", "Restart", "Focus", "Rename", "Delete",
+	"CreateSession", "Pages", "Send", "SendWith", "Queue", "Unqueue", "SendQueued", "Interrupt", "Restart", "Focus", "Rename", "Delete",
 	"Archive", "SetSortOrder", "SetModel", "ToggleModifier", "SetShares",
 	"SetMode", "SetUnattended", "Search", "SummarisePage",
 	"SetBookmark", "SetPinned", "Pinned", "Commands",
@@ -134,6 +134,16 @@ func (c *client) SendWith(sessionID, text string, attachments []app.AttachmentRe
 		}
 	}
 	return c.API.SendWith(sessionID, text, attachments, opts)
+}
+
+// Queue takes attachments as Send does: uploaded, never a path.
+func (c *client) Queue(sessionID, text string, attachments []app.AttachmentRef, opts app.SendOptions) error {
+	for _, r := range attachments {
+		if r.Path != "" {
+			return errors.New("attach files by uploading them")
+		}
+	}
+	return c.API.Queue(sessionID, text, attachments, opts)
 }
 
 // A device browses and starts sessions in folders on the server's own

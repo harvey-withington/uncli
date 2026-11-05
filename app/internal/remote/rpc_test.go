@@ -18,11 +18,11 @@ var pinnedMethods = []string{
 	"Focus", "HasDecisionKey", "ImportTranscript", "InstallUpdate", "Interrupt", "KnownTools",
 	"ListFolder", "MCPCallback", "MCPCancel", "MCPReconnect", "MCPSignIn",
 	"MCPSignOut", "MCPToggle", "MarkSafe", "MoveSafeEntry", "Pages", "Pinned",
-	"PreviewClasses", "ProviderChannels", "ProviderStatus", "PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "ReadArtifact",
-	"Rename", "Restart", "SafeList", "Search", "Send", "SendWith", "SessionAllowlist", "SetBookmark",
+	"PreviewClasses", "ProviderChannels", "ProviderStatus", "PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "Queue", "ReadArtifact",
+	"Rename", "Restart", "SafeList", "Search", "Send", "SendQueued", "SendWith", "SessionAllowlist", "SetBookmark",
 	"SetMode", "SetModel", "SetPinned", "SetPushNotifications", "SetSafeEntry", "SetSafeLabel",
 	"SetShares", "SetSortOrder", "SetUnattended", "SummarisePage", "Teach", "TestPush",
-	"ToggleModifier", "Transcripts", "UpdateStatus", "UploadLink", "Usage", "UsageReport",
+	"ToggleModifier", "Transcripts", "Unqueue", "UpdateStatus", "UploadLink", "Usage", "UsageReport",
 	"WatchFiles", "WatchRead",
 }
 

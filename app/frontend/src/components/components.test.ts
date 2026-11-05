@@ -520,6 +520,62 @@ describe('Reordering sessions', () => {
   })
 })
 
+describe('Queueing a message while an answer runs', () => {
+  async function type(text: string) {
+    const box = (await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement
+    await fireEvent.input(box, { target: { value: text } })
+    return box
+  }
+  const row = () => document.querySelector('.queued')
+
+  it('queues with the Queue button or Enter, combines a second, and sends them when the answer ends', async () => {
+    const backend = mockBackend()
+    const send = vi.spyOn(backend, 'send')
+    render(App, { props: { backend } })
+    await type('Explain the parser')
+    await fireEvent.click(await screen.findByRole('button', { name: 'Send' }))
+    // Answering: Send gives way to Stop and Queue.
+    const queue = await screen.findByRole('button', { name: 'Queue' })
+    expect(screen.getByRole('button', { name: /Stop/ })).toBeInTheDocument()
+    await type('Now the tests')
+    await fireEvent.click(queue)
+    const box = await type('And the docs')
+    await fireEvent.keyDown(box, { key: 'Enter' })
+    await waitFor(() => expect(row()).toHaveTextContent('Queued: goes when this answer ends'))
+    expect(row()).toHaveTextContent('Now the tests And the docs')
+    expect(box.value).toBe('')
+    expect(send).toHaveBeenCalledTimes(1)
+    // The answer ends: the queue goes, as one message.
+    await waitFor(() => expect(send).toHaveBeenLastCalledWith(expect.any(String), 'Now the tests\n\nAnd the docs', [], undefined), { timeout: 8000 })
+    await waitFor(() => expect(document.querySelector('.queued')).toBeNull())
+  })
+
+  it('holds it after Stop, then sends it on Send now, or takes it back to edit', async () => {
+    const backend = mockBackend()
+    const send = vi.spyOn(backend, 'send')
+    render(App, { props: { backend } })
+    await type('Explain the parser')
+    await fireEvent.click(await screen.findByRole('button', { name: 'Send' }))
+    await type('Now the tests')
+    await fireEvent.click(await screen.findByRole('button', { name: 'Queue' }))
+    await fireEvent.click(await screen.findByRole('button', { name: /Stop/ }))
+    await waitFor(() => expect(row()).toHaveTextContent("Held: the last answer didn't finish"))
+    expect(send).toHaveBeenCalledTimes(1)
+    // Taken back: in the box, off the queue.
+    await fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
+    await waitFor(() => expect(document.querySelector('.queued')).toBeNull())
+    expect(((await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement).value).toBe('Now the tests')
+    // Queued again and stopped again: Send now sends it.
+    await fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(send).toHaveBeenCalledTimes(2))
+    await type('One more thing')
+    await fireEvent.click(await screen.findByRole('button', { name: 'Queue' }))
+    await fireEvent.click(await screen.findByRole('button', { name: /Stop/ }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Send now' }))
+    await waitFor(() => expect(send).toHaveBeenLastCalledWith(expect.any(String), 'One more thing', [], undefined))
+  })
+})
+
 describe('Approvals', () => {
   async function ask(text: string) {
     const box = (await screen.findByRole('textbox', { name: 'Your message' })) as HTMLTextAreaElement
@@ -819,7 +875,7 @@ describe('Dropping files and folders', () => {
     expect(chips()).toEqual(['a.png', 'brief.pdf'])
     await fireEvent.input(box, { target: { value: 'Compare these' } })
     await fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.any(String), 'Compare these', [{ path: 'C:/shots/a.png' }, { path: 'C:/docs/brief.pdf' }]))
+    await waitFor(() => expect(send).toHaveBeenCalledWith(expect.any(String), 'Compare these', [expect.objectContaining({ path: 'C:/shots/a.png', name: 'a.png' }), expect.objectContaining({ path: 'C:/docs/brief.pdf', name: 'brief.pdf' })]))
     // The page shows what went with the question.
     const files = await screen.findByRole('list', { name: 'Files sent with this question' })
     expect(within(files).getByText('a.png')).toBeInTheDocument()

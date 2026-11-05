@@ -39,10 +39,26 @@ export interface SessionView {
   shares?: Share[] // what it has of the user's own: their MCP servers and connectors, their skills
   shareable?: Share[] // what it could have (an isolated type, on this machine, a CLI that can)
   mcp?: MCPServer[] // its CLI's MCP servers as last reported (decision 0020); empty until it reports
+  queued?: QueuedMessage // a message waiting for the answer to end (session/queue.go)
 }
 
 // An MCP server of a session's CLI (session.MCPServerView).
 export type MCPStatus = 'connected' | 'needs-auth' | 'pending' | 'failed' | 'disabled'
+// A message waiting in a session's queue: it goes when the answer ends,
+// or, held (the last turn didn't finish: Stop, an error), when the user
+// sends it.
+export interface QueuedMessage {
+  text: string
+  files?: string[] // its attachments' names
+  held?: boolean
+}
+
+// A queued message taken back to edit: its text and attachments as given.
+export interface Unqueued {
+  text: string
+  attachments: AttachmentRef[]
+}
+
 export interface MCPServer {
   name: string
   status: MCPStatus
@@ -866,6 +882,12 @@ export interface Backend {
   pages(sessionId: string): Promise<Page[]>
   // opts: what comes with the turn beyond its text and files.
   send(sessionId: string, text: string, attachments?: AttachmentRef[], opts?: SendOptions): Promise<void>
+  // queue sends a message when the session's answer ends (now if it isn't
+  // answering); queued again, the messages go as one. unqueue takes it back
+  // to edit; sendQueued sends one held after a turn that didn't finish.
+  queue(sessionId: string, text: string, attachments?: AttachmentRef[], opts?: SendOptions): Promise<void>
+  unqueue(sessionId: string): Promise<Unqueued>
+  sendQueued(sessionId: string): Promise<void>
   interrupt(sessionId: string): Promise<void>
   restart(sessionId: string): Promise<SessionView> // stops its CLI and starts it again on the conversation
   setModel(sessionId: string, model: string): Promise<void>

@@ -40,6 +40,8 @@ type View struct {
 	// MCP is its CLI's MCP servers as last reported, with any sign-in
 	// waiting and the last failure (mcp.go); empty until the CLI reports.
 	MCP []MCPServerView `json:"mcp"`
+	// Queued is a message waiting for the answer to end (queue.go).
+	Queued *QueuedView `json:"queued,omitempty"`
 }
 
 // Sink receives everything the UI needs. Implementations must not call

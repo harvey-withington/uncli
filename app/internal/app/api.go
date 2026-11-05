@@ -114,6 +114,21 @@ func (a *API) Send(sessionID, text string, attachments []AttachmentRef) error {
 	return a.svc.Send(context.Background(), sessionID, text, attachments)
 }
 
+// Queue sends a message when the session's answer ends (now if it isn't
+// answering); queued again, the messages go as one (session/queue.go).
+func (a *API) Queue(sessionID, text string, attachments []AttachmentRef, opts SendOptions) error {
+	return a.svc.QueueWith(context.Background(), sessionID, text, attachments, opts)
+}
+
+// Unqueue takes a session's queued message back, to edit.
+func (a *API) Unqueue(sessionID string) (Unqueued, error) { return a.svc.Unqueue(sessionID) }
+
+// SendQueued sends a queued message now: one held after a turn that
+// didn't finish.
+func (a *API) SendQueued(sessionID string) error {
+	return a.svc.Sessions.SendQueued(context.Background(), sessionID)
+}
+
 // SendWith starts a turn with options: an embedding host's context for it.
 func (a *API) SendWith(sessionID, text string, attachments []AttachmentRef, opts SendOptions) error {
 	return a.svc.SendWith(context.Background(), sessionID, text, attachments, opts)

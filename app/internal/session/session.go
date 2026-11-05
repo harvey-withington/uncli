@@ -63,6 +63,9 @@ type Session struct {
 	mcpQuiet   map[string]bool
 	mcpOffSent map[string]core.Proc // servers kept off (mcpoff.go), by the run of the CLI told
 
+	queued    *Queued // a message waiting for the answer to end (queue.go)
+	queueHeld bool    // the last turn didn't finish: it waits for the user
+
 	page         *store.Page // the open page, nil when idle
 	closed       *store.Page // the page closed last
 	evN          int         // events logged on the open page
@@ -133,7 +136,7 @@ func (s *Session) View() View {
 func (s *Session) viewLocked() View {
 	return View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err,
 		Approvals: append([]Approval{}, s.pending...), Unattended: s.unattended, Background: append([]core.BackgroundTask{}, s.background...),
-		Shares: s.sharesLocked(), Shareable: s.m.shareable(s.rec, s.ad().Capabilities()), MCP: s.mcpViewLocked()}
+		Shares: s.sharesLocked(), Shareable: s.m.shareable(s.rec, s.ad().Capabilities()), MCP: s.mcpViewLocked(), Queued: s.queuedViewLocked()}
 }
 
 func (s *Session) changed() { s.m.d.Sink.SessionChanged(s.viewLocked()) }
@@ -640,6 +643,7 @@ func (s *Session) closePage(status, errText string) {
 		s.applyModelLocked(s.pendingModel)
 	}
 	s.pendingModel = ""
+	s.queueAfterLocked(status)
 	_ = s.m.d.Store.PruneEvents(s.rec.ID)
 	s.changed()
 }

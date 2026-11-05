@@ -25,8 +25,25 @@ export function releasePreviews(list: readonly Pending[]) {
   for (const a of list) if (a.preview?.startsWith('blob:')) URL.revokeObjectURL(a.preview)
 }
 
+// toRefs is how each file travels. The name and media type ride along, so
+// a queued message taken back (fromRefs) shows its files as they were.
 export function toRefs(list: readonly Pending[]): AttachmentRef[] {
-  return list.map(a => (a.upload ? { upload: a.upload } : a.path ? { path: a.path } : { name: a.name, mediaType: a.mediaType, data: a.data }))
+  return list.map(a => {
+    const about = { name: a.name, ...(a.mediaType ? { mediaType: a.mediaType } : {}) }
+    return a.upload ? { upload: a.upload, ...about } : a.path ? { path: a.path, ...about } : { ...about, data: a.data }
+  })
+}
+
+// fromRefs makes files to show again from how they travelled: a queued
+// message taken back to edit. Their sizes aren't known (0: not shown).
+export function fromRefs(refs: readonly AttachmentRef[]): Pending[] {
+  return refs.map(r => {
+    const name = r.name || (r.path ?? '').replace(/^.*[\\/]/, '') || 'file'
+    const media = r.mediaType ?? ''
+    const kind: AttachmentKind = media.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(name) ? 'image' : media === 'application/pdf' || /\.pdf$/i.test(name) ? 'pdf' : 'text'
+    const preview = r.data && media.startsWith('image/') ? `data:${media};base64,${r.data}` : undefined
+    return { key: pendingKey(), name, size: 0, kind, path: r.path, upload: r.upload, mediaType: r.mediaType, data: r.data, preview }
+  })
 }
 
 // The longest side a photo is sent at: plenty for a model to read, and

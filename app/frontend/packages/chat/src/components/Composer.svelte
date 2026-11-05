@@ -3,7 +3,7 @@
   import type { SessionView } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
-  import { attachmentIcon, formatSize, pendingKey, readImage, releasePreviews, shrinkPhoto, toRefs, type Pending } from '../lib/attachments'
+  import { attachmentIcon, formatSize, fromRefs, pendingKey, readImage, releasePreviews, shrinkPhoto, toRefs, type Pending } from '../lib/attachments'
   import { ATTACH_EVENT, INSERT_EVENT, quotePath } from '../lib/composerevents'
   import { loadDraft, saveDraft } from '../lib/keep'
   import { atServer } from '../lib/remoteonly'
@@ -63,12 +63,17 @@
 
   const canSend = $derived((text.trim() !== '' || attachments.length > 0) && !sending && uploading === 0)
 
+  // send sends the message, or, while an answer runs, queues it to go when
+  // the answer ends (session/queue.go). With a message held in the queue,
+  // the two go together.
+  const queueing = $derived(session.busy || !!session.queued)
   async function send() {
     const q = text.trim()
-    if ((!q && attachments.length === 0) || session.busy || sending) return
+    if ((!q && attachments.length === 0) || sending) return
     sending = true
     try {
-      await chat.send(q, toRefs(attachments))
+      if (queueing) await chat.queue(q, toRefs(attachments))
+      else await chat.send(q, toRefs(attachments))
       text = ''
       releasePreviews(attachments)
       attachments = []
@@ -79,6 +84,26 @@
     } finally {
       sending = false
       queueMicrotask(() => input?.focus())
+    }
+  }
+
+  // edit takes the queued message back into the box, before what's there.
+  async function editQueued() {
+    try {
+      const q = await chat.client.session(session.id).unqueue()
+      if (q.text) text = text.trim() ? `${q.text}\n\n${text}` : q.text
+      if (q.attachments.length) attachments = [...fromRefs(q.attachments), ...attachments]
+      input?.focus()
+    } catch (e) {
+      shell.toast(String(e), 'error')
+    }
+  }
+
+  async function sendQueued() {
+    try {
+      await chat.client.session(session.id).sendQueued()
+    } catch (e) {
+      shell.toast(String(e), 'error')
     }
   }
 
@@ -231,6 +256,19 @@
 <div class="composer">
   <SlashMenu bind:this={menu} {session} bind:text {input} />
   <MentionMenu bind:this={mentions} bind:text {input} />
+  {#if session.queued}
+    {@const q = session.queued}
+    <!-- A message waiting for the answer to end, or held for the user. -->
+    <div class="queued" class:held={q.held} role="status">
+      <Icon name={q.held ? 'circle-pause' : 'clock'} size={13} />
+      <span class="qbody">
+        <span class="qlabel">{q.held ? t('composer.queuedHeld') : t('composer.queued')}</span>
+        <span class="qtext">{q.text}{#if q.files?.length}{q.text ? ' · ' : ''}{t('composer.queuedFiles', { n: q.files.length })}{/if}</span>
+      </span>
+      {#if q.held && !session.busy}<button class="btn small primary" onclick={sendQueued}>{t('composer.sendNow')}</button>{/if}
+      <button class="btn small ghost" onclick={editQueued} title={t('composer.editQueuedHint')}><Icon name="pencil" size={12} />{t('composer.editQueued')}</button>
+    </div>
+  {/if}
   <div class="field">
     {#if attachments.length > 0}
       <ul class="attachments" aria-label={t('composer.attachments')}>
@@ -242,7 +280,7 @@
               <span class="kicon"><Icon name={attachmentIcon(a.kind)} size={14} /></span>
             {/if}
             <span class="cname">{a.name}</span>
-            <span class="csize">{formatSize(a.size)}</span>
+            {#if a.size > 0}<span class="csize">{formatSize(a.size)}</span>{/if}
             <button class="remove" onclick={() => detach(a.key)} aria-label={t('composer.remove', { name: a.name })} title={t('composer.remove', { name: a.name })}>
               <Icon name="x" size={12} />
             </button>
@@ -276,6 +314,9 @@
     <button class="btn stop" onclick={stop} title={t('composer.stop')}>
       <Icon name="square" size={13} />{t('composer.stop')}
     </button>
+    <button class="btn primary icon send" onclick={send} disabled={!canSend} aria-label={t('composer.queue')} title={enter === 'send' ? t('composer.queueHint') : t('composer.queueHintCtrl')}>
+      <Icon name="list-plus" />
+    </button>
   {:else}
     <button class="btn primary icon send" onclick={send} disabled={!canSend} aria-label={t('composer.send')} title={enter === 'send' ? t('composer.sendHint') : t('composer.sendHintCtrl')}>
       <Icon name="arrow-up" />
@@ -289,6 +330,7 @@
   .composer {
     position: relative; /* the slash-command menu sits above it */
     display: flex;
+    flex-wrap: wrap; /* a queued message takes a line of its own, above */
     align-items: flex-end;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
@@ -326,6 +368,53 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+  }
+  /* A message waiting in the queue: accent while it waits for the answer,
+     warning while it's held for the user. */
+  .queued {
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-right: calc(var(--space-4) - var(--space-2)); /* square with the box's left inset */
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+    background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+    font-size: var(--text-sm);
+  }
+  .queued > :global(.icon) {
+    color: var(--accent);
+  }
+  .queued.held {
+    border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+    background: color-mix(in srgb, var(--warning-soft) 60%, var(--surface));
+  }
+  .queued.held > :global(.icon) {
+    color: var(--warning);
+  }
+  .qbody {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .qlabel {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+  .qtext {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .queued .btn {
+    flex: none;
+    gap: 4px;
   }
   .attachments {
     display: flex;

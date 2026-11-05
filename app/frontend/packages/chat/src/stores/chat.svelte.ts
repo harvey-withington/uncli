@@ -247,6 +247,14 @@ export class ChatStore {
     await this.client.session(this.currentId).send(text, attachments, context ? { context } : undefined)
   }
 
+  // queue sends a message when the current session's answer ends (now if
+  // it isn't answering), with the host's context as send has.
+  async queue(text: string, attachments: AttachmentRef[] = []) {
+    if (!this.currentId) return
+    const context = this.turnContext?.()?.trim()
+    await this.client.session(this.currentId).queue(text, attachments, context ? { context } : undefined)
+  }
+
   async toggleBookmark() {
     if (this.currentId) await this.client.session(this.currentId).toggleBookmark()
   }
