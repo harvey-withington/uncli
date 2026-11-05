@@ -138,6 +138,7 @@
     <span class="label">{t('containerEdit.shares')}</span>
     <div class="shares">
       <label class="check"><input type="checkbox" checked={draft.brain === 'shared'} onchange={e => toggle('brain', e.currentTarget.checked)} />{t('containerEdit.shareBrain')}</label>
+      {#if draft.brain === 'shared'}<span class="hint">{t('containerEdit.brainNote')}</span>{/if}
       <label class="check"><input type="checkbox" checked={draft.mcp === 'shared'} onchange={e => toggle('mcp', e.currentTarget.checked)} />{t('containerEdit.shareMCP')}</label>
       <label class="check"><input type="checkbox" checked={draft.connectors === 'shared'} onchange={e => toggle('connectors', e.currentTarget.checked)} />{t('containerEdit.shareConnectors')}</label>
       {#if draft.connectors === 'shared'}<span class="hint warn">{t('containerEdit.connectorsNote')}</span>{/if}

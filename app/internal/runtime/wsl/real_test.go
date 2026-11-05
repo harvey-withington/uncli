@@ -119,3 +119,51 @@ func TestRealDistro(t *testing.T) {
 		t.Errorf("result = %q", result)
 	}
 }
+
+// TestLockedFileInRealDistro puts a locked copy in an existing distro
+// (UNCLI_WSL_DISTRO) and checks the CLI's user can't change it however
+// they try, that a new copy replaces it, and that nil removes it.
+func TestLockedFileInRealDistro(t *testing.T) {
+	name := os.Getenv("UNCLI_WSL_DISTRO")
+	if name == "" {
+		t.Skip("set UNCLI_WSL_DISTRO to an existing distro to try it there")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	r := &Runtime{Distro: name, run: execRunner}
+	at := "/tmp/uncli-locked-test/CLAUDE.md"
+	asUser := func(script string) error {
+		_, err := r.run(ctx, nil, "--distribution", name, "--user", User, "--exec", "sh", "-c", script, "sh", at)
+		return err
+	}
+	t.Cleanup(func() { _ = r.WriteLockedFile(context.Background(), at, nil) })
+	if err := r.WriteLockedFile(ctx, at, []byte("Be brief.\n")); err != nil {
+		t.Fatal(err)
+	}
+	for what, script := range map[string]string{
+		"writing in place":   `echo changed > "$1"`,
+		"saving by renaming": `echo changed > "$1.new" && mv -f "$1.new" "$1"`,
+		"deleting":           `rm -f "$1" && [ ! -e "$1" ]`,
+		"making it writable": `chmod u+w "$1"`,
+	} {
+		if err := asUser(script); err == nil {
+			t.Errorf("%s worked", what)
+		}
+	}
+	if b, _ := r.ReadFile(ctx, at); string(b) != "Be brief.\n" {
+		t.Errorf("after the attempts: %q", b)
+	}
+	// The next start replaces it with what's on Windows now.
+	if err := r.WriteLockedFile(ctx, at, []byte("Be thorough.\n")); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := r.ReadFile(ctx, at); string(b) != "Be thorough.\n" {
+		t.Errorf("replaced: %q", b)
+	}
+	if err := r.WriteLockedFile(ctx, at, nil); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := r.ReadFile(ctx, at); len(b) != 0 {
+		t.Errorf("removed, yet: %q", b)
+	}
+}

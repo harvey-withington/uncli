@@ -187,6 +187,10 @@ describe('Containers', () => {
     await fireEvent.click(settings.getByRole('button', { name: 'Edit Node' }))
     const form = within(settings.getByRole('form', { name: 'Edit Node' }))
     expect(form.getByRole('checkbox', { name: /Your secrets folder/ })).toBeChecked()
+    // Sharing memories and the rest says the instructions are a read-only copy.
+    const brain = form.getByRole('checkbox', { name: /Your memories, skills/ })
+    if (!(brain as HTMLInputElement).checked) await fireEvent.click(brain)
+    expect(form.getByText(/Your instructions \(CLAUDE\.md\) are a read-only copy/)).toBeInTheDocument()
     expect(form.getByRole('textbox', { name: 'Folder 1: Windows folder' })).toHaveValue('%USERPROFILE%\\notes')
     expect(form.getByText('Mounted at /home/uncli/notes')).toBeInTheDocument()
 

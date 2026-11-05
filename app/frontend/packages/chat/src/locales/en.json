@@ -956,6 +956,7 @@
   "containerEdit.addStep": "Add a step",
   "containerEdit.shares": "Shares",
   "containerEdit.shareBrain": "Your memories, skills, agents, commands and instructions",
+  "containerEdit.brainNote": "Changes to memories, skills, agents and commands are saved on Windows. Your instructions (CLAUDE.md) are a read-only copy: change them on Windows, and sessions get them from their next start.",
   "containerEdit.shareMCP": "Your MCP servers that run on Linux",
   "containerEdit.shareConnectors": "Your connectors",
   "containerEdit.connectorsNote": "Connectors need the whole-account sign-in under AI Providers. A session in this container can then reach your account and everything it's connected to.",

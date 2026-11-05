@@ -391,3 +391,37 @@ func TestBuildSetupSteps(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+// A locked file goes in as root, owned by root, read-only and immutable
+// (unlocking and replacing any copy already there); nil removes it.
+func TestWriteLockedFile(t *testing.T) {
+	var calls [][]string
+	var input []string
+	r := &Runtime{Distro: "uncli-sandbox", run: func(_ context.Context, stdin io.Reader, args ...string) ([]byte, error) {
+		calls = append(calls, args)
+		b := []byte{}
+		if stdin != nil {
+			b, _ = io.ReadAll(stdin)
+		}
+		input = append(input, string(b))
+		return nil, nil
+	}}
+	if err := r.WriteLockedFile(context.Background(), "/home/uncli/.claude/CLAUDE.md", []byte("Be brief.\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.WriteLockedFile(context.Background(), "/home/uncli/.claude/CLAUDE.md", nil); err != nil {
+		t.Fatal(err)
+	}
+	write, remove := strings.Join(calls[0], " "), strings.Join(calls[1], " ")
+	for _, want := range []string{"--user root", `chattr -i "$f"`, `chown root:root "$f"`, `chmod 0444 "$f"`, `chattr +i "$f"`, "/home/uncli/.claude/CLAUDE.md write " + User} {
+		if !strings.Contains(write, want) {
+			t.Errorf("writing lacks %q: %s", want, write)
+		}
+	}
+	if input[0] != "Be brief.\n" {
+		t.Errorf("wrote %q", input[0])
+	}
+	if !strings.Contains(remove, "/home/uncli/.claude/CLAUDE.md remove") || input[1] != "" {
+		t.Errorf("removing: %s, %q", remove, input[1])
+	}
+}

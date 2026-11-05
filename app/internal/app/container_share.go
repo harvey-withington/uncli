@@ -183,10 +183,18 @@ func containerBrief(p ContainerProfile, mounts []wsl.Mount) string {
 func shareBrain(ctx context.Context, r *wsl.Runtime, configDir, host, cli, home string, synced bool) error {
 	for i, sh := range claude.SharedBrain(configDir, host, cli, home, synced) {
 		if sh.File {
-			if b, err := os.ReadFile(sh.Host); err == nil {
-				if err := r.WriteFile(ctx, sh.Path, b); err != nil {
-					return err
-				}
+			// The user's instructions (CLAUDE.md) are a copy, not shared
+			// live: read-only, so an edit in the container fails out loud
+			// rather than being lost at the next start. Without one on
+			// Windows, an earlier copy goes too.
+			b, err := os.ReadFile(sh.Host)
+			if err != nil {
+				b = nil
+			} else if b == nil {
+				b = []byte{}
+			}
+			if err := r.WriteLockedFile(ctx, sh.Path, b); err != nil {
+				return err
 			}
 			continue
 		}

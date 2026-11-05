@@ -260,6 +260,25 @@ func (r *Runtime) WriteFile(ctx context.Context, at string, data []byte) error {
 	return err
 }
 
+// WriteLockedFile puts a file in place that the CLI's user can read but
+// not change: owned by root, read-only, and immutable where the file
+// system allows (chattr +i), so a save fails out loud however it's done,
+// even by writing a new file and renaming it over this one, which a
+// read-only file alone would let through. A copy already there is
+// unlocked and replaced. nil data removes the copy instead.
+func (r *Runtime) WriteLockedFile(ctx context.Context, at string, data []byte) error {
+	script := `f=$1; d=$(dirname "$f"); [ -e "$f" ] && { chattr -i "$f" 2>/dev/null; rm -f "$f"; }
+[ "$2" = remove ] && exit 0
+[ -d "$d" ] || { mkdir -p "$d" && chown "$3:$3" "$d"; } || exit 1
+cat > "$f" && chown root:root "$f" && chmod 0444 "$f" && { chattr +i "$f" 2>/dev/null || true; }`
+	mode, in := "write", bytes.NewReader(data)
+	if data == nil {
+		mode, in = "remove", bytes.NewReader(nil)
+	}
+	_, err := r.run(ctx, in, "--distribution", r.Distro, "--user", "root", "--exec", "sh", "-c", script, "sh", at, mode, User)
+	return err
+}
+
 // ReadFile reads a file as the CLI's user; a missing one is empty.
 func (r *Runtime) ReadFile(ctx context.Context, at string) ([]byte, error) {
 	return r.run(ctx, nil, "--distribution", r.Distro, "--user", User, "--exec", "sh", "-c", `[ -f "$1" ] && cat "$1" || true`, "sh", at)

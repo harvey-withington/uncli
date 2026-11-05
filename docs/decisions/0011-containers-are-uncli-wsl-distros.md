@@ -127,6 +127,12 @@ needs `libgcc` and `libstdc++`):
   is kept on Windows. It also mounts the user's skills, agents and commands,
   copies in their CLAUDE.md, and writes their git name and email to the
   container's `.gitconfig`. Their settings and credentials stay out.
+  The CLAUDE.md copy is read-only: owned by root, mode 0444 and immutable
+  (`chattr +i`), so an edit in the container fails out loud, however it's
+  saved, rather than being lost when the next start copies it in again.
+  Changed on Windows, it reaches sessions from their next start. (A live
+  bind mount of the one file would go stale when an editor saves by
+  renaming a new file over it.)
 - **Shared MCP servers** (`mcp: shared`) copy into the container's
   `~/.claude.json` the user's MCP servers (user scope, and the project's)
   that can run on Linux: URL-based ones, and `npx`, `node`, `uvx`…

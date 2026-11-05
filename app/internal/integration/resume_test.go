@@ -45,7 +45,7 @@ func TestResumeCutOffTurn(t *testing.T) {
 	}
 	waitTil(t, "the turn under way", 90*time.Second, func() bool { return view(svc, v.ID).Busy })
 	time.Sleep(6 * time.Second) // into the answer, which takes longer than this
-	svc.Close() // quit mid-answer
+	svc.Close()                 // quit mid-answer
 
 	svc2, _ := open(t, config)
 	defer svc2.Close()
