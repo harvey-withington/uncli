@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { serverKey, withServer } from '@uncli/chat/lib/api'
 import { mockBackend } from '@uncli/client/mock'
 import type { Backend, Handlers } from '@uncli/chat/lib/api'
+import { tick } from 'svelte'
 import MobileApp from './MobileApp.svelte'
 
 const SERVER = serverKey(location.origin) // the app is this page's server's
@@ -66,6 +67,83 @@ describe('the phone app', () => {
     expect(screen.getByRole('button', { name: 'Attach a photo or file' })).toBeInTheDocument()
     await fireEvent.click(screen.getByRole('button', { name: 'Back' }))
     await waitFor(() => expect(screen.getByRole('list', { name: 'Sessions' })).toBeInTheDocument())
+  })
+
+  describe('reordering the sessions with a finger', () => {
+    // jsdom has no layout: give each row a 60px-tall box.
+    async function rows() {
+      const list = await screen.findByRole('list', { name: 'Sessions' })
+      const items = [...list.querySelectorAll<HTMLElement>('li[data-id]')]
+      items.forEach((li, i) => {
+        li.getBoundingClientRect = () => ({ top: i * 60, height: 60, bottom: i * 60 + 60, left: 0, right: 360, width: 360, x: 0, y: i * 60, toJSON: () => ({}) })
+      })
+      return { list, items, titles: () => [...list.querySelectorAll('li[data-id] .title')].map(e => e.textContent?.trim()) }
+    }
+    // jsdom's pointer events carry no pointerType: a finger's, by hand.
+    const finger = async (el: EventTarget, type: string, clientY = 0) => {
+      const e = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientY })
+      Object.defineProperty(e, 'pointerType', { value: 'touch' })
+      el.dispatchEvent(e)
+      await tick()
+    }
+
+    it('lifts a session held still, and drops it where the finger lets go', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        const backend = phoneBackend()
+        const move = vi.spyOn(backend, 'setSortOrder')
+        render(MobileApp, { props: { backend } })
+        const { items, titles } = await rows()
+        const id = items[0]!.dataset.id
+        const before = titles()
+        const row = items[0]!.querySelector('.main') as HTMLElement
+        await finger(row, 'pointerdown', 10)
+        expect(document.querySelector('.drag-ghost')).toBeNull() // not yet: it could be a tap or a scroll
+        await vi.advanceTimersByTimeAsync(400)
+        expect(items[0]).toHaveClass('dragging')
+        // While it's held, the page doesn't scroll.
+        const scroll = new Event('touchmove', { cancelable: true })
+        document.dispatchEvent(scroll)
+        expect(scroll.defaultPrevented).toBe(true)
+        await finger(document, 'pointermove', 70)
+        await finger(document, 'pointermove', 150) // past the middle of the third row
+        await finger(document, 'pointerup')
+        await waitFor(() => expect(move).toHaveBeenCalledWith(id, expect.any(Number)))
+        await waitFor(() => expect(titles()).toEqual([before[1], before[2], before[0], ...before.slice(3)]))
+        await waitFor(() => expect(document.querySelector('.drag-ghost')).toBeNull())
+        // The session wasn't opened by letting go.
+        expect(screen.getByRole('list', { name: 'Sessions' })).toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('scrolls instead when the finger moves before the session lifts, and a tap still opens it', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        const backend = phoneBackend()
+        const move = vi.spyOn(backend, 'setSortOrder')
+        render(MobileApp, { props: { backend } })
+        const { items } = await rows()
+        const row = items[0]!.querySelector('.main') as HTMLElement
+        await finger(row, 'pointerdown', 10)
+        await finger(document, 'pointermove', 40)
+        const scroll = new Event('touchmove', { cancelable: true })
+        document.dispatchEvent(scroll)
+        expect(scroll.defaultPrevented).toBe(false)
+        await vi.advanceTimersByTimeAsync(400)
+        expect(document.querySelector('.drag-ghost')).toBeNull()
+        await finger(document, 'pointerup')
+        expect(move).not.toHaveBeenCalled()
+        // A tap: down and up at once.
+        await finger(row, 'pointerdown', 10)
+        await finger(document, 'pointerup')
+        await fireEvent.click(row)
+        expect(await screen.findByRole('heading', { name: 'Fix the flaky parser test' })).toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 
   it('cancels a rename on Back, the button or the gesture, and stays in the session', async () => {

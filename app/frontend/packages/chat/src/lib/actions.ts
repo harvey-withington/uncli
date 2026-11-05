@@ -102,6 +102,12 @@ export interface DragSortOptions {
 // the ghost settles into the slot, then the list is reordered. Escape
 // cancels. The list's scroller follows the pointer near its edges. Inputs
 // and controls marked data-no-drag inside an item don't start a drag.
+//
+// On a touch screen a drag that started on moving would take every scroll,
+// so a finger lifts the item by holding still on it (LIFT_MS, with a short
+// buzz), as phones do; moving first scrolls as usual. While an item is
+// lifted, or about to be, the page neither scrolls nor opens its
+// long-press menu, and letting go doesn't open the item.
 export function dragSort(node: HTMLElement, opts: DragSortOptions) {
   let options = opts
   let cancel: (() => void) | null = null
@@ -114,6 +120,8 @@ export function dragSort(node: HTMLElement, opts: DragSortOptions) {
     const id = item.dataset.id
     if (!id) return
     const startY = e.clientY
+    const touch = e.pointerType === 'touch' || e.pointerType === 'pen'
+    let lift: ReturnType<typeof setTimeout> | null = null
     let started = false
     let items: HTMLElement[] = []
     let rects: DOMRect[] = []
@@ -181,6 +189,11 @@ export function dragSort(node: HTMLElement, opts: DragSortOptions) {
 
     const onmove = (ev: PointerEvent) => {
       if (!started) {
+        if (touch) {
+          // Moving before the item lifts is a scroll: let it go.
+          if (Math.abs(ev.clientY - startY) > 8) finish(false)
+          return
+        }
         if (Math.abs(ev.clientY - startY) < 5) return
         start()
       }
@@ -199,7 +212,18 @@ export function dragSort(node: HTMLElement, opts: DragSortOptions) {
     }
     const onscroll = () => follow(lastY)
 
+    // A finger holding a lifted item doesn't scroll the page, and a long
+    // press doesn't open the browser's menu.
+    const holdStill = (te: TouchEvent) => {
+      if (started) te.preventDefault()
+    }
+    const noMenu = (ce: Event) => ce.preventDefault()
+
     const detach = () => {
+      if (lift) clearTimeout(lift)
+      lift = null
+      document.removeEventListener('touchmove', holdStill)
+      document.removeEventListener('contextmenu', noMenu, true)
       document.removeEventListener('pointermove', onmove)
       document.removeEventListener('pointerup', onup)
       document.removeEventListener('pointercancel', oncancel)
@@ -257,6 +281,15 @@ export function dragSort(node: HTMLElement, opts: DragSortOptions) {
     }
 
     cancel = () => finish(false)
+    if (touch) {
+      document.addEventListener('touchmove', holdStill, { passive: false })
+      document.addEventListener('contextmenu', noMenu, true)
+      lift = setTimeout(() => {
+        lift = null
+        start()
+        navigator.vibrate?.(12)
+      }, LIFT_MS)
+    }
     document.addEventListener('pointermove', onmove)
     document.addEventListener('pointerup', onup)
     document.addEventListener('pointercancel', oncancel)
@@ -276,6 +309,7 @@ export function dragSort(node: HTMLElement, opts: DragSortOptions) {
 }
 
 const SETTLE_MS = 170
+const LIFT_MS = 350 // a touch held this long lifts an item: before the browser's own long press
 
 function reducedMotion(): boolean {
   return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches

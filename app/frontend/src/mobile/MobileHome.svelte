@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from '@uncli/chat/components/Icon.svelte'
+  import { dragSort } from '@uncli/chat/lib/actions'
   import SessionItem from '@uncli/chat/components/SessionItem.svelte'
   import UpdateNotice from '../components/UpdateNotice.svelte'
   import { useApp } from '../lib/context'
@@ -7,7 +8,8 @@
 
   // The phone's first screen: the server's sessions, newest activity
   // first as on the desktop, a button for a new one, and Settings. Tapping
-  // a session opens it.
+  // a session opens it; holding one lifts it, to drag it elsewhere in the
+  // list (lib/actions.ts dragSort), as the desktop's sidebar reorders.
 
   interface Props {
     server: string
@@ -40,7 +42,7 @@
   {#if app.activeSessions.length === 0}
     <p class="empty">{t('mobile.noSessions')}</p>
   {:else}
-    <ul class="list" aria-label={t('mobile.sessions')}>
+    <ul class="list" aria-label={t('mobile.sessions')} use:dragSort={{ item: 'li[data-id]', onmove: (id, to) => app.moveSession(id, to) }}>
       {#each app.activeSessions as s (s.id)}
         <SessionItem session={s} active={s.id === app.currentId} />
       {/each}
@@ -107,6 +109,12 @@
   .new {
     min-height: 44px;
     justify-content: center;
+  }
+  /* Holding a session lifts it to reorder (dragSort): no text selection or
+     callout menu on the long press. */
+  .list :global(li) {
+    -webkit-touch-callout: none;
+    user-select: none;
   }
   .list {
     display: flex;

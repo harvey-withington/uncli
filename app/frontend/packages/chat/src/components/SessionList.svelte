@@ -80,25 +80,6 @@
     flex-direction: column;
     gap: 2px;
   }
-  /* Drag to reorder, as in the sidebar. */
-  ul:global(.sorting) :global(li) {
-    transition: transform 180ms var(--ease), background var(--fast) var(--ease);
-  }
-  ul:global(.settled) :global(li) {
-    transition: none;
-  }
-  ul :global(li.dragging) {
-    background: var(--accent-soft);
-    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
-  }
-  ul :global(li.dragging > *) {
-    visibility: hidden;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    ul:global(.sorting) :global(li) {
-      transition: none;
-    }
-  }
   .note {
     display: flex;
     gap: var(--space-2);
