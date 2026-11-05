@@ -994,6 +994,10 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       const s = sessions.find(x => x.id === id)
       if (s && s.state === 'unread') setState(s, 'idle')
     },
+    async setResumeCutOff(on) {
+      prefs = { ...prefs, resumeCutOff: on }
+      return structuredClone(prefs)
+    },
     async setPreferences(p) {
       const d = p.decisionModel
       if (d?.provider === 'systemone' && !/^https?:\/\/./.test(d.endpoint ?? '')) {

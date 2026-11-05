@@ -54,7 +54,7 @@ var rpcMethods = []string{
 	"PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "SetPushNotifications", "TestPush",
 	// UNCLI's own updates (decision 0025): the phone can start one, as a
 	// session on the PC could.
-	"UpdateStatus", "CheckForUpdates", "InstallUpdate",
+	"UpdateStatus", "CheckForUpdates", "InstallUpdate", "SetResumeCutOff",
 }
 
 // EmbeddedMethods is what a host's own UNCLI offers its page (decision
@@ -65,7 +65,7 @@ var rpcMethods = []string{
 func EmbeddedMethods() []string {
 	m := slices.DeleteFunc(slices.Clone(rpcMethods), func(m string) bool {
 		return strings.HasPrefix(m, "Push") || m == "SetPushNotifications" || m == "TestPush" ||
-			m == "UpdateStatus" || m == "CheckForUpdates" || m == "InstallUpdate"
+			m == "UpdateStatus" || m == "CheckForUpdates" || m == "InstallUpdate" || m == "SetResumeCutOff"
 	})
 	return append(append(m, setupMethods...), hostMethods...)
 }

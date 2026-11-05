@@ -238,6 +238,7 @@ export function httpBackend(opts: HttpOptions): Backend {
     archive: (s, on) => call('Archive', s, on),
     focus: s => call('Focus', s),
     setPreferences: only('setPreferences'),
+    setResumeCutOff: on => call('SetResumeCutOff', on),
     setDecisionKey: only('setDecisionKey'),
     hasDecisionKey: () => call('HasDecisionKey'),
     testDecisionModel: only('testDecisionModel'),

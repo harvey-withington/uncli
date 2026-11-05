@@ -113,6 +113,7 @@ export function wailsBackend(): Backend {
     archive: (s, on) => call('Archive', s, on),
     focus: id => call('Focus', id),
     setPreferences: p => call('SetPreferences', p),
+    setResumeCutOff: on => call('SetResumeCutOff', on),
     setDecisionKey: k => call('SetDecisionKey', k),
     hasDecisionKey: () => call('HasDecisionKey'),
     testDecisionModel: () => call('TestDecisionModel'),

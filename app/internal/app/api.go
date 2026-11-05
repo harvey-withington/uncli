@@ -117,6 +117,15 @@ func (a *API) Send(sessionID, text string, attachments []AttachmentRef) error {
 	return a.svc.Send(context.Background(), sessionID, text, attachments)
 }
 
+// SetResumeCutOff turns carrying on answers cut off by a restart on or
+// off (Preferences.ResumeCutOff): the one preference a paired device may
+// change, since the phone is where a cut-off answer is noticed.
+func (a *API) SetResumeCutOff(on bool) (Preferences, error) {
+	p := a.svc.Preferences()
+	p.ResumeCutOff = on
+	return a.svc.SetPreferences(p)
+}
+
 // Queue sends a message when the session's answer ends (now if it isn't
 // answering); queued again, the messages go as one (session/queue.go).
 func (a *API) Queue(sessionID, text string, attachments []AttachmentRef, opts SendOptions) error {

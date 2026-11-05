@@ -4,13 +4,16 @@
   import { relativeTime } from '@uncli/chat/lib/format'
   import { t } from '@uncli/chat/lib/i18n.svelte'
   import Icon from '@uncli/chat/components/Icon.svelte'
+  import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   // Settings → Updates (decision 0025): the version this is, whether it
   // looks for newer releases by itself, Check now, and Update now when
   // there's one. A development build says it's updated another way. The
   // phone's Settings has it without prefs: the PC's version, Check now and
   // Update now, but not the automatic box (the PC's preferences are set at
-  // the PC).
+  // the PC); it does have "Carry on answers cut off by a restart", the one
+  // the phone may change (on the desktop it's under Tray and startup), since
+  // the phone is where a cut-off answer gets noticed.
 
   interface Props {
     prefs?: Preferences
@@ -19,6 +22,15 @@
 
   let { prefs, savePrefs }: Props = $props()
   const app = useApp()
+  const shell = useShell()
+
+  async function resume(on: boolean) {
+    try {
+      app.patchBoot({ preferences: await app.backend.setResumeCutOff(on) })
+    } catch (e) {
+      shell.toast(String(e), 'error')
+    }
+  }
   const u = $derived(app.update)
   const busy = $derived(u?.state === 'checking' || u?.state === 'downloading' || u?.state === 'installing')
   const line = $derived.by(() => {
@@ -51,6 +63,17 @@
   {:else if u && !u.dev}
     <p class="muted">{t('update.versionRemote', { version: u.current })}</p>
   {/if}
+  {#if !prefs}
+    <label class="check resume">
+      <input
+        type="checkbox"
+        checked={!!app.boot?.preferences.resumeCutOff}
+        aria-describedby="phone-resume-hint"
+        onchange={e => void resume(e.currentTarget.checked)}
+      />{t('settings.resumeCutOff')}
+    </label>
+    <p class="muted hint" id="phone-resume-hint">{t('settings.resumeCutOffHint')}</p>
+  {/if}
   {#if line}
     <p class="line" class:err={u?.state === 'error'} role="status">
       {#if busy}<Icon name="loader" spin size={13} />{/if}{line}
@@ -81,6 +104,12 @@
     margin: 0 0 var(--space-3);
     font-size: var(--text-sm);
     color: var(--text-muted);
+  }
+  .resume {
+    margin-top: var(--space-3);
+  }
+  .hint {
+    margin: var(--space-1) 0 0;
   }
   .check {
     display: flex;

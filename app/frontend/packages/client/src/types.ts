@@ -930,6 +930,9 @@ export interface Backend {
   archive(sessionId: string, on: boolean): Promise<SessionView> // archive (stops its CLI) or restore
   focus(sessionId: string): Promise<void>
   setPreferences(p: Preferences): Promise<Preferences>
+  // setResumeCutOff is the one preference a paired device may change:
+  // carrying on answers a restart cut off.
+  setResumeCutOff(on: boolean): Promise<Preferences>
   setDecisionKey(key: string): Promise<void> // the decision model's API key; never read back
   hasDecisionKey(): Promise<boolean>
   testDecisionModel(): Promise<DecisionTest> // a sample question to the decision model

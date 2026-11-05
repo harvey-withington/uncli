@@ -71,7 +71,9 @@ describe('the phone’s Settings', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     const section = (await screen.findByRole('heading', { name: 'Updates' })).closest('section') as HTMLElement
     expect(within(section).getByText(/The PC runs UNCLI 0.3.0-alpha/)).toBeInTheDocument()
-    expect(within(section).queryByRole('checkbox')).toBeNull()
+    // Not the PC's automatic box; only carrying on cut-off answers, the one it may change.
+    expect(within(section).queryByRole('checkbox', { name: 'Check for updates automatically' })).toBeNull()
+    expect(within(section).getAllByRole('checkbox').map(c => c.getAttribute('aria-describedby'))).toEqual(['phone-resume-hint'])
     await fireEvent.click(within(section).getByRole('button', { name: 'Check now' }))
     await waitFor(() => expect(check).toHaveBeenCalled())
     expect(await within(section).findByText(/UNCLI is up to date \(checked/)).toBeInTheDocument()

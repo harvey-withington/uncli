@@ -20,7 +20,7 @@ var pinnedMethods = []string{
 	"MCPSignOut", "MCPToggle", "MarkSafe", "MoveSafeEntry", "Pages", "Pinned",
 	"PreviewClasses", "ProviderChannels", "ProviderStatus", "PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "Queue", "ReadArtifact",
 	"Rename", "Restart", "SafeList", "Search", "Send", "SendQueued", "SendWith", "SessionAllowlist", "SetBookmark",
-	"SetMode", "SetModel", "SetPinned", "SetPushNotifications", "SetSafeEntry", "SetSafeLabel",
+	"SetMode", "SetModel", "SetPinned", "SetPushNotifications", "SetResumeCutOff", "SetSafeEntry", "SetSafeLabel",
 	"SetShares", "SetSortOrder", "SetUnattended", "SummarisePage", "Teach", "TestPush",
 	"ToggleModifier", "Transcripts", "Unqueue", "UpdateStatus", "UploadLink", "Usage", "UsageReport",
 	"WatchFiles", "WatchRead",

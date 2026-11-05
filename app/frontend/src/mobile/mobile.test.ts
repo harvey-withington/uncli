@@ -233,6 +233,22 @@ describe('the phone app', () => {
     expect(document.querySelector('.server')?.textContent).toBe(SERVER)
   })
 
+  it('turns carrying on cut-off answers on and off from the phone, the one PC preference it may change', async () => {
+    const backend = phoneBackend()
+    const set = vi.spyOn(backend, 'setResumeCutOff')
+    render(MobileApp, { props: { backend } })
+    await screen.findByRole('list', { name: 'Sessions' })
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const box = screen.getByRole('checkbox', { name: 'Carry on answers cut off by a restart' })
+    expect(box).not.toBeChecked()
+    expect(box).toHaveAccessibleDescription(/Answers you stopped yourself stay stopped/)
+    await fireEvent.click(box)
+    expect(set).toHaveBeenCalledWith(true)
+    await waitFor(() => expect(box).toBeChecked())
+    // The PC's other preferences stay the PC's: no automatic updates box here.
+    expect(screen.queryByRole('checkbox', { name: 'Check for updates automatically' })).toBeNull()
+  })
+
   it('says when the server can\u2019t be reached', async () => {
     const b = phoneBackend()
     let h: Handlers | null = null
