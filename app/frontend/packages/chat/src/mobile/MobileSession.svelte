@@ -50,11 +50,12 @@
   }
 </script>
 
-<section class="session" class:wide={isWide}>
+<section class="session" class:wide={isWide} class:embedded={app.embedded}>
   <SessionHeader {session} compact {onback} />
 
   <!-- Everything under the header. On a phone it makes no box of its own
-       (display: contents); on a tablet it leaves room for the side panel. -->
+       (display: contents); on a tablet it leaves room for the side panel;
+       embedded, the side panel covers it and not the header. -->
   <div class="body" class:with-panel={isWide && app.outline.open} style:--panel-w="min({app.outline.width}px, 45%)">
   <div class="scroll" bind:this={scroller} part="page">
     <div class="content">
@@ -92,7 +93,7 @@
 
   {#if app.outline.open}
     <div class="panel" role={isWide ? undefined : 'dialog'} aria-label={isWide ? undefined : t('outline.toggle')}>
-      {#if !isWide}<button class="btn ghost icon touch close" onclick={() => app.togglePanel()} aria-label={t('common.close')}><Icon name="x" /></button>{/if}
+      {#if !isWide && !app.embedded}<button class="btn ghost icon touch close" onclick={() => app.togglePanel()} aria-label={t('common.close')}><Icon name="x" /></button>{/if}
       <SidePanel sessionId={session.id} page={page ?? null} {scroller} />
     </div>
   {/if}
@@ -213,6 +214,16 @@
      as they always have, and the side panel covers the whole screen. */
   .body {
     display: contents;
+  }
+  /* Embedded: the side panel covers only what's under the header, which
+     keeps its side panel button to close it (and the corner a host may keep
+     for its own close button free of a second one). */
+  .embedded .body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
   /* A tablet: the body is the column under the header, the side panel sits
      at its right as wide as it's dragged, and the message box and approval

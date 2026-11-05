@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition'
-  import { clickOutside } from '../lib/actions'
+  import { clickOutside, keepInside } from '../lib/actions'
   import type { UsageLimit } from '../lib/api'
   import { resetsIn } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
@@ -18,7 +18,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="pop" use:clickOutside={onclose} onkeydown={e => e.key === 'Escape' && onclose()} transition:fly={{ y: -4, duration: 140 }} role="dialog" aria-label={t('usage.title')} tabindex="-1">
+<div class="pop" use:keepInside use:clickOutside={onclose} onkeydown={e => e.key === 'Escape' && onclose()} transition:fly={{ y: -4, duration: 140 }} role="dialog" aria-label={t('usage.title')} tabindex="-1">
   <h3>{t('usage.title')}</h3>
   {#if windows.length === 0}
     <p class="none">{t('usage.none')}</p>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition'
-  import { clickOutside } from '../lib/actions'
+  import { clickOutside, keepInside } from '../lib/actions'
   import type { MCPServer, SessionView } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
@@ -55,7 +55,7 @@
       {#if attention}<span class="dot" aria-hidden="true"></span>{/if}
     </button>
     {#if open}
-      <div class="pop" use:clickOutside={() => (open = false)} transition:fly={{ y: -4, duration: 140 }} role="dialog" aria-label={t('mcp.title')} tabindex="-1">
+      <div class="pop" use:keepInside use:clickOutside={() => (open = false)} transition:fly={{ y: -4, duration: 140 }} role="dialog" aria-label={t('mcp.title')} tabindex="-1">
         <h3>{t('mcp.title')}</h3>
         <ul>
           {#each servers as sv (sv.name)}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition'
-  import { clickOutside } from '../lib/actions'
+  import { clickOutside, keepInside } from '../lib/actions'
   import type { Share, SessionView } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
@@ -52,7 +52,7 @@
     </button>
     {#if open}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="pop" use:clickOutside={() => (open = false)} onkeydown={e => e.key === 'Escape' && (open = false)} transition:fly={{ y: -4, duration: 140 }} role="dialog" aria-label={t('shares.title')} tabindex="-1">
+      <div class="pop" use:keepInside use:clickOutside={() => (open = false)} onkeydown={e => e.key === 'Escape' && (open = false)} transition:fly={{ y: -4, duration: 140 }} role="dialog" aria-label={t('shares.title')} tabindex="-1">
         <h3>{t('shares.title')}</h3>
         {#each session.shareable as s (s)}
           <label class="check">

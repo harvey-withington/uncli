@@ -318,6 +318,18 @@ describe('the folded header', () => {
     expect(toggle).toHaveBeenCalledWith('s-code', expect.any(String), false)
     expect(await inside(el).findByRole('button', { name: 'Turn on' })).toBeInTheDocument()
   })
+
+  it('opens the side panel under the header, closed from the header, with no close button of its own', async () => {
+    const el = chat(mockBackend(), { compact: '' })
+    await inside(el).findByText(QUESTION)
+    const toggle = inside(el).getAllByRole('button', { name: /side panel|outline/i })[0]!
+    await fireEvent.click(toggle)
+    await inside(el).findByText('On this page')
+    // The host's corner (its own close button, say) stays free of a second one.
+    expect(inside(el).queryByRole('button', { name: 'Close' })).toBeNull()
+    await fireEvent.click(toggle)
+    await waitFor(() => expect(inside(el).queryByText('On this page')).toBeNull())
+  })
 })
 
 describe('setting up the CLI', () => {

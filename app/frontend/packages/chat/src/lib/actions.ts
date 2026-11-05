@@ -25,6 +25,34 @@ export function clickOutside(node: HTMLElement, fn: () => void) {
   }
 }
 
+// keepInside keeps a popover within its UNCLI: the window in the app, the
+// element's own box when embedded, where anything past it is the host's
+// page (under its panels, or cut off). Narrowed to fit, moved sideways
+// back in, and as tall as there's room below it.
+export function keepInside(node: HTMLElement, margin = 8) {
+  const { host } = rootOf(node)
+  const embedded = host !== document.body
+  const fit = () => {
+    const b = embedded ? host.getBoundingClientRect() : { left: 0, right: innerWidth, bottom: innerHeight }
+    node.style.translate = ''
+    node.style.maxWidth = `${Math.max(0, b.right - b.left - 2 * margin)}px`
+    const r = node.getBoundingClientRect()
+    const dx = r.left < b.left + margin ? b.left + margin - r.left : r.right > b.right - margin ? b.right - margin - r.right : 0
+    if (dx) node.style.translate = `${dx}px 0`
+    node.style.maxHeight = `${Math.max(120, b.bottom - r.top - margin)}px`
+  }
+  fit()
+  const seen = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit)
+  if (embedded) seen?.observe(host)
+  addEventListener('resize', fit)
+  return {
+    destroy() {
+      seen?.disconnect()
+      removeEventListener('resize', fit)
+    },
+  }
+}
+
 // focusTrap keeps Tab inside the node and focuses its first control.
 export function focusTrap(node: HTMLElement) {
   const selector = 'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
