@@ -90,9 +90,10 @@
     }
   }
 
-  // Files dropped or pasted on the message box attach to the next turn.
-  // Folders, and files that can't be attached, go in as their paths, with a
-  // note saying why.
+  // Files dropped or pasted on the message box attach to the next turn, as
+  // copied then (upload), so a file gone by Send (a screenshot tool's
+  // temporary file) still goes. Folders, and files that can't be attached,
+  // go in as their paths, with a note saying why.
   async function attachPaths(paths: string[]) {
     const id = session.id
     let infos
@@ -104,7 +105,7 @@
     }
     const known = new Set((id === shownFor ? attachments : drafts.get(id) ?? []).map(a => a.path))
     const fresh = infos.filter(i => i.kind !== 'folder' && i.kind !== 'unsupported' && !known.has(i.path))
-    attach(id, fresh.map(i => ({ key: pendingKey(), name: i.name, size: i.size, kind: i.kind, path: i.path, mediaType: i.mediaType })))
+    attach(id, fresh.map(i => ({ key: pendingKey(), name: i.name, size: i.size, kind: i.kind, path: i.path, upload: i.upload, mediaType: i.mediaType })))
     const rest = infos.filter(i => i.kind === 'folder' || i.kind === 'unsupported')
     if (rest.length > 0) {
       input?.dispatchEvent(new CustomEvent(INSERT_EVENT, { detail: rest.map(i => quotePath(i.path)).join(' ') }))

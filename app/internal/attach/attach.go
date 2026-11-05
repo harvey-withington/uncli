@@ -49,6 +49,10 @@ type Info struct {
 	Kind      string `json:"kind"` // image | pdf | text | folder | unsupported
 	MediaType string `json:"mediaType,omitempty"`
 	Reason    string `json:"reason,omitempty"` // why it can't be attached
+	// Upload is the copy taken as the file was attached (the app's uploads),
+	// sent in its place: the file itself may be gone by Send (a screenshot
+	// tool's temporary file, replaced by the next screenshot).
+	Upload string `json:"upload,omitempty"`
 }
 
 // Attachable reports whether the path can be sent as an attachment.

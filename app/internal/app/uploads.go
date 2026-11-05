@@ -72,6 +72,35 @@ func (s *Service) SaveUpload(name string, body io.Reader) (Upload, error) {
 	return Upload{ID: id, Info: attach.Describe(path)}, nil
 }
 
+// stageFile copies a file being attached into the uploads, returning the
+// copy's id, and remembers where it came from (stagedFrom).
+func (s *Service) stageFile(path, name string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	up, err := s.SaveUpload(name, f)
+	if err != nil {
+		return "", err
+	}
+	s.stagedMu.Lock()
+	defer s.stagedMu.Unlock()
+	if s.staged == nil {
+		s.staged = map[string]string{}
+	}
+	s.staged[up.ID] = path
+	return up.ID, nil
+}
+
+// stagedFrom is the path an upload was copied from as it was attached, or
+// "" for one a remote client sent.
+func (s *Service) stagedFrom(id string) string {
+	s.stagedMu.Lock()
+	defer s.stagedMu.Unlock()
+	return s.staged[id]
+}
+
 // UploadPath is where an upload is on disk, or an error when there's no
 // such upload.
 func (s *Service) UploadPath(id string) (string, error) {

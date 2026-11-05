@@ -270,7 +270,7 @@ func (a *API) DescribePaths(paths []string) []DroppedPath { return DescribePaths
 
 // DescribeAttachments says which dropped or pasted files can be attached.
 func (a *API) DescribeAttachments(paths []string) []attach.Info {
-	return DescribeAttachments(paths)
+	return a.svc.DescribeAttachments(paths)
 }
 
 func (a *API) Rename(sessionID, title string) (session.View, error) {

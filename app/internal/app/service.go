@@ -133,6 +133,8 @@ type Service struct {
 	Quit       func()
 
 	embedded      bool // a host's own UNCLI (Options.Embedded)
+	stagedMu      sync.Mutex
+	staged        map[string]string // uploads copied from files as they were attached, to their paths (uploads.go)
 	emit          Emitter
 	notifier      notify.Notifier
 	remoteMu      sync.Mutex
@@ -656,6 +658,16 @@ func (s *Service) Send(ctx context.Context, sessionID, text string, refs []Attac
 
 // SendWith is Send with the turn's options.
 func (s *Service) SendWith(ctx context.Context, sessionID, text string, refs []AttachmentRef, opts SendOptions) error {
+	files, err := s.loadAttachments(refs)
+	if err != nil {
+		return err
+	}
+	return s.Sessions.SendWith(ctx, sessionID, text, opts.Context, files...)
+}
+
+// loadAttachments reads a turn's attachments; the first that can't be
+// attached says why.
+func (s *Service) loadAttachments(refs []AttachmentRef) ([]core.Attachment, error) {
 	files := make([]core.Attachment, 0, len(refs))
 	for _, r := range refs {
 		var f core.Attachment
@@ -666,6 +678,11 @@ func (s *Service) SendWith(ctx context.Context, sessionID, text string, refs []A
 			if path, err = s.UploadPath(r.Upload); err == nil {
 				f, err = attach.Load(path)
 			}
+			// A copy taken as a file was attached keeps the file's own path
+			// on the page.
+			if from := s.stagedFrom(r.Upload); err == nil && from != "" {
+				f.Path = from
+			}
 		case r.Path != "":
 			f, err = attach.Load(r.Path)
 		default:
@@ -675,19 +692,29 @@ func (s *Service) SendWith(ctx context.Context, sessionID, text string, refs []A
 			}
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 		files = append(files, f)
 	}
-	return s.Sessions.SendWith(ctx, sessionID, text, opts.Context, files...)
+	return files, nil
 }
 
 // DescribeAttachments says, for each dropped or pasted path, whether it
-// can be attached (and as what) or why not.
-func DescribeAttachments(paths []string) []attach.Info {
+// can be attached (and as what) or why not. Each one that can is copied
+// into the uploads at once (Info.Upload), and the turn sends the copy: what
+// was attached is what goes, even if the file is moved, changed or deleted
+// before Send (a screenshot tool that keeps only its latest screenshot). A
+// copy that can't be made leaves the file to be read at Send, as before.
+func (s *Service) DescribeAttachments(paths []string) []attach.Info {
 	out := make([]attach.Info, 0, len(paths))
 	for _, p := range paths {
-		out = append(out, attach.Describe(p))
+		info := attach.Describe(p)
+		if info.Attachable() {
+			if id, err := s.stageFile(p, info.Name); err == nil {
+				info.Upload = id
+			}
+		}
+		out = append(out, info)
 	}
 	return out
 }

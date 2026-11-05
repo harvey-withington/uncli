@@ -48,3 +48,39 @@ func TestUploads(t *testing.T) {
 		t.Errorf("over the total = %v", err)
 	}
 }
+
+// A file is copied as it's attached, so one gone by Send (a screenshot
+// tool's temporary file, replaced by the next) still goes, under its own
+// path; one that couldn't be copied is read at Send, as before.
+func TestAttachedFilesAreCopiedAtOnce(t *testing.T) {
+	s := newTestService(t)
+	dir := t.TempDir()
+	shot := filepath.Join(dir, "2026-11-05 11-26-07.png")
+	png := []byte("\x89PNG\r\n\x1a\n first screenshot")
+	if err := os.WriteFile(shot, png, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(dir, "a folder")
+	_ = os.Mkdir(folder, 0o700)
+	infos := s.DescribeAttachments([]string{shot, folder})
+	if infos[0].Upload == "" || infos[0].Path != shot || infos[0].Kind != "image" {
+		t.Fatalf("screenshot = %+v", infos[0])
+	}
+	if infos[1].Upload != "" {
+		t.Errorf("a folder was copied: %+v", infos[1])
+	}
+	if err := os.Remove(shot); err != nil {
+		t.Fatal(err)
+	}
+	files, err := s.loadAttachments([]AttachmentRef{{Upload: infos[0].Upload, Path: shot}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := files[0]; string(f.Data) != string(png) || f.Path != shot || f.Name != "2026-11-05 11-26-07.png" || f.MediaType != "image/png" {
+		t.Errorf("sent = %q %q %q %q", f.Name, f.Path, f.MediaType, f.Data)
+	}
+	// Without the copy, a file gone by Send says so.
+	if _, err := s.loadAttachments([]AttachmentRef{{Path: shot}}); err == nil || !strings.Contains(err.Error(), "isn't there any more") {
+		t.Errorf("gone = %v", err)
+	}
+}

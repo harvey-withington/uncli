@@ -367,6 +367,7 @@ export interface AttachmentInfo {
   kind: AttachmentKind
   mediaType?: string
   reason?: string
+  upload?: string // the copy taken as it was attached, sent in its place
 }
 
 // What can come with a turn beyond its text and files. context is an
