@@ -5,6 +5,7 @@
   import { t } from '../lib/i18n.svelte'
   import { OUTLINE_MAX, OUTLINE_MIN } from '../lib/outline'
   import type { PanelTab } from '../lib/panels'
+  import { hostIdOf } from '../lib/sidetabs'
   import ArtifactPane from './ArtifactPane.svelte'
   import FilePane from './FilePane.svelte'
   import OutlinePanel from './OutlinePanel.svelte'
@@ -13,7 +14,9 @@
 
   // The side panel beside the answer: "On this page", for session types
   // that keep artifacts "Artifacts", and "File" (a file from the session
-  // folder, watched live), as tabs. The first two have a badge with how
+  // folder, watched live), as tabs; in an embedded chat, those its host
+  // lists, and the host's own, whose content is the host's, in the slot
+  // side-tab-<id> (lib/sidetabs.ts). The first two have a badge with how
   // many sections or artifacts the page has; File is named for the file it
   // shows. The left edge resizes the panel. A session with no page yet
   // shows the panel all the same, its page tabs saying so.
@@ -28,7 +31,8 @@
   const chat = useChat()
   const hasArtifacts = $derived(chat.hasArtifacts(sessionId))
   const tab = $derived(chat.tabFor(sessionId))
-  const tabs = $derived<PanelTab[]>(hasArtifacts ? ['outline', 'artifacts', 'file'] : ['outline', 'file'])
+  const tabs = $derived(chat.tabsFor(sessionId))
+  const hostTab = $derived(hostIdOf(tab))
   const watching = $derived(chat.watchedFor(sessionId).current)
 
   const sections = $derived(page ? chat.outlineFor(page).entries.length : 0)
@@ -39,14 +43,25 @@
     return artifactsAt(pages, index, chat.artifactLive[sessionId] ?? null).length
   })
 
-  const TAB_ICON: Record<PanelTab, string> = { outline: 'table-of-contents', artifacts: 'layers', file: 'eye' }
+  const TAB_ICON: Record<string, string> = { outline: 'table-of-contents', artifacts: 'layers', file: 'eye' }
+  const iconOf = (k: PanelTab) => (hostIdOf(k) !== null ? chat.hostTab(k)?.icon || 'panel-right-open' : TAB_ICON[k] ?? 'table-of-contents')
   const label = (k: PanelTab) =>
-    k === 'file' ? watching.slice(watching.lastIndexOf('/') + 1) || t('watch.title') : t(k === 'artifacts' ? 'artifacts.title' : 'outline.title')
+    hostIdOf(k) !== null
+      ? chat.hostTab(k)?.label ?? ''
+      : k === 'file'
+        ? watching.slice(watching.lastIndexOf('/') + 1) || t('watch.title')
+        : t(k === 'artifacts' ? 'artifacts.title' : 'outline.title')
   const count = (k: PanelTab) => (k === 'artifacts' ? artifacts : sections)
   const countLabel = (k: PanelTab) => {
     const key = k === 'artifacts' ? 'panel.artifactCount' : 'panel.sectionCount'
     return count(k) === 1 ? t(key + 'One') : t(key, { n: count(k) })
   }
+
+  // The host hears when one of its tabs shows, and for which session, so
+  // it fills it then.
+  $effect(() => {
+    if (hostTab !== null) chat.sideTabShown?.(sessionId, hostTab)
+  })
 
   function choose(k: PanelTab) {
     chat.setTab(k)
@@ -81,8 +96,10 @@
         class:on={tab === k}
         onclick={() => choose(k)}
       >
-        <Icon name={TAB_ICON[k]} size={13} />
-        {#if k === 'file'}
+        <Icon name={iconOf(k)} size={13} />
+        {#if hostIdOf(k) !== null}
+          <span class="name">{label(k)}</span>
+        {:else if k === 'file'}
           <span class="name file" title={watching || undefined}>{label(k)}</span>
         {:else}
           <span class="name">{label(k)}</span>
@@ -92,7 +109,9 @@
     {/each}
   </div>
   <div class="body" id="side-panel" role="tabpanel" aria-labelledby="side-tab-{tab}">
-    {#if tab === 'file'}
+    {#if hostTab !== null}
+      <div class="host"><svelte:element this={'slot'} name="side-tab-{hostTab}" /></div>
+    {:else if tab === 'file'}
       <FilePane {sessionId} />
     {:else if !page}
       <p class="none">{t('panel.noPage')}</p>
@@ -171,5 +190,12 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+  }
+  /* A host tab: the host's own content (its slot), the panel's full height,
+     scrolling within it. */
+  .host {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
 </style>

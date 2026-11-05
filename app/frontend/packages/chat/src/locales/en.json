@@ -153,6 +153,7 @@
   "setup.signin.codePlaceholder": "Paste the code from the browser",
   "setup.signin.finish": "Finish sign-in",
   "outline.title": "On this page",
+  "panel.toggle": "Show or hide the side panel",
   "outline.toggle": "Show or hide the side panel: On this page (O), File (F)",
   "outline.question": "Question",
   "outline.empty": "This answer has no headings.",

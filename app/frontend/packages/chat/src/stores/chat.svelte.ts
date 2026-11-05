@@ -13,6 +13,7 @@ import {
 import { ChatState, keyed } from '../lib/chat.svelte'
 import { autoSummaryFor, outlineOf, summaryBlocks, summaryEntries, type OutlineEntry, type OutlineLayout } from '../lib/outline'
 import type { PanelLayout, PanelTab } from '../lib/panels'
+import { BUILTIN_TABS, hostKey, type HostSideTab, type SideTab } from '../lib/sidetabs'
 import { appMemory, type ChatLayout, type LayoutMemory } from '../lib/layoutmemory'
 import { loadWatched, pick, saveWatched, type Watched } from '../lib/watched'
 import { toBlocks } from '../lib/render/markdown'
@@ -99,6 +100,11 @@ export class ChatStore {
   // An embedding host's reviews of its own batches of changes, each a card
   // in its session's approval place (lib/hostreview.ts).
   hostReviews = $state.raw<HostReview[]>([])
+  // The side panel's tabs, in order (lib/sidetabs.ts): all of UNCLI's in
+  // the app; what an embedding host lists. sideTabShown tells the host one
+  // of its own is showing, for a session.
+  sideTabs = $state.raw<SideTab[]>(BUILTIN_TABS)
+  sideTabShown: ((sessionId: string, tab: string) => void) | undefined = undefined
 
   reviewsOf(sessionId: string): HostReview[] {
     return this.hostReviews.filter(r => r.session === sessionId)
@@ -293,11 +299,32 @@ export class ChatStore {
     this.remember()
   }
 
-  // tabFor is the tab a session shows: Artifacts only for a session type
-  // that keeps them.
+  // tabsFor is the side panel's tabs for a session, in order: Artifacts
+  // only for a session type that keeps them. None: no side panel.
+  tabsFor(sessionId: string | null): PanelTab[] {
+    const out: PanelTab[] = []
+    for (const s of this.sideTabs) {
+      const k: PanelTab | null = typeof s === 'string' ? (BUILTIN_TABS.includes(s) ? s : null) : s?.id ? hostKey(s.id) : null
+      if (!k || out.includes(k) || (k === 'artifacts' && !this.hasArtifacts(sessionId))) continue
+      out.push(k)
+    }
+    return out
+  }
+
+  // hostTab is a host tab's name and icon, by its key.
+  hostTab(key: PanelTab): HostSideTab | undefined {
+    return this.sideTabs.find((s): s is HostSideTab => typeof s !== 'string' && hostKey(s.id) === key)
+  }
+
+  hasTab(sessionId: string | null, tab: PanelTab): boolean {
+    return this.tabsFor(sessionId).includes(tab)
+  }
+
+  // tabFor is the tab a session shows: the one last chosen if it has it,
+  // else its first.
   tabFor(sessionId: string | null): PanelTab {
-    if (this.panel.tab === 'file') return 'file'
-    return this.panel.tab === 'artifacts' && this.hasArtifacts(sessionId) ? 'artifacts' : 'outline'
+    const tabs = this.tabsFor(sessionId)
+    return tabs.includes(this.panel.tab) ? this.panel.tab : tabs[0] ?? 'outline'
   }
 
   // hasArtifacts: the session's type keeps artifacts.

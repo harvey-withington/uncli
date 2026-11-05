@@ -187,6 +187,7 @@ The element sends these events. They bubble and are composed, so you can listen 
 | `uncli-new-chat` | The user chose New chat in its header. Cancelable: cancel it and call `newSession` yourself, with your `meta`; otherwise the chat starts a new session of the same type itself |
 | `uncli-new-session` | It started that new session and shows it; `detail` is `{ session, previous }` |
 | `uncli-runs-on` | What the shown session runs on is known or changed; `detail` is `{ session, provider, model }` |
+| `uncli-side-tab` | One of your own side panel tabs shows; `detail` is `{ session, tab }` |
 
 In a host's page, the chat's header has **New chat** and **Delete chat**, since your page may show no session list. Delete asks first.
 
@@ -407,6 +408,30 @@ function typing() {
 
 Or, inside a key handler, check where the key came from: `event.composedPath()[0]` is the text box.
 
+## The side panel's tabs
+
+The side panel beside the answer has UNCLI's tabs: **On this page** (`outline`: the answer's sections and summaries), **Artifacts** (`artifacts`: only for session types that keep them) and **File** (`file`: a file of the session's folder, watched). Choose which show, in which order, and add your own, with `host.sideTabs`:
+
+```js
+chat.host = {
+  …
+  sideTabs: [{ id: 'card', label: 'Card', icon: 'list-checks' }, 'outline'],
+}
+```
+
+```html
+<uncli-chat src="/uncli" session="…">
+  <section slot="side-tab-card">…the card this chat is about…</section>
+</uncli-chat>
+```
+
+- **Left out,** an embedded chat shows On this page and Artifacts. File is left out: a host's chat usually runs in a fresh folder with nothing to watch. With File left out, the eye buttons on an answer's changed files go too; with Artifacts left out, so do its view buttons.
+- **`[]`** means no side panel at all, and no button for it in the header.
+- **Your own tab** is `{ id, label, icon? }`, `icon` being one of UNCLI's icon names (a panel icon when left out). UNCLI draws the tab; its content is yours, in the slot `side-tab-<id>`: your page's own HTML, components and CSS. It fills the panel's height and scrolls within it.
+- **`uncli-side-tab`** (`detail: { session, tab }`) comes when your tab shows: when the user picks it, opens the panel on it, or the chat moves to another session while it's showing. Fill it for that session then.
+- **Remembered** with the layout (`storage-key`), your tabs included: the panel opens on the tab the user last chose, or the first of yours if it's gone.
+- Set `host` again with a new `sideTabs` to change them.
+
 ## Your own controls, and restyling parts
 
 **Slots.** Put your own controls inside the chat by giving the element children with a `slot` attribute. They stay in your page's DOM and get your page's styles.
@@ -418,6 +443,7 @@ Or, inside a key handler, check where the key came from: `event.composedPath()[0
 | `header-extra` | Under the chat's header (a pending-edits banner, say) |
 | `composer-controls` | Inside the message box, above Attach and Send, after any `composerControls` |
 | `below-composer` | Under the message box |
+| `side-tab-<id>` | The content of your own side panel tab `<id>` (see "The side panel's tabs") |
 
 ```html
 <uncli-chat session="s-code">

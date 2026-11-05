@@ -87,7 +87,8 @@ export function saveOptionsOpen(open: boolean) {
 // The side panel's tabs, "On this page", "Artifacts" and "File" (a file
 // from the session folder, watched live): which one is showing. Whether the panel is open, and its width (one for both tabs),
 // are the outline layout's (lib/outline.ts).
-export type PanelTab = 'outline' | 'artifacts' | 'file'
+// An embedding host's own tabs are host:<id> (lib/sidetabs.ts).
+export type PanelTab = 'outline' | 'artifacts' | 'file' | `host:${string}`
 
 const PANEL_KEY = 'uncli-panel'
 

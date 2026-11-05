@@ -31,7 +31,7 @@ list.addEventListener('uncli-select', e => {
 })
 
 const log = document.getElementById('log') as HTMLElement
-for (const type of ['uncli-ready', 'uncli-select', 'uncli-busy', 'uncli-idle', 'uncli-needs-approval', 'uncli-missing', 'uncli-deleted', 'uncli-new-session']) {
+for (const type of ['uncli-ready', 'uncli-select', 'uncli-busy', 'uncli-idle', 'uncli-needs-approval', 'uncli-missing', 'uncli-deleted', 'uncli-new-session', 'uncli-side-tab']) {
   document.addEventListener(type, e => {
     const detail = (e as CustomEvent<{ session: string }>).detail
     log.textContent += `${type} ${detail.session}\n`
@@ -64,6 +64,9 @@ const host = (): ChatHost => ({
     log.textContent += `host opens ${href}\n`
     return href.startsWith('sample:')
   },
+  // Its own side panel tab, before UNCLI's: the card the chat is about (its
+  // content is the slot side-tab-card in the page).
+  sideTabs: [{ id: 'card', label: 'Card', icon: 'list-checks' }, 'outline', 'artifacts'],
   composerControls: [
     { id: 'mode', label: 'Mode', value: mode, options: modes, onChange: id => ((mode = id), (second.host = host())) },
     {

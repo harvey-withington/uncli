@@ -24,6 +24,9 @@
     /* The host restyles a part of it, and puts its own controls in its slots. */
     #second::part(composer) { border-top: 3px solid #0b7a5c; }
     .host-bit { margin: 4px 16px; padding: 4px 10px; border: 1px dashed #0b7a5c; border-radius: 6px; color: #9fd8c4; font: 13px Georgia, serif; background: none; }
+    .host-card { padding: 12px 16px; color: #d9e6e0; font: 14px/1.5 Georgia, serif; }
+    .host-card h3 { margin: 0 0 4px; font-size: 16px; }
+    .host-card p { margin: 0 0 8px; color: #8fb3a6; }
     #log { margin: 0 20px 20px; font: 13px/1.4 ui-monospace, monospace; color: #555; white-space: pre-wrap; }
   </style>
 </head>
@@ -48,6 +51,11 @@
     <uncli-chat id="second" session="s-chat" scheme="dark" storage-key="sample">
       <button slot="header-extra" class="host-bit">3 edits waiting for review</button>
       <p slot="below-composer" class="host-bit">The host's own line under the composer</p>
+      <section slot="side-tab-card" class="host-card">
+        <h3>Lisbon trip</h3>
+        <p>Due Friday · 3 of 7 items done</p>
+        <ul><li>Book flights</li><li>Pick a hotel</li><li>Travel insurance</li></ul>
+      </section>
     </uncli-chat>
   </figure>
   <figure>

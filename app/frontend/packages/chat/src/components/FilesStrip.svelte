@@ -61,8 +61,9 @@
   {@const rel = relPath(session?.workdir ?? '', f.path)}
   {@const name = splitPath(rel)}
   {@const label = f.how === 'deleted' ? '' : openLabel(f)}
-  {@const artifact = artifacts && f.how !== 'deleted' ? artifactPathOf(session?.workdir ?? '', f.path) : null}
+  {@const artifact = artifacts && f.how !== 'deleted' && chat.hasTab(sessionId, 'artifacts') ? artifactPathOf(session?.workdir ?? '', f.path) : null}
   {@const watchable = f.how !== 'deleted' ? watchPathOf(session?.workdir ?? '', f.path) : null}
+  {@const canWatch = chat.hasTab(sessionId, 'file')}
   <li class={f.how}>
     <span class="how" title={t(`files.how.${f.how}`)}><Icon name={HOW_ICON[f.how]} size={13} /></span>
     {#snippet path()}
@@ -92,10 +93,13 @@
         {/if}
         <!-- Off, saying why, for a file outside the session folder:
              the File tab reads only that folder. -->
-        <button class="btn ghost small icon" onclick={() => watchable && chat.watchFile(sessionId, watchable)} disabled={!watchable}
-          aria-label={`${t('files.watch')}: ${name.name}`} title={watchable ? t('files.watch') : t('files.watchOutside')}>
-          <Icon name="eye" size={13} />
-        </button>
+        <!-- Only where there's a File tab (an embedding host may leave it out). -->
+        {#if canWatch}
+          <button class="btn ghost small icon" onclick={() => watchable && chat.watchFile(sessionId, watchable)} disabled={!watchable}
+            aria-label={`${t('files.watch')}: ${name.name}`} title={watchable ? t('files.watch') : t('files.watchOutside')}>
+            <Icon name="eye" size={13} />
+          </button>
+        {/if}
         {#if label}
           <button class="btn ghost small icon" onclick={() => run(chat.backend.openFile(sessionId, f.path, f.line ?? 0))} disabled={!here} aria-label={`${label}: ${name.name}`} title={serverTitle(chat.backend, label)}>
             <Icon name="external-link" size={13} />

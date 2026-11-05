@@ -53,6 +53,15 @@ export interface Mention {
   insert: string
 }
 
+// The side panel's tabs: UNCLI's own, and a host's, whose content goes in the slot side-tab-<id>.
+export type BuiltinTab = 'outline' | 'artifacts' | 'file'
+export interface HostSideTab {
+  id: string
+  label: string
+  icon?: string // one of UNCLI's icon names; a panel icon when left out
+}
+export type SideTab = BuiltinTab | HostSideTab
+
 // What a host does for the chat (the element's host property).
 export interface ChatHost {
   // Every link clicked in an answer comes here first: true when the host took it.
@@ -69,6 +78,8 @@ export interface ChatHost {
   enter?: 'send' | 'newline'
   // The host's own controls in the message box, drawn by UNCLI.
   composerControls?: ComposerControl[]
+  // The side panel's tabs, in order. Left out: 'outline' and 'artifacts'. []: no side panel, nor its button.
+  sideTabs?: SideTab[]
 }
 
 // A host's review of a batch of its own changes, on one card in the
@@ -128,7 +139,7 @@ export declare function chatClient(backend: Backend): ChatClient
 export declare function mountedBackend(src: string): Backend
 export declare function setHostHeaders(headers: (() => Record<string, string> | null | undefined) | null): void
 
-// The events the elements send: detail { session } (uncli-new-session, uncli-runs-on and
+// The events the elements send: detail { session } (uncli-new-session, uncli-runs-on, uncli-side-tab and
 // uncli-select add to it).
 export interface UncliEventMap {
   'uncli-ready': CustomEvent<{ session: string }>
@@ -140,6 +151,7 @@ export interface UncliEventMap {
   'uncli-new-chat': CustomEvent<{ session: string }>
   'uncli-new-session': CustomEvent<{ session: string; previous: string }>
   'uncli-runs-on': CustomEvent<{ session: string; provider: string; model: string }>
+  'uncli-side-tab': CustomEvent<{ session: string; tab: string }>
   'uncli-select': CustomEvent<{ session: string }>
   'uncli-escape': CustomEvent<{ session: string }>
   'uncli-submit': CustomEvent<{ session: string }>

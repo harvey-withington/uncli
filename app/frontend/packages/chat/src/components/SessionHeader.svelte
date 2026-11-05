@@ -46,6 +46,10 @@
   // layout switching with the width, a host mounting the chat again)
   // leaves them as they were.
   const options = $derived(chat.optionsOpen)
+  // The side panel's button, when the session has any tabs (an embedding
+  // host may list none): named for its tabs in the app, plainly when embedded.
+  const panelTabs = $derived(chat.tabsFor(session.id).length > 0)
+  const panelLabel = $derived(t(chat.embedded ? 'panel.toggle' : chat.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle'))
   // A dot on what opens a folded header when something in it wants the
   // user (lib/attention.ts).
   const attention = $derived(attentionCount(session) + chat.reviewsOf(session.id).length)
@@ -155,7 +159,7 @@
         {/if}
       {/if}
       <button class="btn ghost icon touch dotted" onclick={() => chat.setOptionsOpen(!options)} aria-expanded={options} aria-label={options ? t('mobile.options') : attentionLabel(t('mobile.options'))} title={options ? t('mobile.options') : attentionLabel(t('mobile.options'))}><Icon name="sliders-horizontal" />{#if !options && attention}<span class="dot" aria-hidden="true"></span>{/if}</button>
-      <button class="btn ghost icon touch" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>
+      {#if panelTabs}<button class="btn ghost icon touch" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={panelLabel} title={panelLabel}><Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>{/if}
       {@render hostEnd()}
     </header>
     {@render extra()}
@@ -202,15 +206,11 @@
         </button>
       {/if}
       {@render chatActions(false)}
-      <button
-        class="btn ghost small icon"
-        onclick={() => chat.togglePanel()}
-        aria-pressed={chat.outline.open}
-        aria-label={t(chat.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
-        title={t(chat.hasArtifacts(session.id) ? 'panel.toggleBoth' : 'outline.toggle')}
-      >
-        <Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} />
-      </button>
+      {#if panelTabs}
+        <button class="btn ghost small icon" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={panelLabel} title={panelLabel}>
+          <Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} />
+        </button>
+      {/if}
       <!-- Always last on the line, expanded or collapsed. -->
       <button
         class="btn ghost small icon h-toggle dotted"

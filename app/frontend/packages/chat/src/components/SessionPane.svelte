@@ -136,7 +136,7 @@
         </div>
       </footer>
     </div>
-    {#if chat.outline.open}
+    {#if chat.outline.open && chat.tabsFor(session.id).length > 0}
       <SidePanel sessionId={session.id} page={page ?? null} {scroller} />
     {/if}
   </div>

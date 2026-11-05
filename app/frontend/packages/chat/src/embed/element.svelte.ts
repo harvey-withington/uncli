@@ -18,6 +18,8 @@
 // @mentions; turnContext() says what the user has in front of them, sent
 // (hidden) with each turn; headers() is the host's own sign-in, sent with
 // every request to src; enter says what Enter does in the message box.
+// uncli-side-tab: one of the host's own side panel tabs is showing
+// (detail { session, tab }), for the host to fill its slot for that session.
 // uncli-runs-on: the provider and model the shown session runs on, as
 // first known and when they change (detail { session, provider, model }).
 // Events (composed, so they cross into the host's page): uncli-ready,
@@ -41,6 +43,7 @@ import { allowLinkSchemes } from '../lib/render/markdown'
 import { ChatStore, type Mention } from '../stores/chat.svelte'
 import type { EnterKey } from '../lib/enterkey.svelte'
 import type { ComposerControl } from '../lib/composercontrols'
+import { EMBEDDED_TABS, type SideTab } from '../lib/sidetabs'
 import { DISMISSED, type HostReview, type ReviewAnswer, type ReviewRequest } from '../lib/hostreview'
 import { applyScheme, hostFont, shadowFor, srcBackend } from './root'
 
@@ -68,6 +71,11 @@ export interface ChatHost {
   // again with new values to change them. Anything else goes in the
   // composer-controls slot.
   composerControls?: ComposerControl[]
+  // sideTabs: the side panel's tabs, in order (lib/sidetabs.ts): UNCLI's
+  // ('outline', 'artifacts', 'file') and the host's own ({ id, label,
+  // icon? }), whose content goes in the slot side-tab-<id>. Left out: On
+  // this page and Artifacts. [] : no side panel, and no button for it.
+  sideTabs?: SideTab[]
 }
 
 export class UncliChat extends HTMLElement {
@@ -106,6 +114,7 @@ export class UncliChat extends HTMLElement {
     if (this.#props) {
       this.#props.store.enterKey = h?.enter
       this.#props.store.composerControls = h?.composerControls ?? []
+      this.#props.store.sideTabs = h?.sideTabs ?? EMBEDDED_TABS
     }
   }
 
@@ -255,6 +264,8 @@ export class UncliChat extends HTMLElement {
     store.complete = query => this.#host?.complete?.(query) ?? []
     store.enterKey = this.#host?.enter
     store.composerControls = this.#host?.composerControls ?? []
+    store.sideTabs = this.#host?.sideTabs ?? EMBEDDED_TABS
+    store.sideTabShown = (session, tab) => this.#emitFor('uncli-side-tab', { session, tab })
     store.composerSlot = this.#hasComposerSlot()
     store.hostReviews = this.#reviews
     store.embedded = true

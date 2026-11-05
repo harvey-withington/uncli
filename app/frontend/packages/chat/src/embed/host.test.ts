@@ -114,6 +114,58 @@ describe('the chat’s own life in a host', () => {
   })
 })
 
+describe('the side panel’s tabs in a host', () => {
+  const toggle = (el: Element) => inside(el).getAllByRole('button', { name: 'Show or hide the side panel' })[0]!
+
+  it('shows On this page by default, without File or its eye buttons', async () => {
+    const el = chat(mockBackend(), { compact: 'false' })
+    await inside(el).findByText(QUESTION)
+    await fireEvent.click(toggle(el))
+    const tabs = within(await inside(el).findByRole('tablist', { name: /side panel/i }))
+    expect(tabs.getAllByRole('tab').map(t => t.textContent?.trim().replace(/\d+$/, '').trim())).toEqual(['On this page'])
+    expect(inside(el).queryByRole('button', { name: /^Watch/ })).toBeNull()
+  })
+
+  it('adds the host’s own tab, with its content in its slot, and says when it shows', async () => {
+    const shown = vi.fn()
+    document.addEventListener('uncli-side-tab', shown)
+    try {
+      const el = document.createElement('uncli-chat') as UncliChat
+      el.setAttribute('compact', 'false')
+      el.session = 's-code'
+      el.host = { sideTabs: [{ id: 'card', label: 'Card', icon: 'list-checks' }, 'outline'] }
+      const content = document.createElement('div')
+      content.slot = 'side-tab-card'
+      content.textContent = 'Trip to Lisbon: 3 items left'
+      el.append(content)
+      el.backend = mockBackend()
+      document.body.append(el)
+      await inside(el).findByText(QUESTION)
+      await fireEvent.click(toggle(el))
+      const tabs = within(await inside(el).findByRole('tablist', { name: /side panel/i }))
+      expect(tabs.getAllByRole('tab').map(t => t.textContent?.trim().replace(/\d+$/, '').trim())).toEqual(['Card', 'On this page'])
+      // Shown: its slot, and word to the host.
+      await fireEvent.click(tabs.getByRole('tab', { name: /Card/ }))
+      const slot = el.shadowRoot!.querySelector('slot[name="side-tab-card"]') as HTMLSlotElement
+      expect(slot).not.toBeNull()
+      expect(slot.assignedElements()).toContain(content)
+      await waitFor(() => expect(shown).toHaveBeenCalledWith(expect.objectContaining({ detail: { session: 's-code', tab: 'card' } })))
+      // UNCLI's tab still works beside it.
+      await fireEvent.click(tabs.getByRole('tab', { name: /On this page/ }))
+      expect(el.shadowRoot!.querySelector('slot[name="side-tab-card"]')).toBeNull()
+    } finally {
+      document.removeEventListener('uncli-side-tab', shown)
+    }
+  })
+
+  it('has no side panel, nor its button, with no tabs', async () => {
+    const el = chat(mockBackend(), { compact: 'false' })
+    el.host = { sideTabs: [] }
+    await inside(el).findByText(QUESTION)
+    expect(inside(el).queryByRole('button', { name: 'Show or hide the side panel' })).toBeNull()
+  })
+})
+
 describe('the CLI a host’s session runs on', () => {
   it('starts a session on the provider the host names, and says what it runs on', async () => {
     const backend = mockBackend()

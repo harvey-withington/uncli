@@ -5,6 +5,7 @@ import { defineUncliSessionList } from './list.svelte'
 
 export { UncliChat, defineUncliChat, type ChatHost } from './element.svelte'
 export type { Mention } from '../stores/chat.svelte'
+export type { BuiltinTab, HostSideTab, SideTab } from '../lib/sidetabs'
 export type { ReviewAction, ReviewAnswer, ReviewItem, ReviewRequest } from '../lib/hostreview'
 export type { ButtonControl, ComposerControl, ControlItem, MenuControl, ToggleControl, Tone } from '../lib/composercontrols'
 export { UncliSessionList, defineUncliSessionList } from './list.svelte'
