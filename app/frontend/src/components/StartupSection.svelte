@@ -5,7 +5,8 @@
 
   // Settings → Tray and startup: closing the window keeps UNCLI running in
   // the tray (Open and Quit on its icon), and it can start with Windows,
-  // minimised. Elsewhere the switch shows, disabled, with why.
+  // minimised. Elsewhere the switch shows, disabled, with why. Answers a
+  // quit or restart cut off can carry on as UNCLI starts again (app/resume.go).
 
   interface Props {
     prefs: Preferences
@@ -29,6 +30,15 @@
     />{t('settings.startWithWindows')}
   </label>
   {#if !supported}<p class="muted note">{t('settings.startupWindowsOnly')}</p>{/if}
+  <label class="check resume">
+    <input
+      type="checkbox"
+      checked={!!prefs.resumeCutOff}
+      aria-describedby="settings-resume-hint"
+      onchange={e => savePrefs({ ...prefs, resumeCutOff: e.currentTarget.checked })}
+    />{t('settings.resumeCutOff')}
+  </label>
+  <p class="muted note" id="settings-resume-hint">{t('settings.resumeCutOffHint')}</p>
 </section>
 
 <style>
@@ -54,5 +64,8 @@
   }
   .note {
     margin: var(--space-2) 0 0;
+  }
+  .resume {
+    margin-top: var(--space-3);
   }
 </style>

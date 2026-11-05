@@ -54,6 +54,9 @@ type Preferences struct {
 	// UpdateCheck is whether a release build looks for newer releases by
 	// itself (updates.go): auto or off.
 	UpdateCheck string `json:"updateCheck"`
+	// ResumeCutOff carries on, as UNCLI starts, the turns its last quit
+	// (an update, a restart) or crash cut off (resume.go).
+	ResumeCutOff bool `json:"resumeCutOff"`
 }
 
 // Conversation cache lifetimes. Auto leaves it to the CLI: Claude Code

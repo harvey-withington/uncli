@@ -539,6 +539,8 @@
   "settings.startupTitle": "Tray and startup",
   "settings.startupBody": "Closing the window keeps UNCLI running in the tray, so turns carry on and paired devices can still reach it. Open or quit it from the tray icon’s menu.",
   "settings.startWithWindows": "Start with Windows, minimised to the tray",
+  "settings.resumeCutOff": "Carry on answers cut off by a restart",
+  "settings.resumeCutOffHint": "When UNCLI quits or restarts mid-answer (an update, say), each session that was answering is asked to carry on where it left off as UNCLI starts again. Answers you stopped yourself stay stopped.",
   "update.title": "Updates",
   "update.body": "UNCLI looks for a newer release by itself and offers to install it.",
   "update.version": "This is UNCLI {version}. UNCLI looks for a newer release by itself and offers to install it.",

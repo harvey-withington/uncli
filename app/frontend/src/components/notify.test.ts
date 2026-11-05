@@ -40,6 +40,20 @@ describe('Notifications', () => {
     await waitFor(() => expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ startWithWindows: true })))
   })
 
+  it('Settings saves carrying on answers a restart cut off, off to start with', async () => {
+    const backend = mockBackend()
+    const save = vi.spyOn(backend, 'setPreferences')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: /Claude Code 2./ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+    await fireEvent.click(within(dialog).getByRole('tab', { name: 'General' }))
+    const box = within(dialog).getByRole('checkbox', { name: 'Carry on answers cut off by a restart' })
+    expect(box).not.toBeChecked()
+    expect(box).toHaveAccessibleDescription(/Answers you stopped yourself stay stopped/)
+    await fireEvent.click(box)
+    await waitFor(() => expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ resumeCutOff: true })))
+  })
+
   it('a clicked notification opens its session on the latest page', async () => {
     const backend = mockBackend()
     let handlers: Handlers | null = null

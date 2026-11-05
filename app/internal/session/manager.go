@@ -155,6 +155,8 @@ type Manager struct {
 	usage    *core.UsageLimit
 	judge    judging
 
+	cutOff []string // sessions whose turn UNCLI's last stop cut off (cutoff.go)
+
 	mcpOffMu sync.Mutex
 	mcpOff   map[string][]string // MCP servers the user turned off, by provider (mcpoff.go)
 
@@ -168,6 +170,9 @@ const modelsSetting = "claude.models"
 func NewManager(d Deps) (*Manager, error) {
 	m := &Manager{d: d, sessions: map[string]*Session{}, viewing: map[string]string{}, InterruptGrace: 5 * time.Second,
 		judge: judging{inFlight: map[string]bool{}, failed: map[string]bool{}}}
+	if err := m.loadCutOff(); err != nil {
+		return nil, err
+	}
 	if err := d.Store.MarkOpenPages("interrupted"); err != nil {
 		return nil, err
 	}
@@ -626,6 +631,7 @@ func (m *Manager) Close() {
 		all = append(all, s)
 	}
 	m.mu.Unlock()
+	m.noteCutOff(all)
 	for _, s := range all {
 		s.stop()
 	}

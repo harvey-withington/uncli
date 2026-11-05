@@ -659,6 +659,25 @@ func (s *Store) Pinned() ([]PinnedPage, error) {
 	return out, rows.Err()
 }
 
+// OpenPageSessions is the sessions with a page still open: a turn a crash
+// or a forced quit cut off.
+func (s *Store) OpenPageSessions() ([]string, error) {
+	rows, err := s.db.Query(`SELECT DISTINCT session_id FROM pages WHERE status='open'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 // MarkOpenPages closes pages left open by a crash or quit mid-turn.
 func (s *Store) MarkOpenPages(status string) error {
 	_, err := s.db.Exec(`UPDATE pages SET status=?, finished_at=? WHERE status='open'`, status, now())

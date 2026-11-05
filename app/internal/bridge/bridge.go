@@ -193,6 +193,9 @@ func Run(assets fs.FS, opts Options) error {
 				wruntime.Quit(ctx)
 				return
 			}
+			// Turns the last quit or crash cut off carry on, if the user
+			// asked for that (app/resume.go).
+			go svc.ResumeCutOff()
 			if err := svc.KeepInTray(); err != nil {
 				// Without a tray icon there'd be no way back to a hidden
 				// window, so closing it quits instead.
