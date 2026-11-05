@@ -114,6 +114,80 @@ describe('the chat’s own life in a host', () => {
   })
 })
 
+describe('the side panel over the conversation (compact)', () => {
+  afterEach(() => localStorage.clear())
+  const toggle = (el: Element) => inside(el).getAllByRole('button', { name: 'Show or hide the side panel' })[0]!
+  const panel = (el: Element) => inside(el).queryByRole('tablist', { name: /side panel/i })
+  const box = (el: Element) => inside(el).getByRole('textbox', { name: 'Your message' })
+  // The panel was left open, as the storage key remembers.
+  const leftOpen = () => localStorage.setItem('uncli-layout:host', JSON.stringify({ outline: { open: true, width: 360 } }))
+
+  it('opens on the conversation though the panel was left open; beside it, the panel opens as left', async () => {
+    leftOpen()
+    const narrow = chat(mockBackend(), { compact: '', 'storage-key': 'host' })
+    await inside(narrow).findByText(QUESTION)
+    expect(panel(narrow)).toBeNull()
+    expect(toggle(narrow)).toHaveAttribute('aria-pressed', 'false')
+    narrow.remove()
+    leftOpen()
+    const wide = chat(mockBackend(), { compact: 'false', 'storage-key': 'host' })
+    await inside(wide).findByText(QUESTION)
+    expect(panel(wide)).not.toBeNull()
+  })
+
+  it('closes when the user picks a place on the page, or the session changes, and the tab is kept', async () => {
+    const el = chat(mockBackend(), { compact: '', 'storage-key': 'host' })
+    await inside(el).findByText(QUESTION)
+    await fireEvent.click(toggle(el))
+    expect(panel(el)).not.toBeNull()
+    // jsdom can't scroll; the page would.
+    Element.prototype.scrollTo ??= function () {}
+    // On this page: the question, at the top.
+    await fireEvent.click(within(inside(el).getByRole('tabpanel')).getAllByRole('button').find(b => /Question/.test(b.textContent ?? ''))!)
+    await waitFor(() => expect(panel(el)).toBeNull())
+    // Opening it isn't remembered as open, so a remount opens on the conversation.
+    await fireEvent.click(toggle(el))
+    expect(JSON.parse(localStorage.getItem('uncli-layout:host') ?? '{}').outline?.open ?? false).toBe(false)
+    await el.newSession()
+    await waitFor(() => expect(panel(el)).toBeNull())
+  })
+
+  it('doesn’t focus the message box while the panel covers it', async () => {
+    const el = chat(mockBackend(), { compact: '' })
+    await inside(el).findByText(QUESTION)
+    await fireEvent.input(box(el), { target: { value: 'Explain the parser' } })
+    await fireEvent.click(inside(el).getByRole('button', { name: 'Send' }))
+    await fireEvent.input(box(el), { target: { value: 'Now the tests' } })
+    await fireEvent.click(await inside(el).findByRole('button', { name: 'Queue' }))
+    await fireEvent.click(toggle(el))
+    ;(el.shadowRoot!.activeElement as HTMLElement | null)?.blur()
+    // Taking the queued message back, which focuses the box when it's seen.
+    await fireEvent.click(await inside(el).findByRole('button', { name: /Edit/ }))
+    await waitFor(() => expect((box(el) as HTMLTextAreaElement).value).toBe('Now the tests'))
+    await new Promise(r => setTimeout(r, 20))
+    expect(el.shadowRoot!.activeElement).not.toBe(box(el))
+  })
+
+  it('doesn’t focus the message box as a chat opens on a touch screen', async () => {
+    const real = window.matchMedia
+    window.matchMedia = ((q: string) => ({ matches: q === '(pointer: coarse)', media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia
+    try {
+      const el = chat(mockBackend(), { compact: '' })
+      await inside(el).findByText(QUESTION)
+      await new Promise(r => setTimeout(r, 20))
+      expect(el.shadowRoot!.activeElement).not.toBe(box(el))
+    } finally {
+      window.matchMedia = real
+    }
+  })
+
+  it('focuses it as a chat opens with a mouse and keyboard, as before', async () => {
+    const el = chat(mockBackend(), { compact: '' })
+    await inside(el).findByText(QUESTION)
+    await waitFor(() => expect(el.shadowRoot!.activeElement).toBe(box(el)))
+  })
+})
+
 describe('the side panel’s tabs in a host', () => {
   const toggle = (el: Element) => inside(el).getAllByRole('button', { name: 'Show or hide the side panel' })[0]!
 

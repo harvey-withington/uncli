@@ -218,7 +218,7 @@ export class ChatStore {
         this.autoSummarise(n.page)
         break
       case 'turnEnded':
-        if (this.outline.open && n.sessionId === this.currentId) void this.refreshArtifacts(n.sessionId)
+        if (this.panelShown && n.sessionId === this.currentId) void this.refreshArtifacts(n.sessionId)
         break
       case 'resynced':
         if (this.currentId && !this.sessions.some(s => s.id === this.currentId)) this.currentId = null
@@ -238,7 +238,7 @@ export class ChatStore {
     } catch (e) {
       this.shell.toast(String(e), 'error')
     }
-    if (this.outline.open) void this.refreshArtifacts(id)
+    if (this.panelShown) void this.refreshArtifacts(id)
     void this.loadCommands(id)
     await this.backend.focus(id)
   }
@@ -276,22 +276,56 @@ export class ChatStore {
 
   // ---- the side panel
 
+  // Where the side panel covers the conversation (the compact layout, not
+  // beside it: covering), whether it's open is the moment's, not the
+  // remembered layout's: it starts closed, so a chat always opens on the
+  // conversation, and closes when the session changes or the user picks a
+  // place on the page. Beside the conversation (the desktop, a tablet), it
+  // opens as it was left. The tab and width are remembered either way.
+  covering = $state(false)
+  private coverOpen = $state(false)
+
+  // panelShown: the side panel is showing.
+  get panelShown(): boolean {
+    return this.covering ? this.coverOpen : this.outline.open
+  }
+
+  // panelCovers: the side panel covers the conversation now, message box
+  // and all.
+  get panelCovers(): boolean {
+    return this.covering && this.coverOpen
+  }
+
+  setCovering(on: boolean) {
+    this.covering = on
+    this.coverOpen = false
+  }
+
+  // closeCover closes a side panel that covers the conversation.
+  closeCover() {
+    this.coverOpen = false
+  }
+
   // togglePanel opens or closes the side panel, on the tab it had.
   togglePanel() {
-    this.outline.open = !this.outline.open
-    this.remember()
-    if (this.outline.open && this.currentId) void this.refreshArtifacts(this.currentId)
+    if (this.covering) {
+      this.coverOpen = !this.coverOpen
+    } else {
+      this.outline.open = !this.outline.open
+      this.remember()
+    }
+    if (this.panelShown && this.currentId) void this.refreshArtifacts(this.currentId)
   }
 
   // showTab opens the side panel on a tab (O and A); pressed again on the
   // tab already showing, it closes the panel.
   showTab(tab: PanelTab) {
-    if (this.outline.open && this.tabFor(this.currentId) === tab) {
+    if (this.panelShown && this.tabFor(this.currentId) === tab) {
       this.togglePanel()
       return
     }
     this.setTab(tab)
-    if (!this.outline.open) this.togglePanel()
+    if (!this.panelShown) this.togglePanel()
   }
 
   setTab(tab: PanelTab) {
@@ -338,7 +372,7 @@ export class ChatStore {
   openArtifact(sessionId: string, path: string) {
     this.client.session(sessionId).selectArtifact(path)
     this.setTab('artifacts')
-    if (!this.outline.open) this.togglePanel()
+    if (!this.panelShown) this.togglePanel()
     else void this.refreshArtifacts(sessionId)
   }
 
@@ -366,7 +400,7 @@ export class ChatStore {
   watchFile(sessionId: string, path: string) {
     this.setWatched(sessionId, pick(this.watchedFor(sessionId), path))
     this.setTab('file')
-    if (!this.outline.open) this.togglePanel()
+    if (!this.panelShown) this.togglePanel()
   }
 
   // closeFile puts the File tab back as it starts (no file; the recent and
@@ -379,7 +413,7 @@ export class ChatStore {
   // chooseFile opens the File tab with its switcher open.
   chooseFile() {
     this.setTab('file')
-    if (!this.outline.open) this.togglePanel()
+    if (!this.panelShown) this.togglePanel()
     this.fileSwitcher = true
   }
 

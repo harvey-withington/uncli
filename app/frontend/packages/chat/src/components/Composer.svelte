@@ -37,6 +37,15 @@
   // Drafts are per session. The text is kept on every change, so it
   // survives switching sessions and restarting UNCLI (lib/keep.ts);
   // attachments survive switching sessions.
+  // focusBox puts the cursor in the box, unless the side panel covers it
+  // (the compact layout; the keyboard would open for a box the user can't
+  // see), or, as a chat opens, on a touch screen, where the keyboard comes
+  // up only when the user taps the box.
+  function focusBox(opening = false) {
+    if (chat.panelCovers || (opening && touchScreen())) return
+    input?.focus()
+  }
+
   const drafts = new Map<string, Pending[]>()
   let shownFor = ''
   $effect(() => {
@@ -46,7 +55,7 @@
       text = loadDraft(id)
       attachments = drafts.get(id) ?? []
       shownFor = id
-      queueMicrotask(() => input?.focus())
+      queueMicrotask(() => focusBox(true))
     }
   })
   $effect(() => {
@@ -83,7 +92,7 @@
       shell.toast(String(e), 'error')
     } finally {
       sending = false
-      queueMicrotask(() => input?.focus())
+      queueMicrotask(() => focusBox())
     }
   }
 
@@ -93,7 +102,7 @@
       const q = await chat.client.session(session.id).unqueue()
       if (q.text) text = text.trim() ? `${q.text}\n\n${text}` : q.text
       if (q.attachments.length) attachments = [...fromRefs(q.attachments), ...attachments]
-      input?.focus()
+      focusBox()
     } catch (e) {
       shell.toast(String(e), 'error')
     }
@@ -165,7 +174,7 @@
   function detach(key: string) {
     releasePreviews(attachments.filter(a => a.key === key))
     attachments = attachments.filter(a => a.key !== key)
-    input?.focus()
+    focusBox()
   }
 
   // Previews of uploaded photos hold their bytes until released.

@@ -76,6 +76,7 @@
   const smooth = () => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth')
 
   function jump(i: number) {
+    chat.closeCover() // a panel over the conversation gets out of the way of where it goes
     const el = blockEl(entries[i]?.block ?? -1)
     if (!scroller || !el) return
     const y = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - headerHeight() - 12
@@ -83,6 +84,7 @@
   }
 
   function toTop() {
+    chat.closeCover()
     scroller?.scrollTo({ top: 0, behavior: smooth() })
   }
 </script>

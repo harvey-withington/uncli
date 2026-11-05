@@ -139,7 +139,7 @@ It's built already, Svelte inside, so your bundler needs nothing special and you
 - **`scheme`** is `light` or `dark`. Leave it out to follow the system.
 - **`compact`** shows the phone's compact layout, and `compact="false"` the desktop's. Leave it out and the element picks by its own width: compact below 720 px.
 - **`storage-key`** remembers the user's layout and preferences under `uncli-layout:<key>` in the page's local storage. That's the only thing UNCLI ever writes to your storage, and only when you ask. It remembers:
-  - the side panel: open or closed, its width, and its tab (On this page, Artifacts or File);
+  - the side panel: its width, its tab (yours included), and open or closed. Open or closed is restored only where the panel sits beside the conversation (the desktop layout). In the compact layout it covers the conversation, message box and all, so a chat there always opens on the conversation, and the panel closes when the session changes or the user picks a place in On this page;
   - the desktop header, collapsed or not;
   - the question header, collapsed or not;
   - the compact header's Options, open or closed;
@@ -148,6 +148,8 @@ It's built already, Svelte inside, so your bundler needs nothing special and you
   Every chat on the page with the same key shares this memory. A change in one shows in the others at once, and a chat you mount later starts from it. So give all your chats one key, unless you want them to differ. It's read each time a chat mounts, so it survives your page remounting the element, and the switch between the compact and desktop layouts.
 
   Without a key, a chat remembers these only while it's mounted.
+
+  The message box takes the focus as a chat opens, so the user can type at once, except on a touch screen, where that would bring up the keyboard unasked; there it waits for a tap. It never takes the focus while the side panel covers it.
 
   What belongs to one chat isn't remembered here: drafts, scroll positions and the File tab's file. Those stay in memory for as long as the page is open. MCP servers the user turns off aren't remembered here either: your UNCLI saves that choice itself, for every chat (see "Your own tools for the AI"). The side panel starts closed.
 

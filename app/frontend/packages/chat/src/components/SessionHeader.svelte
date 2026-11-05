@@ -159,7 +159,7 @@
         {/if}
       {/if}
       <button class="btn ghost icon touch dotted" onclick={() => chat.setOptionsOpen(!options)} aria-expanded={options} aria-label={options ? t('mobile.options') : attentionLabel(t('mobile.options'))} title={options ? t('mobile.options') : attentionLabel(t('mobile.options'))}><Icon name="sliders-horizontal" />{#if !options && attention}<span class="dot" aria-hidden="true"></span>{/if}</button>
-      {#if panelTabs}<button class="btn ghost icon touch" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={panelLabel} title={panelLabel}><Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>{/if}
+      {#if panelTabs}<button class="btn ghost icon touch" onclick={() => chat.togglePanel()} aria-pressed={chat.panelShown} aria-label={panelLabel} title={panelLabel}><Icon name={chat.panelShown ? 'panel-right-close' : 'panel-right-open'} /></button>{/if}
       {@render hostEnd()}
     </header>
     {@render extra()}
@@ -207,8 +207,8 @@
       {/if}
       {@render chatActions(false)}
       {#if panelTabs}
-        <button class="btn ghost small icon" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={panelLabel} title={panelLabel}>
-          <Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} />
+        <button class="btn ghost small icon" onclick={() => chat.togglePanel()} aria-pressed={chat.panelShown} aria-label={panelLabel} title={panelLabel}>
+          <Icon name={chat.panelShown ? 'panel-right-close' : 'panel-right-open'} />
         </button>
       {/if}
       <!-- Always last on the line, expanded or collapsed. -->

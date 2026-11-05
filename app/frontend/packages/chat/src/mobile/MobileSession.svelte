@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import ApprovalCard from '../components/ApprovalCard.svelte'
   import HostReviewCard from '../components/HostReviewCard.svelte'
   import Composer from '../components/Composer.svelte'
@@ -33,6 +34,20 @@
   let { session, onback, wide: wideProp }: Props = $props()
   const isWide = $derived(wideProp ?? wide.on)
   const app = useChat()
+  // Narrow, the side panel covers the conversation: it opens closed, and
+  // closes when the session changes (ChatStore.covering). Wide, beside it,
+  // it opens as it was left.
+  $effect(() => {
+    app.setCovering(!isWide)
+    return () => app.setCovering(false)
+  })
+  // On the session's id only: the session itself is a new object at every
+  // update (an answer streaming), which mustn't close it.
+  const shownId = $derived(session.id)
+  $effect(() => {
+    void shownId
+    untrack(() => app.closeCover())
+  })
   const profile = $derived(app.boot?.profiles.find(p => p.id === session.profileId))
   const page = $derived(app.currentPage)
   const cards = $derived((session.approvals ?? []).filter(a => !a.judging))
@@ -56,7 +71,7 @@
   <!-- Everything under the header. On a phone it makes no box of its own
        (display: contents); on a tablet it leaves room for the side panel;
        embedded, the side panel covers it and not the header. -->
-  <div class="body" class:with-panel={isWide && app.outline.open && app.tabsFor(session.id).length > 0} style:--panel-w="min({app.outline.width}px, 45%)">
+  <div class="body" class:with-panel={isWide && app.panelShown && app.tabsFor(session.id).length > 0} style:--panel-w="min({app.outline.width}px, 45%)">
   <div class="scroll" bind:this={scroller} part="page">
     <div class="content">
       {#if page}
@@ -91,7 +106,7 @@
     {#if app.embedded}<svelte:element this={'slot'} name="below-composer" />{/if}
   </footer>
 
-  {#if app.outline.open && app.tabsFor(session.id).length > 0}
+  {#if app.panelShown && app.tabsFor(session.id).length > 0}
     <div class="panel" role={isWide ? undefined : 'dialog'} aria-label={isWide ? undefined : t('outline.toggle')}>
       {#if !isWide && !app.embedded}<button class="btn ghost icon touch close" onclick={() => app.togglePanel()} aria-label={t('common.close')}><Icon name="x" /></button>{/if}
       <SidePanel sessionId={session.id} page={page ?? null} {scroller} />
