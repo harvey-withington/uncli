@@ -7,6 +7,7 @@ const dts = readFileSync('packages/chat/element.d.ts', 'utf8')
 const element = readFileSync('packages/chat/src/embed/element.svelte.ts', 'utf8')
 const index = readFileSync('packages/chat/src/embed/index.ts', 'utf8')
 const controls = readFileSync('packages/chat/src/lib/composercontrols.ts', 'utf8')
+const review = readFileSync('packages/chat/src/lib/hostreview.ts', 'utf8')
 
 const block = (src: string, start: string) => src.slice(src.indexOf(start), src.indexOf('\n}', src.indexOf(start)))
 const members = (body: string) => [...body.matchAll(/^\s{2}(\w+)\??[(:]/gm)].map(m => m[1])
@@ -28,6 +29,15 @@ describe('element.d.ts', () => {
     for (const name of ['ButtonControl', 'ToggleControl', 'MenuControl', 'ControlItem']) {
       const src = members(block(controls, `export interface ${name}`))
       const typed = members(block(dts, `export interface ${name}`))
+      for (const m of src) expect(typed, `${name}.${m}`).toContain(m)
+    }
+  })
+
+  it('has every review field', () => {
+    for (const name of ['ReviewItem', 'ReviewAction', 'ReviewRequest', 'ReviewAnswer']) {
+      const src = members(block(review, `export interface ${name}`))
+      const typed = members(block(dts, `export interface ${name}`))
+      expect(src.length, name).toBeGreaterThan(1)
       for (const m of src) expect(typed, `${name}.${m}`).toContain(m)
     }
   })

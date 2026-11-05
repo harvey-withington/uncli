@@ -26,6 +26,9 @@
 // detail: { session, previous }. Before
 // the chat acts on Escape or Ctrl+Enter, uncli-escape and uncli-submit go
 // out, cancelable: a host that cancels one keeps the key for itself.
+// review(request) asks the user about a batch of the host's own changes on
+// one card in the approval cards' place (lib/hostreview.ts), and resolves
+// with their answer.
 import { mount, unmount } from 'svelte'
 import { chatClient, setHostHeaders, type Backend, type SessionSnapshot } from '@uncli/client'
 import Chat from '../components/Chat.svelte'
@@ -36,6 +39,7 @@ import { allowLinkSchemes } from '../lib/render/markdown'
 import { ChatStore, type Mention } from '../stores/chat.svelte'
 import type { EnterKey } from '../lib/enterkey.svelte'
 import type { ComposerControl } from '../lib/composercontrols'
+import { DISMISSED, type HostReview, type ReviewAnswer, type ReviewRequest } from '../lib/hostreview'
 import { applyScheme, hostFont, shadowFor, srcBackend } from './root'
 
 // What a host can do for the chat (decision 0026).
@@ -72,6 +76,8 @@ export class UncliChat extends HTMLElement {
   #props = $state<{ store: ChatStore; session: string; compact: boolean | undefined } | null>(null)
   #app: ReturnType<typeof mount> | null = null
   #offSession: (() => void) | null = null
+  #reviews: HostReview[] = []
+  #reviewSeq = 0
 
   // The backend to reach UNCLI through: the HTTP one for a UNCLI server,
   // or any other Backend.
@@ -120,6 +126,36 @@ export class UncliChat extends HTMLElement {
     const v = await chatClient(this.#backend).createSession(profile, workdir, model, '', '', null, opts.meta ?? '')
     this.session = v.id
     return v.id
+  }
+
+  // review asks the user about a batch of the host's own changes (BRUV's
+  // staged edits, say) on one card, in the session shown now (or
+  // opts.session), and resolves with the button they chose and the changes
+  // still ticked. Aborting opts.signal withdraws the card ("dismissed").
+  // The card stays until answered, through a change of src or of session.
+  review(request: ReviewRequest, opts: { session?: string; signal?: AbortSignal } = {}): Promise<ReviewAnswer> {
+    const session = opts.session ?? this.session
+    if (!session) return Promise.reject(new Error('<uncli-chat> shows no session'))
+    if (opts.signal?.aborted) return Promise.resolve({ action: DISMISSED, items: [] })
+    return new Promise(resolve => {
+      const id = `review-${++this.#reviewSeq}`
+      const settle = (a: ReviewAnswer) => {
+        opts.signal?.removeEventListener('abort', abort)
+        this.#reviews = this.#reviews.filter(r => r.id !== id)
+        this.#syncReviews()
+        resolve(a)
+      }
+      const abort = () => settle({ action: DISMISSED, items: [] })
+      opts.signal?.addEventListener('abort', abort)
+      const all = (request.items ?? []).map(i => i.id)
+      this.#reviews = [...this.#reviews, { ...request, id, session, resolve: a => settle({ action: a.action, items: request.items?.length ? a.items : all }) }]
+      this.#syncReviews()
+      this.#emitFor('uncli-needs-approval', { session })
+    })
+  }
+
+  #syncReviews() {
+    if (this.#props) this.#props.store.hostReviews = this.#reviews
   }
 
   connectedCallback() {
@@ -207,6 +243,7 @@ export class UncliChat extends HTMLElement {
     store.enterKey = this.#host?.enter
     store.composerControls = this.#host?.composerControls ?? []
     store.composerSlot = this.#hasComposerSlot()
+    store.hostReviews = this.#reviews
     store.embedded = true
     store.newChat = () => void this.#newChat()
     store.deleted = id => this.#emitFor('uncli-deleted', { session: id })

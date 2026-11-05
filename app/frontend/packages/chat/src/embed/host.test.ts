@@ -162,6 +162,73 @@ describe('a host’s own approval prompts', () => {
   }
 })
 
+describe('a host’s review of its own changes', () => {
+  const request = {
+    title: 'Apply 3 suggested changes to Trip Planning?',
+    detail: 'From this turn.',
+    items: [
+      { id: 'c1', label: 'Rename “Flights” to “Flights booked”' },
+      { id: 'c2', label: 'Add “Passport” to Preparation to Leave', detail: 'Checklist item' },
+      { id: 'c3', label: 'Move “Hotel” to Done' },
+    ],
+  }
+
+  for (const compact of ['false', '']) {
+    it(`asks about them all on one card in the ${compact === '' ? 'compact' : 'desktop'} layout, and answers with what stayed ticked`, async () => {
+      const needs = vi.fn()
+      document.addEventListener('uncli-needs-approval', needs)
+      try {
+        const el = chat(mockBackend(), { compact })
+        await inside(el).findByText(QUESTION)
+        const answer = el.review(request)
+        const card = await inside(el).findByRole('alertdialog', { name: request.title })
+        expect(needs).toHaveBeenCalledOnce()
+        expect(card.textContent).toContain('From this turn.')
+        expect(card.textContent).toContain('3 of 3 chosen')
+        expect(card.textContent).toContain('Checklist item')
+        if (compact === '') expect(inside(el).getByRole('button', { name: /^Options \(\d+ needs? attention\)$/ })).toBeInTheDocument()
+        // Nothing ticked: Apply waits; Discard doesn't.
+        await fireEvent.click(within(card).getByRole('button', { name: 'None' }))
+        expect(within(card).getByRole('button', { name: 'Apply' })).toBeDisabled()
+        await fireEvent.click(within(card).getByRole('button', { name: 'All' }))
+        await fireEvent.click(within(card).getByRole('checkbox', { name: /Add “Passport”/ }))
+        expect(card.textContent).toContain('2 of 3 chosen')
+        await fireEvent.click(within(card).getByRole('button', { name: 'Apply' }))
+        expect(await answer).toEqual({ action: 'apply', items: ['c1', 'c3'] })
+        await waitFor(() => expect(inside(el).queryByRole('alertdialog', { name: request.title })).toBeNull())
+      } finally {
+        document.removeEventListener('uncli-needs-approval', needs)
+      }
+    })
+  }
+
+  it('takes the host’s own buttons, and goes when the host withdraws it', async () => {
+    const el = chat()
+    await inside(el).findByText(QUESTION)
+    const asked = el.review({ title: 'Keep these edits?', actions: [{ id: 'keep', label: 'Keep', tone: 'primary' }, { id: 'undo', label: 'Undo all', tone: 'danger' }] })
+    let card = await inside(el).findByRole('alertdialog', { name: 'Keep these edits?' })
+    expect(within(card).queryByRole('checkbox')).toBeNull()
+    await fireEvent.click(within(card).getByRole('button', { name: 'Undo all' }))
+    expect(await asked).toEqual({ action: 'undo', items: [] })
+
+    const stop = new AbortController()
+    const withdrawn = el.review(request, { signal: stop.signal })
+    card = await inside(el).findByRole('alertdialog', { name: request.title })
+    stop.abort()
+    expect(await withdrawn).toEqual({ action: 'dismissed', items: [] })
+    await waitFor(() => expect(inside(el).queryByRole('alertdialog', { name: request.title })).toBeNull())
+  })
+
+  it('stays on its own session', async () => {
+    const el = chat()
+    await inside(el).findByText(QUESTION)
+    void el.review({ title: 'For another chat' }, { session: 's-other' })
+    void el.review({ title: 'For this chat' })
+    await inside(el).findByRole('alertdialog', { name: 'For this chat' })
+    expect(inside(el).queryByRole('alertdialog', { name: 'For another chat' })).toBeNull()
+  })
+})
+
 describe('a host’s controls in the message box', () => {
   const modes = [
     { id: 'chat', label: 'Chat', icon: 'message-circle', tone: 'success' as const, hint: "Can't change the board" },

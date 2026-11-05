@@ -1,5 +1,6 @@
 <script lang="ts">
   import ApprovalCard from '../components/ApprovalCard.svelte'
+  import HostReviewCard from '../components/HostReviewCard.svelte'
   import Composer from '../components/Composer.svelte'
   import Icon from '../components/Icon.svelte'
   import NavBar from '../components/NavBar.svelte'
@@ -36,6 +37,8 @@
   const page = $derived(app.currentPage)
   const cards = $derived((session.approvals ?? []).filter(a => !a.judging))
   const checking = $derived((session.approvals ?? []).some(a => a.judging))
+  // An embedding host's reviews of its own changes, after the CLI's cards.
+  const reviews = $derived(app.reviewsOf(session.id))
   let scroller: HTMLElement | undefined = $state()
 
   async function restore() {
@@ -63,10 +66,13 @@
     </div>
   </div>
 
-  {#if cards.length || checking}
+  {#if cards.length || checking || reviews.length}
     <div class="approvals" part="approvals">
       {#each cards as a (a.requestId)}
         <ApprovalCard {session} approval={a} />
+      {/each}
+      {#each reviews as r (r.id)}
+        <HostReviewCard review={r} />
       {/each}
       {#if checking}<p class="checking" role="status"><Icon name="loader" spin size={13} />{t('asking.checking')}</p>{/if}
     </div>

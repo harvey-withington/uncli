@@ -45,7 +45,7 @@
   let options = $state(false)
   // A dot on what opens a folded header when something in it wants the
   // user (lib/attention.ts).
-  const attention = $derived(attentionCount(session))
+  const attention = $derived(attentionCount(session) + chat.reviewsOf(session.id).length)
   const attentionLabel = (what: string) => (attention === 0 ? what : attention === 1 ? t('header.attentionOne', { what }) : t('header.attentionMany', { what, n: attention }))
 
   // In a host's page, with no session list to delete it from: Delete chat

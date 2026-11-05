@@ -80,3 +80,17 @@ const host = (): ChatHost => ({
   ],
 })
 second.host = host()
+
+// Suggest mode's one review of a turn's staged changes, in the dark chat.
+document.getElementById('review')!.addEventListener('click', async () => {
+  const { action, items } = await second.review({
+    title: 'Apply 3 suggested changes to Lisbon trip?',
+    detail: 'From this turn.',
+    items: [
+      { id: 'c1', label: 'Rename “Flights” to “Flights booked”' },
+      { id: 'c2', label: 'Add “Passport” to Preparation to Leave', detail: 'Checklist item' },
+      { id: 'c3', label: 'Move “Hotel” to Done' },
+    ],
+  })
+  log.textContent += `review: ${action} ${items.join(', ')}\n`
+})

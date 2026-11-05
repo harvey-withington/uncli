@@ -71,12 +71,43 @@ export interface ChatHost {
   composerControls?: ComposerControl[]
 }
 
+// A host's review of a batch of its own changes, on one card in the
+// approval cards' place (review()).
+export interface ReviewItem {
+  id: string
+  label: string
+  detail?: string
+}
+
+export interface ReviewAction {
+  id: string
+  label: string
+  tone?: 'primary' | 'danger' | 'neutral'
+}
+
+export interface ReviewRequest {
+  title: string
+  detail?: string
+  // Each change, ticked to untick; none: all or nothing.
+  items?: ReviewItem[]
+  // Apply (primary) and Discard when left out.
+  actions?: ReviewAction[]
+}
+
+// The button chosen ("dismissed" when withdrawn) and the items still ticked.
+export interface ReviewAnswer {
+  action: string
+  items: string[]
+}
+
 export declare class UncliChat extends HTMLElement {
   backend: Backend | null
   host: ChatHost | null
   session: string
   // Starts a session and shows it; meta is the host's word on what it's for.
   newSession(profile?: string, workdir?: string, model?: string, opts?: { meta?: string }): Promise<string>
+  // Asks the user about a batch of the host's changes on one card; aborting signal withdraws it.
+  review(request: ReviewRequest, opts?: { session?: string; signal?: AbortSignal }): Promise<ReviewAnswer>
 }
 
 export declare class UncliSessionList extends HTMLElement {

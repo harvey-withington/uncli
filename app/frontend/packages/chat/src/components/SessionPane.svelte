@@ -5,6 +5,7 @@
   import { tintStyle } from '../lib/tint'
   import { blockMatching } from '../lib/search'
   import ApprovalCard from './ApprovalCard.svelte'
+  import HostReviewCard from './HostReviewCard.svelte'
   import ScrollKeeper from './ScrollKeeper.svelte'
   import SessionHeader from './SessionHeader.svelte'
   import Composer from './Composer.svelte'
@@ -46,6 +47,8 @@
   // Requests the quick-task model is still judging wait without a card.
   const cards = $derived((session.approvals ?? []).filter(a => !a.judging))
   const checking = $derived((session.approvals ?? []).some(a => a.judging))
+  // An embedding host's reviews of its own changes, after the CLI's cards.
+  const reviews = $derived(chat.reviewsOf(session.id))
 
   async function restore() {
     try {
@@ -103,10 +106,13 @@
       <!-- Where the scroller sits through updates, and whether it follows
            the end (the toggle under its scrollbar). -->
       <ScrollKeeper {scroller} pageId={page?.id} />
-      {#if cards.length || checking}
+      {#if cards.length || checking || reviews.length}
         <div class="approvals" class:more-below={moreBelow} bind:this={approvalsEl} onscroll={measureApprovals} part="approvals">
           {#each cards as a (a.requestId)}
             <ApprovalCard {session} approval={a} />
+          {/each}
+          {#each reviews as r (r.id)}
+            <HostReviewCard review={r} />
           {/each}
           {#if checking}
             <p class="checking" role="status"><Icon name="loader" spin size={13} />{t('asking.checking')}</p>

@@ -21,6 +21,7 @@ import { namesOf, providerOf } from '../lib/api'
 import { Shell } from '../lib/shell.svelte'
 import type { EnterKey } from '../lib/enterkey.svelte'
 import type { ComposerControl } from '../lib/composercontrols'
+import type { HostReview, ReviewAnswer } from '../lib/hostreview'
 
 export type { Live }
 
@@ -92,6 +93,19 @@ export class ChatStore {
   // composer-controls slot.
   composerControls = $state.raw<ComposerControl[]>([])
   composerSlot = $state(false)
+  // An embedding host's reviews of its own batches of changes, each a card
+  // in its session's approval place (lib/hostreview.ts).
+  hostReviews = $state.raw<HostReview[]>([])
+
+  reviewsOf(sessionId: string): HostReview[] {
+    return this.hostReviews.filter(r => r.session === sessionId)
+  }
+
+  // answerReview settles a host's review with the user's answer (the
+  // element, which raised it, takes it off the list).
+  answerReview(id: string, answer: ReviewAnswer) {
+    this.hostReviews.find(x => x.id === id)?.resolve(answer)
+  }
 
   constructor(backend: Backend, opts: ChatStoreOptions = {}) {
     this.client = opts.client ?? new ChatClient(backend)

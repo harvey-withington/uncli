@@ -168,7 +168,7 @@ The element sends these events. They bubble and are composed, so you can listen 
 | `uncli-select` | The user picked a session in a list |
 | `uncli-busy` | The session started answering |
 | `uncli-idle` | It finished |
-| `uncli-needs-approval` | A tool call is waiting for the user |
+| `uncli-needs-approval` | A tool call, or a review you raised, is waiting for the user |
 | `uncli-missing` | The session you gave isn't on this UNCLI (deleted, say): start a new one |
 | `uncli-deleted` | The user deleted the chat from its header |
 | `uncli-new-chat` | The user chose New chat in its header. Cancelable: cancel it and call `newSession` yourself, with your `meta`; otherwise the chat starts a new session of the same type itself |
@@ -256,6 +256,24 @@ HostToolPolicy: func(call uncli.HostToolCall) uncli.HostDecision {
 - It sends `uncli-needs-approval`, and counts towards the folded header's attention dot.
 - Allow once runs the tool, and Deny refuses it.
 - "This is safe" remembers the tool, in UNCLI's scope (this project or all of them). From then on the tool runs without you being asked, since the user chose "always". `PolicyDeny` still wins.
+
+**One review for a batch of changes.** Asking on each call means a turn that makes twenty changes asks twenty times. To ask once instead, let the calls through and keep the changes aside yourself (your tool answers `{"status":"staged"}` so the model knows nothing has changed yet). When the turn ends (`uncli-idle`), raise one card with the element's `review()`:
+
+```js
+chat.addEventListener('uncli-idle', async () => {
+  const staged = await myStagedChanges(chat.session)
+  if (!staged.length) return
+  const { action, items } = await chat.review({
+    title: `Apply ${staged.length} suggested changes?`,
+    detail: 'From this turn.',
+    items: staged.map(c => ({ id: c.id, label: c.summary, detail: c.more })),
+  })
+  if (action === 'apply') await applyStaged(items) // the ids still ticked
+  else if (action === 'discard') await discardStaged()
+})
+```
+
+The card sits where approval cards do, in UNCLI's look, in both layouts. Each item starts ticked; the user can untick some, or use All and None. Apply waits for at least one tick. Pass `actions` (`{ id, label, tone }`, tone `primary`, `danger` or `neutral`) for your own buttons in place of Apply and Discard; leave out `items` for an all-or-nothing card. The promise resolves with the button's `id` and the ticked items' ids (all of them for a card without items). The card sends `uncli-needs-approval` and counts towards the folded header's attention dot. It belongs to the session shown when you raised it (or `{ session }` in the second argument), and stays until it's answered, even if the user moves to another chat and back. Pass `{ signal }` (an `AbortSignal`) to withdraw it: the promise then resolves with `action: 'dismissed'`.
 
 Only your own servers' tools are asked about: those `MCPServers` gave the session. The CLI's own tools and the user's own MCP servers keep UNCLI's rules, so your app can't loosen their safety. The chat's trace shows "allowed by the app", with your reason.
 
