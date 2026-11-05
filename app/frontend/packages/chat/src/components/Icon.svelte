@@ -142,7 +142,11 @@
   .flip {
     transform: scaleX(-1);
   }
-  .spin {
+  /* The drawing turns, about its own centre: the wrapper may be stretched
+     by its row, or the drawing nudged within it (top: 2px to sit on a
+     line), and turning the wrapper then made the circle wander. */
+  .spin :global(svg) {
+    transform-origin: 50% 50%;
     animation: spin 0.9s linear infinite;
   }
   @keyframes spin {
