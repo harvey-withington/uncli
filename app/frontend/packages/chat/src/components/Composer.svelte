@@ -253,7 +253,7 @@
     <textarea
       bind:this={input}
       bind:value={text}
-      use:autosize={240}
+      use:autosize={{ max: 240, value: text }}
       rows="2"
       {placeholder}
       aria-label={t('composer.label')}

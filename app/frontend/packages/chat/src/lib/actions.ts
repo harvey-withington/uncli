@@ -78,15 +78,26 @@ export function focusTrap(node: HTMLElement) {
   return { destroy() { node.removeEventListener('keydown', onKey) } }
 }
 
-// autosize grows a textarea with its content up to max pixels.
-export function autosize(node: HTMLTextAreaElement, max = 240) {
+// autosize grows a textarea with its content up to max pixels, and shrinks
+// it again. Typing resizes it; so does value, the text bound to it, when the
+// text changes from code (cleared after Send, a draft loaded, a slash
+// command picked), which fires no input event.
+export function autosize(node: HTMLTextAreaElement, opts: { max?: number; value?: string } = {}) {
+  let max = opts.max ?? 240
   const resize = () => {
     node.style.height = 'auto'
     node.style.height = `${Math.min(node.scrollHeight, max)}px`
   }
   node.addEventListener('input', resize)
   queueMicrotask(resize)
-  return { update() { resize() }, destroy() { node.removeEventListener('input', resize) } }
+  return {
+    update(next: { max?: number; value?: string } = {}) {
+      max = next.max ?? 240
+      // After the DOM has the new text.
+      queueMicrotask(resize)
+    },
+    destroy() { node.removeEventListener('input', resize) },
+  }
 }
 
 export interface DragSortOptions {
