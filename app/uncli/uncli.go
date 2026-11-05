@@ -16,6 +16,7 @@
 package uncli
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -79,6 +80,17 @@ type Options struct {
 	// own servers' tools (see HostToolPolicy). nil: UNCLI decides, as for
 	// any MCP server.
 	HostToolPolicy HostToolPolicy
+	// OnNeedsApproval is told each time a session starts waiting for the
+	// user on an approval card: a tool UNCLI asks about (a host's PolicyAsk
+	// among them), a question the model asks, or a plan to approve. prompt
+	// says what it asks: the host's own words when it asked, else UNCLI's
+	// (in English). It comes whether or not any page is open, so the host
+	// can alert the user elsewhere (a push to their phone), on a goroutine
+	// of its own. nil: not told.
+	OnNeedsApproval func(session string, prompt HostPrompt)
+	// OnIdle is told each time a session's turn ends: an answer finished,
+	// stopped or failed. As OnNeedsApproval, whether or not a page is open.
+	OnIdle func(session string)
 }
 
 // HostToolPolicy decides approvals for the tools of the host's own MCP
@@ -170,7 +182,10 @@ func (h *hostTools) decide(call session.HostToolCall) session.HostDecision {
 	return session.HostDecision{}
 }
 
-// MCPServer is an MCP server of the host's, reached over HTTP.
+// MCPServer is an MCP server of the host's, reached over HTTP. Its tools
+// are loaded from a session's first turn, never deferred behind the CLI's
+// tool search, which is kept for the user's own MCP servers and
+// connectors: the host's tools are the point of its sessions.
 type MCPServer struct {
 	URL     string            // its MCP endpoint, http(s)://…
 	Headers map[string]string // sent with each request: the host's own token, say
@@ -180,6 +195,10 @@ type MCPServer struct {
 // --mcp-config.
 func (o Options) hostMCP(session string) []string { return mcpConfig(o.MCPServers(session)) }
 
+// hostToolsUpFront is on but for a test's control run, which shows what
+// it changes.
+var hostToolsUpFront = true
+
 func mcpConfig(servers map[string]MCPServer) []string {
 	if len(servers) == 0 {
 		return nil
@@ -187,6 +206,9 @@ func mcpConfig(servers map[string]MCPServer) []string {
 	cfg := map[string]any{}
 	for name, s := range servers {
 		server := map[string]any{"type": "http", "url": s.URL}
+		if hostToolsUpFront {
+			server["alwaysLoad"] = true // not deferred behind tool search (CLI 2.1.285)
+		}
 		// No headers, no key: the CLI drops a server whose headers are null.
 		if len(s.Headers) > 0 {
 			server["headers"] = s.Headers
@@ -315,7 +337,15 @@ func Start(o Options) (*Core, error) {
 	if o.MCPServers != nil && o.HostToolPolicy != nil {
 		hostTool = host.decide
 	}
-	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd, CLIConfigDir: cliConfig, HostMCP: hostMCP, HostTool: hostTool})
+	var onApproval func(string, session.Approval)
+	if o.OnNeedsApproval != nil {
+		onApproval = func(id string, a session.Approval) {
+			title, detail := app.ApprovalPrompt(a)
+			o.OnNeedsApproval(id, HostPrompt{Title: title, Detail: detail})
+		}
+	}
+	svc, err := app.NewWith(paths, hub, app.Options{Embedded: true, HookCommand: hookCmd, CLIConfigDir: cliConfig, HostMCP: hostMCP, HostTool: hostTool,
+		OnApproval: onApproval, OnIdle: o.OnIdle})
 	if err != nil {
 		return nil, err
 	}
@@ -378,6 +408,45 @@ func (c *Core) KeyedHandler() http.Handler { return c.routes }
 // session made without it, or after a restart (by then the host has its
 // own record).
 func (c *Core) SessionMeta(session string) string { return c.svc.Sessions.Meta(session) }
+
+// Provider is an AI provider (a CLI) this UNCLI can run sessions on.
+type Provider struct {
+	ID     string // what newSession's provider takes: claude, …
+	Name   string // the CLI's name: Claude Code
+	Ready  bool   // a session can start on it now
+	Reason string // why not, in a sentence to show ("Claude Code isn't signed in")
+	Models []Model
+	// DefaultModel is what a new session on it starts on when newSession
+	// gives no model: the chat profile's model on the first provider; ""
+	// where the CLI picks.
+	DefaultModel string
+}
+
+// Model is one a provider's sessions can run on.
+type Model struct {
+	ID    string // what newSession's model takes: sonnet, …
+	Label string // its name: Sonnet
+}
+
+// Providers lists the CLIs this UNCLI has, the first (the default) first,
+// whether each is ready and the models of each, for the host's own
+// settings. It needs no page open. Checking a CLI's sign-in can take a few
+// seconds the first time (it's kept for half a minute after).
+func (c *Core) Providers(ctx context.Context) []Provider {
+	out := []Provider{}
+	for _, p := range c.svc.HostProviders(ctx) {
+		q := Provider{ID: p.ID, Name: p.Name, Ready: p.Ready, Reason: p.Reason, DefaultModel: p.DefaultModel, Models: []Model{}}
+		for _, m := range p.Models {
+			label := m.DisplayName
+			if label == "" {
+				label = m.Value
+			}
+			q.Models = append(q.Models, Model{ID: m.Value, Label: label})
+		}
+		out = append(out, q)
+	}
+	return out
+}
 
 // Close stops the sessions and the CLIs they run, and frees the folder.
 // Closing again does nothing.

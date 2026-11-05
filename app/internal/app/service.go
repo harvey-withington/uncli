@@ -79,6 +79,13 @@ type Options struct {
 	// HostTool is the host's decision on its own MCP servers' tools
 	// (session.Deps.HostTool).
 	HostTool func(session.HostToolCall) session.HostDecision
+	// OnApproval is told of each approval card as a session starts waiting
+	// on it (once a decision model has had its say), with what it asks in
+	// words (ApprovalPrompt); OnIdle, of each turn's end. Both come whether
+	// or not any page is open, for a host's own alerts. Each is called on a
+	// goroutine of its own.
+	OnApproval func(sessionID string, a session.Approval)
+	OnIdle     func(sessionID string)
 }
 
 // errEmbedded refuses what only the desktop app does.
@@ -222,6 +229,7 @@ func NewWith(paths Paths, emit Emitter, opts Options) (*Service, error) {
 		func() string { return s.Preferences().Notifications },
 		func(n notify.Note) { go s.showNote(n) })
 	sink.remote = s.remoteSink
+	sink.onApproval, sink.onIdle = opts.OnApproval, opts.OnIdle
 	s.Sessions, err = session.NewManager(session.Deps{
 		Store: db, Adapter: s.Adapter, Others: others, Hooks: s.hooks,
 		Runtime: local.New(), Runtimes: s.runtimeFor, Profiles: set,
@@ -575,6 +583,13 @@ func (s *Service) CreateSessionIn(profileID, workdir, model, container string) (
 func (s *Service) CreateSessionWith(n session.NewSession) (session.View, NewSessionChoices, error) {
 	if err := s.pluginAllowed(n.Provider); err != nil {
 		return session.View{}, s.lastNewSession(), err
+	}
+	// A host that names a provider hears at once if it can't run now (not
+	// installed, signed out), rather than at the session's first message.
+	if s.embedded && n.Provider != "" {
+		if err := s.providerReady(s.life, n.Provider); err != nil {
+			return session.View{}, s.lastNewSession(), err
+		}
 	}
 	v, err := s.Sessions.CreateWith(n)
 	if err != nil {

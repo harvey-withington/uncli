@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"strings"
 	"sync"
 	"testing"
@@ -44,14 +45,20 @@ type attention struct {
 	// setting and focus: paired devices decide for themselves (push).
 	remote func() NoteSink
 
+	// onApproval and onIdle tell an embedding host (Options.OnApproval,
+	// OnIdle); asked is the cards it has been told of, by session.
+	onApproval func(string, session.Approval)
+	onIdle     func(string)
+
 	mu    sync.Mutex
 	state map[string]session.State
 	page  map[string]store.Page // each session's latest page, as it was last saved
+	asked map[string]map[string]bool
 }
 
 func newAttention(next session.Sink, focused func(string) bool, setting func() string, show func(notify.Note)) *attention {
 	return &attention{next: next, focused: focused, setting: setting, show: show, remote: func() NoteSink { return nil },
-		state: map[string]session.State{}, page: map[string]store.Page{}}
+		state: map[string]session.State{}, page: map[string]store.Page{}, asked: map[string]map[string]bool{}}
 }
 
 func (a *attention) SessionEvent(id string, ev core.Event) { a.next.SessionEvent(id, ev) }
@@ -70,8 +77,17 @@ func (a *attention) SessionChanged(v session.View) {
 	prev, seen := a.state[v.ID]
 	a.state[v.ID] = v.State
 	page := a.page[v.ID]
+	fresh := a.newCardsLocked(v)
 	a.mu.Unlock()
 	a.next.SessionChanged(v)
+	if a.onApproval != nil {
+		for _, ap := range fresh {
+			go a.onApproval(v.ID, ap)
+		}
+	}
+	if a.onIdle != nil && seen && busy(prev) && !busy(v.State) {
+		go a.onIdle(v.ID)
+	}
 	if !seen || prev == v.State {
 		return
 	}
@@ -83,6 +99,64 @@ func (a *attention) SessionChanged(v session.View) {
 			sink(n, v.State == session.NeedsApproval)
 		}
 	}
+}
+
+// newCardsLocked is the session's approval cards not seen before, each
+// once a decision model has had its say (one it settles never waits on
+// the user); cards gone are forgotten. Caller holds a.mu.
+func (a *attention) newCardsLocked(v session.View) []session.Approval {
+	if a.onApproval == nil {
+		return nil
+	}
+	was := a.asked[v.ID]
+	now := map[string]bool{}
+	var fresh []session.Approval
+	for _, ap := range v.Approvals {
+		if ap.Judging {
+			continue
+		}
+		now[ap.RequestID] = true
+		if !was[ap.RequestID] {
+			fresh = append(fresh, ap)
+		}
+	}
+	a.asked[v.ID] = now
+	return fresh
+}
+
+// ApprovalPrompt is what an approval card asks, in words for an alert: an
+// embedding host's own when it asked (HostToolPolicy), the question or the
+// plan for those, else what the CLI said it would do, and the command or
+// file it touches.
+func ApprovalPrompt(a session.Approval) (title, detail string) {
+	switch {
+	case a.Host != nil:
+		return a.Host.Title, a.Host.Detail
+	case a.Ask == "question":
+		var in struct {
+			Questions []struct {
+				Question string `json:"question"`
+			} `json:"questions"`
+		}
+		_ = json.Unmarshal(a.Input, &in)
+		if len(in.Questions) > 0 && in.Questions[0].Question != "" {
+			return "A question for you", oneLine(in.Questions[0].Question)
+		}
+		return "A question for you", ""
+	case a.Ask == "plan":
+		return "A plan to approve", ""
+	}
+	title = oneLine(a.Description)
+	if title == "" {
+		title = a.Tool
+	}
+	switch {
+	case a.Action.Command != "":
+		detail = oneLine(a.Action.Command)
+	case a.Action.Path != "":
+		detail = a.Action.Path
+	}
+	return title, detail
 }
 
 // NoteSink takes a note about a session for paired devices; approval says

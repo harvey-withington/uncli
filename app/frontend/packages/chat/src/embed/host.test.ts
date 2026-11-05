@@ -114,6 +114,35 @@ describe('the chat’s own life in a host', () => {
   })
 })
 
+describe('the CLI a host’s session runs on', () => {
+  it('starts a session on the provider the host names, and says what it runs on', async () => {
+    const backend = mockBackend()
+    const create = vi.spyOn(backend, 'createSession')
+    const runsOn = vi.fn()
+    document.addEventListener('uncli-runs-on', runsOn)
+    try {
+      const el = chat(backend)
+      await inside(el).findByText(QUESTION)
+      await waitFor(() => expect(el.runsOn).toEqual({ provider: 'claude', model: expect.any(String) }))
+      const id = await el.newSession('chat', '', 'sonnet', { provider: 'claude', meta: 'card:7' })
+      expect(create).toHaveBeenLastCalledWith('chat', '', 'sonnet', '', 'claude', null, { meta: 'card:7' })
+      await waitFor(() => expect(runsOn).toHaveBeenLastCalledWith(expect.objectContaining({ detail: { session: id, provider: 'claude', model: 'sonnet' } })))
+      expect(el.runsOn).toEqual({ provider: 'claude', model: 'sonnet' })
+    } finally {
+      document.removeEventListener('uncli-runs-on', runsOn)
+    }
+  })
+
+  it('rejects with the server’s reason when the provider can’t run, and shows nothing new', async () => {
+    const backend = mockBackend()
+    vi.spyOn(backend, 'createSession').mockRejectedValue(new Error("can't start a session on Claude Code: Claude Code isn't signed in"))
+    const el = chat(backend)
+    await inside(el).findByText(QUESTION)
+    await expect(el.newSession('chat', '', '', { provider: 'claude' })).rejects.toThrow("Claude Code isn't signed in")
+    expect(el.session).toBe('s-code')
+  })
+})
+
 describe('a host’s own approval prompts', () => {
   // HostToolPolicy asked, with its words for the card (decision 0027).
   const hostCard = {

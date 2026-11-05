@@ -105,7 +105,12 @@ export declare class UncliChat extends HTMLElement {
   host: ChatHost | null
   session: string
   // Starts a session and shows it; meta is the host's word on what it's for.
-  newSession(profile?: string, workdir?: string, model?: string, opts?: { meta?: string }): Promise<string>
+  // provider picks the CLI (an id from the host's core.Providers()); left out, the first. One that
+  // can't run now (unknown, not installed, signed out) rejects with an Error whose message says why,
+  // to show as it is ("can't start a session on Claude Code: Claude Code isn't signed in"); nothing is made.
+  newSession(profile?: string, workdir?: string, model?: string, opts?: { meta?: string; provider?: string }): Promise<string>
+  // The provider (CLI id) and model the shown session runs on, once known; uncli-runs-on says when it changes.
+  readonly runsOn: { provider: string; model: string } | null
   // Asks the user about a batch of the host's changes on one card; aborting signal withdraws it.
   review(request: ReviewRequest, opts?: { session?: string; signal?: AbortSignal }): Promise<ReviewAnswer>
 }
@@ -123,7 +128,7 @@ export declare function chatClient(backend: Backend): ChatClient
 export declare function mountedBackend(src: string): Backend
 export declare function setHostHeaders(headers: (() => Record<string, string> | null | undefined) | null): void
 
-// The events the elements send: detail { session } (uncli-new-session and
+// The events the elements send: detail { session } (uncli-new-session, uncli-runs-on and
 // uncli-select add to it).
 export interface UncliEventMap {
   'uncli-ready': CustomEvent<{ session: string }>
@@ -134,6 +139,7 @@ export interface UncliEventMap {
   'uncli-deleted': CustomEvent<{ session: string }>
   'uncli-new-chat': CustomEvent<{ session: string }>
   'uncli-new-session': CustomEvent<{ session: string; previous: string }>
+  'uncli-runs-on': CustomEvent<{ session: string; provider: string; model: string }>
   'uncli-select': CustomEvent<{ session: string }>
   'uncli-escape': CustomEvent<{ session: string }>
   'uncli-submit': CustomEvent<{ session: string }>

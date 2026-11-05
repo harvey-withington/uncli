@@ -130,7 +130,9 @@ It's built already, Svelte inside, so your bundler needs nothing special and you
 - **`src`** is the path your server forwards to your UNCLI. Every element with the same `src` shares one client: one event stream, one copy of the core's state. The page sends no key; your server adds it.
 - **`backend`** (property) instead takes any object implementing `Backend`, such as `@uncli/client/mock` to build against without a core.
 - **`session`** (attribute or property) is the session to show. Changing it shows another.
-- **`newSession(profile?, workdir?, model?, { meta? })`** starts a session and shows it, returning its id. The profiles are `chat` (the default: a fresh folder each time), and `cowork` and `code`, which work in the `workdir` you give. `meta` is your own word on what the session is for, such as `card:42`. Your server reads it back with `core.SessionMeta(id)`, from the session's very first start, before you've recorded anything yourself; that's what `MCPServers` needs. It's kept while your UNCLI runs.
+- **`newSession(profile?, workdir?, model?, { meta?, provider? })`** starts a session and shows it, returning its id. The profiles are `chat` (the default: a fresh folder each time), and `cowork` and `code`, which work in the `workdir` you give. `meta` is your own word on what the session is for, such as `card:42`. Your server reads it back with `core.SessionMeta(id)`, from the session's very first start, before you've recorded anything yourself; that's what `MCPServers` needs. It's kept while your UNCLI runs.
+- **`provider`** picks the CLI the session runs on, by its id from `core.Providers()` (see "Your providers and their models"); left out, the first. If that CLI can't run now (an unknown id, not installed, signed out), the promise rejects with an `Error` whose message says why in words you can show, such as "can't start a session on Claude Code: Claude Code isn't signed in", and nothing is made. `model` is one of that provider's models; left out, its `DefaultModel`.
+- **`runsOn`** is the provider and model the shown session runs on, `{ provider, model }`, once known (`null` before), and `uncli-runs-on` says when it changes: when a session is shown, or the user switches its model.
 - **When it connects.** A moment after it gets `src` or `backend`, so a `host` you set in the same go (with your sign-in headers) is in place for the first request.
 - **The client** the elements use is exported from `@uncli/chat/element` too (`chatClient`, `mountedBackend`). Import it from there, not from `@uncli/client`, so your code shares the elements' connection rather than opening its own.
 - **`scheme`** is `light` or `dark`. Leave it out to follow the system.
@@ -184,6 +186,7 @@ The element sends these events. They bubble and are composed, so you can listen 
 | `uncli-deleted` | The user deleted the chat from its header |
 | `uncli-new-chat` | The user chose New chat in its header. Cancelable: cancel it and call `newSession` yourself, with your `meta`; otherwise the chat starts a new session of the same type itself |
 | `uncli-new-session` | It started that new session and shows it; `detail` is `{ session, previous }` |
+| `uncli-runs-on` | What the shown session runs on is known or changed; `detail` is `{ session, provider, model }` |
 
 In a host's page, the chat's header has **New chat** and **Delete chat**, since your page may show no session list. Delete asks first.
 
@@ -232,6 +235,7 @@ core, err := uncli.Start(uncli.Options{
 
 - **When it's asked.** Each time a session's CLI starts, with the session's id (what `newSession()` returned). So each session can have the servers for what it's about, with a token that's current then.
 - **Every session type.** It works for chats, cowork and code sessions alike, beside whatever servers the session type shares of the user's own.
+- **Loaded from the first turn.** Your servers' tools are always there in full. A session that shares the user's own MCP servers or connectors has the CLI's tool search on, so the model looks those up only when it needs them, but never yours: your tools are the point of your sessions, so the model never has to search for them.
 - **What the session is for.** For a session made with `newSession(…, { meta })`, `core.SessionMeta(session)` tells you, from its very first start.
 - **Servers the user turns off.** The CLI may load MCP servers that aren't yours, such as the claude.ai connectors of the account it's signed in with. One that needs signing in shows the attention dot. The user can choose **Turn off** for it in the MCP servers list. Your UNCLI saves that in its data folder, for every chat, and turns the server off again each time a CLI starts. It shows as "off", with **Turn on** to bring it back.
 - **Approvals.** By default, calls to your tools are approved like any MCP server's. A tool marked read-only in its MCP annotations (`readOnlyHint`) runs without asking under the default prompt level; others ask in the chat, where your user can allow them once or always.
@@ -288,6 +292,42 @@ chat.addEventListener('uncli-idle', async () => {
 The card sits where approval cards do, in UNCLI's look, in both layouts. Each item starts ticked; the user can untick some, or use All and None. Apply waits for at least one tick. Pass `actions` (`{ id, label, tone }`, tone `primary`, `danger` or `neutral`) for your own buttons in place of Apply and Discard; leave out `items` for an all-or-nothing card. The promise resolves with the button's `id` and the ticked items' ids (all of them for a card without items). The card sends `uncli-needs-approval` and counts towards the folded header's attention dot. It belongs to the session shown when you raised it (or `{ session }` in the second argument), and stays until it's answered, even if the user moves to another chat and back. Pass `{ signal }` (an `AbortSignal`) to withdraw it: the promise then resolves with `action: 'dismissed'`.
 
 Only your own servers' tools are asked about: those `MCPServers` gave the session. The CLI's own tools and the user's own MCP servers keep UNCLI's rules, so your app can't loosen their safety. The chat's trace shows "allowed by the app", with your reason.
+
+## Your providers and their models
+
+Your settings can offer the CLIs and models your UNCLI has ("Claude Code · Sonnet") without any page open:
+
+```go
+for _, p := range core.Providers(ctx) {
+	// p.ID ("claude"), p.Name ("Claude Code"), p.Ready, p.Reason (why not),
+	// p.Models ([]uncli.Model{ID: "sonnet", Label: "Sonnet"}, …), p.DefaultModel
+}
+```
+
+- **Ready** says a session can start on it now. When it can't, **Reason** says why in a sentence you can show: "Claude Code isn't installed in this UNCLI yet", "Claude Code isn't signed in".
+- **Models** are the IDs `newSession`'s `model` takes. The first provider lists the ones its CLI reported, or its stable aliases (Opus, Sonnet, Haiku) until it has run once. Other CLIs list what their sign-in check reports, which may be none: then the CLI picks.
+- **DefaultModel** is what a new session starts on when you give no model: the `chat` profile's model on the first provider, or "" where the CLI picks. Other profiles start on their own model.
+- The first call checks each CLI's sign-in, which can take a few seconds; the answer is kept for half a minute.
+
+Pass the ID to `newSession(…, { provider })`.
+
+## Hearing when a session waits
+
+Your page hears `uncli-needs-approval` and `uncli-idle`, but only while it's open. To alert the user elsewhere, such as a push to their phone, have your server hear it too:
+
+```go
+core, err := uncli.Start(uncli.Options{
+	…
+	OnNeedsApproval: func(session string, prompt uncli.HostPrompt) {
+		// "Your chat on “Trip” is waiting for your OK": prompt.Title, prompt.Detail
+	},
+	OnIdle: func(session string) { … },
+})
+```
+
+- **`OnNeedsApproval`** is called each time a session starts waiting for the user on a card: a tool UNCLI asks about (your `PolicyAsk` among them), a question the model asks, or a plan to approve. It's called once a card is the user's to answer: one the decision model settles by itself never comes. `prompt` is your own words when you asked; otherwise UNCLI's, in English: what the CLI said it would do as the title, and the command or file as the detail.
+- **`OnIdle`** is called each time a session's turn ends: the answer finished, was stopped, or failed.
+- Both are called whether or not any page is open, each on a goroutine of its own. Map the session to your own things with `core.SessionMeta` or your own record.
 
 ## Your links, strings, mentions and context, and your keys
 

@@ -18,6 +18,8 @@
 // @mentions; turnContext() says what the user has in front of them, sent
 // (hidden) with each turn; headers() is the host's own sign-in, sent with
 // every request to src; enter says what Enter does in the message box.
+// uncli-runs-on: the provider and model the shown session runs on, as
+// first known and when they change (detail { session, provider, model }).
 // Events (composed, so they cross into the host's page): uncli-ready,
 // uncli-busy, uncli-idle, uncli-needs-approval, uncli-missing (no such
 // session here), uncli-deleted (deleted from the header); detail:
@@ -107,6 +109,14 @@ export class UncliChat extends HTMLElement {
     }
   }
 
+  // runsOn is the provider (CLI id) and model the shown session runs on,
+  // once it's known; uncli-runs-on says when it changes.
+  get runsOn(): { provider: string; model: string } | null {
+    return this.#runsOn
+  }
+
+  #runsOn: { provider: string; model: string } | null = null
+
   // The session shown (the session attribute).
   get session(): string {
     return this.getAttribute('session') ?? ''
@@ -120,10 +130,13 @@ export class UncliChat extends HTMLElement {
   // a fresh folder by default, or a profile's (cowork, code) in workdir.
   // opts.meta is the host's word on what it's for (a card, say), which the
   // host's server reads back with core.SessionMeta, from the session's very
-  // first start (MCPServers).
-  async newSession(profile = 'chat', workdir = '', model = '', opts: { meta?: string } = {}): Promise<string> {
+  // first start (MCPServers). opts.provider picks the CLI (an id from
+  // core.Providers); left out, the first. A provider that can't run now
+  // (unknown, not installed, signed out) rejects the promise with an Error
+  // whose message says why, in words to show, and nothing is made.
+  async newSession(profile = 'chat', workdir = '', model = '', opts: { meta?: string; provider?: string } = {}): Promise<string> {
     if (!this.#backend) throw new Error('<uncli-chat> has no src or backend')
-    const v = await chatClient(this.#backend).createSession(profile, workdir, model, '', '', null, opts.meta ?? '')
+    const v = await chatClient(this.#backend).createSession(profile, workdir, model, '', opts.provider ?? '', null, opts.meta ?? '')
     this.session = v.id
     return v.id
   }
@@ -303,9 +316,15 @@ export class UncliChat extends HTMLElement {
     if (!store || !id) return
     let busy = false
     let asking = 0
+    this.#runsOn = null
     const seen = (s: SessionSnapshot) => {
       const v = s.view
       if (!v) return
+      const provider = v.adapter || store.boot?.providers[0]?.id || ''
+      if (provider !== this.#runsOn?.provider || v.model !== this.#runsOn?.model) {
+        this.#runsOn = { provider, model: v.model }
+        this.#emitFor('uncli-runs-on', { session: id, provider, model: v.model })
+      }
       if (v.busy !== busy) this.#emit(v.busy ? 'uncli-busy' : 'uncli-idle')
       busy = v.busy
       const n = v.approvals?.length ?? 0

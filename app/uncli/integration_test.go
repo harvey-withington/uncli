@@ -264,7 +264,21 @@ func TestHostToolPolicyDecidesForTheCLI(t *testing.T) {
 			b := &board{}
 			srv := httptest.NewServer(b)
 			defer srv.Close()
+			// What the host hears server-side: cards waiting, and turns ending.
+			var hookMu sync.Mutex
+			var prompts []HostPrompt
+			var idle []string
 			c, err := Start(Options{DataDir: t.TempDir(), UserCLIConfig: true,
+				OnNeedsApproval: func(id string, p HostPrompt) {
+					hookMu.Lock()
+					prompts = append(prompts, p)
+					hookMu.Unlock()
+				},
+				OnIdle: func(id string) {
+					hookMu.Lock()
+					idle = append(idle, id)
+					hookMu.Unlock()
+				},
 				MCPServers: func(string) map[string]MCPServer { return map[string]MCPServer{"board": {URL: srv.URL}} },
 				HostToolPolicy: func(c HostToolCall) HostDecision {
 					if c.Tool != "set_card_title" {
@@ -324,6 +338,87 @@ func TestHostToolPolicyDecidesForTheCLI(t *testing.T) {
 				if len(renamed) == 0 || renamed[0] != "Melbourne in December" {
 					t.Errorf("allowed on the card, but the board got %v", renamed)
 				}
+			}
+			time.Sleep(200 * time.Millisecond) // the hooks run on goroutines of their own
+			hookMu.Lock()
+			defer hookMu.Unlock()
+			if len(idle) == 0 || idle[0] != v.ID {
+				t.Errorf("OnIdle heard %v, not the turn's end in %s", idle, v.ID)
+			}
+			heard := false
+			for _, p := range prompts {
+				heard = heard || p.Title == "Rename card 42" && p.Detail == "New title: Melbourne in December"
+			}
+			if mode == PolicyAsk && !heard {
+				t.Errorf("OnNeedsApproval heard %+v, not the host's card", prompts)
+			}
+			if mode != PolicyAsk && heard {
+				t.Errorf("OnNeedsApproval heard of a card the host decided: %+v", prompts)
+			}
+		})
+	}
+}
+
+// The host's own tools are loaded from the first turn even where the CLI's
+// tool search is on (a session that shares the user's MCP servers and
+// connectors, on Sonnet, which uses it): the model calls the host's tool
+// without searching for it. The control run, without alwaysLoad, has to
+// search first, which is what this changes. The user's own servers stay
+// deferred, and answerFor denies them should the model try one.
+func TestHostToolsLoadedUpFront(t *testing.T) {
+	def, err := app.DefaultPaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bins, _ := filepath.Glob(filepath.Join(def.Cache, "cli", "claude", "*", "claude.exe"))
+	if len(bins) == 0 {
+		t.Skip("no downloaded Claude CLI in the app's cache")
+	}
+	t.Setenv("UNCLI_CLAUDE_BIN", bins[len(bins)-1])
+	if prev, ok := os.LookupEnv("CLAUDE_CONFIG_DIR"); ok {
+		os.Unsetenv("CLAUDE_CONFIG_DIR")
+		t.Cleanup(func() { os.Setenv("CLAUDE_CONFIG_DIR", prev) })
+	}
+	for _, upFront := range []bool{true, false} {
+		name := map[bool]string{true: "up front", false: "control, deferred"}[upFront]
+		t.Run(name, func(t *testing.T) {
+			hostToolsUpFront = upFront
+			defer func() { hostToolsUpFront = true }()
+			b := &board{}
+			srv := httptest.NewServer(b)
+			defer srv.Close()
+			c, err := Start(Options{DataDir: t.TempDir(), UserCLIConfig: true,
+				MCPServers: func(string) map[string]MCPServer { return map[string]MCPServer{"board": {URL: srv.URL}} }})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer c.Close()
+			shared := session.NewSession{Profile: "chat", Model: "sonnet", Shares: []string{"tools"}}
+			v, err := c.svc.Sessions.CreateWith(shared)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.svc.Sessions.SetMode(v.ID, session.ModeUnsafe); err != nil {
+				t.Fatal(err)
+			}
+			answer, _ := turn(t, c, v.ID, "Use the board's card_title tool to look up card 42, then reply with just its title.")
+			pages, _ := c.svc.Sessions.Pages(v.ID)
+			searched, called := 0, false
+			for _, it := range pages[len(pages)-1].Trace {
+				if it.Name == "ToolSearch" {
+					searched++
+				}
+				called = called || strings.Contains(it.Name, "card_title")
+			}
+			t.Logf("searched %d times, called the board: %v, answer %q", searched, called, answer)
+			if !called {
+				t.Fatalf("the board's tool wasn't called; the answer: %q", answer)
+			}
+			if upFront && searched > 0 {
+				t.Errorf("searched for tools %d times though the host's were loaded", searched)
+			}
+			if !upFront && searched == 0 {
+				t.Errorf("the control didn't search: tool search may be off, so the test shows nothing")
 			}
 		})
 	}

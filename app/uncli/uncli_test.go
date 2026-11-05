@@ -2,6 +2,7 @@ package uncli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -324,16 +325,19 @@ func TestHostMCPConfig(t *testing.T) {
 	}
 	var cfg struct {
 		MCPServers map[string]struct {
-			Type    string            `json:"type"`
-			URL     string            `json:"url"`
-			Headers map[string]string `json:"headers"`
+			Type       string            `json:"type"`
+			URL        string            `json:"url"`
+			Headers    map[string]string `json:"headers"`
+			AlwaysLoad bool              `json:"alwaysLoad"`
 		} `json:"mcpServers"`
 	}
 	if err := json.Unmarshal([]byte(got[0]), &cfg); err != nil {
 		t.Fatal(err)
 	}
 	b := cfg.MCPServers["board"]
-	if b.Type != "http" || b.URL != "http://127.0.0.1:9870/repos/r1/mcp" || b.Headers["Authorization"] != "Bearer t" {
+	// alwaysLoad: its tools are there from the first turn, never deferred
+	// behind tool search.
+	if b.Type != "http" || b.URL != "http://127.0.0.1:9870/repos/r1/mcp" || b.Headers["Authorization"] != "Bearer t" || !b.AlwaysLoad {
 		t.Errorf("board = %+v", b)
 	}
 	if o.hostMCP("s2") != nil {
@@ -387,5 +391,71 @@ func TestWhatTheHostDoesItselfIsntOffered(t *testing.T) {
 		if r.Error == nil || !strings.Contains(r.Error.Message, "doesn't offer") {
 			t.Errorf("%s: %+v", m, r)
 		}
+	}
+}
+
+// The host learns its UNCLI's providers without any page open: each with
+// whether it's ready and why not, and its models. On a fresh folder the
+// first provider's CLI isn't installed yet.
+func TestProvidersWithoutAPage(t *testing.T) {
+	c := start(t, Options{})
+	got := c.Providers(context.Background())
+	if len(got) == 0 || got[0].ID != "claude" || got[0].Name != "Claude Code" {
+		t.Fatalf("providers = %+v", got)
+	}
+	p := got[0]
+	if p.Ready || !strings.Contains(p.Reason, "Claude Code isn't installed") {
+		t.Errorf("not installed, yet ready = %v, reason %q", p.Ready, p.Reason)
+	}
+	ids := map[string]string{}
+	for _, m := range p.Models {
+		ids[m.ID] = m.Label
+	}
+	if ids["sonnet"] != "Sonnet" || ids["opus"] != "Opus" || ids["haiku"] != "Haiku" || p.DefaultModel != "sonnet" {
+		t.Errorf("models = %+v, default %q", p.Models, p.DefaultModel)
+	}
+	for _, q := range got {
+		if q.Models == nil {
+			t.Errorf("%s has nil models", q.ID)
+		}
+	}
+}
+
+// A page that names a provider for a new session hears at once when it
+// can't run there, in words it can show; without one, as before.
+func TestNewSessionOnAProviderThatIsntReady(t *testing.T) {
+	c := start(t, Options{})
+	srv := httptest.NewServer(c.Handler())
+	defer srv.Close()
+	create := func(provider string) (string, string) {
+		body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "CreateSession",
+			"params": []any{"chat", "", "", "", provider, nil}})
+		resp, err := http.Post(srv.URL+"/rpc", "application/json", bytes.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var r struct {
+			Result struct {
+				Session struct{ ID string } `json:"session"`
+			}
+			Error *struct{ Message string }
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			t.Fatal(err)
+		}
+		if r.Error != nil {
+			return "", r.Error.Message
+		}
+		return r.Result.Session.ID, ""
+	}
+	if _, msg := create("claude"); msg != "can't start a session on Claude Code: Claude Code isn't installed in this UNCLI yet" {
+		t.Errorf("an uninstalled provider: %q", msg)
+	}
+	if _, msg := create("nope"); msg != `no AI provider "nope" in this UNCLI` {
+		t.Errorf("an unknown provider: %q", msg)
+	}
+	if id, msg := create(""); id == "" || msg != "" {
+		t.Errorf("no provider named: %q, %q", id, msg)
 	}
 }
