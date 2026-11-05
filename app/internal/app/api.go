@@ -224,6 +224,11 @@ func (a *API) MCPCallback(sessionID, server, url string) error {
 	return a.svc.Sessions.MCPCallback(sessionID, server, url)
 }
 
+// MCPToggle turns one of a session's MCP servers off, or on again.
+func (a *API) MCPToggle(sessionID, server string, enabled bool) error {
+	return a.svc.Sessions.MCPToggle(a.ctx(), sessionID, server, enabled)
+}
+
 func (a *API) MCPReconnect(sessionID, server string) error {
 	return a.svc.Sessions.MCPReconnect(a.ctx(), sessionID, server)
 }

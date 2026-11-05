@@ -879,6 +879,9 @@ export interface Backend {
   mcpSignIn(sessionId: string, server: string): Promise<MCPSignInStart> // starts its CLI if need be; open the link
   mcpCallback(sessionId: string, server: string, url: string): Promise<void> // the address the browser ended up on, pasted
   mcpReconnect(sessionId: string, server: string): Promise<void>
+  // mcpToggle turns one of a session's MCP servers off (its status becomes
+  // disabled, which needs nothing from the user) or on again.
+  mcpToggle(sessionId: string, server: string, enabled: boolean): Promise<void>
   mcpSignOut(sessionId: string, server: string): Promise<void>
   mcpCancel(sessionId: string, server: string): Promise<void> // stop waiting for a sign-in
   setUnattended(sessionId: string, on: boolean): Promise<SessionView>

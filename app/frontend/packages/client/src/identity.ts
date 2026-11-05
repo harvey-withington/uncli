@@ -40,7 +40,7 @@ export function serverKey(origin: string): string {
 // The methods whose first argument is a session id.
 export const SESSION_FIRST = [
   'setShares', 'pages', 'send', 'interrupt', 'restart', 'setModel', 'toggleModifier', 'rename', 'setSortOrder',
-  'answerApproval', 'answerAsk', 'commands', 'mcpSignIn', 'mcpCallback', 'mcpReconnect', 'mcpSignOut', 'mcpCancel',
+  'answerApproval', 'answerAsk', 'commands', 'mcpSignIn', 'mcpCallback', 'mcpReconnect', 'mcpSignOut', 'mcpCancel', 'mcpToggle',
   'setUnattended', 'setMode', 'safeList', 'setSafeEntry', 'deleteSafeEntry', 'moveSafeEntry', 'setSafeLabel',
   'markSafe', 'teach', 'previewClasses', 'knownTools', 'explainCommand', 'sessionAllowlist', 'remove',
   'setBookmark', 'setPinned', 'archive', 'focus', 'summarisePage', 'openFile', 'openPath', 'watchFiles', 'watchRead',

@@ -749,6 +749,13 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
         changed(s)
       }, 600)
     },
+    async mcpToggle(sid, server, on) {
+      const s = find(sid)
+      const sv = (s.mcp ?? []).find(x => x.name === server)
+      if (!sv) throw new Error(`Server not found: ${server}`)
+      Object.assign(sv, on ? { status: 'connected', tools: sv.tools || 3, error: undefined } : { status: 'disabled', signing: false, site: undefined, error: undefined })
+      changed(s)
+    },
     async mcpSignOut(sid, server) {
       const s = find(sid)
       const sv = (s.mcp ?? []).find(x => x.name === server)

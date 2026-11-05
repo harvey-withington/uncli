@@ -116,12 +116,14 @@ const (
 	// the CLI's own listener); the answer is an EvMCPAuth. CtlMCPCallback
 	// hands the CLI the address the browser came back to (URL);
 	// CtlMCPReconnect connects Server again (after signing in elsewhere);
-	// CtlMCPSignOut forgets its sign-in. Server status comes with the
-	// answer to CtlToolHints, as EvMCPServers.
+	// CtlMCPSignOut forgets its sign-in; CtlMCPToggle turns Server off or
+	// on again (Enabled). Server status comes with the answer to
+	// CtlToolHints, as EvMCPServers.
 	CtlMCPSignIn    ControlKind = "mcp_sign_in"
 	CtlMCPCallback  ControlKind = "mcp_callback"
 	CtlMCPReconnect ControlKind = "mcp_reconnect"
 	CtlMCPSignOut   ControlKind = "mcp_sign_out"
+	CtlMCPToggle    ControlKind = "mcp_toggle"
 )
 
 type Control struct {
@@ -133,6 +135,7 @@ type Control struct {
 	Message      string          // CtlApprove deny reason
 	UpdatedInput json.RawMessage // CtlApprove allow
 	Server       string          // the CtlMCP* controls: the MCP server, by the name the CLI reports
+	Enabled      bool            // CtlMCPToggle: on (true) or off
 	URL          string          // CtlMCPSignIn: the redirect to use (optional); CtlMCPCallback: where the browser came back to
 }
 

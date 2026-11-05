@@ -46,7 +46,7 @@ var rpcMethods = []string{
 	"DeleteSafeEntry", "SetSafeLabel", "MoveSafeEntry", "Teach",
 	"PreviewClasses", "KnownTools", "ExplainCommand", "SessionAllowlist",
 	// MCP servers of a session.
-	"MCPSignIn", "MCPCallback", "MCPReconnect", "MCPSignOut", "MCPCancel",
+	"MCPSignIn", "MCPCallback", "MCPReconnect", "MCPSignOut", "MCPCancel", "MCPToggle",
 	// Files, artifacts and folders on the server, read only.
 	"WatchFiles", "WatchRead", "ArtifactFiles", "ReadArtifact", "ListFolder",
 	"ArtifactLink", "UploadLink",

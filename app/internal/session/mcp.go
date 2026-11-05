@@ -162,6 +162,20 @@ func (m *Manager) MCPReconnect(ctx context.Context, id, server string) error {
 	return s.mcpSend(core.Control{Kind: core.CtlMCPReconnect, Server: server}, mcpSettle)
 }
 
+// MCPToggle turns one of a session's MCP servers off, or on again: a
+// server the user won't sign in to stops asking (its status becomes
+// disabled, which needs nothing from them).
+func (m *Manager) MCPToggle(ctx context.Context, id, server string, enabled bool) error {
+	s, err := m.mcpSession(id)
+	if err != nil {
+		return err
+	}
+	if err := s.warm(ctx); err != nil {
+		return err
+	}
+	return s.mcpSend(core.Control{Kind: core.CtlMCPToggle, Server: server, Enabled: enabled}, mcpSettle)
+}
+
 // MCPSignOut forgets a server's sign-in, for every session that shares it.
 func (m *Manager) MCPSignOut(id, server string) error {
 	s, err := m.mcpSession(id)
@@ -343,7 +357,7 @@ func (s *Session) mcpServersLocked(list []core.MCPServer) {
 // mcpAuthLocked takes an answer to a sign-in request. Caller holds s.mu.
 func (s *Session) mcpAuthLocked(a core.MCPAuth) {
 	kind := map[string]core.ControlKind{"sign_in": core.CtlMCPSignIn, "callback": core.CtlMCPCallback,
-		"reconnect": core.CtlMCPReconnect, "sign_out": core.CtlMCPSignOut}[a.Step]
+		"reconnect": core.CtlMCPReconnect, "sign_out": core.CtlMCPSignOut, "toggle": core.CtlMCPToggle}[a.Step]
 	key := string(kind) + "\x00" + a.Server
 	if ch, ok := s.mcpAnswers[key]; ok {
 		delete(s.mcpAnswers, key)

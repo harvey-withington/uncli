@@ -86,6 +86,7 @@ export function wailsBackend(): Backend {
     mcpSignIn: (s, server) => call('MCPSignIn', s, server),
     mcpCallback: (s, server, url) => call('MCPCallback', s, server, url),
     mcpReconnect: (s, server) => call('MCPReconnect', s, server),
+    mcpToggle: (s, server, on) => call('MCPToggle', s, server, on),
     mcpSignOut: (s, server) => call('MCPSignOut', s, server),
     mcpCancel: (s, server) => call('MCPCancel', s, server),
     setUnattended: (s, on) => call('SetUnattended', s, on),

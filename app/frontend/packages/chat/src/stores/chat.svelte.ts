@@ -342,6 +342,7 @@ export class ChatStore {
 
   mcpSignIn = (sessionId: string, server: string) => this.toasting(this.client.session(sessionId).mcpSignIn(server))
   mcpReconnect = (sessionId: string, server: string) => this.toasting(this.client.session(sessionId).mcpReconnect(server))
+  mcpToggle = (sessionId: string, server: string, on: boolean) => this.toasting(this.client.session(sessionId).mcpToggle(server, on))
   mcpSignOut = (sessionId: string, server: string) => this.toasting(this.client.session(sessionId).mcpSignOut(server))
   mcpCancel = (sessionId: string, server: string) => this.toasting(this.client.session(sessionId).mcpCancel(server))
 

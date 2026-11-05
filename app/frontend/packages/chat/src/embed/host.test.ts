@@ -232,8 +232,24 @@ describe('the folded header', () => {
     const options = inside(el).getByRole('button', { name: /^Options \(\d+ needs? attention\)$/ })
     expect(options.querySelector('.dot')).not.toBeNull()
     await fireEvent.click(options)
-    // Open, the option shows for itself.
+    // Open, the option shows for itself: the dot goes from Options, and the
+    // MCP servers' own button (with its dot) is there, which the compact
+    // header otherwise has no room for.
     expect(inside(el).getByRole('button', { name: 'Options' }).querySelector('.dot')).toBeNull()
+    expect(inside(el).getByRole('button', { name: /MCP servers/ })).toBeInTheDocument()
+  })
+
+  it('turns off an MCP server the user won’t sign in to, so it stops asking', async () => {
+    const backend = mockBackend()
+    const toggle = vi.spyOn(backend, 'mcpToggle')
+    const el = chat(backend, { compact: '' })
+    await inside(el).findByText(QUESTION)
+    await fireEvent.click(inside(el).getByRole('button', { name: /^Options/ }))
+    await fireEvent.click(inside(el).getByRole('button', { name: /MCP servers/ }))
+    const offs = await inside(el).findAllByRole('button', { name: 'Turn off' })
+    await fireEvent.click(offs[0]!)
+    expect(toggle).toHaveBeenCalledWith('s-code', expect.any(String), false)
+    expect(await inside(el).findByRole('button', { name: 'Turn on' })).toBeInTheDocument()
   })
 })
 

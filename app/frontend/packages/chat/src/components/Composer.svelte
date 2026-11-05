@@ -317,8 +317,11 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-soft);
   }
+  /* Full height, so the text starts at the top even when the right-hand
+     column (a host's controls over Attach and Send) is the taller. */
   .field {
     flex: 1;
+    align-self: stretch;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -380,8 +383,10 @@
     background: var(--surface-3);
     color: var(--text);
   }
+  /* Its height is its text's (autosize), and it grows into any room the
+     field has beyond that. */
   textarea {
-    flex: 1;
+    flex: 1 0 auto;
     min-height: 56px;
     padding: 7px 0;
     border: 0;

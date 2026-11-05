@@ -141,6 +141,16 @@
         <h1><SessionTitle {session} /></h1>
         <ActivityBadge state={session.state} />
       </div>
+      {#if options}
+        <!-- Open, Options shows every icon the desktop's title line has, each
+             with its own warning: the MCP servers (whose dot the Options
+             button carried while closed) and the safe list. -->
+        <McpServers {session} />
+        {#if chat.openSettings}
+          {@const open = chat.openSettings}
+          <button class="btn ghost icon touch" onclick={() => open('safe')} aria-label={t('safe.open')} title={t('safe.open')}><Icon name="shield" /></button>
+        {/if}
+      {/if}
       <button class="btn ghost icon touch dotted" onclick={() => (options = !options)} aria-expanded={options} aria-label={options ? t('mobile.options') : attentionLabel(t('mobile.options'))} title={options ? t('mobile.options') : attentionLabel(t('mobile.options'))}><Icon name="sliders-horizontal" />{#if !options && attention}<span class="dot" aria-hidden="true"></span>{/if}</button>
       <button class="btn ghost icon touch" onclick={() => chat.togglePanel()} aria-pressed={chat.outline.open} aria-label={t('outline.toggle')} title={t('outline.toggle')}><Icon name={chat.outline.open ? 'panel-right-close' : 'panel-right-open'} /></button>
       {@render hostEnd()}

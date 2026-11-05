@@ -194,6 +194,10 @@ export class SessionStore {
     await this.client.backend.mcpReconnect(this.id, server)
   }
 
+  async mcpToggle(server: string, on: boolean) {
+    await this.client.backend.mcpToggle(this.id, server, on)
+  }
+
   async mcpSignOut(server: string) {
     await this.client.backend.mcpSignOut(this.id, server)
   }

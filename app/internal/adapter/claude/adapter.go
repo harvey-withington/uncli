@@ -335,7 +335,7 @@ func (a *Adapter) EncodeControl(c core.Control) ([]byte, bool) {
 		req = map[string]any{"subtype": "set_permission_mode", "mode": c.Mode}
 	case core.CtlToolHints:
 		req = map[string]any{"subtype": "mcp_status"}
-	case core.CtlMCPSignIn, core.CtlMCPCallback, core.CtlMCPReconnect, core.CtlMCPSignOut:
+	case core.CtlMCPSignIn, core.CtlMCPCallback, core.CtlMCPReconnect, core.CtlMCPSignOut, core.CtlMCPToggle:
 		if c.Server == "" {
 			return nil, false
 		}
@@ -349,6 +349,8 @@ func (a *Adapter) EncodeControl(c core.Control) ([]byte, bool) {
 				return nil, false
 			}
 			req["callbackUrl"] = c.URL
+		case c.Kind == core.CtlMCPToggle:
+			req["enabled"] = c.Enabled
 		}
 		// The answer carries the request id back: it says which server and
 		// step it answers (mcpRequestID).
@@ -413,6 +415,7 @@ var mcpSteps = map[core.ControlKind]struct{ subtype, name string }{
 	core.CtlMCPCallback:  {"mcp_oauth_callback_url", "callback"},
 	core.CtlMCPReconnect: {"mcp_reconnect", "reconnect"},
 	core.CtlMCPSignOut:   {"mcp_clear_auth", "sign_out"},
+	core.CtlMCPToggle:    {"mcp_toggle", "toggle"}, // {serverName, enabled} (CLI 2.1.285)
 }
 
 // mcpRequestID tags a request with its step and server ("mcp.<step>.<random>.<server>"),

@@ -138,3 +138,53 @@ func waitTil(t *testing.T, what string, d time.Duration, ok func() bool) {
 	}
 	t.Fatalf("timed out waiting for %s", what)
 }
+
+// A session's MCP server turned off and on again through the CLI
+// (mcp_toggle, CLI 2.1.285): off, its status is disabled, which needs
+// nothing from the user, so a server they won't sign in to stops asking.
+// No turn is sent (no usage).
+func TestMCPToggle(t *testing.T) {
+	config := t.TempDir()
+	dir := t.TempDir()
+	server := filepath.Join(dir, "notes.mjs")
+	os.WriteFile(server, []byte(notesServer), 0o644)
+	cfg, _ := json.Marshal(map[string]any{"mcpServers": map[string]any{"notes": map[string]any{"command": "node", "args": []string{filepath.ToSlash(server)}}}})
+	os.WriteFile(filepath.Join(dir, "mcp.json"), cfg, 0o644)
+	os.WriteFile(filepath.Join(config, "profiles.yaml"), []byte(`profiles:
+  - id: notes
+    label: Notes
+    folder: pick
+    model: haiku
+    tools: [Read]
+    isolated: true
+    permission_mode: default
+    mcp_config: ["`+filepath.ToSlash(filepath.Join(dir, "mcp.json"))+`"]
+`), 0o644)
+	svc, _ := open(t, config)
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	v, err := svc.Sessions.Create("notes", t.TempDir(), "haiku")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := func() string {
+		view, _ := svc.Sessions.View(v.ID)
+		for _, s := range view.MCP {
+			if s.Name == "notes" {
+				return s.Status
+			}
+		}
+		return ""
+	}
+	if err := svc.Sessions.MCPToggle(ctx, v.ID, "notes", false); err != nil {
+		t.Fatal(err)
+	}
+	waitTil(t, "notes disabled", 30*time.Second, func() bool { return status() == "disabled" })
+	if err := svc.Sessions.MCPToggle(ctx, v.ID, "notes", true); err != nil {
+		t.Fatal(err)
+	}
+	waitTil(t, "notes connected again", 30*time.Second, func() bool { return status() == "connected" })
+}
