@@ -264,10 +264,11 @@ const MOCK_PLUGINS: Provider[] = [
   },
 ]
 
-export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; commandsLate?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; mcpSlow?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
+export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; inContainer?: boolean; commandsLate?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; mcpSlow?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
   const sessions: SessionView[] = opts.empty ? [] : [
     session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode, mcp: mockMCP() }),
-    session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2 }),
+    // opts.inContainer: it runs in the Sandbox container.
+    session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2, ...(opts.inContainer ? { runtime: 'wsl', runtimeRef: 'sandbox' } : {}) }),
     session('s-cowork', 'cowork', 'Summarise the Q3 planning notes', 'idle', { modifiers: ['efficiency'], sortOrder: 1 }),
     session('s-old', 'chat', 'Compare three standing desks', 'idle', { sortOrder: 0, archived: true }),
   ]

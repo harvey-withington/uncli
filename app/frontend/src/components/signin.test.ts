@@ -43,3 +43,26 @@ describe('A turn whose sign-in failed', () => {
     expect(await section.findByRole('textbox', { name: 'Code from the sign-in page' })).toBeInTheDocument()
   })
 })
+
+describe('A turn whose sign-in failed in a container', () => {
+  it('sends the user to the container’s own sign-in, not this PC’s', async () => {
+    const backend = mockBackend({ signInFailed: true, inContainer: true })
+    const signIn = vi.spyOn(backend, 'signIn')
+    render(App, { props: { backend } })
+    await screen.findByRole('heading', { name: 'Fix the flaky parser test' })
+    await fireEvent.click(screen.getByText('Plan a weekend in Lisbon'))
+    await screen.findByRole('heading', { name: 'Plan a weekend in Lisbon' })
+    await fireEvent.keyDown(window, { key: 'End' })
+    const box = (await screen.findByText(/Claude couldn't use your Claude sign-in/)).closest('.signin-failed') as HTMLElement
+    expect(within(box).getByText(/runs in the Sandbox container, which has a sign-in of its own/)).toBeInTheDocument()
+    // Not this PC's sign-in, which isn't the one that failed.
+    expect(within(box).queryByRole('button', { name: 'Sign in again' })).toBeNull()
+    await fireEvent.click(within(box).getByRole('button', { name: 'Sign in for containers' }))
+    const settings = within(await screen.findByRole('dialog', { name: 'Settings' }))
+    expect(settings.getByRole('tab', { name: 'AI Providers', selected: true })).toBeInTheDocument()
+    expect(settings.getByText(/Sign in for containers|Sign in with your whole/)).toBeInTheDocument()
+    expect(signIn).not.toHaveBeenCalled()
+    // Send again is still there for afterwards.
+    expect(within(box).getByRole('button', { name: 'Send again' })).toBeInTheDocument()
+  }, 15000)
+})
