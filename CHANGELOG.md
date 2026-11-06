@@ -4,6 +4,52 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.8.0-alpha
+
+Queue your next message, answers that carry on after a restart, and more
+for apps that embed UNCLI.
+
+- **Queue a message while an answer runs.** Send, Enter or the new Queue
+  button beside Stop puts your message in the session's queue, and it goes
+  when the answer ends. Several queued messages go as one. The queue shows
+  above the message box, where Edit takes a message back with its files.
+  After Stop or an error it waits, with Send now. Every device sees the
+  same queue.
+- **Answers cut off by a restart can carry on.** Turn on "Carry on answers
+  cut off by a restart" (Settings → Tray and startup, or Settings → Updates
+  on the phone), and each answer an update, a restart or a crash cut off
+  is asked to carry on where it left off when UNCLI starts again. An
+  answer you stopped stays stopped.
+- **Reorder sessions on the phone.** Hold a session still for a moment to
+  lift it, then drag it elsewhere in the list.
+- **Turn off an MCP server once.** Turning a server off now holds for
+  every session of that CLI, new ones included, until you turn it on
+  again.
+- **Sign-in in a container.** When a turn fails because a container's
+  sign-in has run out, the card now says so and opens the containers'
+  sign-in (Settings → AI Providers → Containers), instead of offering this
+  PC's, which changed nothing.
+- **A container's instructions are read-only.** The copy of your
+  instructions (CLAUDE.md) inside a container can't be edited there, so an
+  edit fails out loud rather than being lost at the next start. Edit them
+  on Windows.
+- The message box shrinks back as soon as a message is sent.
+- Spinning icons spin in place instead of swinging around.
+- On the phone, the side panel no longer stays open over the conversation
+  when you open a chat, and opening a chat no longer brings up the
+  keyboard unasked.
+- The header's Options stay open or closed as you left them when the
+  window is resized.
+- **For app developers.** A host can choose which CLI a session runs on,
+  list the CLIs and their models, name the sessions it makes, choose the
+  side panel's tabs and add its own, and hear on the server when a session
+  waits for approval or finishes. A host's own MCP tools are always
+  loaded. See `docs/EMBEDDING.md`.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone.
+
 ## 0.7.0-alpha
 
 UNCLI's chat in other apps, and fixes from daily use.
