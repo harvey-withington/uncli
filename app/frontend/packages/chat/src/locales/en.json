@@ -645,6 +645,8 @@
   "walk.files.one": "1 file",
   "walk.files.other": "{n} files",
   "walk.lines": "lines {from}–{to}",
+  "walk.fold": "Hide the notes, for more room for the code",
+  "walk.unfold": "Show the notes",
   "walk.slides": "slides",
   "walk.slide": "Slide {n} of {total}",
   "walk.prev": "Previous",

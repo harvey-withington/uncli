@@ -54,6 +54,14 @@ describe('Walk through the changes', () => {
     expect(within(dialog.getByLabelText('Slide 4 of 5')).getByText(/replays the recorded stream fifty times/)).toBeInTheDocument()
     expect(dialog.getByText(/^Explained by .* · \$0\.00/)).toBeInTheDocument()
 
+    // The notes fold away on every slide, for the code's sake, and come back.
+    await fireEvent.click(within(dialog.getByLabelText('Slide 2 of 5')).getByRole('button', { name: 'Hide the notes, for more room for the code' }))
+    expect(dialog.queryByText(/only flushed by the message it belongs to/)).not.toBeInTheDocument()
+    expect(dialog.queryByText(/replays the recorded stream fifty times/)).not.toBeInTheDocument()
+    expect(within(dialog.getByLabelText('Slide 2 of 5')).getByText('internal/adapter/claude/parser.go')).toBeInTheDocument()
+    await fireEvent.click(within(dialog.getByLabelText('Slide 4 of 5')).getByRole('button', { name: 'Show the notes' }))
+    expect(dialog.getByText(/only flushed by the message it belongs to/)).toBeInTheDocument()
+
     // With options: the whole session, thorough; then remembered.
     await fireEvent.click(dialog.getByRole('button', { name: 'Explain with options…' }))
     const options = within(await screen.findByRole('dialog', { name: 'Explain these changes' }))

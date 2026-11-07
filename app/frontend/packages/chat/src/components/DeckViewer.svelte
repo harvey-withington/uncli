@@ -15,7 +15,9 @@
   // screen puts the viewer on the whole screen. An explanation, when there
   // is one, puts its summary on the title slide and its note for each place
   // above that place's code; Explain (with its options beside it) asks for
-  // one, or for another.
+  // one, or for another. On a change's slide the file line and the note
+  // stay put while the code scrolls on its own, and fold away (on every
+  // slide at once) to give the code the room.
   interface Props {
     deck: Deck
     codes: string[] // each changed place's code (lib/deckcode.ts)
@@ -32,6 +34,8 @@
   let track = $state<HTMLElement>()
   let index = $state(0)
   let full = $state(false)
+  // Folded: each change's file line and note give their room to its code.
+  let folded = $state(false)
   const total = $derived(1 + deck.slides.length + (deck.others.length ? 1 : 0))
   const files = $derived([...new Set(deck.slides.map(s => s.rel))])
 
@@ -85,13 +89,20 @@
       <p class="keys">{t('walk.keys')}</p>
     </section>
     {#each deck.slides as s, i (i)}
-      <section class="slide" aria-label={t('walk.slide', { n: i + 2, total })}>
-        <div class="file">
-          <span class="path">{s.rel}</span>
-          <span class="lines">{t('walk.lines', { from: s.first, to: s.last })}</span>
-          {#if s.added}<span class="add">+{s.added}</span>{/if}{#if s.removed}<span class="del">−{s.removed}</span>{/if}
+      {@const note = notes.get(s.place)}
+      <section class="slide change" class:folded aria-label={t('walk.slide', { n: i + 2, total })}>
+        <div class="head">
+          <div class="file">
+            <span class="path">{s.rel}</span>
+            <span class="lines">{t('walk.lines', { from: s.first, to: s.last })}</span>
+            {#if s.added}<span class="add">+{s.added}</span>{/if}{#if s.removed}<span class="del">−{s.removed}</span>{/if}
+          </div>
+          <button class="btn ghost small icon fold" onclick={() => (folded = !folded)} aria-expanded={!folded}
+            aria-label={folded ? t('walk.unfold') : t('walk.fold')} title={folded ? t('walk.unfold') : t('walk.fold')}>
+            <Icon name={folded ? 'chevron-down' : 'chevron-up'} size={14} />
+          </button>
         </div>
-        {#if notes.get(s.place)}<p class="note">{notes.get(s.place)}</p>{/if}
+        {#if note && !folded}<p class="note">{note}</p>{/if}
         <div class="code">{@html codes[i] ?? ''}</div>
       </section>
     {/each}
@@ -167,6 +178,45 @@
     .slide {
       padding: var(--space-3);
     }
+  }
+  .slide.change {
+    overflow: hidden;
+  }
+  .slide.change.folded {
+    gap: var(--space-2);
+  }
+  .head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  .head .file {
+    flex: 1;
+    min-width: 0;
+    padding-top: 4px;
+  }
+  .folded .file {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  .folded .path {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl; /* when cut, keep the file name */
+    text-align: left;
+  }
+  .folded .lines {
+    flex: none;
+  }
+  .fold {
+    flex: none;
+  }
+  .change .note {
+    flex: none;
+    max-height: 40%;
+    overflow-y: auto;
   }
   h3 {
     margin: 0;
@@ -252,13 +302,20 @@
   .del {
     color: var(--danger);
   }
-  .code :global(pre) {
-    margin: 0;
-    padding: var(--space-2) 0;
-    overflow-x: auto;
+  .code {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
+  }
+  .code :global(pre) {
+    margin: 0;
+    padding: var(--space-2) 0;
+    overflow: visible;
+    min-width: max-content;
+    background: none;
     font-family: var(--mono);
     font-size: 12.5px;
     line-height: 1.6;
