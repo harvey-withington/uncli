@@ -72,6 +72,9 @@ type ContainerProfile struct {
 	// Setup is shell steps run as root after the packages when the
 	// container is built (for what isn't a package: npm i -g, pip install).
 	Setup []string `yaml:"setup,omitempty" json:"setup"`
+	// From is the project container it was imported from (decision 0028);
+	// only importing sets it.
+	From *ContainerSource `yaml:"from,omitempty" json:"from,omitempty"`
 }
 
 const (

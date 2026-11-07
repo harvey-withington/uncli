@@ -148,7 +148,7 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // one writer; keeps SQLite simple and safe
-	if _, err := db.Exec(schema); err != nil {
+	if _, err := db.Exec(schema + changesSchema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("schema: %w", err)
 	}
@@ -296,7 +296,7 @@ func (s *Store) DeleteSession(id string) error {
 	if err := unindexSession(tx, id); err != nil {
 		return err
 	}
-	for _, q := range []string{`DELETE FROM events WHERE session_id=?`, `DELETE FROM pages WHERE session_id=?`, `DELETE FROM sessions WHERE id=?`} {
+	for _, q := range []string{`DELETE FROM events WHERE session_id=?`, `DELETE FROM page_changes WHERE session_id=?`, `DELETE FROM pages WHERE session_id=?`, `DELETE FROM sessions WHERE id=?`} {
 		if _, err := tx.Exec(q, id); err != nil {
 			return err
 		}
@@ -363,6 +363,9 @@ type TouchedFile struct {
 	// for both when no tool said (a command's change).
 	Added   int `json:"added,omitempty"`
 	Removed int `json:"removed,omitempty"`
+	// Hunks is how many of its changed places were recorded for the
+	// walkthrough (page_changes, decision 0029); zero when none were.
+	Hunks int `json:"hunks,omitempty"`
 }
 
 // ArtifactVersion is an artifact as a page's turn left it: its content

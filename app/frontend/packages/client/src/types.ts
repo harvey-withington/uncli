@@ -269,6 +269,22 @@ export interface TouchedFile {
   how: 'write' | 'edit' | 'command' | 'deleted'
   added?: number // lines added and removed by the turn's tools; absent when no tool said (a command's change)
   removed?: number
+  hunks?: number // how many changed places were recorded for the walkthrough (Backend.pageChanges, decision 0029)
+}
+
+// What one tool call changed in one file (decision 0029).
+export interface FileChange {
+  path: string
+  hunks: Hunk[]
+}
+
+// One changed place in a file, as a unified diff's: its first line in the
+// old and new file, and its lines, each starting with "+", "-" or " "
+// (unchanged, around the change).
+export interface Hunk {
+  oldStart: number
+  newStart: number
+  lines: string[]
 }
 
 // An artifact as a page's turn left it: its content by hash, or deleted.
@@ -960,6 +976,7 @@ export interface Backend {
   setPushNotifications(setting: NotifySetting): Promise<void>
   testPush(): Promise<void>
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
+  pageChanges(sessionId: string, pageId: string): Promise<FileChange[]> // what its turn changed, per tool call, for the walkthrough
   usage(): Promise<UsageLimit | null>
   // UNCLI's own updates (decision 0025). installUpdate resolves once the
   // installer has it; UNCLI quits a few seconds later and comes back.
@@ -973,6 +990,8 @@ export interface Backend {
   buildContainer(id: string): Promise<void> // progress arrives as containersChanged
   removeContainer(id: string): Promise<void>
   saveContainer(p: ContainerProfile): Promise<void> // into the user's containers.yaml; a built-in's id replaces it
+  suggestedContainers(folder: string): Promise<Suggestions> // what the folder's repository suggests in .uncli (desktop only)
+  importContainer(p: ContainerProfile, repo: string, suggestion: string): Promise<void> // imported or synced, as the user left it
   removeContainerConfig(id: string): Promise<void> // a built-in: back to UNCLI's; the user's own: deleted with its container
   startContainerSignIn(): Promise<string> // the link to approve
   finishContainerSignIn(code: string): Promise<void>
@@ -1045,6 +1064,43 @@ export interface ContainerProfile {
   connectors?: 'shared' | 'none' | '' // shared: the user's claude.ai connectors, with the full account sign-in
   secrets?: 'shared' | 'none' | '' // shared: %USERPROFILE%\.secrets, read-only at ~/.secrets
   folders?: ContainerFolder[] // more Windows folders it mounts, at /home/uncli/<name>
+  from?: ContainerSource // the project container it was imported from (decision 0028); only importing sets it
+}
+
+export interface ContainerSource {
+  repo: string // the repository's root folder
+  id: string // the container's id there
+  imported: string // when it was last imported or synced (RFC 3339)
+  sum: string // fingerprints the suggestion as it was then
+}
+
+// The containers a session folder's repository suggests in .uncli
+// (decision 0028), each against the user's own.
+export interface Suggestions {
+  repo?: string // the repository's root; absent when the folder has no .uncli
+  name?: string // its folder's name
+  problem?: 'both' | 'unreadable' | 'version' // the file as a whole
+  detail?: string // unreadable: the parser's words; version: the one it gave
+  containers: SuggestedContainer[]
+}
+
+export interface SuggestedContainer {
+  profile: ContainerProfile
+  // new: none of the user's came from it; imported: the user's is the same;
+  // differs; unusable: problem says why.
+  status: 'new' | 'imported' | 'differs' | 'unusable'
+  yours?: string // the user's container that came from it
+  by?: 'project' | 'you' // differs: who changed it
+  changed?: string // differs: when the project's file last changed (RFC 3339)
+  problem?: 'base' | 'invalid'
+  detail?: string
+  reaches: Array<'brain' | 'mcp' | 'connectors' | 'secrets' | 'folders'> // what of the user's it shares
+  steps: StepRisks[] // its setup steps UNCLI's risk rules flag
+}
+
+export interface StepRisks {
+  step: string
+  why: string[] // publishes, remote, secrets, runs-code, cloud, mounts, unreadable…
 }
 
 // A Windows folder a container mounts (decision 0017). source may start

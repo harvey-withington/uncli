@@ -3,6 +3,7 @@ package session
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -45,8 +46,33 @@ func TestPageListsEditedFile(t *testing.T) {
 	}
 	pages := h.send(v.ID, "change six to SIX")
 	got := pages[0].TouchedFiles
-	if len(got) != 1 || got[0].How != HowEdit || got[0].Line != 6 || !strings.HasSuffix(got[0].Path, "notes.txt") {
+	if len(got) != 1 || got[0].How != HowEdit || got[0].Line != 6 || !strings.HasSuffix(got[0].Path, "notes.txt") || got[0].Hunks != 1 {
 		t.Errorf("touched = %+v", got)
+	}
+	// The change itself is kept for the walkthrough (decision 0029).
+	changes, err := h.m.d.Store.PageChanges(v.ID, pages[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(changes) != 1 || len(changes[0].Hunks) != 1 || !slices.Contains(changes[0].Hunks[0].Lines, "-six") || !slices.Contains(changes[0].Hunks[0].Lines, "+SIX") {
+		t.Errorf("changes = %+v", changes)
+	}
+	if other, _ := h.m.d.Store.PageChanges("another-session", pages[0].ID); len(other) != 0 {
+		t.Error("another session's id read this page's changes")
+	}
+}
+
+// A page's recorded changes stop at its cap; one tool's too big a change
+// isn't kept.
+func TestChangeBudget(t *testing.T) {
+	var b changeBudget
+	if b.take(0) || b.take(maxChangeRecord+1) {
+		t.Error("an empty or too big change was taken")
+	}
+	for b.take(maxChangeRecord) {
+	}
+	if b.used > maxPageChanges || b.used < maxPageChanges-maxChangeRecord {
+		t.Errorf("used %d of %d", b.used, maxPageChanges)
 	}
 }
 

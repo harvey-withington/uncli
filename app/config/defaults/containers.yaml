@@ -36,6 +36,11 @@
 # replaces these by id; Settings → Containers edits it (Edit, New
 # container, Reset to built-in, Delete). Change a profile's packages or
 # setup steps, then Rebuild it.
+#
+# A repository suggests containers to its team in .uncli/containers.yaml
+# (or .yml): this format with version: 1 at the top, on these bases. Each
+# user imports one through the editor into their own file, which notes
+# where it came from (from:), and syncs it when it changes (decision 0028).
 
 # Bases are pinned root filesystems, checked against their SHA-256. cli is
 # the build of the CLI that runs on them (from the same release manifest as

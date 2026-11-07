@@ -25,6 +25,7 @@
     "lucide-svelte": "^1.0.1",
     "markdown-it": "^15.0.2",
     "mermaid": "^11.17.2",
+    "reveal.js": "^6.0.2",
     "shiki": "^4.4.3"
   },
   "peerDependencies": {

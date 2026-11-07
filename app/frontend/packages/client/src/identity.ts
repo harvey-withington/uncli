@@ -43,7 +43,7 @@ export const SESSION_FIRST = [
   'answerApproval', 'answerAsk', 'commands', 'mcpSignIn', 'mcpCallback', 'mcpReconnect', 'mcpSignOut', 'mcpCancel', 'mcpToggle', 'queue', 'unqueue', 'sendQueued',
   'setUnattended', 'setMode', 'safeList', 'setSafeEntry', 'deleteSafeEntry', 'moveSafeEntry', 'setSafeLabel',
   'markSafe', 'teach', 'previewClasses', 'knownTools', 'explainCommand', 'sessionAllowlist', 'remove',
-  'setBookmark', 'setPinned', 'archive', 'focus', 'summarisePage', 'openFile', 'openPath', 'watchFiles', 'watchRead',
+  'setBookmark', 'setPinned', 'archive', 'focus', 'summarisePage', 'pageChanges', 'openFile', 'openPath', 'watchFiles', 'watchRead',
   'artifactFiles', 'readArtifact', 'artifactPath', 'artifactLink',
 ] as const satisfies readonly (keyof Backend)[]
 

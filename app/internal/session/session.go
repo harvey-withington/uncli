@@ -28,7 +28,11 @@ type Session struct {
 	rec   store.Session
 	meta  string // the host's word on what it's for (NewSession.Meta); set once, at creation
 	state State
-	err   string
+	// changesPage and changes: how much of the page's changes is recorded
+	// so far (changes.go).
+	changesPage string
+	changes     changeBudget
+	err         string
 
 	// The running process. gen increases on every spawn and deliberate
 	// kill, so output from an old process is ignored.
@@ -844,7 +848,7 @@ func (s *Session) handle(gen int, ev core.Event) {
 			if f.Path, ok = s.hostPath(f.Path); !ok {
 				return // a file only the CLI's own system has
 			}
-			s.page.TouchedFiles = mergeTouched(s.page.TouchedFiles, store.TouchedFile{Path: f.Path, Line: f.Line, How: f.How, Added: f.Added, Removed: f.Removed})
+			s.page.TouchedFiles = mergeTouched(s.page.TouchedFiles, store.TouchedFile{Path: f.Path, Line: f.Line, How: f.How, Added: f.Added, Removed: f.Removed, Hunks: s.recordChange(f)})
 			s.savePage()
 		}
 	case core.EvApprovalAsked:

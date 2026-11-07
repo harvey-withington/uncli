@@ -104,7 +104,9 @@ apply changes.
   to ask before using a tool. A card shows what it wants to do, and "This is
   safe" teaches UNCLI for next time. The shield opens the safe list.
 - Each page lists the **files the agent changed**. In Code sessions, Open takes
-  you to the line in your editor (Settings → Editor).
+  you to the line in your editor (Settings → Editor). **Walk through** plays
+  the changes as a slide show, one changed place a slide, coloured, numbered
+  and marked added or removed (decision 0029).
 - Chat and Co-work sessions keep their **artifacts** (HTML, SVG, Mermaid,
   Markdown, images) version by version. The side panel's Artifacts tab (or
   A) shows them as they were at the page you're on, beside On this page (O).
@@ -139,6 +141,15 @@ apply changes.
   containers or replaces the built-in ones by `id`. Settings says when a
   container no longer matches its config and needs a Rebuild; conversations
   survive rebuilds.
+- **Containers for a team** (decision 0028): a repository suggests
+  containers in `.uncli/containers.yaml` (or `.yml`), in the same format
+  with `version: 1` at the top and UNCLI's built-in bases. Starting a
+  session in that repository lists them in the new session dialog, and
+  Import opens the container editor on one, saying whether it reaches
+  outside its container (your memories, MCP servers, connectors, secrets
+  or folders, and setup steps that send data away or run fetched code). You
+  change what you like and save it as one of your own. When the
+  repository's version changes, Sync imports it again.
 
 ### Your sessions from your phone
 

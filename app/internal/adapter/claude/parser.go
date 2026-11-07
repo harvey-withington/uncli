@@ -262,7 +262,7 @@ func (p *parser) Feed(raw []byte) ([]core.Event, error) {
 				}))
 				if touches && !b.IsError {
 					if len(bs) == 1 { // the line's tool_use_result is this tool's
-						ft.Line, ft.Added, ft.Removed = patchStats(l.ToolUseResult)
+						ft.Line, ft.Added, ft.Removed, ft.Hunks = patchStats(l.ToolUseResult)
 					}
 					out = append(out, ev(core.EvFileTouched, ft))
 				}
@@ -586,29 +586,40 @@ func toolSummary(name string, input json.RawMessage) string {
 }
 
 // patchStats reads what a tool that wrote a file reports: the first
-// changed line in the new file, and the lines added and removed, from its
-// structuredPatch (a hunk starts at newStart and leads with context lines,
-// " ", then the change, "-" / "+"). A file the tool created has no patch:
-// every line of its content is added. Zeros when it says neither.
-func patchStats(result json.RawMessage) (line, added, removed int) {
+// changed line in the new file, the lines added and removed, and the hunks
+// themselves (decision 0029), from its structuredPatch (a hunk starts at
+// oldStart / newStart and leads with context lines, " ", then the change,
+// "-" / "+"). A file the tool created has no patch: every line of its
+// content is added, as one hunk. Zeros and no hunks when it says neither.
+func patchStats(result json.RawMessage) (line, added, removed int, hunks []core.Hunk) {
 	var r struct {
 		Type            string `json:"type"`
 		Content         string `json:"content"`
 		StructuredPatch []struct {
+			OldStart int      `json:"oldStart"`
 			NewStart int      `json:"newStart"`
 			Lines    []string `json:"lines"`
 		} `json:"structuredPatch"`
 	}
 	if json.Unmarshal(result, &r) != nil {
-		return 0, 0, 0
+		return 0, 0, 0, nil
 	}
 	if len(r.StructuredPatch) == 0 {
 		if r.Type == "create" {
-			return 0, lineCount(r.Content), 0
+			n := lineCount(r.Content)
+			if n == 0 {
+				return 0, 0, 0, nil
+			}
+			lines := strings.Split(strings.TrimSuffix(r.Content, "\n"), "\n")
+			for i, l := range lines {
+				lines[i] = "+" + strings.TrimSuffix(l, "\r")
+			}
+			return 0, n, 0, []core.Hunk{{OldStart: 0, NewStart: 1, Lines: lines}}
 		}
-		return 0, 0, 0
+		return 0, 0, 0, nil
 	}
 	for i, h := range r.StructuredPatch {
+		hunks = append(hunks, core.Hunk{OldStart: h.OldStart, NewStart: h.NewStart, Lines: h.Lines})
 		at := h.NewStart
 		for _, l := range h.Lines {
 			switch {
@@ -628,7 +639,7 @@ func patchStats(result json.RawMessage) (line, added, removed int) {
 	if line == 0 {
 		line = r.StructuredPatch[0].NewStart
 	}
-	return line, added, removed
+	return line, added, removed, hunks
 }
 
 // lineCount counts the lines in a file's content.

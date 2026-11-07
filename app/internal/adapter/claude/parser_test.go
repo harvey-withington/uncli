@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -282,10 +283,19 @@ func TestPatchStats(t *testing.T) {
 		`not json`:               {0, 0, 0},
 	}
 	for in, want := range cases {
-		line, added, removed := patchStats(json.RawMessage(in))
+		line, added, removed, _ := patchStats(json.RawMessage(in))
 		if got := [3]int{line, added, removed}; got != want {
 			t.Errorf("patchStats(%s) = %v, want %v", in, got, want)
 		}
+	}
+	// The hunks themselves, for the walkthrough (decision 0029).
+	_, _, _, hunks := patchStats(json.RawMessage(`{"structuredPatch":[{"oldStart":2,"newStart":2,"lines":[" a","-b"," d"]},{"oldStart":39,"newStart":38,"lines":[" x","+y"]}]}`))
+	if len(hunks) != 2 || hunks[1].OldStart != 39 || hunks[1].NewStart != 38 || !slices.Equal(hunks[0].Lines, []string{" a", "-b", " d"}) {
+		t.Errorf("hunks = %+v", hunks)
+	}
+	_, _, _, hunks = patchStats(json.RawMessage(`{"type":"create","content":"one\r\ntwo\n"}`))
+	if len(hunks) != 1 || hunks[0].NewStart != 1 || !slices.Equal(hunks[0].Lines, []string{"+one", "+two"}) {
+		t.Errorf("a created file's hunk = %+v", hunks)
 	}
 }
 

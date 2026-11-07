@@ -122,6 +122,19 @@ type FileTouched struct {
 	// file's content); zero for both when it doesn't.
 	Added   int `json:"added,omitempty"`
 	Removed int `json:"removed,omitempty"`
+	// Hunks are the change itself, when the tool says (its patch, or a new
+	// file's content as one hunk of added lines), for the walkthrough
+	// (decision 0029).
+	Hunks []Hunk `json:"hunks,omitempty"`
+}
+
+// Hunk is one changed place in a file, as a unified diff's: its first line
+// in the old and new file, and its lines, each starting with "+" (added),
+// "-" (removed) or " " (unchanged, around the change).
+type Hunk struct {
+	OldStart int      `json:"oldStart"`
+	NewStart int      `json:"newStart"`
+	Lines    []string `json:"lines"`
 }
 
 type ApprovalAsked struct {

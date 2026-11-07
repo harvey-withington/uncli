@@ -22,8 +22,8 @@ describe('Changed files', () => {
     const row = screen.getByText('parser.go').closest('li') as HTMLElement
     expect(within(row).getByText('internal/adapter/claude/')).toBeInTheDocument()
     expect(within(row).getByText(':148')).toBeInTheDocument()
-    expect(within(row).getByTitle('12 lines added, 3 removed')).toHaveTextContent('+12−3')
-    expect(within(row).getByText('Edited, 12 lines added, 3 removed')).toBeInTheDocument()
+    expect(within(row).getByTitle('6 lines added, 3 removed')).toHaveTextContent('+6−3')
+    expect(within(row).getByText('Edited, 6 lines added, 3 removed')).toBeInTheDocument()
     await fireEvent.click(within(row).getByRole('button', { name: 'Open in VS Code: parser.go' }))
     expect(open).toHaveBeenCalledWith('s-code', 'C:\\Users\\you\\code\\internal\\adapter\\claude\\parser.go', 148)
     // The name itself opens it too.

@@ -6,6 +6,9 @@
   import FolderBrowser from './FolderBrowser.svelte'
   import Icon from '@uncli/chat/components/Icon.svelte'
   import Modal from '@uncli/chat/components/Modal.svelte'
+  import SuggestedContainers from './SuggestedContainers.svelte'
+  import ImportContainerDialog from './ImportContainerDialog.svelte'
+  import type { SuggestedContainer } from '@uncli/chat/lib/api'
   import { atServer, onlyAtServer } from '@uncli/chat/lib/remoteonly'
   import { modelOptions } from '@uncli/chat/lib/models'
   import { tintStyle } from '@uncli/chat/lib/tint'
@@ -79,6 +82,10 @@
       shares = startingShares(profiles.find(p => p.id === id), last, SHARES)
     })
   })
+
+  // A container the folder's repository suggests, being imported (decision 0028).
+  let importing = $state<{ s: SuggestedContainer; repo: string; name: string } | null>(null)
+  let imported = $state(0)
 
   let startButton: HTMLButtonElement | undefined = $state()
   // Away from the server there's no folder dialog: its folders are browsed.
@@ -191,6 +198,9 @@
         <p class="hint">{t('newSession.containerSignIn')}</p>
       {/if}
     {/if}
+    {#if needsFolder && folder && isFirst && app.boot?.platform === 'windows' && atServer(app.backend)}
+      <SuggestedContainers {folder} bind:container refresh={imported} onimport={(s, repo, name) => (importing = { s, repo, name })} />
+    {/if}
 
     {#if shareable.length}
       <fieldset class="field shares">
@@ -231,6 +241,9 @@
 
 {#if browsing}
   <FolderBrowser title={pickTitle} start={folder} onpick={picked} onclose={() => (browsing = false)} />
+{/if}
+{#if importing}
+  <ImportContainerDialog suggestion={importing.s} repo={importing.repo} name={importing.name} onclose={() => { importing = null; imported++ }} />
 {/if}
 
 <style>

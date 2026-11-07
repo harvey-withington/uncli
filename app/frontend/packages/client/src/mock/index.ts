@@ -15,6 +15,7 @@ import { mockRemote } from './remote'
 import { mockUpdate } from './update'
 import { mockTranscriptPages, mockTranscripts } from './import'
 import { mockWatch } from './watch'
+import { MOCK_CHANGES } from './changes'
 
 const profiles: Bootstrap['profiles'] = [
   { id: 'chat', label: 'Chat', icon: 'message-circle', hue: 205, folder: 'scratch', model: 'sonnet', tools: ['WebSearch', 'WebFetch', 'Write'], modifiersOn: [], ideLinks: false, artifacts: true, isolated: true, shares: ['tools', 'skills'] },
@@ -277,8 +278,8 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       page('s-code', 1, 'Why does TestMultiTurnPartial fail about one run in five?', PARSER, {
         model: 'opus', modifiers: ['thorough'], bookmarked: true,
         touchedFiles: [
-          { path: 'C:\\Users\\you\\code\\internal\\adapter\\claude\\parser.go', how: 'edit', line: 148, added: 12, removed: 3 },
-          { path: 'C:\\Users\\you\\code\\internal\\adapter\\claude\\parser_test.go', how: 'write', added: 64 },
+          { path: 'C:\\Users\\you\\code\\internal\\adapter\\claude\\parser.go', how: 'edit', line: 148, added: 6, removed: 3, hunks: 2 },
+          { path: 'C:\\Users\\you\\code\\internal\\adapter\\claude\\parser_test.go', how: 'write', added: 13, hunks: 1 },
           { path: 'C:\\Users\\you\\code\\coverage.out', how: 'command' },
           { path: 'C:\\Users\\you\\code\\testdata\\old.jsonl', how: 'deleted' },
         ],
@@ -1018,6 +1019,12 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
         return { decider: `systemone/${d.model}@${d.version ?? ''}`, calibrated: true, command: 'npm test', level: 'routine', confidence: 0.95, verdict: (d.threshold ?? 0.9) <= 0.95 ? 'routine' : 'risky', millis: 95 }
       }
       return { decider: `quick-task/${prefs.quickTaskModel.model}@`, calibrated: false, command: 'npm test', level: 'routine', confidence: 1, verdict: 'routine', reason: "Runs the project's tests.", millis: 2400 }
+    },
+    async pageChanges(sid, pid) {
+      const p = pages[sid]?.find(x => x.id === pid)
+      if (!p) throw new Error('page not found')
+      const recorded = new Set(p.touchedFiles.filter(f => f.hunks).map(f => f.path))
+      return structuredClone(MOCK_CHANGES.filter(c => recorded.has(c.path)))
     },
     async summarisePage(sid, pid, blocks) {
       const p = pages[sid]?.find(x => x.id === pid)

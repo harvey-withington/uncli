@@ -46,9 +46,22 @@ func (m *Manager) Import(t core.Transcript, profileID, model string) (ImportedSe
 	}
 	for i, turn := range t.Turns {
 		p := pageFrom(rec, i+1, turn, model)
+		// Each file's changes, as the transcript has them, for the
+		// walkthrough (decision 0029), within the page's cap.
+		var kept []store.FileChange
+		var budget changeBudget
+		for _, f := range turn.Files {
+			if c, size := changeOf(f); budget.take(size) {
+				kept = append(kept, c)
+				p.TouchedFiles = mergeTouched(p.TouchedFiles, store.TouchedFile{Path: f.Path, How: f.How, Hunks: len(c.Hunks)})
+			}
+		}
 		if err := m.d.Store.SavePage(&p); err != nil {
 			_ = m.d.Store.DeleteSession(rec.ID)
 			return ImportedSession{}, err
+		}
+		for _, c := range kept {
+			_ = m.d.Store.AddPageChange(rec.ID, p.ID, c)
 		}
 	}
 	s := newSession(m, rec)

@@ -17,7 +17,7 @@ var pinnedMethods = []string{
 	"CreateSession", "Delete", "DeleteSafeEntry", "Editors", "ExplainCommand",
 	"Focus", "HasDecisionKey", "ImportTranscript", "InstallUpdate", "Interrupt", "KnownTools",
 	"ListFolder", "MCPCallback", "MCPCancel", "MCPReconnect", "MCPSignIn",
-	"MCPSignOut", "MCPToggle", "MarkSafe", "MoveSafeEntry", "Pages", "Pinned",
+	"MCPSignOut", "MCPToggle", "MarkSafe", "MoveSafeEntry", "PageChanges", "Pages", "Pinned",
 	"PreviewClasses", "ProviderChannels", "ProviderStatus", "PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "Queue", "ReadArtifact",
 	"Rename", "Restart", "SafeList", "Search", "Send", "SendQueued", "SendWith", "SessionAllowlist", "SetBookmark",
 	"SetMode", "SetModel", "SetPinned", "SetPushNotifications", "SetResumeCutOff", "SetSafeEntry", "SetSafeLabel",
@@ -43,6 +43,7 @@ func TestRPCMethods(t *testing.T) {
 		"SignInTerminal", "CancelDeviceSignIn", "EnablePlugin", "DisablePlugin",
 		"InstallWSL", "StopContainers", "BuildContainer", "SaveContainer", "RemoveContainer",
 		"RemoveContainerConfig", "StartContainerSignIn", "SignOutContainers", "Theme",
+		"SuggestedContainers", "ImportContainer",
 		"ArtifactPath", "ClipboardFiles", "DescribePaths", "DescribeAttachments"} {
 		if rpcNames[m] {
 			t.Errorf("%s must not be reachable remotely", m)

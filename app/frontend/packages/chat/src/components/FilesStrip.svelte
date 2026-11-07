@@ -8,6 +8,7 @@
   import { t } from '../lib/i18n.svelte'
   import { atServer, serverTitle } from '../lib/remoteonly'
   import Icon from './Icon.svelte'
+  import Walkthrough from './Walkthrough.svelte'
   import { useShell } from '../lib/shell.svelte'
 
   const shell = useShell()
@@ -21,14 +22,17 @@
   // (outside it, Watch is off and says why). When the repo's HEAD moved
   // (a checkout, pull…), what commands changed is folded into one line
   // saying so, expandable; the tools' own writes and edits stay listed.
+  // Beside the summary, Walk through plays the recorded changes.
 
   interface Props {
     files: TouchedFile[] | null | undefined
     sessionId: string
+    pageId: string
+    question: string
     move?: HeadMove
   }
 
-  let { files: raw, sessionId, move }: Props = $props()
+  let { files: raw, sessionId, pageId, question, move }: Props = $props()
   const chat = useChat()
   // Opening a file or its folder happens on the server's screen.
   const here = $derived(atServer(chat.backend))
@@ -115,11 +119,14 @@
 
 {#if files.length > 0}
   <section class="files">
-    <button class="summary" onclick={() => (open = !shown)} aria-expanded={shown}>
-      <Icon name="file-pen" size={14} />
-      <span>{files.length === 1 ? t('files.changedOne') : t('files.changed', { n: files.length })}</span>
-      <span class="chev" class:open={shown}><Icon name="chevron-right" size={14} /></span>
-    </button>
+    <div class="head">
+      <button class="summary" onclick={() => (open = !shown)} aria-expanded={shown}>
+        <Icon name="file-pen" size={14} />
+        <span>{files.length === 1 ? t('files.changedOne') : t('files.changed', { n: files.length })}</span>
+        <span class="chev" class:open={shown}><Icon name="chevron-right" size={14} /></span>
+      </button>
+      <Walkthrough {sessionId} {pageId} {question} {files} />
+    </div>
     {#if shown}
       <ul transition:slide={{ duration: 160 }}>
         {#each parts.own as f (f.path)}{@render row(f)}{/each}
@@ -147,11 +154,18 @@
     border-radius: var(--radius);
     background: var(--surface);
   }
+  .head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-right: var(--space-2);
+  }
   .summary {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     padding: var(--space-2) var(--space-3);
     border: 0;
     border-radius: var(--radius);

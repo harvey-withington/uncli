@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { ContainerBase, ContainerInfo, ContainerProfile } from '@uncli/chat/lib/api'
-  import { untrack } from 'svelte'
+  import type { ContainerBase, ContainerInfo, ContainerProfile, StepRisks } from '@uncli/chat/lib/api'
+  import { untrack, type Snippet } from 'svelte'
+  import { flaggedIn, whyKey } from '../lib/suggestions'
   import { addPackages, idFor, MAX_STEP, problems, same, tidy, validPackage } from '../lib/containers'
   import { useApp } from '../lib/context'
   import { t } from '@uncli/chat/lib/i18n.svelte'
@@ -14,18 +15,24 @@
   // Containers): its name, base, packages, setup steps and what it shares.
   // A new one gets its id from its name. A built-in one saved here is the
   // user's version until Reset; one of the user's own can be deleted, with
-  // its container.
+  // its container. Importing a project's container (decision 0028) saves
+  // through onsave instead, can Save and build, flags the steps UNCLI's
+  // risk rules caught, and puts its summary above the form.
   interface Props {
     start: ContainerProfile
     container?: ContainerInfo // absent for a new one
     bases: ContainerBase[]
     taken: string[] // other containers' ids
     onclose: () => void
+    onsave?: (p: ContainerProfile) => Promise<void>
+    flagged?: StepRisks[]
+    top?: Snippet<[ContainerProfile]>
   }
-  let { start, container, bases, taken, onclose }: Props = $props()
+  let { start, container, bases, taken, onclose, onsave, flagged = [], top }: Props = $props()
   const app = useApp()
   // The editor opens afresh for each container, so what it started from stays put.
   const isNew = untrack(() => !container)
+  const importing = untrack(() => !!onsave)
   let draft = $state<ContainerProfile>(untrack(() => structuredClone($state.snapshot(start))))
   let typed = $state('')
   let saving = $state(false)
@@ -36,8 +43,10 @@
   })
 
   const wrong = $derived(problems(draft))
-  const unsaved = $derived(isNew || !same(draft, start))
+  const unsaved = $derived(isNew || importing || !same(draft, start))
   const typedBad = $derived(typed.trim() !== '' && addPackages([], typed).some(p => !validPackage(p)))
+  const flags = $derived(flaggedIn(draft.setup, flagged))
+  const flagOf = (step: string) => flags.find(f => f.step.trim() === step.trim())
 
   function addTyped() {
     if (!typed.trim() || typedBad) return
@@ -59,14 +68,17 @@
     else draft[k] = on ? 'shared' : 'none'
   }
 
-  async function save() {
+  async function save(build = false) {
     addTyped()
     if (wrong.length || saving) return
     saving = true
     try {
-      await app.backend.saveContainer(tidy($state.snapshot(draft) as ContainerProfile))
+      const p = tidy($state.snapshot(draft) as ContainerProfile)
+      await (onsave ?? app.backend.saveContainer)(p)
+      if (build) await app.backend.buildContainer(p.id)
       await app.loadContainers()
-      shell.toast(t(container?.built ? 'containerEdit.savedBuilt' : 'containerEdit.saved', { label: draft.label.trim() }))
+      if (!build) shell.toast(t(container?.built ? 'containerEdit.savedBuilt' : 'containerEdit.saved', { label: draft.label.trim() }))
+      else shell.toast(t('containerEdit.building', { label: draft.label.trim() }))
       onclose()
     } catch (e) {
       shell.toast(String(e), 'error')
@@ -95,12 +107,13 @@
   }
 </script>
 
-<form class="editor" aria-label={isNew ? t('containerEdit.newTitle') : t('containerEdit.title', { label: start.label })} onsubmit={e => { e.preventDefault(); void save() }}>
+<form class="editor" aria-label={isNew ? t('containerEdit.newTitle') : t('containerEdit.title', { label: start.label })} onsubmit={e => { e.preventDefault(); void save(importing) }}>
+  {@render top?.(draft)}
   <div class="grid">
     <label for="{uid}-name">{t('containerEdit.name')}</label>
     <div>
       <!-- svelte-ignore a11y_autofocus -->
-      <input id="{uid}-name" class="input" bind:value={draft.label} autofocus={isNew} maxlength="60" />
+      <input id="{uid}-name" class="input" bind:value={draft.label} autofocus={isNew} data-autofocus={importing ? '' : undefined} maxlength="60" />
       {#if isNew && draft.label.trim()}<span class="hint">{t('containerEdit.id', { id: draft.id })}</span>{/if}
     </div>
 
@@ -131,6 +144,8 @@
           <textarea class="input mono" rows="2" maxlength={MAX_STEP} bind:value={draft.setup[i]} aria-label={t('containerEdit.step', { n: i + 1 })} placeholder="pip install httpie" spellcheck="false"></textarea>
           <button type="button" class="btn small ghost icon" aria-label={t('containerEdit.removeStep', { n: i + 1 })} title={t('containerEdit.removeStep', { n: i + 1 })} onclick={() => (draft.setup = draft.setup.filter((_, j) => j !== i))}><Icon name="trash" size={14} /></button>
         </div>
+        {@const flag = flagOf(draft.setup[i] ?? '')}
+        {#if flag}<span class="hint warn flag"><Icon name="triangle-alert" size={12} />{flag.why.map(w => t(whyKey(w))).join(' ')}</span>{/if}
       {/each}
       <button type="button" class="btn small" onclick={() => (draft.setup = [...draft.setup, ''])}><Icon name="plus" size={13} />{t('containerEdit.addStep')}</button>
     </div>
@@ -153,15 +168,18 @@
 
   {#if wrong.length && !isNew}<p class="err" role="alert">{wrong.map(k => t(k)).join(' ')}</p>{/if}
   <div class="actions">
-    {#if container && (container.edited || !container.builtin)}
+    {#if container && !importing && (container.edited || !container.builtin)}
       <button type="button" class="btn small" class:danger={!container.builtin} onclick={removeConfig}>
         {t(container.builtin ? 'containerEdit.reset' : 'containerEdit.delete')}
       </button>
     {/if}
     <span class="grow"></span>
     <button type="button" class="btn small" onclick={onclose}>{t('containerEdit.cancel')}</button>
+    {#if importing}
+      <button type="button" class="btn small" disabled={!!wrong.length || saving} onclick={() => save()}>{t('containerEdit.save')}</button>
+    {/if}
     <button type="submit" class="btn small primary" disabled={!!wrong.length || !unsaved || saving}>
-      {#if saving}<Icon name="loader" spin size={13} />{/if}{t('containerEdit.save')}
+      {#if saving}<Icon name="loader" spin size={13} />{/if}{t(importing ? (container?.built ? 'containerEdit.saveRebuild' : 'containerEdit.saveBuild') : 'containerEdit.save')}
     </button>
   </div>
 </form>
@@ -196,6 +214,11 @@
   }
   .hint.warn {
     color: var(--warning);
+  }
+  .hint.flag {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
   }
   .hint.err,
   .err {

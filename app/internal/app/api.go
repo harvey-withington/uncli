@@ -354,6 +354,13 @@ func (a *API) SummarisePage(sessionID, pageID string, blocks []string) (store.Pa
 	return a.svc.SummarisePage(a.ctx(), sessionID, pageID, blocks)
 }
 
+// PageChanges is what a page's turn changed in each file, as the tools
+// reported it, for the walkthrough (decision 0029): one entry per tool
+// call, in order.
+func (a *API) PageChanges(sessionID, pageID string) ([]store.FileChange, error) {
+	return a.svc.Store.PageChanges(sessionID, pageID)
+}
+
 func (a *API) Focus(sessionID string) { a.svc.Sessions.Focus(sessionID) }
 
 // TestNotification shows a sample desktop notification.
@@ -377,6 +384,17 @@ func (a *API) BuildContainer(id string) error { return a.svc.BuildContainer(id) 
 // RemoveContainerConfig takes the user's version out (a built-in one goes
 // back to how it ships; one of their own is deleted with its container).
 func (a *API) SaveContainer(p ContainerProfile) error { return a.svc.SaveContainer(p) }
+
+// SuggestedContainers lists the containers a folder's repository suggests
+// in .uncli (decision 0028); ImportContainer saves one the user imported
+// or synced, as they left it in the editor.
+func (a *API) SuggestedContainers(folder string) (Suggestions, error) {
+	return a.svc.SuggestedContainers(a.ctx(), folder)
+}
+
+func (a *API) ImportContainer(p ContainerProfile, repo, suggestion string) error {
+	return a.svc.ImportContainer(a.ctx(), p, repo, suggestion)
+}
 
 func (a *API) RemoveContainerConfig(id string) error {
 	return a.svc.RemoveContainerConfig(a.ctx(), id)

@@ -240,7 +240,7 @@ func (a *Adapter) ReadTranscript(loc core.TranscriptLocation, id string) (core.T
 				tl.Done, tl.OK, tl.Output = true, !b.IsError, truncate(resultText(b.Content))
 				if ft, ok := touching[b.ToolUseID]; ok && !b.IsError {
 					if len(bs) == 1 {
-						ft.Line, ft.Added, ft.Removed = patchStats(l.ToolUseResult)
+						ft.Line, ft.Added, ft.Removed, ft.Hunks = patchStats(l.ToolUseResult)
 					}
 					cur.Files = append(cur.Files, ft)
 				}

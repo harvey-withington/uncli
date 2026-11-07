@@ -1,6 +1,6 @@
 # 0023. A repository's .uncli folder holds its team's UNCLI setup
 
-Status: accepted
+Status: accepted; superseded in part by 0028 (a repository suggests containers the user imports: no layering, team rules, default container or trust prompt)
 Date: 2026-10-26
 
 ## Context

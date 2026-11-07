@@ -1,11 +1,36 @@
 // Containers in the browser mock. ?containers=nowsl starts without WSL,
 // ?containers=hung with WSL not responding, ?containers=built with the sandbox built and signed in; otherwise WSL is
 // on and nothing is built. Building walks through the steps on timers.
-import type { ContainerInfo, ContainerProfile, ContainerStep, ContainersInfo } from '../types'
+import type { ContainerInfo, ContainerProfile, ContainerStep, ContainersInfo, SuggestedContainer, Suggestions } from '../types'
 
 const STEPS: ContainerStep[] = ['download', 'remove', 'import', 'packages', 'setup', 'cli', 'lockdown', 'check']
 // The mock's user has no secrets folder yet, so a container sharing it says so.
 const SECRETS = 'C:\\Users\\you\\.secrets'
+
+// A repository whose .uncli suggests two containers (decision 0028): one
+// that reaches outside itself, one that stays inside.
+const REPO = 'C:\\Users\\you\\projects\\demo' // where the mock's Choose… goes
+const SUGGESTED: ContainerProfile[] = [
+  {
+    id: 'team-dev', label: 'Team dev', description: 'Node and Go, with the tools this repository builds with.', base: 'alpine-3.24',
+    packages: ['nodejs', 'npm', 'go', 'make'], setup: ['npm i -g pnpm', 'curl -fsSL https://example.com/install.sh | sh'],
+    brain: 'shared', mcp: 'none', connectors: 'none', secrets: 'shared', folders: [],
+  },
+  {
+    id: 'docs', label: 'Docs', description: 'Python and MkDocs, for the documentation.', base: 'alpine-3.24',
+    packages: ['python3', 'py3-pip'], setup: ['pip install mkdocs'], brain: 'sandboxed', mcp: 'none', connectors: 'none', secrets: 'none', folders: [],
+  },
+]
+// What a container builds and shares, to compare (names and descriptions don't count).
+const canon = (p: ContainerProfile) => JSON.stringify({
+  base: p.base, packages: p.packages, setup: p.setup, brain: p.brain || 'sandboxed', mcp: p.mcp || 'none',
+  connectors: p.connectors || 'none', secrets: p.secrets === 'shared' ? 'shared' : '', folders: p.folders ?? [],
+})
+const reachesOf = (p: ContainerProfile): SuggestedContainer['reaches'] => [
+  ...(p.brain === 'shared' ? ['brain' as const] : []), ...(p.mcp === 'shared' ? ['mcp' as const] : []),
+  ...(p.connectors === 'shared' ? ['connectors' as const] : []), ...(p.secrets === 'shared' ? ['secrets' as const] : []),
+  ...(p.folders?.length ? ['folders' as const] : []),
+]
 
 export function mockContainers(emit: (c: ContainersInfo) => void) {
   const mode = new URLSearchParams(location.search).get('containers')
@@ -35,6 +60,21 @@ export function mockContainers(emit: (c: ContainersInfo) => void) {
   if (mode === 'built') state.wsl.distros = ['uncli-sandbox']
   const snap = () => structuredClone(state)
   const send = () => emit(snap())
+  async function save(p: ContainerProfile) {
+    if (!p.label) throw new Error('a container needs a name')
+    const base = state.bases.find(b => b.id === p.base)
+    if (!base) throw new Error(`no base ${p.base}`)
+    const i = state.containers.findIndex(c => c.id === p.id)
+    const old = state.containers[i]
+    const next: ContainerInfo = {
+      ...p, baseLabel: base.label, builtin: shipped.has(p.id), edited: true, built: old?.built ?? false, changes: old?.changes,
+      missing: p.secrets === 'shared' ? [SECRETS] : [],
+    }
+    next.changes = changesOf(next)
+    if (old) state.containers[i] = next
+    else state.containers.push(next)
+    send()
+  }
   return {
     async containers() { return snap() },
     async installWSL() {
@@ -69,20 +109,33 @@ export function mockContainers(emit: (c: ContainersInfo) => void) {
       state.wsl.distros = state.wsl.distros.filter(d => d !== `uncli-${id}`)
       send()
     },
-    async saveContainer(p: ContainerProfile) {
-      if (!p.label) throw new Error('a container needs a name')
-      const base = state.bases.find(b => b.id === p.base)
-      if (!base) throw new Error(`no base ${p.base}`)
-      const i = state.containers.findIndex(c => c.id === p.id)
-      const old = state.containers[i]
-      const next: ContainerInfo = {
-        ...p, baseLabel: base.label, builtin: shipped.has(p.id), edited: true, built: old?.built ?? false, changes: old?.changes,
-        missing: p.secrets === 'shared' ? [SECRETS] : [],
+    saveContainer: (p: ContainerProfile) => save({ ...p, from: state.containers.find(c => c.id === p.id)?.from }),
+    async suggestedContainers(folder: string): Promise<Suggestions> {
+      if (!folder.toLowerCase().startsWith(REPO.toLowerCase())) return { containers: [] }
+      return {
+        repo: REPO, name: 'demo',
+        containers: SUGGESTED.map(p => {
+          const yours = state.containers.find(c => c.from?.repo === REPO && c.from.id === p.id)
+          const s: SuggestedContainer = {
+            profile: structuredClone(p), status: 'new', reaches: reachesOf(p),
+            steps: p.setup.filter(st => st.includes('| sh')).map(step => ({ step, why: ['runs-code'] })),
+          }
+          if (yours) {
+            s.yours = yours.id
+            s.status = canon(yours) === canon(p) ? 'imported' : 'differs'
+            if (s.status === 'differs') {
+              s.by = yours.from!.sum === canon(p) ? 'you' : 'project'
+              s.changed = '2026-11-03T10:00:00Z'
+            }
+          }
+          return s
+        }),
       }
-      next.changes = changesOf(next)
-      if (old) state.containers[i] = next
-      else state.containers.push(next)
-      send()
+    },
+    async importContainer(p: ContainerProfile, repo: string, suggestion: string) {
+      const sug = SUGGESTED.find(s => s.id === suggestion)
+      if (repo !== REPO || !sug) throw new Error("that project doesn't suggest that container any more")
+      await save({ ...p, from: { repo, id: suggestion, imported: new Date().toISOString(), sum: canon(sug) } })
     },
     async removeContainerConfig(id: string) {
       const i = state.containers.findIndex(c => c.id === id)

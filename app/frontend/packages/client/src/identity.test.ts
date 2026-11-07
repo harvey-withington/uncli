@@ -13,7 +13,7 @@ const NOT_SESSION = [
   'disablePlugin', 'signInTerminal', 'revealCLI', 'startDeviceSignIn', 'cancelDeviceSignIn', 'pickFolder',
   'createSession', 'describePaths', 'describeAttachments', 'search', 'clipboardFiles', 'pinned', 'setPreferences', 'setResumeCutOff',
   'setDecisionKey', 'hasDecisionKey', 'testDecisionModel', 'testNotification', 'usage', 'usageReport', 'updateStatus', 'checkForUpdates', 'installUpdate', 'containers',
-  'installWSL', 'stopContainers', 'buildContainer', 'removeContainer', 'saveContainer', 'removeContainerConfig',
+  'installWSL', 'stopContainers', 'buildContainer', 'removeContainer', 'saveContainer', 'suggestedContainers', 'importContainer', 'removeContainerConfig',
   'startContainerSignIn', 'finishContainerSignIn', 'cancelContainerSignIn', 'signOutContainers',
   'startContainerAccountSignIn', 'finishContainerAccountSignIn', 'cancelContainerAccountSignIn',
   'signOutContainerAccount', 'theme', 'openFolder', 'revealFile', 'editors', 'transcripts', 'importTranscript',

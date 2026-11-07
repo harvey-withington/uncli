@@ -153,6 +153,7 @@ func mergeTouched(list []store.TouchedFile, f store.TouchedFile) []store.Touched
 			}
 			cur.Added += f.Added
 			cur.Removed += f.Removed
+			cur.Hunks += f.Hunks
 		}
 		return list
 	}

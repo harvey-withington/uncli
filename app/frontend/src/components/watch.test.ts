@@ -119,7 +119,7 @@ describe('File tab', () => {
       ...Array.from({ length: 40 }, (_, i) => ({ path: `${dir}\\pkg\\f${i}.go`, how: 'command' as const })),
     ]
     const move = { from: { branch: 'main', commit: 'a'.repeat(40) }, to: { branch: 'server-mode', commit: 'b'.repeat(40) } }
-    render(FilesStrip, { props: { files, sessionId: 's-code', move }, context: ctx(s) })
+    render(FilesStrip, { props: { files, sessionId: 's-code', pageId: 'p1', question: 'q', move }, context: ctx(s) })
     // Two rows, so the list starts open, with the switch folded.
     expect(screen.getByText('parser.go')).toBeInTheDocument()
     const fold = screen.getByRole('button', { name: 'Switched from main to server-mode: 40 files differ' })
@@ -132,7 +132,7 @@ describe('File tab', () => {
   it('shows Watch off, saying why, for a changed file outside the session folder', async () => {
     const { s } = await code()
     const outside = 'C:\\Users\\you\\.claude\\notes.md'
-    render(FilesStrip, { props: { files: [{ path: outside, how: 'write' }], sessionId: 's-code' }, context: ctx(s) })
+    render(FilesStrip, { props: { files: [{ path: outside, how: 'write' }], sessionId: 's-code', pageId: 'p1', question: 'q' }, context: ctx(s) })
     const watch = screen.getByRole('button', { name: 'Watch it on the File tab: notes.md' })
     expect(watch).toBeDisabled()
     expect(watch).toHaveAttribute('title', "Only files in the session's folder can be watched")

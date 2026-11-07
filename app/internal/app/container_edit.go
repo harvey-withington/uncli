@@ -65,12 +65,24 @@ func builtinContainers() (containersFile, error) {
 }
 
 // SaveContainer adds a container, or replaces one by its id, in the user's
-// containers.yaml.
+// containers.yaml. Where it was imported from stays as it was: only
+// importing sets that.
 func (s *Service) SaveContainer(p ContainerProfile) error {
-	p.Label, p.Description = strings.TrimSpace(p.Label), strings.TrimSpace(p.Description)
-	if p.Label == "" {
-		return errors.New("give the container a name")
+	u, err := s.readUserContainers()
+	if err != nil {
+		return err
 	}
+	p.From = nil
+	if i := slices.IndexFunc(u.Containers, func(c ContainerProfile) bool { return c.ID == p.ID }); i >= 0 {
+		p.From = u.Containers[i].From
+	}
+	return s.saveContainer(p)
+}
+
+// tidyProfile is a profile as it's saved: trimmed, packages once each,
+// empty steps left out, defaults as the file leaves them.
+func tidyProfile(p ContainerProfile) ContainerProfile {
+	p.Label, p.Description = strings.TrimSpace(p.Label), strings.TrimSpace(p.Description)
 	pkgs := []string{}
 	for _, x := range p.Packages {
 		if x = strings.TrimSpace(x); x != "" && !slices.Contains(pkgs, x) {
@@ -85,15 +97,27 @@ func (s *Service) SaveContainer(p ContainerProfile) error {
 		}
 	}
 	p.Setup = steps
-	for i := range p.Folders {
-		f := &p.Folders[i]
+	folders := []ContainerFolder{}
+	for _, f := range p.Folders {
 		f.Source, f.Name = strings.TrimSpace(f.Source), strings.TrimSpace(f.Name)
 		if f.Access != "rw" {
 			f.Access = "" // read-only, the default
 		}
+		folders = append(folders, f)
 	}
+	p.Folders = folders
 	if p.Secrets != SecretsShared {
 		p.Secrets = ""
+	}
+	return p
+}
+
+// saveContainer checks a profile and writes it into the user's
+// containers.yaml, with p.From as given.
+func (s *Service) saveContainer(p ContainerProfile) error {
+	p = tidyProfile(p)
+	if p.Label == "" {
+		return errors.New("give the container a name")
 	}
 	s.reloadContainers()
 	s.containers.mu.Lock()
