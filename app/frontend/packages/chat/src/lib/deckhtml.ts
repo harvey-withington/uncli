@@ -54,18 +54,19 @@ html, body, .reveal-viewport { margin: 0; height: 100%; background: light-dark(#
 :root { --r-background-color: light-dark(#ffffff, #16171b); }
 .reveal { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 26px; color: light-dark(#1d1f24, #e6e7ea); }
 .reveal .slides { text-align: left; }
-.reveal .slides section { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; }
+.reveal .slides section { height: 100%; box-sizing: border-box; }
+.reveal .slide { height: 100%; display: flex; flex-direction: column; gap: 14px; }
 .reveal h2 { margin: 0; font-size: 1.5em; font-weight: 650; line-height: 1.25; }
 .reveal .summary { color: light-dark(#5b606b, #a0a4ad); margin: 0; }
 .reveal ul { margin: 0; padding-left: 1.2em; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: .7em; line-height: 1.6; }
 .reveal .keys { margin-top: auto; color: light-dark(#8a8f99, #7b808a); font-size: .6em; }
-.reveal .file { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: .7em; color: light-dark(#5b606b, #a0a4ad); display: flex; gap: 1em; align-items: baseline; }
+.reveal .file { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: .7em; color: light-dark(#5b606b, #a0a4ad); display: flex; flex-wrap: wrap; gap: .3em 1em; align-items: baseline; }
 .reveal .file b { color: light-dark(#1d1f24, #e6e7ea); font-weight: 600; }
 .reveal .file .add { color: light-dark(#1a7f37, #3fb950); }
 .reveal .file .del { color: light-dark(#cf222e, #f85149); }
 .reveal pre.shiki { margin: 0; padding: 12px 0; flex: 1 1 auto; min-height: 0; overflow: auto; border-radius: 10px;
   background: light-dark(#f6f7f9, #1e2026); border: 1px solid light-dark(#e3e5e9, #2c2f36);
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 18px; line-height: 1.55; }
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 18px; line-height: 1.55; tab-size: 4; }
 .reveal pre.shiki code { display: block; min-width: max-content; }
 .reveal pre.shiki .line { display: inline-block; min-width: 100%; min-height: 1.55em; box-sizing: border-box; padding: 0 16px 0 4.6em; position: relative; white-space: pre; vertical-align: top; }
 .reveal pre.shiki .line::before { content: attr(data-n); position: absolute; left: 0; width: 2.6em; text-align: right; color: light-dark(#a0a4ad, #5b606b); }
@@ -83,30 +84,45 @@ html, body, .reveal-viewport { margin: 0; height: 100%; background: light-dark(#
 // The deck's own script: reveal.js, with Escape and F passed to the dialog
 // (the dialog closes, or leaves full screen) instead of reveal.js's own
 // overview and full screen; O still opens the overview.
+// The slides are landscape in a wide frame and portrait in a tall one (a
+// phone), switching as the frame turns. Code too wide for its slide
+// scrolls sideways under a finger instead of swiping to the next slide.
 const SCRIPT = `
 const tell = what => parent.postMessage({ ${JSON.stringify(DECK_MESSAGE)}: what }, '*')
-new Reveal({ hash: false, history: false, controls: true, progress: true, center: false, transition: 'slide',
-  width: 1200, height: 720, margin: 0.05, minScale: 0.2, maxScale: 1.4,
-  keyboard: { 27: () => tell('escape'), 70: () => tell('fullscreen') } }).initialize()
+const shape = () => (innerHeight > innerWidth * 1.1 ? { width: 460, height: 780 } : { width: 1200, height: 720 })
+let now = shape()
+const deck = new Reveal({ hash: false, history: false, controls: true, progress: true, center: false, transition: 'slide',
+  ...now, margin: 0.05, minScale: 0.2, maxScale: 1.4,
+  keyboard: { 27: () => tell('escape'), 70: () => tell('fullscreen') } })
+const wide = () => document.querySelectorAll('pre.shiki').forEach(p => p.toggleAttribute('data-prevent-swipe', p.scrollWidth > p.clientWidth + 1))
+deck.initialize().then(() => {
+  wide()
+  deck.on('slidechanged', wide)
+  addEventListener('resize', () => {
+    const next = shape()
+    if (next.width !== now.width) { now = next; deck.configure(next) }
+    wide()
+  })
+})
 `
 
 // deckHTML is the whole document for the iframe. scheme is the dialog's
 // color-scheme ("light", "dark" or "light dark").
 export async function deckHTML(deck: Deck, text: DeckText, scheme: string): Promise<string> {
-  const slides = [`<section>
+  const slides = [`<section><div class="slide">
     <h2>${esc(text.title)}</h2>
     <p class="summary">${esc(text.summary)}</p>
     <ul>${[...new Set(deck.slides.map(s => s.rel))].map(r => `<li>${esc(r)}</li>`).join('')}</ul>
     <p class="keys">${esc(text.keys)}</p>
-  </section>`]
+  </div></section>`]
   for (const s of deck.slides) {
-    slides.push(`<section>
+    slides.push(`<section><div class="slide">
       <div class="file"><b>${esc(text.file(s))}</b>${s.added ? `<span class="add">+${s.added}</span>` : ''}${s.removed ? `<span class="del">−${s.removed}</span>` : ''}</div>
       ${await codeOf(s)}
-    </section>`)
+    </div></section>`)
   }
   if (deck.others.length) {
-    slides.push(`<section><h2>${esc(text.others)}</h2><ul>${deck.others.map(r => `<li>${esc(r)}</li>`).join('')}</ul></section>`)
+    slides.push(`<section><div class="slide"><h2>${esc(text.others)}</h2><ul>${deck.others.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div></section>`)
   }
   const safeScheme = /^(light|dark|light dark|dark light)$/.test(scheme.trim()) ? scheme.trim() : 'light dark'
   return `<!doctype html><html><head><meta charset="utf-8"><style>${revealCss}</style><style>:root{--scheme:${safeScheme}}${CSS}</style></head>

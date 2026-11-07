@@ -24,7 +24,12 @@
   const chat = useChat()
   const shell = useShell()
   const recorded = $derived(recordedOf(files))
-  const label = $derived(t(recorded.files === 1 ? 'walk.countOne' : 'walk.count', { places: recorded.places, files: recorded.files }))
+  // "1 change in 1 file", "3 changes in 2 files".
+  const count = (places: number, files: number) => t('walk.count', {
+    changes: t(places === 1 ? 'walk.changes.one' : 'walk.changes.other', { n: places }),
+    files: t(files === 1 ? 'walk.files.one' : 'walk.files.other', { n: files }),
+  })
+  const label = $derived(count(recorded.places, recorded.files))
 
   let doc = $state<string | null>(null)
   let loading = $state(false)
@@ -42,7 +47,7 @@
       const scheme = getComputedStyle(host ?? document.documentElement).colorScheme || 'light dark'
       doc = await deckHTML(deck, {
         title: question.trim().split('\n')[0]!.slice(0, 200) || t('walk.title'),
-        summary: t(deck.files === 1 ? 'walk.countOne' : 'walk.count', { places: deck.slides.length, files: deck.files }),
+        summary: count(deck.slides.length, deck.files),
         file: s => t('walk.file', { file: s.rel, from: s.first, to: s.last, part: s.part, parts: s.parts }),
         others: t('walk.others'),
         keys: t('walk.keys'),
