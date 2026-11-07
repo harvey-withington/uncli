@@ -53,6 +53,8 @@
     inset: 0;
     z-index: 50;
     display: grid;
+    /* One column the screen's width, so a wide dialog's max-width holds. */
+    grid-template-columns: minmax(0, 1fr);
     place-items: center;
     background: var(--scrim);
     padding: var(--space-5);
@@ -60,7 +62,7 @@
   .dialog {
     max-width: 100%;
     min-width: 0;
-    max-height: calc(100vh - 64px);
+    max-height: calc(100dvh - 64px);
     display: flex;
     flex-direction: column;
     background: var(--surface);

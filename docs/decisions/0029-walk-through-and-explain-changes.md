@@ -1,6 +1,6 @@
 # 0029. UNCLI walks through a turn's changes as a slide show, and explains them on request
 
-Status: accepted
+Status: accepted; superseded in part by 0030 (UNCLI's own viewer plays walkthroughs; reveal.js is for export)
 Date: 2026-11-07
 
 ## Context

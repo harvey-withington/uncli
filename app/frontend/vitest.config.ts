@@ -1,10 +1,9 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import { deckPlayer } from './packages/chat/build/deck-player'
 
 export default defineConfig({
-  plugins: [svelte({ hot: false }), deckPlayer()],
+  plugins: [svelte({ hot: false })],
   // Use Svelte's browser build in jsdom, or mount() picks the SSR entry.
   resolve: { conditions: ['browser'], alias: { '@uncli/chat': resolve(__dirname, 'packages/chat/src') } },
   // Tests read the UI contract (docs/UI-CONVENTIONS.md) to check it against the code.

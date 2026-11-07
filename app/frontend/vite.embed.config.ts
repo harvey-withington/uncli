@@ -1,7 +1,6 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import { deckPlayer } from './packages/chat/build/deck-player'
 
 // <uncli-chat> as a library (decision 0026), built into @uncli/chat's dist
 // as its element export: one ES module that registers the elements, with
@@ -11,7 +10,7 @@ import { deckPlayer } from './packages/chat/build/deck-player'
 // `vite build --config vite.embed.config.ts --mode sample` builds the
 // sample host page (embed-sample/) on the mock instead.
 export default defineConfig(({ mode }) => {
-  const plugins = [svelte({ compilerOptions: { css: 'injected' }, emitCss: false }), deckPlayer()]
+  const plugins = [svelte({ compilerOptions: { css: 'injected' }, emitCss: false })]
   const alias = { '@uncli/chat': resolve(__dirname, 'packages/chat/src') }
   if (mode === 'sample') {
     return {

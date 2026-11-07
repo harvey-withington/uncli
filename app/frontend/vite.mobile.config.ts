@@ -1,7 +1,6 @@
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import { deckPlayer } from './packages/chat/build/deck-player'
 
 // The phone app (decision 0021): its own page, built into dist/m and served
 // by UNCLI's remote access server at /m/, with its manifest, icons and
@@ -9,7 +8,7 @@ import { deckPlayer } from './packages/chat/build/deck-player'
 export default defineConfig({
   root: resolve(__dirname, 'm'),
   base: '/m/',
-  plugins: [svelte(), deckPlayer()],
+  plugins: [svelte()],
   resolve: { alias: { '@uncli/chat': resolve(__dirname, 'packages/chat/src') } },
   // The build's id: the page registers the service worker with it, so a new
   // build replaces the old cache (m/public/sw.js).
