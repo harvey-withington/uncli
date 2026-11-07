@@ -361,6 +361,17 @@ func (a *API) PageChanges(sessionID, pageID string) ([]store.FileChange, error) 
 	return a.svc.Store.PageChanges(sessionID, pageID)
 }
 
+// ExplainPage asks a model to explain a page's changes, in a call of its
+// own, and stores the explanation with the page; ExplainSize is roughly how
+// many tokens that would send (decision 0029).
+func (a *API) ExplainPage(sessionID, pageID string, o ExplainOptions) (store.Page, error) {
+	return a.svc.ExplainPage(a.ctx(), sessionID, pageID, o)
+}
+
+func (a *API) ExplainSize(sessionID, pageID string, o ExplainOptions) (int, error) {
+	return a.svc.ExplainSize(sessionID, pageID, o)
+}
+
 func (a *API) Focus(sessionID string) { a.svc.Sessions.Focus(sessionID) }
 
 // TestNotification shows a sample desktop notification.

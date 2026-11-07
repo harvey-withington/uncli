@@ -11,6 +11,7 @@ export interface DeckLine {
 }
 
 export interface DeckSlide {
+  place: string // c<change>h<hunk>: the change's index in pageChanges and the hunk's in it, as an explanation's notes name it
   path: string
   rel: string // relative to the session folder
   lines: DeckLine[]
@@ -31,14 +32,14 @@ export interface Deck {
 // deckOf turns a page's recorded changes into slides: files in the order
 // they were first changed, each file's places in order.
 export function deckOf(changes: FileChange[], touched: TouchedFile[], workdir: string): Deck {
-  const byFile = new Map<string, FileChange[]>()
-  for (const c of changes) {
+  const byFile = new Map<string, { c: FileChange; n: number }[]>()
+  changes.forEach((c, n) => {
     const key = c.path.toLowerCase()
-    byFile.set(key, [...(byFile.get(key) ?? []), c])
-  }
+    byFile.set(key, [...(byFile.get(key) ?? []), { c, n }])
+  })
   const slides: DeckSlide[] = []
   for (const list of byFile.values()) {
-    const hunks = list.flatMap(c => c.hunks)
+    const hunks = list.flatMap(({ c, n }) => c.hunks.map((h, k) => ({ ...h, place: `c${n}h${k}` })))
     hunks.forEach((h, i) => {
       let oldN = h.oldStart
       let newN = h.newStart
@@ -68,8 +69,8 @@ export function deckOf(changes: FileChange[], touched: TouchedFile[], workdir: s
           newN++
         }
       }
-      const path = list[0]!.path
-      slides.push({ path, rel: relPath(workdir, path), lines, first: first || h.newStart, last: last || first || h.newStart, added, removed, part: i + 1, parts: hunks.length })
+      const path = list[0]!.c.path
+      slides.push({ place: h.place, path, rel: relPath(workdir, path), lines, first: first || h.newStart, last: last || first || h.newStart, added, removed, part: i + 1, parts: hunks.length })
     })
   }
   const recorded = new Set(changes.map(c => c.path.toLowerCase()))

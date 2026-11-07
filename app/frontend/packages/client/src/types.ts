@@ -211,6 +211,7 @@ export interface Page {
   startedAt: number
   finishedAt: number
   outline?: PageOutline
+  explanation?: PageExplanation // a model's explanation of its changes, for the walkthrough (decision 0029)
   attachments?: PageAttachment[] // files sent with the question
   origin?: 'cli' // the CLI started this turn by itself (a background task finished): no question
   headMove?: HeadMove // the repo's HEAD moved during the turn (a checkout, pull, merge, rebase or reset)
@@ -276,6 +277,31 @@ export interface TouchedFile {
 export interface FileChange {
   path: string
   hunks: Hunk[]
+}
+
+// A model's explanation of a page's changes: a summary of the turn and a
+// note per changed place, by its id (c<change>h<hunk>, in pageChanges's
+// order).
+export interface PageExplanation {
+  model: string
+  context: ExplainContext
+  pages?: number
+  detail: ExplainDetail
+  summary: string
+  notes: { place: string; text: string }[]
+  costUsd: number
+  at: number
+}
+
+export type ExplainContext = 'page' | 'pages' | 'session'
+export type ExplainDetail = 'brief' | 'thorough'
+
+// What Explain sends, and with what (decision 0029).
+export interface ExplainOptions {
+  model: string // of the first provider; '' for the session's
+  context: ExplainContext // besides the changes: this page's question and answer, the last N pages too, or the whole session
+  pages: number // for 'pages'
+  detail: ExplainDetail
 }
 
 // One changed place in a file, as a unified diff's: its first line in the
@@ -977,6 +1003,8 @@ export interface Backend {
   testPush(): Promise<void>
   summarisePage(sessionId: string, pageId: string, blocks: string[]): Promise<Page>
   pageChanges(sessionId: string, pageId: string): Promise<FileChange[]> // what its turn changed, per tool call, for the walkthrough
+  explainPage(sessionId: string, pageId: string, o: ExplainOptions): Promise<Page> // a model explains its changes, in a call of its own; stored on the page
+  explainSize(sessionId: string, pageId: string, o: ExplainOptions): Promise<number> // roughly how many tokens that would send
   usage(): Promise<UsageLimit | null>
   // UNCLI's own updates (decision 0025). installUpdate resolves once the
   // installer has it; UNCLI quits a few seconds later and comes back.

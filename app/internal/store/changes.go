@@ -69,3 +69,42 @@ func (s *Store) PageChanges(sessionID, pageID string) ([]FileChange, error) {
 	}
 	return out, rows.Err()
 }
+
+// PageExplanation is a model's explanation of a page's changes: a summary
+// of the turn, and a note on each changed place it explains, by the place's
+// id (c<change>h<hunk>, in PageChanges's order).
+type PageExplanation struct {
+	Model   string        `json:"model"`
+	Context string        `json:"context"` // page | pages | session: what it was told besides the changes
+	Pages   int           `json:"pages,omitempty"`
+	Detail  string        `json:"detail"` // brief | thorough
+	Summary string        `json:"summary"`
+	Notes   []ExplainNote `json:"notes"`
+	CostUSD float64       `json:"costUsd"`
+	At      int64         `json:"at"`
+}
+
+type ExplainNote struct {
+	Place string `json:"place"` // c<change>h<hunk>
+	Text  string `json:"text"`
+}
+
+// SetPageExplanation stores (or with nil, clears) a page's explanation.
+func (s *Store) SetPageExplanation(pageID string, e *PageExplanation) error {
+	var v any
+	if e != nil {
+		b, err := json.Marshal(e)
+		if err != nil {
+			return err
+		}
+		v = string(b)
+	}
+	res, err := s.db.Exec(`UPDATE pages SET explanation=? WHERE id=?`, v, pageID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("page %s not found", pageID)
+	}
+	return nil
+}

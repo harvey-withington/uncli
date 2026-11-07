@@ -104,6 +104,8 @@ export class ChatStore {
   // the app; what an embedding host lists. sideTabShown tells the host one
   // of its own is showing, for a session.
   sideTabs = $state.raw<SideTab[]>(BUILTIN_TABS)
+  // Explain in a page's walkthrough; an embedding host can leave it out.
+  explain = $state(true)
   sideTabShown: ((sessionId: string, tab: string) => void) | undefined = undefined
 
   reviewsOf(sessionId: string): HostReview[] {

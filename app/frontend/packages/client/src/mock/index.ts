@@ -1026,6 +1026,26 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       const recorded = new Set(p.touchedFiles.filter(f => f.hunks).map(f => f.path))
       return structuredClone(MOCK_CHANGES.filter(c => recorded.has(c.path)))
     },
+    // A canned explanation of the mock's changes, a note per changed place.
+    async explainPage(sid, pid, o) {
+      const p = pages[sid]?.find(x => x.id === pid)
+      if (!p) throw new Error('page not found')
+      await new Promise(r => setTimeout(r, 600))
+      p.explanation = {
+        model: o.model || p.model, context: o.context, ...(o.context === 'pages' ? { pages: o.pages } : {}), detail: o.detail, costUsd: 0.004, at: Date.now(),
+        summary: 'The parser sent a partial line on its own when it arrived before its message, so a turn sometimes ended with half an answer. It now keeps the partial line until the message that ends it, and a new test runs the case fifty times.',
+        notes: [
+          { place: 'c0h0', text: 'A partial line is only flushed by the message it belongs to (matched by ID), instead of by whichever message comes next.' },
+          { place: 'c0h1', text: 'Trailing newlines are trimmed when the partial line is sent, so the answer doesn\'t end with a blank line.' },
+          { place: 'c1h0', text: 'A new test replays the recorded stream fifty times, which caught the one-in-five failure before the fix.' },
+        ],
+      }
+      h?.pageChanged(structuredClone(p))
+      return structuredClone(p)
+    },
+    async explainSize(_sid, _pid, o) {
+      return o.context === 'session' ? 23000 : o.context === 'pages' ? 2600 + 1800 * o.pages : 2600
+    },
     async summarisePage(sid, pid, blocks) {
       const p = pages[sid]?.find(x => x.id === pid)
       if (!p) throw new Error('page not found')

@@ -76,6 +76,10 @@ export interface ChatHost {
   // icon? }), whose content goes in the slot side-tab-<id>. Left out: On
   // this page and Artifacts. [] : no side panel, and no button for it.
   sideTabs?: SideTab[]
+  // explain: false leaves out Explain in a page's walkthrough, which costs
+  // a call to a model (decision 0029); the walkthrough itself stays.
+  // Experimental.
+  explain?: boolean
 }
 
 export class UncliChat extends HTMLElement {
@@ -115,6 +119,7 @@ export class UncliChat extends HTMLElement {
       this.#props.store.enterKey = h?.enter
       this.#props.store.composerControls = h?.composerControls ?? []
       this.#props.store.sideTabs = h?.sideTabs ?? EMBEDDED_TABS
+      this.#props.store.explain = h?.explain !== false
     }
   }
 
@@ -267,6 +272,7 @@ export class UncliChat extends HTMLElement {
     store.enterKey = this.#host?.enter
     store.composerControls = this.#host?.composerControls ?? []
     store.sideTabs = this.#host?.sideTabs ?? EMBEDDED_TABS
+    store.explain = this.#host?.explain !== false
     store.sideTabShown = (session, tab) => this.#emitFor('uncli-side-tab', { session, tab })
     store.composerSlot = this.#hasComposerSlot()
     store.hostReviews = this.#reviews

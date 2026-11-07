@@ -397,6 +397,39 @@ func TestSummarisePage(t *testing.T) {
 	t.Logf("sections: %+v (cost $%.4f)", o.Sections, o.CostUSD)
 }
 
+// Explain (decision 0029): the real CLI explains a page's recorded changes
+// in a call of its own, with a note for each changed place by its id.
+func TestExplainPage(t *testing.T) {
+	svc, _ := open(t, t.TempDir())
+	defer svc.Close()
+	ctx := context.Background()
+	if _, err := svc.InstallCLI(ctx); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	svc.Store.CreateSession(&store.Session{ID: "s", Adapter: "claude", Runtime: "local", ProfileID: "code", Workdir: dir, Model: "haiku"})
+	svc.Store.SavePage(&store.Page{ID: "p", SessionID: "s", Seq: 1, Question: "Make greet say something kinder late at night",
+		AnswerMD: "I added an early return to greet() for hours before 5am, since you said night-shift users found 'Good evening' odd, and noted it in the README.", Model: "haiku", Status: "done"})
+	svc.Store.AddPageChange("s", "p", store.FileChange{Path: filepath.Join(dir, "greet.js"), Hunks: []store.Hunk{{OldStart: 1, NewStart: 1, Lines: []string{
+		" function greet(name, now = new Date()) {", "   const hour = now.getHours()", "+  if (hour < 5) return `Up late, ${name}?`", "   const part = hour < 12 ? 'morning' : 'evening'"}}}})
+	svc.Store.AddPageChange("s", "p", store.FileChange{Path: filepath.Join(dir, "README.md"), Hunks: []store.Hunk{{OldStart: 3, NewStart: 3, Lines: []string{
+		"-greet() says good morning or good evening.", "+greet() says good morning or good evening, or asks if you're up late before 5am."}}}})
+	p, err := svc.ExplainPage(ctx, "s", "p", app.ExplainOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := p.Explanation
+	if e == nil || e.Model != "haiku" || e.Context != "page" || e.Detail != "brief" || e.Summary == "" || len(e.Notes) == 0 {
+		t.Fatalf("explanation = %+v", e)
+	}
+	for _, n := range e.Notes {
+		if n.Place != "c0h0" && n.Place != "c1h0" {
+			t.Errorf("a note for a place that isn't there: %+v", n)
+		}
+	}
+	t.Logf("summary: %s\nnotes: %+v (cost $%.4f)", e.Summary, e.Notes, e.CostUSD)
+}
+
 // Files dropped or pasted go to the real CLI as content: two images (one
 // from disk, one pasted as data), a PDF and a text file, in a chat session,
 // which has no tool to read files, so the answer can only come from the

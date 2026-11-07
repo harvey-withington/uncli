@@ -43,7 +43,7 @@ export const SESSION_FIRST = [
   'answerApproval', 'answerAsk', 'commands', 'mcpSignIn', 'mcpCallback', 'mcpReconnect', 'mcpSignOut', 'mcpCancel', 'mcpToggle', 'queue', 'unqueue', 'sendQueued',
   'setUnattended', 'setMode', 'safeList', 'setSafeEntry', 'deleteSafeEntry', 'moveSafeEntry', 'setSafeLabel',
   'markSafe', 'teach', 'previewClasses', 'knownTools', 'explainCommand', 'sessionAllowlist', 'remove',
-  'setBookmark', 'setPinned', 'archive', 'focus', 'summarisePage', 'pageChanges', 'openFile', 'openPath', 'watchFiles', 'watchRead',
+  'setBookmark', 'setPinned', 'archive', 'focus', 'summarisePage', 'pageChanges', 'explainPage', 'explainSize', 'openFile', 'openPath', 'watchFiles', 'watchRead',
   'artifactFiles', 'readArtifact', 'artifactPath', 'artifactLink',
 ] as const satisfies readonly (keyof Backend)[]
 
@@ -60,7 +60,7 @@ const RESULTS: Partial<Record<keyof Backend, (v: never, q: Q) => unknown>> = {
   transcripts: (ts: TranscriptEntry[], q: Q) => ts.map(t => (t.sessionId ? { ...t, sessionId: q(t.sessionId) } : t)),
   setShares: view, toggleModifier: view, rename: view, setSortOrder: view, setUnattended: view, setMode: view, archive: view, restart: view,
   pages: (ps: Page[], q: Q) => ps.map(p => page(p, q)),
-  setBookmark: page, setPinned: page, summarisePage: page,
+  setBookmark: page, setPinned: page, summarisePage: page, explainPage: page,
   pinned: (ps: PinnedPage[], q: Q) => ps.map(p => ({ ...p, sessionId: q(p.sessionId) })),
   search: (r: SearchResult, q: Q) => ({ ...r, hits: r.hits.map(h => ({ ...h, sessionId: q(h.sessionId) })) }),
 }

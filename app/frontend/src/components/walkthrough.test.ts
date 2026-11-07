@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from '@testing-library/svelte'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
+import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
 import { mockBackend } from '@uncli/client/mock'
 
@@ -35,5 +35,35 @@ describe('Walk through the changes', () => {
     expect(dialog.getByText('5 / 5')).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: 'Next' })).toBeDisabled()
     expect(dialog.getByRole('button', { name: 'Full screen' })).toBeInTheDocument()
+  })
+
+  it('explains the changes, with the options last used or chosen first', async () => {
+    localStorage.removeItem('uncli-explain')
+    const backend = mockBackend()
+    const explain = vi.spyOn(backend, 'explainPage')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: /Fix the flaky parser test/ }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Walk through' }))
+    const dialog = within(await screen.findByRole('dialog', { name: 'Walk through the changes' }))
+
+    // Explain, with the defaults: this page, brief, the session's model.
+    await fireEvent.click(dialog.getByRole('button', { name: 'Explain' }))
+    expect(await dialog.findByText(/kept the partial line until the message that ends it|keeps the partial line until the message that ends it/)).toBeInTheDocument()
+    expect(explain).toHaveBeenLastCalledWith('s-code', expect.any(String), { model: '', context: 'page', pages: 3, detail: 'brief' })
+    expect(within(dialog.getByLabelText('Slide 2 of 5')).getByText(/only flushed by the message it belongs to/)).toBeInTheDocument()
+    expect(within(dialog.getByLabelText('Slide 4 of 5')).getByText(/replays the recorded stream fifty times/)).toBeInTheDocument()
+    expect(dialog.getByText(/^Explained by .* · \$0\.00/)).toBeInTheDocument()
+
+    // With options: the whole session, thorough; then remembered.
+    await fireEvent.click(dialog.getByRole('button', { name: 'Explain with options…' }))
+    const options = within(await screen.findByRole('dialog', { name: 'Explain these changes' }))
+    expect(await options.findByText('Sends about 3k tokens, in a call of its own (not the session).')).toBeInTheDocument()
+    await fireEvent.click(options.getByRole('radio', { name: 'The whole session' }))
+    await fireEvent.click(options.getByRole('radio', { name: /Thorough/ }))
+    expect(await options.findByText('Sends about 23k tokens, in a call of its own (not the session).')).toBeInTheDocument()
+    await fireEvent.click(options.getByRole('button', { name: 'Explain' }))
+    await waitFor(() => expect(explain).toHaveBeenLastCalledWith('s-code', expect.any(String), { model: '', context: 'session', pages: 3, detail: 'thorough' }))
+    expect(JSON.parse(localStorage.getItem('uncli-explain') ?? '{}')).toMatchObject({ context: 'session', detail: 'thorough' })
+    expect(await dialog.findByRole('button', { name: 'Explain again' })).toBeInTheDocument()
   })
 })

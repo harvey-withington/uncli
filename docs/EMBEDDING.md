@@ -435,6 +435,12 @@ chat.host = {
 - **Remembered** with the layout (`storage-key`), your tabs included: the panel opens on the tab the user last chose, or the first of yours if it's gone.
 - Set `host` again with a new `sideTabs` to change them.
 
+## Walking through a page's changes
+
+When a turn changes files, **Walk through** by its changed files plays the changes as slides, one changed place a slide (decisions 0029 and 0030). It costs nothing: the changes were recorded as the turn ran. **Explain** in the slides asks a model to explain them, in a call of its own (not the session), with the page's question and answer, and earlier pages if the user chooses; that costs a little. In a dialog, the walkthrough stays inside the element's box.
+
+To leave Explain out, so your users can't spend on it, set `host.explain` to `false`. The walkthrough stays. Experimental, as its options may change.
+
 ## Your own controls, and restyling parts
 
 **Slots.** Put your own controls inside the chat by giving the element children with a `slot` attribute. They stay in your page's DOM and get your page's styles.

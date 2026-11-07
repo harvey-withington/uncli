@@ -106,7 +106,9 @@ apply changes.
 - Each page lists the **files the agent changed**. In Code sessions, Open takes
   you to the line in your editor (Settings → Editor). **Walk through** plays
   the changes as a slide show, one changed place a slide, coloured, numbered
-  and marked added or removed (decision 0029).
+  and marked added or removed (decisions 0029, 0030); **Explain** has a model
+  add a note to each, in a call of its own, with the arrow beside it for its
+  options (model, how much of the conversation it sees, how much it says).
 - Chat and Co-work sessions keep their **artifacts** (HTML, SVG, Mermaid,
   Markdown, images) version by version. The side panel's Artifacts tab (or
   A) shows them as they were at the page you're on, beside On this page (O).

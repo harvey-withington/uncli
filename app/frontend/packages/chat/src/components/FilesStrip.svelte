@@ -1,6 +1,6 @@
 <script lang="ts">
   import { slide } from 'svelte/transition'
-  import type { HeadMove, TouchedFile } from '../lib/api'
+  import type { HeadMove, PageExplanation, TouchedFile } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { artifactPathOf } from '../lib/artifacts'
   import { watchPathOf } from '../lib/watched'
@@ -29,10 +29,11 @@
     sessionId: string
     pageId: string
     question: string
+    explanation?: PageExplanation
     move?: HeadMove
   }
 
-  let { files: raw, sessionId, pageId, question, move }: Props = $props()
+  let { files: raw, sessionId, pageId, question, explanation, move }: Props = $props()
   const chat = useChat()
   // Opening a file or its folder happens on the server's screen.
   const here = $derived(atServer(chat.backend))
@@ -125,7 +126,7 @@
         <span>{files.length === 1 ? t('files.changedOne') : t('files.changed', { n: files.length })}</span>
         <span class="chev" class:open={shown}><Icon name="chevron-right" size={14} /></span>
       </button>
-      <Walkthrough {sessionId} {pageId} {question} {files} />
+      <Walkthrough {sessionId} {pageId} {question} {files} {explanation} />
     </div>
     {#if shown}
       <ul transition:slide={{ duration: 160 }}>

@@ -14,7 +14,7 @@ import (
 var pinnedMethods = []string{
 	"AnswerApproval", "AnswerAsk", "Archive", "ArtifactFiles", "ArtifactLink",
 	"Bootstrap", "CLIChannels", "CLIStatus", "CheckForUpdates", "Commands", "Containers",
-	"CreateSession", "Delete", "DeleteSafeEntry", "Editors", "ExplainCommand",
+	"CreateSession", "Delete", "DeleteSafeEntry", "Editors", "ExplainCommand", "ExplainPage", "ExplainSize",
 	"Focus", "HasDecisionKey", "ImportTranscript", "InstallUpdate", "Interrupt", "KnownTools",
 	"ListFolder", "MCPCallback", "MCPCancel", "MCPReconnect", "MCPSignIn",
 	"MCPSignOut", "MCPToggle", "MarkSafe", "MoveSafeEntry", "PageChanges", "Pages", "Pinned",

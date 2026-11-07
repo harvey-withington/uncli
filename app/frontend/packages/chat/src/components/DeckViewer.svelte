@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
+  import type { PageExplanation } from '../lib/api'
   import type { Deck } from '../lib/deck'
   import { t } from '../lib/i18n.svelte'
   import Icon from './Icon.svelte'
@@ -11,14 +12,21 @@
   // that snaps to each one, so a phone swipes between them natively; arrow
   // keys, Page Up and Down, Home and End move too, and the counter says
   // where you are. Code wider than its slide scrolls on its own. Full
-  // screen puts the viewer on the whole screen.
+  // screen puts the viewer on the whole screen. An explanation, when there
+  // is one, puts its summary on the title slide and its note for each place
+  // above that place's code; Explain (with its options beside it) asks for
+  // one, or for another.
   interface Props {
     deck: Deck
     codes: string[] // each changed place's code (lib/deckcode.ts)
     title: string // the page's question
     summary: string // "3 changes in 2 files"
+    explanation?: PageExplanation | null
+    by?: string // who explained it, and what it cost
+    explain?: { busy: boolean; run: () => void; options: () => void } // absent: no Explain
   }
-  let { deck, codes, title, summary }: Props = $props()
+  let { deck, codes, title, summary, explanation, by, explain }: Props = $props()
+  const notes = $derived(new Map((explanation?.notes ?? []).map(n => [n.place, n.text])))
 
   let box = $state<HTMLElement>()
   let track = $state<HTMLElement>()
@@ -69,6 +77,10 @@
     <section class="slide" aria-label={t('walk.slide', { n: 1, total })}>
       <h3>{title}</h3>
       <p class="summary">{summary}</p>
+      {#if explanation?.summary}
+        <p class="note">{explanation.summary}</p>
+        {#if by}<p class="by">{by}</p>{/if}
+      {/if}
       <ul class="files">{#each files as f (f)}<li>{f}</li>{/each}</ul>
       <p class="keys">{t('walk.keys')}</p>
     </section>
@@ -79,6 +91,7 @@
           <span class="lines">{t('walk.lines', { from: s.first, to: s.last })}</span>
           {#if s.added}<span class="add">+{s.added}</span>{/if}{#if s.removed}<span class="del">−{s.removed}</span>{/if}
         </div>
+        {#if notes.get(s.place)}<p class="note">{notes.get(s.place)}</p>{/if}
         <div class="code">{@html codes[i] ?? ''}</div>
       </section>
     {/each}
@@ -94,8 +107,16 @@
     <span class="count" aria-live="polite">{index + 1} / {total}</span>
     <button class="btn ghost small icon" onclick={() => go(index + 1)} disabled={index >= total - 1} aria-label={t('walk.next')} title={t('walk.next')}><Icon name="chevron-right" size={16} /></button>
     <span class="grow"></span>
-    <button class="btn ghost small" onclick={fullscreen}>
-      <Icon name={full ? 'minimize' : 'maximize'} size={13} />{full ? t('walk.leaveFullscreen') : t('walk.fullscreen')}
+    {#if explain}
+      <span class="split">
+        <button class="btn small" onclick={explain.run} disabled={explain.busy}>
+          <Icon name={explain.busy ? 'loader' : 'sparkles'} spin={explain.busy} size={13} />{explain.busy ? t('explain.busy') : explanation ? t('explain.again') : t('explain.button')}
+        </button>
+        <button class="btn small icon" onclick={explain.options} disabled={explain.busy} aria-label={t('explain.options')} title={t('explain.options')}><Icon name="chevron-down" size={13} /></button>
+      </span>
+    {/if}
+    <button class="btn ghost small fs" onclick={fullscreen} aria-label={full ? t('walk.leaveFullscreen') : t('walk.fullscreen')} title={full ? t('walk.leaveFullscreen') : t('walk.fullscreen')}>
+      <Icon name={full ? 'minimize' : 'maximize'} size={13} /><span class="txt">{full ? t('walk.leaveFullscreen') : t('walk.fullscreen')}</span>
     </button>
   </div>
 </div>
@@ -175,6 +196,41 @@
     .keys {
       display: none; /* a finger swipes, or uses the arrows below */
     }
+  }
+  .note {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    white-space: pre-line;
+  }
+  .by {
+    margin: calc(-1 * var(--space-2)) 0 0;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+  .split {
+    display: inline-flex;
+  }
+  .nav .btn {
+    white-space: nowrap;
+  }
+  @media (max-width: 600px) {
+    .fs .txt {
+      display: none; /* the icon alone, its name kept for screen readers */
+    }
+  }
+  .split .btn:first-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .split .btn + .btn {
+    margin-left: -1px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
   }
   .file {
     display: flex;

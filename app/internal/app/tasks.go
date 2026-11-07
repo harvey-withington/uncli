@@ -210,7 +210,12 @@ func (s *Service) textTasker(provider string) (core.TextTasker, error) {
 
 // RunTextTask runs a quick task on the user's chosen model.
 func (s *Service) RunTextTask(ctx context.Context, t core.TextTask) (core.TextResult, ModelRef, error) {
-	ref := s.Preferences().QuickTaskModel
+	return s.runTextTaskOn(ctx, s.Preferences().QuickTaskModel, t)
+}
+
+// runTextTaskOn runs a quick task on the given model: a call of its own,
+// outside any session.
+func (s *Service) runTextTaskOn(ctx context.Context, ref ModelRef, t core.TextTask) (core.TextResult, ModelRef, error) {
 	tasker, err := s.textTasker(ref.Provider)
 	if err != nil {
 		return core.TextResult{}, ref, err

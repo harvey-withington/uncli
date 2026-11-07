@@ -38,7 +38,7 @@ var rpcMethods = []string{
 	// Sessions.
 	"CreateSession", "Pages", "Send", "SendWith", "Queue", "Unqueue", "SendQueued", "Interrupt", "Restart", "Focus", "Rename", "Delete",
 	"Archive", "SetSortOrder", "SetModel", "ToggleModifier", "SetShares",
-	"SetMode", "SetUnattended", "Search", "SummarisePage", "PageChanges",
+	"SetMode", "SetUnattended", "Search", "SummarisePage", "PageChanges", "ExplainPage", "ExplainSize",
 	"SetBookmark", "SetPinned", "Pinned", "Commands",
 	"Transcripts", "ImportTranscript",
 	// Approvals and the safe list: the same rules as at the server.

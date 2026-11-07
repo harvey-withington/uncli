@@ -110,7 +110,7 @@ func migrate(db *sql.DB) error {
 		return false
 	}
 	for _, c := range []struct{ table, col, def string }{
-		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"}, {"pages", "origin", "TEXT"}, {"pages", "head_move", "TEXT"},
+		{"pages", "outline", "TEXT"}, {"pages", "attachments", "TEXT"}, {"pages", "origin", "TEXT"}, {"pages", "head_move", "TEXT"}, {"pages", "explanation", "TEXT"},
 		{"sessions", "mode", "TEXT"}, {"sessions", "shares", "TEXT"},
 		{"risk_judgements", "decider", "TEXT"}, {"risk_judgements", "confidence", "REAL"},
 		{"safe_list", "label", "TEXT NOT NULL DEFAULT ''"},
@@ -402,7 +402,10 @@ type Page struct {
 	StartedAt    int64             `json:"startedAt"`
 	FinishedAt   int64             `json:"finishedAt"`
 	Outline      *PageOutline      `json:"outline,omitempty"` // a summary table of contents, if one was made
-	Attachments  []PageAttachment  `json:"attachments"`       // files sent with the question (their content is in the CLI's transcript)
+	// Explanation is a model's explanation of the page's changes, for the
+	// walkthrough (decision 0029), if one was asked for.
+	Explanation *PageExplanation `json:"explanation,omitempty"`
+	Attachments []PageAttachment `json:"attachments"` // files sent with the question (their content is in the CLI's transcript)
 	// Origin is who started the turn: empty for the user; "cli" when the CLI
 	// carried on by itself (a background task finished), with no question.
 	Origin string `json:"origin,omitempty"`
@@ -536,7 +539,7 @@ func (s *Store) SetPageFiles(pageID string, touched []TouchedFile, artifacts []A
 
 const pageColumns = `id, session_id, seq, question, directives, model, modifiers, answer_md, trace,
 		touched_files, status, bookmarked, pinned, input_tokens, output_tokens, cache_read, cache_write, cost_usd,
-		duration_ms, started_at, finished_at, outline, attachments, artifacts, origin, head_move`
+		duration_ms, started_at, finished_at, outline, attachments, artifacts, origin, head_move, explanation`
 
 // Page reads one page.
 func (s *Store) Page(pageID string) (Page, error) {
@@ -571,9 +574,9 @@ func scanPages(rows *sql.Rows) ([]Page, error) {
 		var bm, pin sql.NullBool
 		var in, outT, cr, cw, dur, st, fin sql.NullInt64
 		var cost sql.NullFloat64
-		var outline, attached, artifacts, origin, head sql.NullString
+		var outline, attached, artifacts, origin, head, explained sql.NullString
 		if err := rows.Scan(&p.ID, &p.SessionID, &p.Seq, &p.Question, &directives, &p.Model, &mods, &answer, &trace,
-			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached, &artifacts, &origin, &head); err != nil {
+			&touched, &status, &bm, &pin, &in, &outT, &cr, &cw, &cost, &dur, &st, &fin, &outline, &attached, &artifacts, &origin, &head, &explained); err != nil {
 			return nil, err
 		}
 		p.Origin = origin.String
@@ -591,6 +594,12 @@ func scanPages(rows *sql.Rows) ([]Page, error) {
 			var o PageOutline
 			if json.Unmarshal([]byte(outline.String), &o) == nil {
 				p.Outline = &o
+			}
+		}
+		if explained.Valid && explained.String != "" {
+			var e PageExplanation
+			if json.Unmarshal([]byte(explained.String), &e) == nil {
+				p.Explanation = &e
 			}
 		}
 		p.Directives, p.AnswerMD, p.Status = directives.String, answer.String, status.String

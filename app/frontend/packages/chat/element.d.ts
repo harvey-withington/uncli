@@ -80,6 +80,8 @@ export interface ChatHost {
   composerControls?: ComposerControl[]
   // The side panel's tabs, in order. Left out: 'outline' and 'artifacts'. []: no side panel, nor its button.
   sideTabs?: SideTab[]
+  // false leaves out Explain in a page's walkthrough (it costs a call to a model); the walkthrough stays. Experimental.
+  explain?: boolean
 }
 
 // A host's review of a batch of its own changes, on one card in the

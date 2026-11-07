@@ -142,6 +142,8 @@ export function wailsBackend(): Backend {
     testPush: () => Promise.reject(new Error('push is for remote clients')),
     summarisePage: (s, p, b) => call('SummarisePage', s, p, b),
     pageChanges: (s, p) => call('PageChanges', s, p),
+    explainPage: (s, p, o) => call('ExplainPage', s, p, o),
+    explainSize: (s, p, o) => call('ExplainSize', s, p, o),
     usage: () => call('Usage'),
     usageReport: q => call('UsageReport', q),
     containers: () => call('Containers'),

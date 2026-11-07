@@ -15,7 +15,7 @@ describe('walkthrough deck', () => {
       { path: `${W}\\built.js`, how: 'command' },
     ], W)
     expect(deck.files).toBe(2)
-    expect(deck.slides.map(s => [s.rel, s.part, s.parts])).toEqual([['a.go', 1, 2], ['a.go', 2, 2], ['b.go', 1, 1]])
+    expect(deck.slides.map(s => [s.rel, s.part, s.parts, s.place])).toEqual([['a.go', 1, 2, 'c0h0'], ['a.go', 2, 2, 'c2h0'], ['b.go', 1, 1, 'c1h0']])
     const a = deck.slides[0]!
     expect(a.lines).toEqual([
       { kind: 'ctx', text: 'x', n: 10 },
