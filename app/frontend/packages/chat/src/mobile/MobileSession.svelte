@@ -11,6 +11,7 @@
   import type { SessionView } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
+  import { slideIn, swipe } from '../lib/swipe'
   import { wide } from './wide.svelte'
   import { useShell } from '../lib/shell.svelte'
 
@@ -55,6 +56,15 @@
   // An embedding host's reviews of its own changes, after the CLI's cards.
   const reviews = $derived(app.reviewsOf(session.id))
   let scroller: HTMLElement | undefined = $state()
+  // A sideways swipe on the page moves to the next or previous page, which
+  // slides in from that side (lib/swipe.ts).
+  let content: HTMLElement | undefined = $state()
+  function swiped(dir: 1 | -1) {
+    const to = app.currentIndex + dir
+    if (to < 0 || to >= app.currentPages.length) return
+    app.goTo(to)
+    slideIn(content, dir)
+  }
 
   async function restore() {
     try {
@@ -72,8 +82,8 @@
        (display: contents); on a tablet it leaves room for the side panel;
        embedded, the side panel covers it and not the header. -->
   <div class="body" class:with-panel={isWide && app.panelShown && app.tabsFor(session.id).length > 0} style:--panel-w="min({app.outline.width}px, 45%)">
-  <div class="scroll" bind:this={scroller} part="page">
-    <div class="content">
+  <div class="scroll" bind:this={scroller} part="page" use:swipe={swiped}>
+    <div class="content" bind:this={content}>
       {#if page}
         <PageView {page} />
       {:else}

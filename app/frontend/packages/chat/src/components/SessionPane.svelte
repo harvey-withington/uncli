@@ -4,6 +4,7 @@
   import { t } from '../lib/i18n.svelte'
   import { tintStyle } from '../lib/tint'
   import { blockMatching } from '../lib/search'
+  import { slideIn, swipe } from '../lib/swipe'
   import ApprovalCard from './ApprovalCard.svelte'
   import HostReviewCard from './HostReviewCard.svelte'
   import ScrollKeeper from './ScrollKeeper.svelte'
@@ -50,6 +51,16 @@
   // An embedding host's reviews of its own changes, after the CLI's cards.
   const reviews = $derived(chat.reviewsOf(session.id))
 
+  // A sideways swipe on a touch screen moves to the next or previous page,
+  // which slides in from that side (lib/swipe.ts).
+  let content: HTMLElement | undefined = $state()
+  function swiped(dir: 1 | -1) {
+    const to = chat.currentIndex + dir
+    if (to < 0 || to >= chat.currentPages.length) return
+    chat.goTo(to)
+    slideIn(content, dir)
+  }
+
   async function restore() {
     try {
       await chat.archive(session.id, false)
@@ -90,8 +101,8 @@
          above the composer (centred over the answer, not the outline), and
          the composer. -->
     <div class="main">
-      <div class="scroll" bind:this={scroller} part="page">
-        <div class="content">
+      <div class="scroll" bind:this={scroller} part="page" use:swipe={swiped}>
+        <div class="content" bind:this={content}>
           {#if page}
             <PageView {page} />
           {:else}
