@@ -34,6 +34,7 @@
   "files": [
     "src",
     "dist",
+    "build",
     "element.d.ts",
     "!**/*.test.ts"
   ]

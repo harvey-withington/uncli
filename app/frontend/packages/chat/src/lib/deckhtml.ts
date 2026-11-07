@@ -1,9 +1,10 @@
 // The walkthrough's page (decision 0029): a whole HTML document for a
-// sandboxed iframe's srcdoc, with reveal.js inside it, so it needs nothing
-// from the app or the network. Loaded only when a deck first opens, which
-// keeps reveal.js out of the chat's own bundle.
-import revealJs from 'reveal.js?raw'
+// sandboxed iframe's srcdoc. Its scripts (reveal.js and the deck's own)
+// are one file loaded by URL from the app's origin, not inline: the frame
+// inherits the page's content security policy, which may refuse inline
+// scripts (the phone app's does). Loaded only when a deck first opens.
 import revealCss from 'reveal.js/reveal.css?raw'
+import playerUrl from 'virtual:uncli-deck-player'
 import type { Deck, DeckSlide } from './deck'
 import { langOf } from './watched'
 import { highlight } from './render/highlight'
@@ -19,14 +20,6 @@ export interface DeckText {
 // Messages the deck sends its dialog.
 export const DECK_MESSAGE = 'uncli-deck'
 export type DeckMessage = { [DECK_MESSAGE]: 'escape' | 'fullscreen' }
-
-// reveal.js's package hands bundlers its ES module, which ends in its one
-// export; as a plain script in the deck, that becomes the global Reveal.
-export function revealScript(mjs: string): string {
-  const out = mjs.replace(/export\s*\{\s*([\w$]+)\s+as\s+default\s*\};?\s*$/, 'window.Reveal = $1;\n')
-  if (out === mjs || /^\s*(export|import)\s/m.test(out)) throw new Error("reveal.js's module changed shape: the walkthrough can't load it")
-  return out.replace(/<\/script/gi, '<\\/script')
-}
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -81,31 +74,6 @@ html, body, .reveal-viewport { margin: 0; height: 100%; background: light-dark(#
 .reveal .progress { color: light-dark(#4f46e5, #8b85ff); }
 `
 
-// The deck's own script: reveal.js, with Escape and F passed to the dialog
-// (the dialog closes, or leaves full screen) instead of reveal.js's own
-// overview and full screen; O still opens the overview.
-// The slides are landscape in a wide frame and portrait in a tall one (a
-// phone), switching as the frame turns. Code too wide for its slide
-// scrolls sideways under a finger instead of swiping to the next slide.
-const SCRIPT = `
-const tell = what => parent.postMessage({ ${JSON.stringify(DECK_MESSAGE)}: what }, '*')
-const shape = () => (innerHeight > innerWidth * 1.1 ? { width: 460, height: 780 } : { width: 1200, height: 720 })
-let now = shape()
-const deck = new Reveal({ hash: false, history: false, controls: true, progress: true, center: false, transition: 'slide',
-  ...now, margin: 0.05, minScale: 0.2, maxScale: 1.4,
-  keyboard: { 27: () => tell('escape'), 70: () => tell('fullscreen') } })
-const wide = () => document.querySelectorAll('pre.shiki').forEach(p => p.toggleAttribute('data-prevent-swipe', p.scrollWidth > p.clientWidth + 1))
-deck.initialize().then(() => {
-  wide()
-  deck.on('slidechanged', wide)
-  addEventListener('resize', () => {
-    const next = shape()
-    if (next.width !== now.width) { now = next; deck.configure(next) }
-    wide()
-  })
-})
-`
-
 // deckHTML is the whole document for the iframe. scheme is the dialog's
 // color-scheme ("light", "dark" or "light dark").
 export async function deckHTML(deck: Deck, text: DeckText, scheme: string): Promise<string> {
@@ -127,5 +95,5 @@ export async function deckHTML(deck: Deck, text: DeckText, scheme: string): Prom
   const safeScheme = /^(light|dark|light dark|dark light)$/.test(scheme.trim()) ? scheme.trim() : 'light dark'
   return `<!doctype html><html><head><meta charset="utf-8"><style>${revealCss}</style><style>:root{--scheme:${safeScheme}}${CSS}</style></head>
 <body><div class="reveal"><div class="slides">${slides.join('\n')}</div></div>
-<script>${revealScript(revealJs)}</script><script>${SCRIPT}</script></body></html>`
+<script src="${esc(new URL(playerUrl, location.href).href)}"></script></body></html>`
 }

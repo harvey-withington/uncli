@@ -23,6 +23,11 @@ describe('Walk through the changes', () => {
     expect(doc).toContain('internal/adapter/claude/parser_test.go · lines 1–13 · 1 of 1')
     expect(doc).toContain('coverage.out')
     expect(doc).toContain('class="line add"')
+    // Its script is a file from the app's origin, never inline: the frame
+    // inherits the page's content security policy (the phone app's refuses
+    // inline scripts).
+    expect(doc).toMatch(/<script src="http:\/\/[^"]+\/@uncli\/deck-player\.js"><\/script>/)
+    expect(doc).not.toMatch(/<script>/)
 
     // Escape inside the deck closes the dialog.
     window.dispatchEvent(new MessageEvent('message', { data: { 'uncli-deck': 'escape' }, source: frame.contentWindow }))

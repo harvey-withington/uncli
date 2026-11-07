@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { deckPlayer } from './packages/chat/build/deck-player'
 
 // go:embed needs frontend/dist to exist on a clean checkout, so the build
 // puts back the .gitkeep that emptying the folder removes.
@@ -13,7 +14,7 @@ const keepDist = (): Plugin => ({
 })
 
 export default defineConfig({
-  plugins: [svelte(), keepDist()],
+  plugins: [svelte(), keepDist(), deckPlayer()],
   // The chat's package, from its source (decision 0026).
   resolve: { alias: { '@uncli/chat': resolve(__dirname, 'packages/chat/src') } },
   server: {

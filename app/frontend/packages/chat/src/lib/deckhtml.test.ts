@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import revealJs from 'reveal.js?raw'
-import { revealScript } from './deckhtml'
+import { deckPlayerSource } from '../../build/deck-player'
 
-describe('the deck’s reveal.js', () => {
-  it('runs as a plain script, defining Reveal', () => {
-    const script = revealScript(revealJs)
-    expect(script).toContain('window.Reveal = ')
-    expect(script).not.toMatch(/^\s*export\s/m)
-    expect(() => new Function(script)).not.toThrow() // parses as a classic script
-  })
-
-  it('says so when the module changes shape', () => {
-    expect(() => revealScript('const R = 1\nexport { R as Reveal }')).toThrow(/changed shape/)
+describe('the deck’s script file', () => {
+  it('is reveal.js as a plain script, then the deck’s player', () => {
+    const src = deckPlayerSource()
+    expect(src).toMatch(/e\.Reveal\s*=/) // the UMD build defines the global
+    expect(src).toContain("'uncli-deck'")
+    expect(src.indexOf('new Reveal(')).toBeGreaterThan(src.indexOf('e.Reveal'))
+    expect(src).not.toMatch(/^\s*export\s/m)
+    expect(() => new Function(src)).not.toThrow() // parses as a classic script
   })
 })
