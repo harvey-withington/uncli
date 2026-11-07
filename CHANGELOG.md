@@ -4,6 +4,45 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.9.0-alpha
+
+Walk through what a turn changed, have it explained, and share a
+container with your team.
+
+- **Walk through the changes.** A page that changed files has Walk through
+  beside its changed files: a slide show of the changes, one changed place
+  a slide, coloured, with line numbers and the added and removed lines
+  marked. Swipe between slides on the phone, or use the arrow keys, and go
+  full screen for more room. The code scrolls on its own under the file's
+  name. Pages from before this release have no walkthrough, since their
+  changes weren't recorded.
+- **Explain.** In the walkthrough, Explain asks a model to explain the
+  changes: a summary of the turn on the first slide, and a note above each
+  change. It's a small call of its own, not a turn in the session, so it
+  doesn't send the whole conversation again. The arrow beside it chooses
+  the model, how much of the conversation it sees (this page, the pages
+  before it, or the whole session) and how much it says, and shows roughly
+  what that sends. The explanation is kept with the page. Fold the notes
+  away to give the code the room.
+- **Swipe between pages.** On the phone or a tablet, swipe sideways on an
+  answer to move to the next or previous page. Code you're scrolling
+  sideways and the screen's edges are left alone.
+- **Containers for a team.** A repository can suggest containers in
+  `.uncli/containers.yaml` (or `.yml`). Starting a session there lists them
+  in the new session dialog with Import, which opens the container editor
+  on the suggestion and says whether it reaches outside its container (your
+  memories, MCP servers, connectors, secrets or folders, and setup steps
+  that send data away or run code they fetch). Change what you like and
+  save it as one of your own. When the repository's version changes, Sync
+  imports it again.
+- Dialogs no longer run off the screen of a phone turned sideways.
+- **For app developers.** A host's chat has the walkthrough and Explain
+  too; `explain: false` leaves Explain out.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone.
+
 ## 0.8.0-alpha
 
 Queue your next message, answers that carry on after a restart, and more
