@@ -40,6 +40,7 @@ export interface SessionView {
   shareable?: Share[] // what it could have (an isolated type, on this machine, a CLI that can)
   mcp?: MCPServer[] // its CLI's MCP servers as last reported (decision 0020); empty until it reports
   queued?: QueuedMessage // a message waiting for the answer to end (session/queue.go)
+  git?: GitHead // the git branch its folder is on, when it's in a repository
 }
 
 // An MCP server of a session's CLI (session.MCPServerView).
@@ -223,6 +224,9 @@ export interface HeadMove {
   to: GitHead
 }
 
+// Where a repo's HEAD points: a turn's start and end (HeadMove), or a
+// session folder's now (SessionView.git, internal/gitinfo, where commit is
+// "" on a branch).
 export interface GitHead {
   branch?: string // absent when detached
   commit: string

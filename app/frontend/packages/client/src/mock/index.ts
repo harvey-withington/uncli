@@ -272,7 +272,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     session('r-build', 'code', 'Nightly build keeps timing out', 'idle', { workdir: 'D:\\builds\\uncli', sortOrder: 2 }),
     session('r-notes', 'chat', 'Draft the 0.4 release notes', 'unread', { sortOrder: 1 }),
   ] : opts.empty ? [] : [
-    session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode, mcp: mockMCP() }),
+    session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode, mcp: mockMCP(), git: { branch: 'fix/flaky-parser', commit: '' } }),
     // opts.inContainer: it runs in the Sandbox container.
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2, ...(opts.inContainer ? { runtime: 'wsl', runtimeRef: 'sandbox' } : {}) }),
     session('s-cowork', 'cowork', 'Summarise the Q3 planning notes', 'idle', { modifiers: ['efficiency'], sortOrder: 1 }),

@@ -138,9 +138,13 @@ func (s *Session) View() View {
 }
 
 func (s *Session) viewLocked() View {
-	return View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err,
+	v := View{Session: s.rec, State: s.state, Running: s.proc != nil, Busy: s.page != nil, Error: s.err,
 		Approvals: append([]Approval{}, s.pending...), Unattended: s.unattended, Background: append([]core.BackgroundTask{}, s.background...),
 		Shares: s.sharesLocked(), Shareable: s.m.shareable(s.rec, s.ad().Capabilities()), MCP: s.mcpViewLocked(), Queued: s.queuedViewLocked()}
+	if h, ok := s.m.git.Head(s.rec.Workdir); ok {
+		v.Git = &h
+	}
+	return v
 }
 
 func (s *Session) changed() { s.m.d.Sink.SessionChanged(s.viewLocked()) }
