@@ -20,7 +20,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
@@ -79,9 +79,22 @@ const lastTag = execFileSync('git', ['describe', '--tags', '--abbrev=0', '--matc
 const version = `${lastTag.replace(/^v/, '')}+${branch || 'dev'}.${seq}`
 
 // No -clean: it would delete build/bin, which fails while `npm run dev` runs.
-// --skip-build keeps whatever build/bin holds, stamped or not.
+// --skip-build keeps whatever build/bin holds, stamped or not. The
+// installer and the exe's file version are stamped with the release's
+// numbers (0.9.0), as release.mjs does, so Windows' installed apps list
+// shows the version rather than wails.json's placeholder; wails.json is put
+// back afterwards.
 if (!skipBuild) {
-  execFileSync('wails', ['build', '-nsis', '-platform', 'windows/amd64', '-ldflags', `"-X github.com/harvey-withington/uncli/app/internal/buildinfo.Version=${version}"`], { cwd: appDir, stdio: 'inherit', shell: true })
+  const wailsJson = join(appDir, 'wails.json')
+  const original = readFileSync(wailsJson, 'utf8')
+  const config = JSON.parse(original)
+  config.info.productVersion = lastTag.replace(/^v/, '').match(/^\d+\.\d+\.\d+/)[0]
+  writeFileSync(wailsJson, JSON.stringify(config, null, 2) + '\n')
+  try {
+    execFileSync('wails', ['build', '-nsis', '-platform', 'windows/amd64', '-ldflags', `"-X github.com/harvey-withington/uncli/app/internal/buildinfo.Version=${version}"`], { cwd: appDir, stdio: 'inherit', shell: true })
+  } finally {
+    writeFileSync(wailsJson, original)
+  }
 }
 
 const data = readFileSync(installer)
