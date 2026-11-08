@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>UNCLI — AI CLIs if you're not a CLI guy.</title>
   <meta name="description"
-    content="UNCLI is a desktop app for AI coding CLIs like Claude Code: sessions side by side, every answer a page you can read, and approvals in plain words, on your phone too. Free, open source, for Windows." />
+    content="UNCLI is a desktop app for AI coding CLIs like Claude Code: approvals in plain words, a walkthrough of every change with an explanation on request, and your sessions on your phone and your other PCs. Free, open source, for Windows." />
   <meta name="theme-color" content="#0b0806" />
 
   <link rel="canonical" href="https://uncli.app/" />
@@ -15,7 +15,7 @@
        scrapers: relative paths don't resolve off-site. -->
   <meta property="og:title" content="UNCLI — AI CLIs if you're not a CLI guy." />
   <meta property="og:description"
-    content="A desktop app for AI coding CLIs like Claude Code: sessions side by side, answers as pages, approvals in plain words." />
+    content="A desktop app for AI coding CLIs like Claude Code: approvals in plain words, a walkthrough of what changed, and your sessions on every device you own." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://uncli.app/" />
   <meta property="og:image" content="https://uncli.app/images/shot-session.png" />
@@ -49,29 +49,10 @@
         <path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6Z" />
         <path d="m9 12 2 2 4-4" />
       </symbol>
-      <symbol id="i-plug" viewBox="0 0 24 24">
-        <path d="M9 3v6M15 3v6" />
-        <path d="M6 9h12v2a6 6 0 0 1-12 0Z" />
-        <path d="M12 17v4" />
-      </symbol>
       <symbol id="i-lock" viewBox="0 0 24 24">
         <rect x="5" y="10.5" width="14" height="10" rx="2" />
         <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
         <circle cx="12" cy="15" r="1.2" />
-      </symbol>
-      <symbol id="i-columns" viewBox="0 0 24 24">
-        <rect x="3.5" y="4" width="17" height="16" rx="2" />
-        <path d="M9.5 4v16M15 4v16" />
-      </symbol>
-      <symbol id="i-files" viewBox="0 0 24 24">
-        <path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z" />
-        <path d="M14 3.5v5h5" />
-        <path d="m9 14 2 2 4-4" />
-      </symbol>
-      <symbol id="i-sliders" viewBox="0 0 24 24">
-        <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
-        <circle cx="16" cy="7" r="2" />
-        <circle cx="10" cy="17" r="2" />
       </symbol>
       <symbol id="i-box" viewBox="0 0 24 24">
         <path d="M12 3 20.5 7.5v9L12 21l-8.5-4.5v-9Z" />
@@ -81,27 +62,20 @@
         <path d="M4 20h16" />
         <path d="M7 16v-4M11 16V8M15 16v-6M19 16V5" />
       </symbol>
-      <symbol id="i-bookmark" viewBox="0 0 24 24">
-        <path d="M6.5 3.5h11v17L12 16.5l-5.5 4Z" />
-      </symbol>
       <symbol id="i-eye" viewBox="0 0 24 24">
         <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
         <circle cx="12" cy="12" r="3" />
       </symbol>
-      <symbol id="i-key" viewBox="0 0 24 24">
-        <circle cx="8" cy="15" r="4" />
-        <path d="m11 12 8.5-8.5M16 7l2.5 2.5M14 9l2 2" />
+      <symbol id="i-slides" viewBox="0 0 24 24">
+        <rect x="3" y="4.5" width="18" height="12" rx="2" />
+        <path d="m10.5 8 4 2.5-4 2.5Z" />
+        <path d="M8 20.5h8M12 16.5v4" />
       </symbol>
-      <symbol id="i-slash" viewBox="0 0 24 24">
-        <rect x="3.5" y="4" width="17" height="16" rx="2" />
-        <path d="m10 16 4-8" />
-      </symbol>
-      <symbol id="i-phone" viewBox="0 0 24 24">
-        <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
-        <path d="M10.5 18.5h3" />
-      </symbol>
-      <symbol id="i-arrow" viewBox="0 0 24 24">
-        <path d="M4 12h16m-6-6 6 6-6 6" />
+      <symbol id="i-devices" viewBox="0 0 24 24">
+        <rect x="2.5" y="5" width="13" height="9" rx="1.5" />
+        <path d="M1.5 17h15" />
+        <rect x="17" y="8.5" width="5.5" height="11" rx="1.5" />
+        <path d="M19 17.5h1.5" />
       </symbol>
       <!-- GitHub mark (filled, not stroked) -->
       <symbol id="i-github" viewBox="0 0 24 24">
@@ -125,10 +99,10 @@
       <span>UNCLI</span>
     </a>
     <nav class="nav-links">
-      <a href="#features">What it does</a>
       <a href="#approvals">Approvals</a>
+      <a href="#walkthrough">Walkthrough</a>
+      <a href="#everywhere">Everywhere</a>
       <a href="#providers">Providers</a>
-      <a href="#phone">On your phone</a>
       <a href="#closer-look">A closer look</a>
       <a class="nav-cta" href="https://github.com/harvey-withington/uncli"><svg class="gh-ico" aria-hidden="true">
           <use href="#i-github" />
@@ -146,8 +120,9 @@
         <p class="say">UNCLI, pronounced "un-clee". The command line, without the command line.</p>
         <p class="lede">
           The best AI coding agents live in a terminal, which is lovely if you love terminals. UNCLI puts Claude
-          Code and friends in a proper window: sessions side by side, every answer a page you can actually read,
-          and approvals in plain words. Step away from the desk and they follow you to your phone.</p>
+          Code and friends in a proper window, asks before anything risky in plain words, and walks you through
+          what the agent changed, explaining it if you like. Step away from the desk and your sessions follow you
+          to your phone, or to your laptop on the road.</p>
         <p class="lede">
           It drives each provider's official CLI with your own subscription, and it never switches the
           approvals off to look clever.</p>
@@ -178,13 +153,6 @@
     <section class="pillars">
       <div class="pillar reveal">
         <svg class="ico">
-          <use href="#i-pages" />
-        </svg>
-        <h3>Pages, not scrollback</h3>
-        <p>Every question and its answer is a page. Page through them, bookmark them, copy any bit with a click.</p>
-      </div>
-      <div class="pillar reveal">
-        <svg class="ico">
           <use href="#i-shield" />
         </svg>
         <h3>Asks in plain words</h3>
@@ -192,17 +160,25 @@
       </div>
       <div class="pillar reveal">
         <svg class="ico">
-          <use href="#i-plug" />
+          <use href="#i-slides" />
         </svg>
-        <h3>Any agent, one window</h3>
-        <p>Claude Code and the Antigravity CLI built in. More through plugins, described in a single YAML file.</p>
+        <h3>See what it did</h3>
+        <p>Walk through every change the agent made, one place at a time, and have it explained on request.</p>
+      </div>
+      <div class="pillar reveal">
+        <svg class="ico">
+          <use href="#i-devices" />
+        </svg>
+        <h3>Wherever you are</h3>
+        <p>Your sessions on your phone, and on your other PCs, served by the PC they run on. Over Tailscale only.</p>
       </div>
       <div class="pillar reveal">
         <svg class="ico">
           <use href="#i-lock" />
         </svg>
         <h3>Careful by default</h3>
-        <p>Pinned, checksum-checked CLIs, plugins off until you say so, and a locked-down Linux when you want one.</p>
+        <p>Official, pinned, checksum-checked CLIs, plugins off until you say so, and a locked-down Linux when you
+          want one.</p>
       </div>
     </section>
 
@@ -238,86 +214,32 @@
       </p>
     </section>
 
-    <!-- ───────────────── Features ───────────────── -->
-    <section id="features" class="section">
-      <div class="section-head reveal">
-        <span class="eyebrow">What it does</span>
-        <h2>Ask, read, <span class="grad">carry on.</span></h2>
-        <p>Everything the terminal does, laid out where you can see it.</p>
-      </div>
-      <div class="grid">
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-columns" />
-          </svg>
-          <h3>Several sessions at once</h3>
-          <p>Chat, work on a folder of documents, or code in a repository, as many side by side as you like. A
-            notification says when one finishes or needs you.</p>
-        </article>
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-bookmark" />
-          </svg>
-          <h3>Bookmarks and pins</h3>
-          <p>Bookmark the good answers, pin the ones you keep coming back to, and search every session at once.
-            Finished? Archive it.</p>
-        </article>
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-files" />
-          </svg>
-          <h3>See what changed</h3>
-          <p>Each page lists the files the agent touched and opens them in your editor at the right line. Artifacts
-            (HTML, diagrams, images) are kept version by version.</p>
-        </article>
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-sliders" />
-          </svg>
-          <h3>Switch with a click</h3>
-          <p>Change model mid-conversation, make answers Efficient or Thorough, compact the context. One click
-            each, coloured by what it costs.</p>
-        </article>
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-chart" />
-          </svg>
-          <h3>Know what it cost</h3>
-          <p>Usage by day, model, session type and session, so the monthly allowance stops being a mystery. (It was
-            probably the Opus.)</p>
-        </article>
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-pages" />
-          </svg>
-          <h3>Bring your old chats</h3>
-          <p>Import a conversation you started in the terminal and carry on in UNCLI. Ctrl+Shift+P finds anything
-            else; ? lists every shortcut.</p>
-        </article>
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-eye" />
-          </svg>
-          <h3>Watch a file</h3>
-          <p>Keep a file from the session's folder open beside the answer, say the TODO the agent is working
-            through, and watch it update as it changes. Type "todo" and the latest one is on top.</p>
-        </article>
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-key" />
-          </svg>
-          <h3>Sign in to your tools</h3>
-          <p>An MCP server that needs signing in says so. One click opens its sign-in in your browser, and its
-            tools arrive without a restart, in your other sessions too. Chats can use them as well.</p>
-        </article>
-        <article class="card reveal">
-          <svg class="ico">
-            <use href="#i-slash" />
-          </svg>
-          <h3>Questions get answers</h3>
-          <p>Type / for the CLI's commands. When the agent asks you something or shows a plan, you answer on a card,
-            with its options, your own words, or a note on what to change.</p>
-        </article>
+    <!-- ───────────────── Walkthrough spotlight ───────────────── -->
+    <section id="walkthrough" class="section spotlight">
+      <div class="spotlight-grid">
+        <div class="spotlight-copy reveal">
+          <span class="eyebrow">Walk through and explain</span>
+          <h2>Know what it did, <span class="grad">not just that it's done.</span></h2>
+          <p>With an agent writing the code, the hard part is keeping up with it. Every page that changed files has
+            Walk through: the changes as a slide show, one changed place at a time.</p>
+          <ul class="ticks">
+            <li><strong>The code first.</strong> Coloured, with line numbers and the added and removed lines marked.
+              Arrow keys or a swipe on the phone, full screen when you want the room.</li>
+            <li><strong>Explain, on request.</strong> A model writes a summary of the turn and a note above each
+              change. It's a small call of its own, not another turn, so it doesn't send the whole conversation
+              again.</li>
+            <li><strong>You choose what it costs.</strong> Pick the model, how much of the conversation it sees and
+              how much it says; it shows roughly what that sends before it goes.</li>
+            <li><strong>Kept with the page,</strong> so the explanation is there next time, and on your phone.</li>
+          </ul>
+        </div>
+        <div class="spotlight-art reveal">
+          <figure class="shot">
+            <img src="images/shot-walkthrough.png"
+              alt="Walk through the changes: a slide showing lines 145 to 149 of parser.go, removed lines in red and added lines in green, with a note above saying what the change does, and Explain again at the bottom."
+              width="1440" height="900" loading="lazy" decoding="async" />
+          </figure>
+        </div>
       </div>
     </section>
 
@@ -391,25 +313,26 @@
       </div>
     </section>
 
-    <!-- ───────────────── Phone spotlight ───────────────── -->
-    <section id="phone" class="section spotlight">
+    <!-- ───────────────── Everywhere spotlight ───────────────── -->
+    <section id="everywhere" class="section spotlight">
       <div class="spotlight-grid flip">
         <div class="spotlight-copy reveal">
-          <span class="eyebrow">On your phone</span>
+          <span class="eyebrow">Your phone, your other PCs</span>
           <h2>Leave the desk, <span class="grad">keep the session.</span></h2>
-          <p>An agent that stops for approval while you're making a coffee just sits there. Switch on Remote access and
-            your sessions follow you to your phone, served by the PC they run on.</p>
+          <p>An agent that stops for approval while you're making a coffee just sits there. Switch on Remote access
+            and your sessions follow you, served by the PC they run on.</p>
           <ul class="ticks">
-            <li><strong>Carry on from anywhere.</strong> Approve, answer the agent's questions, send the next message
-              or start a new session. A notification says when one needs you, even with the app closed.</li>
+            <li><strong>On your phone.</strong> Approve, answer the agent's questions, send the next message or start
+              a new session. A notification says when one needs you, even with the app closed.</li>
+            <li><strong>On your other PCs.</strong> Pair your laptop with your desktop and the desktop's sessions sit
+              in the laptop's sidebar under its name, beside the laptop's own. Start a session on either, from
+              either.</li>
             <li><strong>Over Tailscale, and only Tailscale.</strong> Never your local network, never the internet at
               large, with HTTPS from your PC's own certificate.</li>
-            <li><strong>Pair, then allow.</strong> Scan a code, then allow the phone on the PC. Revoke it and it's out
-              at once.</li>
-            <li><strong>It keeps running.</strong> Closing the window leaves UNCLI in the tray, so sessions carry on,
-              and it can start with Windows.</li>
-            <li><strong>Setup stays at the desk.</strong> Containers, providers and anything that installs are for
-              the PC, not the phone.</li>
+            <li><strong>Pair, then allow.</strong> Scan a code or paste a link, then allow it on the PC. Revoke it and
+              it's out at once.</li>
+            <li><strong>It keeps running.</strong> Closing the window leaves UNCLI in the tray, it can start with
+              Windows, and devices reconnect by themselves after an update.</li>
           </ul>
         </div>
         <div class="spotlight-art reveal">
@@ -420,8 +343,44 @@
           </figure>
         </div>
       </div>
-      <p class="platform-note reveal">Needs Tailscale on the PC and the phone (free for personal use). Tested on
-        Android; iPhone not yet.</p>
+      <p class="platform-note reveal">Needs Tailscale on each PC and phone (free for personal use). Setup, such as
+        containers and providers, stays at each PC. Tested on Android; iPhone not yet.</p>
+    </section>
+
+    <!-- ───────────────── The everyday ───────────────── -->
+    <section id="everyday" class="section">
+      <div class="section-head reveal">
+        <span class="eyebrow">And the everyday</span>
+        <h2>The rest, <span class="grad">done properly.</span></h2>
+        <p>Sessions side by side, a model switch, notifications, the CLI's own commands: the things you'd expect
+          are there. These are the ones worth a mention.</p>
+      </div>
+      <div class="grid">
+        <article class="card reveal">
+          <svg class="ico">
+            <use href="#i-pages" />
+          </svg>
+          <h3>Pages, not scrollback</h3>
+          <p>Every question and its answer is a page of its own. Page through them, bookmark the good ones, pin the
+            ones you come back to, and search every session at once.</p>
+        </article>
+        <article class="card reveal">
+          <svg class="ico">
+            <use href="#i-eye" />
+          </svg>
+          <h3>Watch the work</h3>
+          <p>Each page lists the files it touched and opens them at the right line. Keep a file open beside the
+            answer, say the agent's TODO, and watch it change. The header shows the branch it's on.</p>
+        </article>
+        <article class="card reveal">
+          <svg class="ico">
+            <use href="#i-chart" />
+          </svg>
+          <h3>Know what it cost</h3>
+          <p>Usage by day, model, session type and session, so the monthly allowance stops being a mystery. (It was
+            probably the Opus.)</p>
+        </article>
+      </div>
     </section>
 
     <!-- ───────────────── Gallery ───────────────── -->
@@ -439,28 +398,28 @@
           <figcaption>An approval, mid-answer. The session in the sidebar says it needs you.</figcaption>
         </figure>
         <figure class="shot reveal">
+          <img src="images/shot-walkthrough.png"
+            alt="A walkthrough slide: a change in parser.go with removed and added lines marked, and the explanation's note above it."
+            width="1440" height="900" loading="lazy" decoding="async" />
+          <figcaption>Walking through a turn's changes, with Explain's note above each one.</figcaption>
+        </figure>
+        <figure class="shot reveal">
           <img src="images/shot-file.png"
             alt="The File tab beside the answer, showing TODO.md with its checkboxes, and the file finder open with a search for todo."
             width="1440" height="900" loading="lazy" decoding="async" />
           <figcaption>Watching TODO.md beside the answer. Type part of a name: the latest changed comes first.</figcaption>
         </figure>
         <figure class="shot reveal">
-          <img src="images/shot-mcp.png"
-            alt="MCP servers that need signing in, listed under the header with Sign in buttons, and the servers list open with each one's status."
+          <img src="images/shot-remote.png"
+            alt="The sidebar grouped by PC: This PC's sessions, then a paired server's with a green dot, and an offline one saying it can't be reached. A session on the paired server is open, with Open folder greyed out."
             width="1440" height="900" loading="lazy" decoding="async" />
-          <figcaption>MCP servers that need you, and every server's status, a click from signed in.</figcaption>
+          <figcaption>Another PC's sessions beside your own. What only works on that PC says so.</figcaption>
         </figure>
         <figure class="shot reveal">
           <img src="images/shot-usage.png"
             alt="The usage dashboard: cost by day for 30 days, and breakdowns by model, session type and session."
             width="1440" height="900" loading="lazy" decoding="async" />
           <figcaption>Usage over 30 days, by model, session type and session.</figcaption>
-        </figure>
-        <figure class="shot reveal">
-          <img src="images/shot-providers.png"
-            alt="Settings, AI Providers: Claude Code's pinned version, account, and sign-in for containers."
-            width="1440" height="900" loading="lazy" decoding="async" />
-          <figcaption>Each provider's pinned version and sign-in, in one place.</figcaption>
         </figure>
         <figure class="shot reveal">
           <img src="images/shot-containers.png"
@@ -486,8 +445,8 @@
         </article>
         <article class="card reveal">
           <h3>Not an IDE</h3>
-          <p>When the work turns into code, UNCLI opens your editor at the right file and line, and stops there.
-            No diff viewer, no git client.</p>
+          <p>UNCLI walks you through what changed, then opens your editor at the right file and line, and stops
+            there. No git client, no editing in UNCLI.</p>
         </article>
         <article class="card reveal">
           <h3>Your plan, your limits</h3>
