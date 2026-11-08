@@ -494,6 +494,7 @@
   "push.lastFail": "The last one didn’t get through: {error}",
   "push.why.insecure": "Notifications need the app opened over HTTPS, at the address shown on your PC under Settings → Remote access.",
   "push.why.unsupported": "This browser can’t get notifications from a web app. Add the app to your home screen (Chrome on Android, Safari on iPhone) and open it from there.",
+  "push.why.noService": "This browser has no push service, so it can’t get notifications (the Meta Quest’s doesn’t). Sessions still update here while the app is open.",
   "push.why.denied": "Notifications are blocked for this site. Allow them in the browser’s site settings, then come back.",
   "remote.title": "Remote access",
   "remote.button.ok": "Remote access is on: paired devices can reach this PC",

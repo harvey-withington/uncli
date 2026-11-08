@@ -4,7 +4,7 @@ import { mockBackend } from '@uncli/client/mock'
 import { APP_CONTEXT } from '../lib/context'
 import { AppStore } from '../stores/app.svelte'
 import type { Backend } from '@uncli/chat/lib/api'
-import { keyBytes, pushSupport, type PushEnv } from './push'
+import { keyBytes, noPushService, pushSupport, type PushEnv } from './push'
 import PushSection from './PushSection.svelte'
 
 const ok: PushEnv = { secure: true, serviceWorker: true, pushManager: true, permission: 'default' }
@@ -15,6 +15,12 @@ describe('push support', () => {
     expect(pushSupport({ ...ok, secure: false })).toBe('insecure')
     expect(pushSupport({ ...ok, pushManager: false })).toBe('unsupported')
     expect(pushSupport({ ...ok, permission: 'denied' })).toBe('denied')
+  })
+
+  it('knows a browser with no push service from other failures', () => {
+    expect(noPushService(new DOMException('Registration failed - push service not available', 'AbortError'))).toBe(true)
+    expect(noPushService(new DOMException('no', 'NotAllowedError'))).toBe(false)
+    expect(noPushService(new Error('network'))).toBe(false)
   })
 
   it('reads the server’s key', () => {

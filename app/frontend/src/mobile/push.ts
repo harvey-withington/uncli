@@ -4,7 +4,9 @@
 // needs approval or finishes; the service worker (m/public/sw.js) shows it.
 import type { Backend, PushSubscriptionInfo } from '@uncli/chat/lib/api'
 
-export type PushSupport = 'ok' | 'insecure' | 'unsupported' | 'denied'
+// noService: the browser has the API but no push service behind it (the
+// Meta Quest's), found only when subscribing fails.
+export type PushSupport = 'ok' | 'insecure' | 'unsupported' | 'denied' | 'noService'
 
 export interface PushEnv {
   secure: boolean // HTTPS (or localhost)
@@ -40,18 +42,32 @@ export function keyBytes(key: string): Uint8Array<ArrayBuffer> {
   return out
 }
 
+// noPushService says whether subscribing failed because the browser has no
+// push service to subscribe with (Chromium's AbortError, "Registration
+// failed - push service not available").
+export function noPushService(e: unknown): boolean {
+  return e instanceof DOMException && e.name === 'AbortError'
+}
+
+export type EnableResult = 'on' | 'refused' | 'noService'
+
 // enablePush asks for permission, subscribes this browser with the
 // server's key (replacing a subscription made with another), and tells
-// the server. False when the user said no.
-export async function enablePush(backend: Backend): Promise<boolean> {
-  if ((await Notification.requestPermission()) !== 'granted') return false
+// the server.
+export async function enablePush(backend: Backend): Promise<EnableResult> {
+  if ((await Notification.requestPermission()) !== 'granted') return 'refused'
   const key = await backend.pushKey()
   const reg = await navigator.serviceWorker.ready
   let sub = await reg.pushManager.getSubscription()
   if (sub) await sub.unsubscribe()
-  sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) })
+  try {
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(key) })
+  } catch (e) {
+    if (noPushService(e)) return 'noService'
+    throw e
+  }
   await backend.pushSubscribe(sub.toJSON() as PushSubscriptionInfo)
-  return true
+  return 'on'
 }
 
 // disablePush drops this browser's subscription, here and at the server.

@@ -20,7 +20,8 @@
 
   let { env = pushEnv() }: Props = $props()
   const app = useApp()
-  const support = $derived(pushSupport(env))
+  let noService = $state(false) // found when turning on failed
+  const support = $derived(noService ? 'noService' : pushSupport(env))
   const settings: NotifySetting[] = ['all', 'approvals', 'off']
   let info = $state<PushState | null>(null)
   let busy = $state(false)
@@ -47,7 +48,9 @@
   }
 
   const turnOn = () => run(async () => {
-    if (!(await enablePush(app.backend))) shell.toast(t('push.refused'), 'info')
+    const result = await enablePush(app.backend)
+    if (result === 'refused') shell.toast(t('push.refused'), 'info')
+    noService = result === 'noService'
   })
 </script>
 
