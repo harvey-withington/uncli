@@ -1,7 +1,8 @@
 <script lang="ts">
   // One group of the sidebar's sessions (decision 0031): This PC's, or a
   // paired server's. Its heading folds the group away; the archive button
-  // at its right end hides the group's archived sessions altogether. Under
+  // at its right end shows the group's archived sessions, highlighted while
+  // they show and faint while they're hidden (out of the way). Under
   // the active sessions, the group's own Archived (n) opens its archived
   // ones. All three are remembered per group (lib/sidebargroups.ts).
   import type { Snippet } from 'svelte'
@@ -26,9 +27,11 @@
   let { key, icon, label, sessions, archived, dot, status, empty }: Props = $props()
   const app = useApp()
   const g = $derived(app.groupState(key))
-  const hideLabel = $derived(
-    archived.length === 0 ? t('group.noArchived') : g.hideArchived ? t('group.showArchived', { n: archived.length }) : t('group.hideArchived'),
-  )
+  // A toggle: its name stays "Show archived sessions", pressed while they
+  // show; the tooltip says what a click does.
+  const showing = $derived(archived.length > 0 && !g.hideArchived)
+  const showLabel = $derived(archived.length === 0 ? t('group.noArchived') : t('group.showArchived', { n: archived.length }))
+  const showTitle = $derived(archived.length === 0 ? showLabel : showing ? t('group.hideArchived') : showLabel)
 </script>
 
 <section class="group" aria-label={t('group.label', { name: label })}>
@@ -42,15 +45,15 @@
       {#if g.collapsed && sessions.length}<span class="count">{sessions.length}</span>{/if}
     </button>
     <button
-      class="btn ghost small icon hide"
-      class:on={g.hideArchived}
+      class="btn ghost small icon show"
+      class:on={showing}
       onclick={() => app.toggleGroup(key, 'hideArchived')}
       disabled={archived.length === 0}
-      aria-pressed={!!g.hideArchived}
-      aria-label={hideLabel}
-      title={hideLabel}
+      aria-pressed={showing}
+      aria-label={showLabel}
+      title={showTitle}
     >
-      <Icon name={g.hideArchived ? 'archive-x' : 'archive'} size={13} />
+      <Icon name="archive" size={13} />
     </button>
   </div>
   {#if !g.collapsed}
@@ -119,12 +122,21 @@
   .chev.open {
     transform: rotate(90deg);
   }
-  .hide {
+  /* Hidden is the quiet state: faint until hovered. Showing is the one
+     that stands out. */
+  .show {
     flex: none;
     color: var(--text-faint);
+    opacity: 0.55;
   }
-  .hide.on {
+  .show:hover:not(:disabled),
+  .show:focus-visible {
+    opacity: 1;
+  }
+  .show.on {
     color: var(--accent);
+    background: var(--accent-soft);
+    opacity: 1;
   }
   .archived-toggle {
     display: flex;

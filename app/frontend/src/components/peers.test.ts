@@ -57,10 +57,14 @@ describe('Remote servers (decision 0031)', () => {
     await fireEvent.click(within(here).getByRole('button', { name: 'Archived (1)' }))
     expect(within(here).getByRole('list', { name: 'Archived sessions on This PC' })).toHaveTextContent('Compare three standing desks')
     expect(within(ripped).getByRole('button', { name: 'No archived sessions' })).toBeDisabled()
-    // Hidden, This PC's archived sessions are gone, and the button says how to bring them back.
-    await fireEvent.click(within(here).getByRole('button', { name: 'Hide archived sessions' }))
+    // The toggle is pressed while they show; hidden, they're gone and it isn't.
+    const show = within(here).getByRole('button', { name: 'Show archived sessions (1)' })
+    expect(show).toHaveAttribute('aria-pressed', 'true')
+    expect(show).toHaveAttribute('title', 'Hide archived sessions')
+    await fireEvent.click(show)
     expect(within(here).queryByRole('button', { name: 'Archived (1)' })).toBeNull()
-    expect(within(here).getByRole('button', { name: 'Show archived sessions (1)' })).toHaveAttribute('aria-pressed', 'true')
+    expect(show).toHaveAttribute('aria-pressed', 'false')
+    expect(show).toHaveAttribute('title', 'Show archived sessions (1)')
     // Folded, the server's sessions are out of the way, and it's remembered.
     const head = within(ripped).getByRole('button', { name: /ripped/i, expanded: true })
     await fireEvent.click(head)
