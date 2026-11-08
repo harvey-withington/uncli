@@ -65,7 +65,7 @@ describe('Archive', () => {
     expect(within(sessions).queryByText('Plan a weekend in Lisbon')).not.toBeInTheDocument()
 
     await fireEvent.click(toggle)
-    const archived = screen.getByRole('list', { name: 'Archived sessions' })
+    const archived = screen.getByRole('list', { name: 'Archived sessions on This PC' })
     await fireEvent.click(within(archived).getByText('Plan a weekend in Lisbon'))
     const note = (await screen.findByText('This session is archived. Restore it to carry on the conversation.')).closest('[role=status]') as HTMLElement
     expect(screen.queryByPlaceholderText(/Ask anything/)).not.toBeInTheDocument()

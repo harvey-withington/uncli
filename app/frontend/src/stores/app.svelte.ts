@@ -10,6 +10,7 @@ import type { SearchRange } from '@uncli/chat/lib/search'
 import { setNames, t } from '@uncli/chat/lib/i18n.svelte'
 import { applyThemeFile } from '../lib/hosttheme'
 import { settingsAttention } from '../lib/attention'
+import { loadGroups, saveGroups, toggled, type GroupFlag, type GroupStates } from '../lib/sidebargroups'
 import { ChatStore, type ChatStoreOptions } from '@uncli/chat/stores/chat.svelte'
 
 export { displayAnswer, type Live } from '@uncli/chat/stores/chat.svelte'
@@ -35,7 +36,9 @@ export class AppStore extends ChatStore {
   })
   searchFocus = $state(0)
   search = $state<{ result: SearchResult | null; active: number }>({ result: null, active: 0 })
-  showArchived = $state(false) // the sidebar shows the archived sessions
+  // The sidebar's groups (This PC, each paired server): collapsed, archived
+  // hidden, Archived open (lib/sidebargroups.ts).
+  sidebarGroups = $state<GroupStates>(loadGroups())
 
   // openLast: start on the session open last time (the window); the phone
   // starts on its session list instead.
@@ -62,6 +65,25 @@ export class AppStore extends ChatStore {
   // The servers this PC is paired with (decision 0031).
   get servers() { return this.chat.servers }
   set servers(v) { this.client.patch({ servers: v }) }
+  groupState(key: string) {
+    return this.sidebarGroups[key] ?? {}
+  }
+
+  // toggleGroup flips (or sets) one of a sidebar group's flags, remembered.
+  toggleGroup(key: string, flag: GroupFlag, on?: boolean) {
+    this.sidebarGroups = toggled(this.sidebarGroups, key, flag, on)
+    saveGroups(this.sidebarGroups)
+  }
+
+  // toggleArchived opens or closes a group's Archived list, showing the
+  // group and its archived sessions first if they were hidden.
+  toggleArchived(key: string) {
+    const g = this.groupState(key)
+    const open = g.collapsed || g.hideArchived ? true : !g.archivedOpen
+    this.sidebarGroups = { ...this.sidebarGroups, [key]: { ...g, collapsed: false, hideArchived: false, archivedOpen: open } }
+    saveGroups(this.sidebarGroups)
+  }
+
   loadServers() {
     return this.client.loadServers()
   }

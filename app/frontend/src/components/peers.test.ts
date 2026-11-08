@@ -46,4 +46,26 @@ describe('Remote servers (decision 0031)', () => {
     await fireEvent.click(within(ask).getByRole('button', { name: 'Remove' }))
     await waitFor(() => expect(remove).toHaveBeenCalledWith('studio.tail2ebd58.ts.net:9871'))
   })
+
+  it('folds each group, keeps each group’s archived sessions under it, and hides them when asked', async () => {
+    localStorage.removeItem('uncli-sidebar-groups')
+    render(App, { props: { backend: withPeers() } })
+    const here = await screen.findByRole('region', { name: 'Sessions on This PC' })
+    const ripped = await screen.findByRole('region', { name: 'Sessions on ripped' })
+    await within(ripped).findByText('Nightly build keeps timing out')
+    // This PC's archived session is under This PC, not the server.
+    await fireEvent.click(within(here).getByRole('button', { name: 'Archived (1)' }))
+    expect(within(here).getByRole('list', { name: 'Archived sessions on This PC' })).toHaveTextContent('Compare three standing desks')
+    expect(within(ripped).getByRole('button', { name: 'No archived sessions' })).toBeDisabled()
+    // Hidden, This PC's archived sessions are gone, and the button says how to bring them back.
+    await fireEvent.click(within(here).getByRole('button', { name: 'Hide archived sessions' }))
+    expect(within(here).queryByRole('button', { name: 'Archived (1)' })).toBeNull()
+    expect(within(here).getByRole('button', { name: 'Show archived sessions (1)' })).toHaveAttribute('aria-pressed', 'true')
+    // Folded, the server's sessions are out of the way, and it's remembered.
+    const head = within(ripped).getByRole('button', { name: /ripped/i, expanded: true })
+    await fireEvent.click(head)
+    expect(within(ripped).queryByText('Nightly build keeps timing out')).toBeNull()
+    expect(JSON.parse(localStorage.getItem('uncli-sidebar-groups') ?? '{}')['ripped.tail2ebd58.ts.net:9871']).toMatchObject({ collapsed: true })
+    localStorage.removeItem('uncli-sidebar-groups')
+  })
 })

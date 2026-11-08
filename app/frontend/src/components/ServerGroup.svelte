@@ -1,46 +1,34 @@
 <script lang="ts">
-  // One paired server's sessions in the sidebar (decision 0031): its name
-  // with a status dot, then its sessions, reordered among themselves. A
-  // server that can't be reached keeps its heading and says why.
-  import type { PeerState, SessionView } from '@uncli/chat/lib/api'
-  import { useApp } from '../lib/context'
-  import { t } from '@uncli/chat/lib/i18n.svelte'
+  // One paired server's group in the sidebar (decision 0031): a
+  // SessionGroup with its status dot. A server that can't be reached keeps
+  // its heading and says why; one that no longer accepts this PC says so,
+  // with Settings to pair again.
+  import type { ServerGroup } from '@uncli/chat/lib/servers'
   import { peerStatus } from '@uncli/chat/lib/servers'
-  import PeerDot from './PeerDot.svelte'
-  import SidebarList from './SidebarList.svelte'
-  import SidebarHeading from './SidebarHeading.svelte'
+  import { t } from '@uncli/chat/lib/i18n.svelte'
+  import { useApp } from '../lib/context'
+  import SessionGroup from './SessionGroup.svelte'
 
-  interface Props {
-    peer: PeerState
-    sessions: SessionView[]
-  }
-
-  let { peer, sessions }: Props = $props()
+  let { group }: { group: ServerGroup } = $props()
   const app = useApp()
+  const peer = $derived(group.peer)
   const status = $derived(peerStatus(peer))
 </script>
 
-<section class="group" aria-label={t('peers.group', { name: peer.name })}>
-  <SidebarHeading icon="server" label={peer.name} title={status}>
-    <PeerDot state={peer.state} />
-    <span class="visually-hidden">{status}</span>
-  </SidebarHeading>
-  {#if peer.state === 'unpaired'}
-    <p class="note">
-      {t('peers.unpairedShort')}
-      <button class="link" onclick={() => app.openSettings('peers')}>{t('peers.openSettings')}</button>
-    </p>
-  {:else if sessions.length === 0}
-    <p class="note">{peer.state === 'online' ? t('peers.noSessions') : status}</p>
-  {:else}
-    <SidebarList {sessions} />
-  {/if}
-</section>
+<SessionGroup key={peer.key} icon="server" label={peer.name} sessions={group.sessions} archived={group.archived} dot={peer.state} {status}>
+  {#snippet empty()}
+    {#if peer.state === 'unpaired'}
+      <p class="note">
+        {t('peers.unpairedShort')}
+        <button class="link" onclick={() => app.openSettings('peers')}>{t('peers.openSettings')}</button>
+      </p>
+    {:else}
+      <p class="note">{peer.state === 'online' ? t('peers.noSessions') : status}</p>
+    {/if}
+  {/snippet}
+</SessionGroup>
 
 <style>
-  .group {
-    margin-top: var(--space-4);
-  }
   .note {
     margin: 0;
     padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);

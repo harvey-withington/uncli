@@ -14,18 +14,28 @@ export function onServer<T extends { id: string }>(list: readonly T[], sessionId
   return list.filter(s => serverOf(s.id) === server)
 }
 
-export interface ServerGroup {
-  peer: PeerState
+// A group's sessions: the active ones, and the archived ones apart.
+export interface SessionGroup {
   sessions: SessionView[]
+  archived: SessionView[]
 }
 
-export function groupSessions(sessions: readonly SessionView[], servers: readonly PeerState[]): { local: SessionView[]; servers: ServerGroup[] } {
-  const by = new Map<string, SessionView[]>()
-  for (const s of sessions) {
-    const k = serverOf(s.id)
-    by.set(k, [...(by.get(k) ?? []), s])
+export interface ServerGroup extends SessionGroup {
+  peer: PeerState
+}
+
+// groupSessions puts every session (active and archived) under its server:
+// this PC's, then each paired server's in the order they were paired, empty
+// or not.
+export function groupSessions(sessions: readonly SessionView[], servers: readonly PeerState[]): { local: SessionGroup; servers: ServerGroup[] } {
+  const by = new Map<string, SessionGroup>()
+  const of = (k: string) => {
+    let g = by.get(k)
+    if (!g) by.set(k, (g = { sessions: [], archived: [] }))
+    return g
   }
-  return { local: by.get(LOCAL) ?? [], servers: servers.map(peer => ({ peer, sessions: by.get(peer.key) ?? [] })) }
+  for (const s of sessions) (s.archived ? of(serverOf(s.id)).archived : of(serverOf(s.id)).sessions).push(s)
+  return { local: of(LOCAL), servers: servers.map(peer => ({ peer, ...of(peer.key) })) }
 }
 
 // peerStatus is a server's state in words, for its heading's tooltip and

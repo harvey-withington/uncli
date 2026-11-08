@@ -7,11 +7,11 @@
   import ResizeHandle from '@uncli/chat/components/ResizeHandle.svelte'
   import SearchPanel from './SearchPanel.svelte'
   import ServerGroup from './ServerGroup.svelte'
-  import SidebarHeading from './SidebarHeading.svelte'
-  import SidebarList from './SidebarList.svelte'
+  import SessionGroup from './SessionGroup.svelte'
   import UpdateNotice from './UpdateNotice.svelte'
   import { SIDEBAR_MAX, SIDEBAR_MIN } from '@uncli/chat/lib/panels'
   import { groupSessions } from '@uncli/chat/lib/servers'
+  import { LOCAL } from '@uncli/chat/lib/api'
 
   const app = useApp()
   // The tab that needs the user, if any: the dot opens Settings there.
@@ -19,8 +19,9 @@
   const attentionTitle = $derived(
     attentionAt ? [t('attention.label'), ...Object.values(app.attention).flat().map(k => t(k as string))].join('\n') : t('settings.title'),
   )
-  // This PC's sessions, then each paired server's (decision 0031).
-  const groups = $derived(groupSessions(app.activeSessions, app.servers))
+  // This PC's sessions, then each paired server's (decision 0031), each
+  // with its own archived ones.
+  const groups = $derived(groupSessions(app.sessions, app.servers))
   const themeIcon = $derived(theme.value === 'light' ? 'sun' : theme.value === 'dark' ? 'moon' : 'monitor')
 </script>
 
@@ -53,27 +54,12 @@
       <SearchPanel results />
     {:else}
       <PinnedList />
-      {#if groups.servers.length > 0}
-        <SidebarHeading icon="monitor" label={t('peers.thisPC')} />
-      {/if}
-      {#if groups.local.length === 0}
-        <p class="empty">{t('session.none')}</p>
-      {:else}
-        <SidebarList sessions={groups.local} />
-      {/if}
+      <SessionGroup key={LOCAL} icon="monitor" label={t('peers.thisPC')} sessions={groups.local.sessions} archived={groups.local.archived}>
+        {#snippet empty()}<p class="empty">{t('session.none')}</p>{/snippet}
+      </SessionGroup>
       {#each groups.servers as g (g.peer.key)}
-        <ServerGroup peer={g.peer} sessions={g.sessions} />
+        <ServerGroup group={g} />
       {/each}
-      {#if app.archivedSessions.length > 0}
-        <button class="archived-toggle" onclick={() => (app.showArchived = !app.showArchived)} aria-expanded={app.showArchived}>
-          <Icon name="archive" size={13} />
-          <span>{t('archive.list', { n: app.archivedSessions.length })}</span>
-          <span class="chev" class:open={app.showArchived}><Icon name="chevron-right" size={12} /></span>
-        </button>
-        {#if app.showArchived}
-          <div class="archived"><SidebarList sessions={app.archivedSessions} sortable={false} dim label={t('archive.title')} /></div>
-        {/if}
-      {/if}
     {/if}
   </nav>
 
@@ -147,34 +133,6 @@
     color: var(--text-faint);
     font-size: var(--text-sm);
     padding: var(--space-2) var(--space-3);
-  }
-  .archived-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    margin-top: var(--space-3);
-    padding: var(--space-1) var(--space-2);
-    border: 0;
-    background: none;
-    color: var(--text-faint);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    text-align: left;
-  }
-  .archived-toggle:hover {
-    color: var(--text);
-  }
-  .archived-toggle .chev {
-    margin-left: auto;
-    display: inline-flex;
-    transition: transform var(--normal) var(--ease);
-  }
-  .archived-toggle .chev.open {
-    transform: rotate(90deg);
-  }
-  .archived {
-    margin-top: var(--space-1);
   }
   .gear {
     position: relative;
