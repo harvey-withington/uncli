@@ -18,7 +18,8 @@ friendly UI: sessions, pages, approvals, artifacts.
   plugin reference), `EMBEDDING.md` (`<uncli-chat>` for host authors).
 - `website/`: the landing page. `scripts/`: build, release and test
   helpers.
-- `plan/`: a private scratchpad, its own git repo, ignored here.
+- `plan/`: a private scratchpad, its own private repo
+  (`harvey-withington/uncli-plan`, cloned here as `plan/`), ignored here.
 
 `npm run dev | build | check | test` are the entry points for every stack.
 
@@ -27,5 +28,8 @@ friendly UI: sessions, pages, approvals, artifacts.
 - Changing code, docs or plans, or writing a commit message: read the
   `conventions` skill (`.claude/skills/conventions/SKILL.md`).
 - Seeing a UI change rendered: use the `run-app` skill.
-- Requirements live on the UNCLI project on BRUV; its id is in Claude's
-  memory for this project.
+- Requirements live on the UNCLI project on BRUV. Its ids, how Harvey
+  works and the build routine are in `plan/CLAUDE.md` (private), imported
+  below; nothing about working here relies on one machine's Claude memory.
+
+@plan/CLAUDE.md

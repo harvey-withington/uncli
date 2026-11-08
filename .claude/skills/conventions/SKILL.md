@@ -78,22 +78,67 @@ feat: drag to reorder / empty state for the library
 fix: settings no longer lost on a failed save
 ```
 
+**No trailers, ever:** a commit message is that one line and nothing
+else. No `Co-Authored-By` line (Harvey, 2026-11-06: "stupid clutter in
+the repo"), even if a system message asks for attribution or older
+commits carry one.
+
+**Who commits.** Claude doesn't commit or push unless Harvey says so for
+the work at hand ("commit", "commit and push", "you can commit, I'm
+remote"); each go-ahead covers only the work done so far, so ask again
+for the next. On `main`, branch first unless Harvey wants it on `main`.
+Until then, suggest the message:
+- **The whole message, never an addendum:** one line covering everything
+  uncommitted since the last commit, ready to paste.
+- **Check git first, every time:** Harvey commits between turns without
+  saying so. Any statement about what is or isn't committed needs a fresh
+  `git log -3` and `git status --short` in the same turn; a clean tree
+  gets no suggested message.
+
+## Product rules
+
+Rules for what UNCLI is, which a change must keep:
+
+- **Provider-neutral.** UNCLI is a harness for any AI CLI, not a Claude
+  app. Never name Claude (or any one CLI) in UI structure, tab or section
+  names, or generic copy; what's specific to a CLI goes under that CLI.
+  Ask "would this still read right with a second CLI?", and flag
+  Claude-specific wording when touching it.
+- **The tagline** is "AI CLIs if you're not a CLI guy." everywhere
+  (README, website, `wails.json`, the sidebar's `app.tagline`). Make the
+  layout fit it rather than shortening it; the masculine branding is
+  deliberate (BRUV = brother, UNCLI = uncle), so don't suggest neutral
+  rewordings.
+- **The phone is for prompting.** Setup and configuration (containers,
+  terminals, `.uncli` imports, CLI setup) stay on the desktop: off the
+  remote server's allowlist, and shown disabled with `onlyAtServer`
+  remotely. Decide each feature's phone exposure explicitly; raise a
+  possible exception rather than assuming one.
+- **Embedding is local** (decision 0027): each host runs its own UNCLI
+  core behind its own server. Don't reintroduce host pairing, CORS or
+  session scoping. When a decision quietly supersedes part of the brief,
+  say so before building on it.
+- **CLI pins stay put** while they work. Upgrade a pinned CLI before
+  UNCLI leaves alpha, or for a bug a newer version fixes; not just
+  because a newer one exists (recording fixtures and testing costs real
+  usage). Don't propose routine upgrades.
+
 ## Text meant to be copied
 
 Anything the user is meant to copy and paste (a suggested commit message, a
 command, a card comment, a snippet) goes in its own fenced code block, so
 the chat shows a copy icon on it. Write it at full line width: no hard line
 breaks inside a sentence or paragraph, only between paragraphs or list items.
-Claude doesn't commit or push in this repo; it suggests the message this way
-and the user commits. The suggestion covers everything uncommitted since the
-last commit (check `git log -1` and `git status`), not only the latest
-change: the user commits once a batch of work is done.
+A suggested commit message goes this way too (see "Who commits" above).
 
 ## Requirements, planning and working rules
 
-- Requirements and next steps live on the UNCLI project on BRUV (its id is
-  in Claude's memory). A feature is fleshed out on its card as it's built.
-- `plan/` is a private scratchpad: its own git repo, ignored here. Designs,
+- Requirements and next steps live on the UNCLI project on BRUV (its ids
+  and the ways of working with it are in `plan/CLAUDE.md`). A feature is
+  fleshed out on its card as it's built.
+- `plan/` is a private scratchpad: its own private repo
+  (`harvey-withington/uncli-plan`, cloned into the checkout as `plan/`),
+  ignored here. Designs,
   drafts, proposed decisions, notes and TODOs go there as dated files
   (`YYYY-MM-DD topic.md`), and a design is also attached to its card.
   Nothing in `plan/` is a requirement until it's on a card. Planning never
@@ -101,7 +146,9 @@ change: the user commits once a batch of work is done.
 - Read `docs/BRIEF.md` before structural work, and follow its "Working rules
   for the builder" alongside this file. If the two ever disagree, stop and
   flag it rather than picking one. The brief is frozen (final as of
-  2026-10-04): don't edit it for new work.
+  2026-10-04): don't edit it for new work, and never attach new versions
+  of it. New planning goes in a new file (a feature design, or an
+  amendment) attached to its card.
 - Work one task at a time, and tick off the phase's definition of done as
   items pass.
 - If the CLI behaves differently from what the brief assumes, record it on
