@@ -8,6 +8,7 @@
   import Icon from './Icon.svelte'
   import { useShell } from '../lib/shell.svelte'
   import { rootOf } from '../lib/actions'
+  import { onServer } from '../lib/servers'
 
   const shell = useShell()
 
@@ -52,7 +53,7 @@
     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
     e.preventDefault()
     const { root } = rootOf(e.currentTarget as Node)
-    const from = app.activeSessions.findIndex(s => s.id === session.id)
+    const from = onServer(app.activeSessions, session.id).findIndex(s => s.id === session.id)
     app.moveSession(session.id, e.key === 'ArrowUp' ? from - 1 : from + 2).then(() => {
       root.querySelector<HTMLElement>(`[data-id="${session.id}"] .main`)?.focus()
     })

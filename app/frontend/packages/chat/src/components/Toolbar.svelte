@@ -122,7 +122,7 @@
         <Icon name={item.icon ?? 'terminal'} size={13} />{item.label}
       </button>
     {:else if item.kind === 'native'}
-      {@const away = item.action === 'open_workdir' && !atServer(chat.backend)}
+      {@const away = item.action === 'open_workdir' && !atServer(chat.backend, session.id)}
       <span class="native">
         <!-- Away from the server's screen it looks disabled but still takes a
              tap, which says why: a phone shows no tooltip. -->

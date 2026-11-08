@@ -798,6 +798,20 @@ export interface ThinkingData {
   estimatedTokens?: number
 }
 
+// A server this PC is paired with (decision 0031), and its connection.
+// key (host and port) is how its sessions' ids name it.
+export interface PeerState {
+  key: string
+  url: string
+  name: string
+  device: string // this PC's device id there
+  state: 'connecting' | 'online' | 'offline' | 'unpaired'
+  error?: string
+  lastOnline?: string
+  app?: string // its UNCLI version
+  protocol?: number
+}
+
 export interface Handlers {
   sessionEvent(msg: SessionEventMsg): void
   sessionChanged(v: SessionView): void
@@ -816,6 +830,7 @@ export interface Handlers {
   pairRequest?(r: PairRequest): void // a device waits for "Allow <name>?" (the server's window only)
   devicesChanged?(d: PairedDevice[]): void // paired devices changed (the server's window only)
   updateStatus?(s: UpdateStatus): void // an update check or install moved on
+  peersChanged?(p: PeerState[]): void // the servers this PC is paired with, or their connections, changed
 }
 
 // Pairing a device (decision 0022): a one-use code that lasts a few
@@ -991,6 +1006,16 @@ export interface Backend {
   answerPairing(id: string, allow: boolean): Promise<void>
   pairedDevices(): Promise<PairedDevice[]>
   revokeDevice(id: string): Promise<void>
+  // Remote servers (decision 0031): other UNCLIs this PC is paired with,
+  // the desktop's only. Pairing waits for Allow on the server.
+  remoteServers(): Promise<PeerState[]>
+  addRemoteServer(link: string, name: string): Promise<PeerState>
+  cancelAddRemoteServer(): Promise<void>
+  removeRemoteServer(key: string): Promise<void>
+  thisPCName(): Promise<string>
+  // peer is a paired server's own backend, its session ids qualified with
+  // its key (identity.ts): New session there, its providers and folders.
+  peer(key: string): Backend
   // For remote clients: the server's folders (any backend), files sent to
   // the server to attach, and links that open an artifact or an upload in
   // the browser (http only).

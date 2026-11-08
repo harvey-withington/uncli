@@ -36,6 +36,7 @@ type App struct {
 	ctx    context.Context
 	svc    *app.Service
 	remote *remote.Server
+	peers  *remote.Peers // the servers this PC is paired with
 
 	mu       sync.Mutex
 	pending  []func(context.Context) // events emitted before the window exists
@@ -146,8 +147,11 @@ func Run(assets fs.FS, opts Options) error {
 	svc.SetRemoteNotes(func(n notify.Note, approval bool) { go a.remote.Notify(n, approval) })
 	defer svc.Close()
 	defer a.remote.Close()
+	a.peers = a.newPeers()
+	defer a.peers.Close()
 	if !opts.Quit {
 		go a.remote.Start()
+		go a.peers.Start()
 	}
 
 	return wails.Run(&options.App{

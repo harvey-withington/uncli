@@ -86,7 +86,7 @@
   // At the server it opens with the default app; on a remote client, in
   // the device's browser through a signed link.
   async function open() {
-    if (!atServer(chat.backend)) {
+    if (!atServer(chat.backend, sessionId)) {
       try {
         await chat.backend.openURL(await chat.backend.artifactLink(sessionId, entry.hash ? { hash: entry.hash } : { path: entry.path }))
       } catch (e) {
@@ -112,7 +112,7 @@
     {#if canOpenDefault(entry.path)}
       <button class="btn ghost small icon" onclick={open} aria-label={t('artifacts.open')} title={t('artifacts.open')}><Icon name="external-link" size={14} /></button>
     {/if}
-    <button class="btn ghost small icon" onclick={reveal} disabled={!atServer(chat.backend)} aria-label={t('files.reveal')} title={serverTitle(chat.backend, t('files.reveal'))}><Icon name="folder-search" size={14} /></button>
+    <button class="btn ghost small icon" onclick={reveal} disabled={!atServer(chat.backend, sessionId)} aria-label={t('files.reveal')} title={serverTitle(chat.backend, t('files.reveal'), sessionId)}><Icon name="folder-search" size={14} /></button>
   </div>
   <div class="body" class:framed={kind === 'html' || kind === 'svg' || kind === 'mermaid'} use:keepScroll={{ key: `artifact:${sessionId}:${entry.path}` }}>
     {#if error}

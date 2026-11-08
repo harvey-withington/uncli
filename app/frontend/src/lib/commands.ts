@@ -2,7 +2,7 @@
 // them, the keyboard map shows their shortcuts, and the window's key handler
 // runs them. A command is only in the list while it can run (no page, no
 // bookmark commands), so none of the three ever offers a dead action.
-import type { SessionMode } from '@uncli/chat/lib/api'
+import { LOCAL, parseRef, type SessionMode } from '@uncli/chat/lib/api'
 import { back, forward, nextBookmark, prevBookmark } from '@uncli/chat/lib/nav'
 import { t } from '@uncli/chat/lib/i18n.svelte'
 import { cycleTheme } from './theme.svelte'
@@ -78,7 +78,7 @@ export function commands(app: AppStore): Command[] {
       if (s.id !== app.currentId) add({ id: `go.${s.id}`, group: 'session', label: t('cmd.go', { title: s.title || t('session.untitled') }), run: () => run(app.select(s.id)) })
     }
     if (app.boot?.capabilities.import) add({ id: 'import', group: 'session', label: t('cmd.import'), run: () => (app.importOpen = true) })
-    if (app.archivedSessions.length) add({ id: 'archived', group: 'session', label: t('cmd.archivedList'), run: () => (app.showArchived = !app.showArchived) })
+    if (app.archivedSessions.some(s => parseRef(s.id).server === LOCAL)) add({ id: 'archived', group: 'session', label: t('cmd.archivedList'), run: () => app.toggleArchived(LOCAL) })
   }
   if (!session) return out
 

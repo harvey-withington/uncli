@@ -6,6 +6,7 @@
 // snapshot() let any stack observe it; actions return promises that
 // reject on failure, and the caller decides what to show.
 import { namesOf, providerOf, type ProviderNames } from '../providers'
+import { parseRef } from '../identity'
 import { orderAt } from '../reorder'
 import type { Backend, CLIStatus, ModelInfo, Page, SessionEventMsg, SessionView, Share, TextDelta, ThinkingData, UsageLimit } from '../types'
 import { SessionStore } from './session'
@@ -109,6 +110,7 @@ export class ChatClient {
       remoteStatus: s => this.set({ remote: s }),
       pairRequest: r => this.set({ pairRequest: r }),
       devicesChanged: d => this.set({ devices: d }),
+      peersChanged: p => this.set({ servers: p }),
       updateStatus: u => this.set({ update: u }),
       resync: () => { void this.resync() },
       connection: c => {
@@ -133,8 +135,19 @@ export class ChatClient {
     void this.loadProviders()
     // Remote access, for the server's own window; later changes arrive as events.
     if (this.backend.kind !== 'http') void this.backend.remoteStatus().then(s => { if (!this.s.remote) this.set({ remote: s }) }, () => {})
+    // The servers this PC is paired with (decision 0031); changes arrive as events.
+    void this.loadServers()
     void this.backend.updateStatus().then(u => { if (!this.s.update) this.set({ update: u }) }, () => {})
     this.set({ ready: true })
+  }
+
+  // loadServers fetches the servers this PC is paired with.
+  async loadServers() {
+    try {
+      this.set({ servers: await this.backend.remoteServers() })
+    } catch (e) {
+      this.notice({ kind: 'error', error: e })
+    }
   }
 
   destroy() {
@@ -206,13 +219,14 @@ export class ChatClient {
   // provider: an AI provider's id, '' for the first; shares: what it can
   // use of the user's own, null for its type's defaults.
   // meta: an embedding host's word on what the session is for, and title
-  // its name from the start (CreateOptions).
-  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null, meta = '', title = '') {
+  // its name from the start (CreateOptions). on: the backend of a paired
+  // server to start it there (decision 0031), this PC's by default.
+  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null, meta = '', title = '', on: Backend = this.backend) {
     const opts = { ...(meta ? { meta } : {}), ...(title.trim() ? { title: title.trim() } : {}) }
     const { session: v, lastNewSession } = Object.keys(opts).length
-      ? await this.backend.createSession(profileId, workdir, model, container, provider, shares, opts)
-      : await this.backend.createSession(profileId, workdir, model, container, provider, shares)
-    if (this.s.boot) this.set({ boot: { ...this.s.boot, lastNewSession } })
+      ? await on.createSession(profileId, workdir, model, container, provider, shares, opts)
+      : await on.createSession(profileId, workdir, model, container, provider, shares)
+    if (this.s.boot && on === this.backend) this.set({ boot: { ...this.s.boot, lastNewSession } })
     this.upsertSession(v)
     this.setData(v.id, { pages: [], index: 0 })
     return v
@@ -226,10 +240,12 @@ export class ChatClient {
     return r
   }
 
-  // moveSession puts a session at a position in the active list as shown,
-  // saving only its new sortOrder. It moves at once, and back if saving fails.
+  // moveSession puts a session at a position in its server's active list as
+  // shown (each server keeps its own order), saving only its new sortOrder.
+  // It moves at once, and back if saving fails.
   async moveSession(id: string, to: number) {
-    const order = orderAt(this.s.sessions.filter(s => !s.archived), id, to)
+    const server = parseRef(id).server
+    const order = orderAt(this.s.sessions.filter(s => !s.archived && parseRef(s.id).server === server), id, to)
     if (order === null) return
     const before = this.s.sessions
     this.set({ sessions: sortSessions(before.map(s => (s.id === id ? { ...s, sortOrder: order } : s))) })

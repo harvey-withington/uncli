@@ -12,6 +12,7 @@ import { mockTheme } from './theme'
 import { mockContainers } from './containers'
 import { mockFiles } from './files'
 import { mockRemote } from './remote'
+import { mockPeers } from './peers'
 import { mockUpdate } from './update'
 import { mockTranscriptPages, mockTranscripts } from './import'
 import { mockWatch } from './watch'
@@ -265,15 +266,22 @@ const MOCK_PLUGINS: Provider[] = [
   },
 ]
 
-export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; inContainer?: boolean; commandsLate?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; mcpSlow?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences> } = {}): Backend {
-  const sessions: SessionView[] = opts.empty ? [] : [
+export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boolean; inContainer?: boolean; commandsLate?: boolean; empty?: boolean; unattended?: boolean; mode?: SessionMode; mcpSlow?: boolean; lastNew?: Partial<NewSessionChoices>; prefs?: Partial<Preferences>; server?: string } = {}): Backend {
+  // A paired server (peers.ts) has sessions of its own.
+  const sessions: SessionView[] = opts.server ? [
+    session('r-build', 'code', 'Nightly build keeps timing out', 'idle', { workdir: 'D:\\builds\\uncli', sortOrder: 2 }),
+    session('r-notes', 'chat', 'Draft the 0.4 release notes', 'unread', { sortOrder: 1 }),
+  ] : opts.empty ? [] : [
     session('s-code', 'code', 'Fix the flaky parser test', 'idle', { model: 'opus', modifiers: ['thorough'], sortOrder: 3, unattended: opts.unattended, mode: opts.mode, mcp: mockMCP(), git: { branch: 'fix/flaky-parser', commit: '' } }),
     // opts.inContainer: it runs in the Sandbox container.
     session('s-chat', 'chat', 'Plan a weekend in Lisbon', 'unread', { sortOrder: 2, ...(opts.inContainer ? { runtime: 'wsl', runtimeRef: 'sandbox' } : {}) }),
     session('s-cowork', 'cowork', 'Summarise the Q3 planning notes', 'idle', { modifiers: ['efficiency'], sortOrder: 1 }),
     session('s-old', 'chat', 'Compare three standing desks', 'idle', { sortOrder: 0, archived: true }),
   ]
-  const pages: Record<string, Page[]> = opts.empty ? {} : {
+  const pages: Record<string, Page[]> = opts.server ? {
+    'r-build': [page('r-build', 1, 'Why does the nightly build time out on this machine?', 'The **WSL import** step waits on a lock left by the previous run. Clearing it at the start of the job fixes it.')],
+    'r-notes': [page('r-notes', 1, 'Draft the 0.4 release notes from the merged changes.', '**UNCLI 0.4**\n\n- Remote servers: see a home server’s sessions beside your own.\n- Phone notifications.')],
+  } : opts.empty ? {} : {
     's-code': [
       page('s-code', 1, 'Why does TestMultiTurnPartial fail about one run in five?', PARSER, {
         model: 'opus', modifiers: ['thorough'], bookmarked: true,
@@ -357,6 +365,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     devices: d => h?.devicesChanged?.(d),
   })
   const updates = mockUpdate(s => h?.updateStatus?.(s))
+  const peers = mockPeers(l => h?.peersChanged?.(l), () => mockBackend({ server: 'peer' }))
   const lastNew: NewSessionChoices = { models: {}, folders: {}, ...opts.lastNew }
   let decisionKey = ''
   let prefs: Preferences = { quickTaskModel: { provider: 'claude', model: 'haiku' }, autoSummary: 'off', ...opts.prefs }
@@ -1070,6 +1079,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     async revealFile() {},
     ...mockWatch(),
     ...remote,
+    ...peers,
     ...updates,
     ...mockFiles(),
     async usageReport(q) { return mockUsageReport(q) },
