@@ -48,7 +48,7 @@
       aria-label={compact ? t(sharesNote(shares)) : undefined}
       title={compact ? t(sharesNote(shares)) : t('shares.title')}
     >
-      <Icon name={shares.length ? 'plug' : 'unplug'} size={compact ? 14 : 12} />{#if !compact}{t(sharesNote(shares))}{/if}
+      <Icon name={shares.length ? 'lock-keyhole-open' : 'lock-keyhole'} size={compact ? 14 : 12} />{#if !compact}{t(sharesNote(shares))}{/if}
     </button>
     {#if open}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
