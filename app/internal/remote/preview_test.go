@@ -40,7 +40,7 @@ func TestPWANamedForMachine(t *testing.T) {
 	if err := json.Unmarshal(named, &m); err != nil {
 		t.Fatal(err)
 	}
-	if m["name"] != "UNCLI · deviant" || m["short_name"] != "deviant" || m["scope"] != "/m/" {
+	if m["name"] != "UNCLI - deviant" || m["short_name"] != "UNCLI deviant" || m["scope"] != "/m/" {
 		t.Errorf("named manifest = %v", m)
 	}
 	plain := []byte(`{"name":"UNCLI"}`)
@@ -81,7 +81,7 @@ func TestPWAServing(t *testing.T) {
 	var manifest map[string]string
 	err = json.NewDecoder(resp.Body).Decode(&manifest)
 	resp.Body.Close()
-	if err != nil || manifest["name"] != "UNCLI · test" || manifest["short_name"] != "test" {
+	if err != nil || manifest["name"] != "UNCLI - test" || manifest["short_name"] != "UNCLI test" {
 		t.Errorf("served manifest = %v (%v), want it named for the machine", manifest, err)
 	}
 	if cc := get("/m/sw.js").Header.Get("Cache-Control"); cc != "no-cache" {
