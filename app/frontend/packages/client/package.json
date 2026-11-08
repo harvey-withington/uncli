@@ -1,6 +1,6 @@
 {
   "name": "@uncli/client",
-  "version": "0.9.0-alpha",
+  "version": "0.10.0-alpha",
   "description": "UNCLI's client without a UI: the API's types, the Backend interface, the HTTP backend and a mock.",
   "license": "MIT",
   "private": true,

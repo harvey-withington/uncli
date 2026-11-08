@@ -4,6 +4,47 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.10.0-alpha
+
+See another PC's sessions beside your own, and know which branch a
+session is on.
+
+- **Remote servers.** Pair this PC with UNCLI on another PC, the way a
+  phone pairs: on that PC open Settings → Remote access → Pair a device,
+  paste its link here in Settings → Remote access → Remote servers, and
+  click Allow there. Its sessions show in the sidebar under its name, with
+  a dot that says whether it's connected, and carry on through either PC
+  restarting or updating. New session has a Where choice, to start a
+  session on this PC or a paired server, with that server's providers,
+  models and folders. A session on another PC works like your own: answer
+  its approvals, attach files from this PC, and get a notification when it
+  needs you or finishes. What only works on the session's own PC, such as
+  opening its folder, is shown but disabled, saying why.
+- **The sidebar groups sessions by PC.** This PC, then each paired server,
+  each with its own Archived list. Fold a group away under its heading,
+  and use the archive button at the heading's right to show or hide that
+  group's archived sessions. UNCLI remembers how you left each group.
+- **The branch in the header.** A session's header shows the git branch
+  its folder is on, after the folder (or the commit, when it isn't on a
+  branch), so you can see which branch an agent is working on without
+  opening an editor.
+- **The phone app is named for UNCLI and its PC.** It installs as "UNCLI -
+  deviant", say, so it can't be mistaken for another app installed from
+  the same PC. Remove the old one and add it to the home screen again to
+  get the new name.
+- What a session can use of yours (your MCP servers and connectors, your
+  skills) now shows a padlock, so it no longer looks like the MCP servers'
+  button.
+- A browser with no push service behind it, such as the Meta Quest's, now
+  says notifications aren't available there and why, instead of showing
+  the browser's error.
+- **For app developers.** A host hears of approval cards and turn ends in
+  the order they happened.
+
+### Known issues
+
+- The phone app still hasn't been tested on an iPhone.
+
 ## 0.9.0-alpha
 
 Walk through what a turn changed, have it explained, and share a
