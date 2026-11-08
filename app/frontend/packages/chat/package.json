@@ -1,6 +1,6 @@
 {
   "name": "@uncli/chat",
-  "version": "0.6.2-alpha",
+  "version": "0.9.0-alpha",
   "description": "UNCLI's chat: the Svelte components, the <uncli-chat> and <uncli-session-list> elements, and the ChatStore they run on.",
   "license": "MIT",
   "private": true,
@@ -20,7 +20,7 @@
     "./*": "./src/*"
   },
   "dependencies": {
-    "@uncli/client": "*",
+    "@uncli/client": "0.9.0-alpha",
     "dompurify": "^3.4.17",
     "lucide-svelte": "^1.0.1",
     "markdown-it": "^15.0.2",

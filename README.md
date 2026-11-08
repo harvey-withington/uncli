@@ -191,6 +191,7 @@ npm run test:e2e          # real app and CLI on Windows, driven in headless Edge
 npm run website           # landing page on http://localhost:5180
 npm run notices           # regenerate THIRD-PARTY-NOTICES.md after changing dependencies
 npm run release           # build a release into dist/ (needs RELEASE_VERSION and NSIS)
+npm run set-version -- 1.0.0-alpha  # give @uncli/client and @uncli/chat the release's version
 npm run install-build     # install the built installer on this PC and start UNCLI again, even from a session (app/internal/update/install-build.ps1)
 ```
 
@@ -213,8 +214,10 @@ For development, `UNCLI_DATA_DIR` moves the app data elsewhere and
 
 1. Add a `## <version>` section to [CHANGELOG.md](CHANGELOG.md); it becomes
    the release notes.
-2. Run `npm run notices` if dependencies changed, and commit.
-3. Tag and push: `git tag v0.1.0-alpha`, then `git push origin v0.1.0-alpha`.
+2. Run `npm run set-version -- <version>`, so UNCLI's packages carry the
+   release's version (decision 0026); the release stops if they don't.
+3. Run `npm run notices` if dependencies changed, and commit.
+4. Tag and push: `git tag v0.1.0-alpha`, then `git push origin v0.1.0-alpha`.
 
 The Release workflow builds the installer with `npm run release` and
 publishes it with its checksum, `LICENSE` and the third-party notices. A

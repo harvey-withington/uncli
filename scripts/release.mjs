@@ -47,6 +47,17 @@ if (!notes) {
   process.exit(1)
 }
 
+// UNCLI's packages carry the version being released (decision 0026; set
+// with npm run set-version).
+for (const name of ['client', 'chat']) {
+  const pkg = JSON.parse(readFileSync(join(appDir, 'frontend', 'packages', name, 'package.json'), 'utf8'))
+  const dep = pkg.dependencies?.['@uncli/client']
+  if (pkg.version !== version || (dep && dep !== version)) {
+    console.error(`@uncli/${name} is ${pkg.version}${dep ? ` (on @uncli/client ${dep})` : ''}, not ${version}: run npm run set-version -- ${version}`)
+    process.exit(1)
+  }
+}
+
 execFileSync(process.execPath, [join(root, 'scripts', 'notices.mjs'), '--check'], { stdio: 'inherit' })
 
 const wailsJson = join(appDir, 'wails.json')

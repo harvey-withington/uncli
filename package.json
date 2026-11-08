@@ -29,7 +29,8 @@
     "publish-build": "node scripts/publish-build.mjs",
     "install-build": "powershell -NoProfile -ExecutionPolicy Bypass -File app/internal/update/install-build.ps1",
     "notices": "node scripts/notices.mjs",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "set-version": "node scripts/set-version.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^23.11.1"
