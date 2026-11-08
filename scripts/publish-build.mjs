@@ -2,10 +2,11 @@
 // with the date and a sequence number (uncli-setup-2026-10-03-001.exe).
 // Only the newest few builds are kept there; older ones are deleted.
 //
-//   node scripts/publish-build.mjs [--skip-build] [--keep 6] [--branch]
+//   node scripts/publish-build.mjs [--skip-build] [--keep 6]
 //
-// --branch publishes a build of the current git branch apart from the
-// regular ones: named uncli-<branch>-<date>-<n>.exe (feat/packages →
+// Only main makes the regular builds. On any other branch the build is
+// published apart from them, by itself (--branch is still taken, and does
+// nothing more): named uncli-<branch>-<date>-<n>.exe (feat/packages →
 // uncli-feat-packages-2026-11-04-001.exe) and stamped <release>+<branch>.<n>,
 // with its own sequence, and only that branch's builds are pruned. The
 // regular builds are never counted or deleted by it.
@@ -26,13 +27,13 @@ import { join } from 'node:path'
 
 const args = process.argv.slice(2)
 const skipBuild = args.includes('--skip-build')
-const branch = args.includes('--branch')
-  ? execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  : ''
-if (args.includes('--branch') && (!branch || branch === 'main')) {
-  console.error('--branch is for a branch other than main.')
+// The branch being built; '' for main, whose builds are the regular ones.
+const current = execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim()
+if (!current) {
+  console.error('Check out a branch first: a detached HEAD has no name to publish a build under.')
   process.exit(2)
 }
+const branch = current === 'main' ? '' : current.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 const prefix = branch ? `uncli-${branch}` : 'uncli-setup'
 const keepAt = args.indexOf('--keep')
 const keep = keepAt >= 0 ? Number(args[keepAt + 1]) : 6

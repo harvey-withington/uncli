@@ -7,7 +7,7 @@
   import { t } from '@uncli/chat/lib/i18n.svelte'
   import { peerStatus } from '@uncli/chat/lib/servers'
   import PeerDot from './PeerDot.svelte'
-  import SessionList from './SidebarList.svelte'
+  import SidebarList from './SidebarList.svelte'
   import SidebarHeading from './SidebarHeading.svelte'
 
   interface Props {
@@ -33,7 +33,7 @@
   {:else if sessions.length === 0}
     <p class="note">{peer.state === 'online' ? t('peers.noSessions') : status}</p>
   {:else}
-    <SessionList {sessions} />
+    <SidebarList {sessions} />
   {/if}
 </section>
 
