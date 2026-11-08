@@ -49,6 +49,8 @@ type attention struct {
 	// OnIdle); asked is the cards it has been told of, by session.
 	onApproval func(string, session.Approval)
 	onIdle     func(string)
+	// hostCalls runs them one at a time, in the order they happened.
+	hostCalls inOrder
 
 	mu    sync.Mutex
 	state map[string]session.State
@@ -77,17 +79,16 @@ func (a *attention) SessionChanged(v session.View) {
 	prev, seen := a.state[v.ID]
 	a.state[v.ID] = v.State
 	page := a.page[v.ID]
-	fresh := a.newCardsLocked(v)
-	a.mu.Unlock()
-	a.next.SessionChanged(v)
-	if a.onApproval != nil {
-		for _, ap := range fresh {
-			go a.onApproval(v.ID, ap)
-		}
+	// The host hears of cards and turn ends in the order they happened,
+	// so they're queued while a.mu holds the order still.
+	for _, ap := range a.newCardsLocked(v) {
+		a.hostCalls.do(func() { a.onApproval(v.ID, ap) })
 	}
 	if a.onIdle != nil && seen && busy(prev) && !busy(v.State) {
-		go a.onIdle(v.ID)
+		a.hostCalls.do(func() { a.onIdle(v.ID) })
 	}
+	a.mu.Unlock()
+	a.next.SessionChanged(v)
 	if !seen || prev == v.State {
 		return
 	}
@@ -299,4 +300,40 @@ func (s *Service) TestNotification() error {
 		return nil
 	}
 	return s.notifier.Show(notify.Note{Title: "UNCLI", Body: "Notifications are on. You'll see one like this when a session needs you."})
+}
+
+// inOrder runs calls one at a time, in the order they were given, on a
+// goroutine of its own: a host's callback that's slow doesn't hold up the
+// sessions, and the host hears of things in the order they happened.
+type inOrder struct {
+	mu      sync.Mutex
+	queue   []func()
+	running bool
+}
+
+func (o *inOrder) do(f func()) {
+	o.mu.Lock()
+	o.queue = append(o.queue, f)
+	if o.running {
+		o.mu.Unlock()
+		return
+	}
+	o.running = true
+	o.mu.Unlock()
+	go o.drain()
+}
+
+func (o *inOrder) drain() {
+	for {
+		o.mu.Lock()
+		if len(o.queue) == 0 {
+			o.running = false
+			o.mu.Unlock()
+			return
+		}
+		f := o.queue[0]
+		o.queue = o.queue[1:]
+		o.mu.Unlock()
+		f()
+	}
 }
