@@ -55,8 +55,9 @@ func servePWA(files fs.FS) http.Handler {
 }
 
 // The app installed from each PC is named for it, so a phone paired with
-// two tells them apart on its home screen: "UNCLI · deviant", labelled
-// "deviant" under the icon (a launcher has room for about 12 letters).
+// two tells them apart on its home screen, and it reads as UNCLI's beside
+// other apps installed from the same PC (BRUV's, say): "UNCLI - deviant",
+// labelled "UNCLI deviant" under the icon, as BRUV labels its own.
 
 // machineName is the PC's name from the host a request was sent to: the
 // first label of a DNS name (deviant.tail1234.ts.net → deviant), or empty
@@ -87,7 +88,7 @@ func namedManifest(data []byte, machine string) ([]byte, error) {
 	if base == "" {
 		base = "UNCLI"
 	}
-	m["name"] = base + " · " + machine
-	m["short_name"] = machine
+	m["name"] = base + " - " + machine
+	m["short_name"] = base + " " + machine
 	return json.Marshal(m)
 }
