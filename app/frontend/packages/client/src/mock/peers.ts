@@ -1,5 +1,5 @@
 // Remote servers for the browser mock (decision 0031). ?peers=on starts
-// paired with two servers: ripped, online with sessions of its own, and
+// paired with two servers: workshop, online with sessions of its own, and
 // studio, offline. Adding one by its pairing link waits a moment for
 // "Allow" and pairs.
 import { withServer } from '../identity'
@@ -11,7 +11,7 @@ export function mockPeers(changed: (l: PeerState[]) => void, server: (key: strin
   const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString()
   let list: PeerState[] = params.get('peers') === 'on'
     ? [
-      { key: 'ripped.tail2ebd58.ts.net:9871', url: 'https://ripped.tail2ebd58.ts.net:9871', name: 'ripped', device: 'd7', state: 'online', lastOnline: ago(0), app: '0.4.0', protocol: 1 },
+      { key: 'workshop.tail2ebd58.ts.net:9871', url: 'https://workshop.tail2ebd58.ts.net:9871', name: 'workshop', device: 'd7', state: 'online', lastOnline: ago(0), app: '0.4.0', protocol: 1 },
       { key: 'studio.tail2ebd58.ts.net:9871', url: 'https://studio.tail2ebd58.ts.net:9871', name: 'studio', device: 'd2', state: 'offline', error: "can't reach studio: connection timed out", lastOnline: ago(180), app: '0.4.0', protocol: 1 },
     ]
     : []

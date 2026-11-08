@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -232,16 +234,38 @@ func TestPeerDenied(t *testing.T) {
 }
 
 func TestParsePairLink(t *testing.T) {
-	base, code, err := ParsePairLink(" https://ripped.tail0.ts.net:9871/m/#pair=abcde23456 ")
-	if err != nil || base != "https://ripped.tail0.ts.net:9871" || code != "ABCDE23456" {
+	base, code, err := ParsePairLink(" https://workshop.tail0.ts.net:9871/m/#pair=abcde23456 ")
+	if err != nil || base != "https://workshop.tail0.ts.net:9871" || code != "ABCDE23456" {
 		t.Errorf("= %q %q %v", base, code, err)
 	}
-	for _, bad := range []string{"", "ripped:9871", "http://ripped:9871/m/#pair=X", "https://ripped:9871/m/"} {
+	for _, bad := range []string{"", "workshop:9871", "http://workshop:9871/m/#pair=X", "https://workshop:9871/m/"} {
 		if _, _, err := ParsePairLink(bad); err == nil {
 			t.Errorf("%q parsed", bad)
 		}
 	}
-	if n := peerName("ripped.tail0.ts.net:9871"); n != "ripped" || peerName("100.64.0.1:9871") != "100.64.0.1:9871" {
+	if n := peerName("workshop.tail0.ts.net:9871"); n != "workshop" || peerName("100.64.0.1:9871") != "100.64.0.1:9871" {
 		t.Errorf("peerName = %q", n)
+	}
+}
+
+// A server that doesn't answer is described in plain words, whatever the
+// network library said, and the cause is still there underneath.
+func TestPeerUnreachableWords(t *testing.T) {
+	p := &Peers{}
+	srv := PeerServer{Name: "deviant"}
+	slow := p.unreachable(srv, fmt.Errorf("Post \"https://deviant:9871/rpc\": %w", context.DeadlineExceeded))
+	if slow.Error() != "deviant took too long to answer. It may be busy or asleep; try again in a moment." || !errors.Is(slow, context.DeadlineExceeded) {
+		t.Errorf("timeout = %q", slow)
+	}
+	_, dial := net.Dial("tcp", "127.0.0.1:1")
+	if dial == nil {
+		t.Skip("something listens on port 1")
+	}
+	gone := p.unreachable(srv, dial)
+	if gone.Error() != "Can't reach deviant. Check it's on and connected to Tailscale." {
+		t.Errorf("refused = %q", gone)
+	}
+	if err := p.unreachable(srv, context.Canceled); !errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "deviant") {
+		t.Errorf("cancelled = %v", err)
 	}
 }

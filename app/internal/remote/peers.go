@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,7 +84,8 @@ const peersKey = "peers.servers"
 type Peers struct {
 	store    Store
 	tokens   Tokens
-	client   *http.Client // calls
+	client   *http.Client // quick requests: /version, pairing
+	caller   *http.Client // calls: some wait on a model (Explain, Summarise)
 	streamer *http.Client // event streams: no overall timeout
 	onEvent  func(string, string, json.RawMessage)
 	onStatus func([]PeerState)
@@ -111,6 +113,7 @@ func NewPeers(c PeersConfig) *Peers {
 	if p.client == nil {
 		p.client = &http.Client{Timeout: 30 * time.Second}
 	}
+	p.caller = &http.Client{Transport: p.client.Transport, Timeout: callTime}
 	p.streamer = &http.Client{Transport: p.client.Transport}
 	var saved []PeerServer
 	if raw, err := c.Store.Setting(peersKey); err == nil && raw != "" {
@@ -402,9 +405,14 @@ func (p *Peers) Upload(ctx context.Context, key, path string) (json.RawMessage, 
 	return raw, nil
 }
 
+// callTime is the longest a call may take. Most answer at once; a few ask
+// a model (Explain, Summarise), and a busy server (building, say) is slow
+// to answer anything. The phone gives calls no limit at all.
+const callTime = 10 * time.Minute
+
 // reply sends a request and reads its JSON reply with read.
 func (p *Peers) reply(key string, req *http.Request, read func(io.Reader) (json.RawMessage, error)) (json.RawMessage, error) {
-	resp, err := p.client.Do(req)
+	resp, err := p.caller.Do(req)
 	if err != nil {
 		srv, _, _ := p.get(key)
 		return nil, p.unreachable(srv, err)
@@ -420,6 +428,9 @@ func (p *Peers) reply(key string, req *http.Request, read func(io.Reader) (json.
 	return read(resp.Body)
 }
 
+// unreachable says, in plain words, why a server didn't answer: it took too
+// long, or it couldn't be reached at all. The network library's own text
+// (the address, "context deadline exceeded") is no help to the user.
 func (p *Peers) unreachable(srv PeerServer, err error) error {
 	if errors.Is(err, context.Canceled) {
 		return err
@@ -428,8 +439,22 @@ func (p *Peers) unreachable(srv PeerServer, err error) error {
 	if name == "" {
 		name = "the server"
 	}
-	return fmt.Errorf("can't reach %s: %w", name, err)
+	var ne net.Error
+	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &ne) && ne.Timeout()) {
+		return &peerError{msg: name + " took too long to answer. It may be busy or asleep; try again in a moment.", err: err}
+	}
+	return &peerError{msg: "Can't reach " + name + ". Check it's on and connected to Tailscale.", err: err}
 }
+
+// peerError is a server not answering: a message for the user, and the
+// cause underneath for errors.Is.
+type peerError struct {
+	msg string
+	err error
+}
+
+func (e *peerError) Error() string { return e.msg }
+func (e *peerError) Unwrap() error { return e.err }
 
 // unpaired marks a server that refused this PC's token, and stops its
 // stream: retrying wouldn't help.
@@ -456,7 +481,7 @@ func (p *Peers) version(ctx context.Context, base string) (VersionInfo, error) {
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return VersionInfo{}, fmt.Errorf("can't reach %s: %w", peerName(strings.TrimPrefix(base, "https://")), err)
+		return VersionInfo{}, p.unreachable(PeerServer{Name: peerName(strings.TrimPrefix(base, "https://"))}, err)
 	}
 	defer resp.Body.Close()
 	var v VersionInfo
@@ -479,7 +504,7 @@ func (p *Peers) post(ctx context.Context, base, path string, in, out any) (int, 
 		if errors.Is(ctx.Err(), context.Canceled) {
 			return 0, errors.New("pairing cancelled")
 		}
-		return 0, fmt.Errorf("can't reach the server: %w", err)
+		return 0, p.unreachable(PeerServer{Name: peerName(strings.TrimPrefix(base, "https://"))}, err)
 	}
 	defer resp.Body.Close()
 	_ = json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(out)

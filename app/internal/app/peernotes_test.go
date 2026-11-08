@@ -14,7 +14,7 @@ import (
 func TestPeerNotes(t *testing.T) {
 	var shown []notify.Note
 	focused := ""
-	p := newPeerNotes("ripped:9871", func(id string) bool { return id == focused }, func() string { return NotifyAll },
+	p := newPeerNotes("workshop:9871", func(id string) bool { return id == focused }, func() string { return NotifyAll },
 		func(n notify.Note) { shown = append(shown, n) })
 	send := func(state session.State) {
 		raw, _ := json.Marshal(session.View{Session: store.Session{ID: "s1", Title: "Nightly build"}, State: state})
@@ -23,10 +23,10 @@ func TestPeerNotes(t *testing.T) {
 	send(session.Idle)
 	send(session.Thinking)
 	send(session.NeedsApproval)
-	if len(shown) != 1 || shown[0].Key != "ripped:9871~s1" || shown[0].Title != "Nightly build" {
+	if len(shown) != 1 || shown[0].Key != "workshop:9871~s1" || shown[0].Title != "Nightly build" {
 		t.Fatalf("shown = %+v", shown)
 	}
-	focused = "ripped:9871~s1"
+	focused = "workshop:9871~s1"
 	send(session.Thinking)
 	send(session.NeedsApproval)
 	if len(shown) != 1 {

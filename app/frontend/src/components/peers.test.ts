@@ -5,7 +5,7 @@ import { combinedBackend, type Backend } from '@uncli/client'
 import { mockBackend } from '@uncli/client/mock'
 
 // The window as the app runs it: this PC's mock, paired (?peers=on) with
-// ripped (online, sessions of its own) and studio (offline).
+// workshop (online, sessions of its own) and studio (offline).
 function withPeers(spy?: (b: Backend) => void) {
   const base = mockBackend()
   spy?.(base)
@@ -18,8 +18,8 @@ describe('Remote servers (decision 0031)', () => {
 
   it('groups the sidebar by server, and says why one is offline', async () => {
     render(App, { props: { backend: withPeers() } })
-    const ripped = await screen.findByRole('region', { name: 'Sessions on ripped' })
-    expect(await within(ripped).findByText('Nightly build keeps timing out')).toBeInTheDocument()
+    const workshop = await screen.findByRole('region', { name: 'Sessions on workshop' })
+    expect(await within(workshop).findByText('Nightly build keeps timing out')).toBeInTheDocument()
     expect(screen.getByText('This PC')).toBeInTheDocument()
     const studio = screen.getByRole('region', { name: 'Sessions on studio' })
     expect(within(studio).getByText("Can't reach studio: connection timed out", { selector: 'p' })).toBeInTheDocument()
@@ -51,12 +51,12 @@ describe('Remote servers (decision 0031)', () => {
     localStorage.removeItem('uncli-sidebar-groups')
     render(App, { props: { backend: withPeers() } })
     const here = await screen.findByRole('region', { name: 'Sessions on This PC' })
-    const ripped = await screen.findByRole('region', { name: 'Sessions on ripped' })
-    await within(ripped).findByText('Nightly build keeps timing out')
+    const workshop = await screen.findByRole('region', { name: 'Sessions on workshop' })
+    await within(workshop).findByText('Nightly build keeps timing out')
     // This PC's archived session is under This PC, not the server.
     await fireEvent.click(within(here).getByRole('button', { name: 'Archived (1)' }))
     expect(within(here).getByRole('list', { name: 'Archived sessions on This PC' })).toHaveTextContent('Compare three standing desks')
-    expect(within(ripped).getByRole('button', { name: 'No archived sessions' })).toBeDisabled()
+    expect(within(workshop).getByRole('button', { name: 'No archived sessions' })).toBeDisabled()
     // The toggle is pressed while they show; hidden, they're gone and it isn't.
     const show = within(here).getByRole('button', { name: 'Show archived sessions (1)' })
     expect(show).toHaveAttribute('aria-pressed', 'true')
@@ -66,10 +66,10 @@ describe('Remote servers (decision 0031)', () => {
     expect(show).toHaveAttribute('aria-pressed', 'false')
     expect(show).toHaveAttribute('title', 'Show archived sessions (1)')
     // Folded, the server's sessions are out of the way, and it's remembered.
-    const head = within(ripped).getByRole('button', { name: /ripped/i, expanded: true })
+    const head = within(workshop).getByRole('button', { name: /workshop/i, expanded: true })
     await fireEvent.click(head)
-    expect(within(ripped).queryByText('Nightly build keeps timing out')).toBeNull()
-    expect(JSON.parse(localStorage.getItem('uncli-sidebar-groups') ?? '{}')['ripped.tail2ebd58.ts.net:9871']).toMatchObject({ collapsed: true })
+    expect(within(workshop).queryByText('Nightly build keeps timing out')).toBeNull()
+    expect(JSON.parse(localStorage.getItem('uncli-sidebar-groups') ?? '{}')['workshop.tail2ebd58.ts.net:9871']).toMatchObject({ collapsed: true })
     localStorage.removeItem('uncli-sidebar-groups')
   })
 })

@@ -6,9 +6,9 @@ describe('sidebar groups', () => {
 
   it('flips one flag of one group, leaving the rest', () => {
     let g = toggled({}, 'local', 'collapsed')
-    g = toggled(g, 'ripped:9871', 'hideArchived')
+    g = toggled(g, 'workshop:9871', 'hideArchived')
     g = toggled(g, 'local', 'archivedOpen', true)
-    expect(g).toEqual({ local: { collapsed: true, archivedOpen: true }, 'ripped:9871': { hideArchived: true } })
+    expect(g).toEqual({ local: { collapsed: true, archivedOpen: true }, 'workshop:9871': { hideArchived: true } })
     expect(toggled(g, 'local', 'collapsed').local).toEqual({ collapsed: false, archivedOpen: true })
   })
 
