@@ -38,7 +38,7 @@
     if (target?.kind === 'web') void chat.backend.openURL(target.url)
     else if (target?.kind === 'file' && session) {
       // Files open on the server's screen; a remote client says so.
-      if (!atServer(chat.backend)) shell.toast(t('remote.onlyAtServerFor', { what: target.path }), 'info')
+      if (!atServer(chat.backend, session.id)) shell.toast(t('remote.onlyAtServerFor', { what: target.path }), 'info')
       else chat.backend.openPath(session.id, target.path, target.line).catch(err => shell.toast(String(err), 'error'))
     }
   }

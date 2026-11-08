@@ -5,6 +5,10 @@
 // mock backend is @uncli/client/mock.
 export type * from './types'
 export { absolute, httpBackend, mountedBackend, parseSSE, setHostHeaders, RemoteOnlyError, RPCError, type HttpOptions, type SSEFrame } from './http'
+export { combinedBackend } from './combined'
+export { peerBackend, type Bridge } from './peer'
+export { parsePairLink } from './pairlink'
+export { dispatchEvent, remoteBackend, type Transport } from './remote'
 export { LOCAL, parseRef, qualify, serverKey, SESSION_FIRST, withServer, type SessionRef } from './identity'
 export { dayKey, startOfDay } from './days'
 export { SECTION_KINDS, type SectionKind } from './sections'

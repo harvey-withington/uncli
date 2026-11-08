@@ -3,7 +3,7 @@
 // keeps a consistent picture, and comparing references says what changed.
 import type {
   ArtifactFile, Bootstrap, CLIStatus, CommandInfo, Connection, ContainersInfo, MCPServer, Page, PairRequest, PairedDevice,
-  PinnedPage, Progress, RemoteStatus, SessionView, UpdateStatus, UsageLimit,
+  PeerState, PinnedPage, Progress, RemoteStatus, SessionView, UpdateStatus, UsageLimit,
 } from '../types'
 
 // Live is the text block of an answer still streaming, not yet in the
@@ -49,6 +49,7 @@ export interface ClientState {
   containers: ContainersInfo | null
   remote: RemoteStatus | null // the server's remote access (its own window only)
   devices: PairedDevice[]
+  servers: PeerState[] // the servers this PC is paired with (decision 0031), the desktop's only
   pairRequest: PairRequest | null
   connection: Connection | null // a remote client's link to its server
   update: UpdateStatus | null
@@ -67,6 +68,7 @@ export const INITIAL_STATE: ClientState = Object.freeze({
   containers: null,
   remote: null,
   devices: [],
+  servers: [],
   pairRequest: null,
   connection: null,
   update: null,

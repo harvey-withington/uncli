@@ -77,7 +77,7 @@ export function withServer(backend: Backend, server: string): Backend {
   const first = new Set<string>(SESSION_FIRST)
   const out: Record<string, unknown> = { ...backend }
   for (const [name, fn] of Object.entries(backend)) {
-    if (typeof fn !== 'function' || name === 'subscribe') continue
+    if (typeof fn !== 'function' || name === 'subscribe' || name === 'peer') continue
     const map = RESULTS[name as keyof Backend] as ((v: unknown, q: Q) => unknown) | undefined
     out[name] = async (...args: unknown[]) => {
       // "" is no session (focus('') when none is shown), on any server.

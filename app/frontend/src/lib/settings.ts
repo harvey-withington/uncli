@@ -22,6 +22,7 @@ const SECTION_TAB: Record<string, SettingsTab> = {
   'provider-containers': 'providers',
   cache: 'providers',
   remote: 'remote',
+  peers: 'remote',
   containers: 'containers',
 }
 

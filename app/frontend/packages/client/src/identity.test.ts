@@ -18,7 +18,8 @@ const NOT_SESSION = [
   'startContainerAccountSignIn', 'finishContainerAccountSignIn', 'cancelContainerAccountSignIn',
   'signOutContainerAccount', 'theme', 'openFolder', 'revealFile', 'editors', 'transcripts', 'importTranscript',
   'openURL', 'copyText', 'remoteStatus', 'setRemoteAccess', 'startPairing', 'cancelPairing', 'answerPairing',
-  'pairedDevices', 'revokeDevice', 'listFolder', 'upload', 'uploadLink',
+  'pairedDevices', 'revokeDevice', 'remoteServers', 'addRemoteServer', 'cancelAddRemoteServer', 'removeRemoteServer',
+  'thisPCName', 'peer', 'listFolder', 'upload', 'uploadLink',
   'pushKey', 'pushState', 'pushSubscribe', 'pushUnsubscribe', 'setPushNotifications', 'testPush',
 ]
 

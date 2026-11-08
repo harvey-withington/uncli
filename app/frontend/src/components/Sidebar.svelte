@@ -6,10 +6,12 @@
   import PinnedList from './PinnedList.svelte'
   import ResizeHandle from '@uncli/chat/components/ResizeHandle.svelte'
   import SearchPanel from './SearchPanel.svelte'
-  import SessionItem from '@uncli/chat/components/SessionItem.svelte'
+  import ServerGroup from './ServerGroup.svelte'
+  import SidebarHeading from './SidebarHeading.svelte'
+  import SidebarList from './SidebarList.svelte'
   import UpdateNotice from './UpdateNotice.svelte'
   import { SIDEBAR_MAX, SIDEBAR_MIN } from '@uncli/chat/lib/panels'
-  import { dragSort } from '@uncli/chat/lib/actions'
+  import { groupSessions } from '@uncli/chat/lib/servers'
 
   const app = useApp()
   // The tab that needs the user, if any: the dot opens Settings there.
@@ -17,6 +19,8 @@
   const attentionTitle = $derived(
     attentionAt ? [t('attention.label'), ...Object.values(app.attention).flat().map(k => t(k as string))].join('\n') : t('settings.title'),
   )
+  // This PC's sessions, then each paired server's (decision 0031).
+  const groups = $derived(groupSessions(app.activeSessions, app.servers))
   const themeIcon = $derived(theme.value === 'light' ? 'sun' : theme.value === 'dark' ? 'moon' : 'monitor')
 </script>
 
@@ -49,15 +53,17 @@
       <SearchPanel results />
     {:else}
       <PinnedList />
-      {#if app.activeSessions.length === 0}
+      {#if groups.servers.length > 0}
+        <SidebarHeading icon="monitor" label={t('peers.thisPC')} />
+      {/if}
+      {#if groups.local.length === 0}
         <p class="empty">{t('session.none')}</p>
       {:else}
-        <ul use:dragSort={{ item: 'li[data-id]', onmove: (id, to) => app.moveSession(id, to) }}>
-          {#each app.activeSessions as session (session.id)}
-            <SessionItem {session} active={session.id === app.currentId} />
-          {/each}
-        </ul>
+        <SidebarList sessions={groups.local} />
       {/if}
+      {#each groups.servers as g (g.peer.key)}
+        <ServerGroup peer={g.peer} sessions={g.sessions} />
+      {/each}
       {#if app.archivedSessions.length > 0}
         <button class="archived-toggle" onclick={() => (app.showArchived = !app.showArchived)} aria-expanded={app.showArchived}>
           <Icon name="archive" size={13} />
@@ -65,11 +71,7 @@
           <span class="chev" class:open={app.showArchived}><Icon name="chevron-right" size={12} /></span>
         </button>
         {#if app.showArchived}
-          <ul class="archived" aria-label={t('archive.title')}>
-            {#each app.archivedSessions as session (session.id)}
-              <SessionItem {session} active={session.id === app.currentId} />
-            {/each}
-          </ul>
+          <div class="archived"><SidebarList sessions={app.archivedSessions} sortable={false} dim label={t('archive.title')} /></div>
         {/if}
       {/if}
     {/if}
@@ -141,15 +143,6 @@
     margin: 0 calc(-1 * var(--space-1));
     padding: 0 var(--space-1);
   }
-  ul {
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  /* Drag to reorder: the others slide out of the way, and the dragged
-     item's own place becomes an empty slot where it will land. */
   .empty {
     color: var(--text-faint);
     font-size: var(--text-sm);
@@ -181,7 +174,7 @@
     transform: rotate(90deg);
   }
   .archived {
-    opacity: 0.75;
+    margin-top: var(--space-1);
   }
   .gear {
     position: relative;

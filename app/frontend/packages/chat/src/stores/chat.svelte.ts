@@ -148,6 +148,7 @@ export class ChatStore {
   get progress() { return this.chat.progress } // a CLI download
   get containers() { return this.chat.containers }
   get remote() { return this.chat.remote }
+  get servers() { return this.chat.servers } // paired servers (decision 0031)
   set remote(v) { this.client.patch({ remote: v }) }
   get connection() { return this.chat.connection }
   get usage() { return this.chat.usage }

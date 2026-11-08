@@ -11,19 +11,36 @@
   import type { SuggestedContainer } from '@uncli/chat/lib/api'
   import { atServer, onlyAtServer } from '@uncli/chat/lib/remoteonly'
   import { modelOptions } from '@uncli/chat/lib/models'
-  import { tintStyle } from '@uncli/chat/lib/tint'
-  import { providerOf } from '@uncli/chat/lib/api'
-  import { SHARES, shareableFor, startingShares, toggled } from '@uncli/chat/lib/shares'
+  import { LOCAL, providerOf } from '@uncli/chat/lib/api'
+  import { SHARES, shareableFor, startingShares } from '@uncli/chat/lib/shares'
   import { useShell } from '@uncli/chat/lib/shell.svelte'
+  import { ServerPlace, thisPC, type Place } from '../stores/place.svelte'
+  import ProfilePicker from './ProfilePicker.svelte'
+  import SharesField from './SharesField.svelte'
+  import WhereField from './WhereField.svelte'
 
   const shell = useShell()
 
   const app = useApp()
-  const profiles = $derived(app.boot?.profiles ?? [])
+  // Where it runs (decision 0031): this PC, or a paired server, whose
+  // profiles, providers, models and folders the dialog then offers.
+  const local = thisPC(app)
+  const remote: Record<string, ServerPlace> = {}
+  let where = $state(LOCAL)
+  const place = $derived<Place>(where === LOCAL ? local : remote[where]!)
+  const here = $derived(where === LOCAL && atServer(app.backend))
+  function choose(key: string) {
+    if (key !== LOCAL && !remote[key]) {
+      remote[key] = new ServerPlace(key, app.backend.peer(key))
+      void remote[key].load()
+    }
+    where = key
+  }
+  const profiles = $derived(place.boot?.profiles ?? [])
   // The welcome card clicked, else what was picked last time, else the first.
-  const last = app.boot?.lastNewSession
+  const last = $derived(place.boot?.lastNewSession)
   const known = (id: string | null | undefined) => (id && profiles.some(p => p.id === id) ? id : null)
-  const firstProfile = known(app.newSessionProfile) ?? known(last?.profileId) ?? app.boot?.profiles[0]?.id ?? 'chat'
+  const firstProfile = known(app.newSessionProfile) ?? known(app.boot?.lastNewSession?.profileId) ?? app.boot?.profiles[0]?.id ?? 'chat'
   let profileId = $state(firstProfile)
   // A folder dropped onto the window opens the dialog with it filled in
   // (for the type it opens on).
@@ -33,23 +50,23 @@
   // Where the CLI runs: '' for this computer, else a built container
   // profile (decision 0011). Offered once one is built.
   let container = $state('')
-  const built = $derived((app.containers?.containers ?? []).filter(c => c.built))
+  const built = $derived((place.containers?.containers ?? []).filter(c => c.built))
   if (app.boot?.platform === 'windows' && !app.containers) void app.loadContainers()
   let creating = $state(false)
   // The AI provider (its CLI) the session runs on, when there's a choice.
   // Plugins only once enabled (decision 0013).
-  const providers = $derived((app.boot?.providers ?? []).filter(p => !p.plugin || (p.plugin.enabled && !p.plugin.error)))
+  const providers = $derived((place.boot?.providers ?? []).filter(p => !p.plugin || (p.plugin.enabled && !p.plugin.error)))
   let provider = $state('')
   const isFirst = $derived(!provider || provider === providers[0]?.id)
-  const status = $derived(app.statusOf(provider))
+  const status = $derived(place.statusOf(provider))
   const ready = $derived(!!status?.installed && !!status?.loggedIn)
-  const names = $derived(app.namesFor(provider))
+  const names = $derived(place.namesFor(provider))
 
   const profile = $derived<Profile | undefined>(profiles.find(p => p.id === profileId))
   const needsFolder = $derived(profile?.folder !== 'scratch')
-  const options = $derived(modelOptions(app.modelsFor(provider), model, t('model.cliDefault', names)))
+  const options = $derived(modelOptions(place.modelsFor(provider), model, t('model.cliDefault', names)))
   // What an isolated type can use of the user's own (decision 0016).
-  const caps = $derived(providerOf(app.boot, provider)?.capabilities ?? (isFirst ? app.boot?.capabilities : undefined))
+  const caps = $derived(providerOf(place.boot, provider)?.capabilities ?? (isFirst ? place.boot?.capabilities : undefined))
   const shareable = $derived(shareableFor(profile, caps, container))
   let shares = $state<Share[]>([])
 
@@ -59,7 +76,7 @@
     const lastModel = last?.models?.[id]
     if ((last?.providers?.[id] ?? providers[0]?.id) === p && lastModel !== undefined) return lastModel
     if (!p || p === providers[0]?.id) return profile?.model ?? 'sonnet'
-    return app.modelsFor(p)?.[0]?.value ?? ''
+    return place.modelsFor(p)?.[0]?.value ?? ''
   }
 
   function chooseProvider(p: string) {
@@ -70,13 +87,19 @@
 
   $effect(() => {
     // On each profile, start from the provider, model and folder used with
-    // it last time, else the first provider, the profile's model and no folder.
-    const id = profileId
+    // it last time, else the first provider, the profile's model and no
+    // folder. Another place (once loaded) starts over on its own profiles.
+    if (!place.boot) return
+    const id = known(profileId) ?? known(last?.profileId) ?? profiles[0]?.id ?? profileId
+    if (id !== profileId) {
+      profileId = id
+      return
+    }
     untrack(() => {
       const was = last?.providers?.[id]
       provider = was && providers.some(p => p.id === was) ? was : (providers[0]?.id ?? '')
       model = modelFor(id, provider)
-      folder = (id === firstProfile && dropped) || last?.folders?.[id] || ''
+      folder = (where === LOCAL && id === firstProfile && dropped) || last?.folders?.[id] || ''
       const wasIn = last?.containers?.[id] ?? ''
       container = isFirst && built.some(c => c.id === wasIn) ? wasIn : ''
       shares = startingShares(profiles.find(p => p.id === id), last, SHARES)
@@ -101,7 +124,7 @@
   }
 
   async function pick() {
-    if (!atServer(app.backend)) {
+    if (!here) {
       browsing = true
       return
     }
@@ -129,7 +152,7 @@
     if (!profile || (needsFolder && !folder) || !ready) return
     creating = true
     try {
-      await app.createSession(profile.id, needsFolder ? folder : '', model, container, isFirst ? '' : provider, shareable.length ? shares.filter(s => shareable.includes(s)) : null)
+      await app.createSession(profile.id, needsFolder ? folder : '', model, container, isFirst ? '' : provider, shareable.length ? shares.filter(s => shareable.includes(s)) : null, place.backend)
       app.newSessionOpen = false
     } catch (e) {
       shell.toast(String(e), 'error')
@@ -142,17 +165,8 @@
 <Modal title={t('newSession.title')} width={560} onclose={() => (app.newSessionOpen = false)}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div {onkeydown}>
-    <fieldset class="profiles">
-      <legend class="visually-hidden">{t('newSession.mode')}</legend>
-      {#each profiles as p (p.id)}
-        <label class="profile" class:selected={p.id === profileId} style={tintStyle(p.hue)}>
-          <input type="radio" name="profile" value={p.id} bind:group={profileId} class="visually-hidden" data-autofocus={p.id === profileId ? '' : undefined} />
-          <span class="picon"><Icon name={p.icon} size={18} /></span>
-          <span class="plabel">{p.label}</span>
-          <span class="pdesc">{t(`profile.${p.id}.desc`)}</span>
-        </label>
-      {/each}
-    </fieldset>
+    <WhereField {where} onchoose={choose} error={where === LOCAL ? '' : remote[where]?.error ?? ''} loading={!place.boot} />
+    <ProfilePicker {profiles} bind:value={profileId} />
 
     {#if needsFolder}
       <div class="field">
@@ -171,7 +185,7 @@
         <span class="flabel">{t('newSession.provider')}</span>
         <select class="select" value={provider} onchange={e => chooseProvider(e.currentTarget.value)}>
           {#each providers as p (p.id)}
-            {@const st = app.statusOf(p.id)}
+            {@const st = place.statusOf(p.id)}
             <option value={p.id}>{st?.installed && st.loggedIn ? p.name : t('newSession.notSetUp', { cli: p.name })}</option>
           {/each}
         </select>
@@ -179,7 +193,7 @@
       {#if !ready}
         <p class="hint setup">
           {t(status?.installed ? 'newSession.providerSignIn' : 'newSession.providerInstall', names)}
-          <button class="btn small" onclick={() => { app.newSessionOpen = false; app.openSettings(`provider-${provider}`) }} disabled={!atServer(app.backend)} title={atServer(app.backend) ? undefined : onlyAtServer()}>{t('newSession.setUp')}</button>
+          <button class="btn small" onclick={() => { app.newSessionOpen = false; app.openSettings(`provider-${provider}`) }} disabled={!here} title={here ? undefined : onlyAtServer()}>{t('newSession.setUp')}</button>
         </p>
       {/if}
     {/if}
@@ -194,25 +208,16 @@
           {/each}
         </select>
       </label>
-      {#if container && !app.containers?.signedIn}
+      {#if container && !place.containers?.signedIn}
         <p class="hint">{t('newSession.containerSignIn')}</p>
       {/if}
     {/if}
-    {#if needsFolder && folder && isFirst && app.boot?.platform === 'windows' && atServer(app.backend)}
+    {#if needsFolder && folder && isFirst && app.boot?.platform === 'windows' && here}
       <SuggestedContainers {folder} bind:container refresh={imported} onimport={(s, repo, name) => (importing = { s, repo, name })} />
     {/if}
 
     {#if shareable.length}
-      <fieldset class="field shares">
-        <legend class="flabel">{t('newSession.shares')}</legend>
-        {#each shareable as s (s)}
-          <label class="check">
-            <input type="checkbox" checked={shares.includes(s)} onchange={e => (shares = toggled(shares, s, e.currentTarget.checked))} />
-            {t(`shares.${s}`)}
-          </label>
-        {/each}
-        <span class="fhint">{t('shares.hint', names)}</span>
-      </fieldset>
+      <SharesField {shareable} bind:shares {names} />
     {/if}
 
     <label class="field">
@@ -240,59 +245,13 @@
 </Modal>
 
 {#if browsing}
-  <FolderBrowser title={pickTitle} start={folder} onpick={picked} onclose={() => (browsing = false)} />
+  <FolderBrowser backend={place.backend} title={pickTitle} start={folder} onpick={picked} onclose={() => (browsing = false)} />
 {/if}
 {#if importing}
   <ImportContainerDialog suggestion={importing.s} repo={importing.repo} name={importing.name} onclose={() => { importing = null; imported++ }} />
 {/if}
 
 <style>
-  .profiles {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-2);
-    border: 0;
-    margin: 0 0 var(--space-4);
-    padding: 0;
-  }
-  @media (max-width: 600px) {
-    .profiles {
-      grid-template-columns: 1fr;
-    }
-  }
-  .profile {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
-  }
-  .profile:hover {
-    border-color: var(--border-strong);
-  }
-  .profile.selected {
-    border-color: var(--tint, var(--accent));
-    background: var(--tint-soft, var(--accent-soft));
-  }
-  .profile:has(input:focus-visible) {
-    outline: 2px solid var(--tint, var(--accent));
-    outline-offset: 2px;
-  }
-  .picon {
-    color: var(--tint, var(--text-muted));
-    margin-bottom: var(--space-1);
-  }
-  .plabel {
-    font-weight: 600;
-  }
-  .pdesc {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    line-height: 1.4;
-  }
   .field {
     display: flex;
     flex-direction: column;
@@ -341,25 +300,6 @@
   }
   .hint.setup .btn {
     flex: none;
-  }
-  .shares {
-    gap: 4px;
-    border: 0;
-    padding: 0;
-  }
-  .shares legend {
-    padding: 0;
-    margin-bottom: 4px;
-  }
-  .check {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-  }
-  .fhint {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
   }
   .import-link {
     margin-right: auto;

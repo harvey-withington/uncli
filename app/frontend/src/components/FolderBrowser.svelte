@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import type { FolderListing } from '@uncli/chat/lib/api'
+  import type { Backend, FolderListing } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
   import { t } from '@uncli/chat/lib/i18n.svelte'
   import Icon from '@uncli/chat/components/Icon.svelte'
@@ -15,13 +15,14 @@
   // the home folder and the drives.
 
   interface Props {
+    backend?: Backend // the server's (a paired server's from the desktop); the app's by default
     title: string
     start?: string // a folder to open at; '' for the top
     onpick: (path: string) => void
     onclose: () => void
   }
 
-  let { title, start = '', onpick, onclose }: Props = $props()
+  let { backend, title, start = '', onpick, onclose }: Props = $props()
   const app = useApp()
   let listing = $state<FolderListing | null>(null)
   let loading = $state(false)
@@ -29,7 +30,7 @@
   async function open(path: string) {
     loading = true
     try {
-      listing = await app.backend.listFolder(path)
+      listing = await (backend ?? app.backend).listFolder(path)
     } catch (e) {
       // A folder that's gone (or can't be read) falls back to the top.
       if (path !== '') return open('')

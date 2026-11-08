@@ -16,6 +16,7 @@ export class ChatState {
   containers = $state.raw<Fields['containers']>(null)
   remote = $state.raw<Fields['remote']>(null)
   devices = $state.raw<Fields['devices']>([])
+  servers = $state.raw<Fields['servers']>([])
   pairRequest = $state.raw<Fields['pairRequest']>(null)
   connection = $state.raw<Fields['connection']>(null)
   update = $state.raw<Fields['update']>(null)
@@ -50,6 +51,7 @@ export class ChatState {
     if (was?.containers !== s.containers) this.containers = s.containers
     if (was?.remote !== s.remote) this.remote = s.remote
     if (was?.devices !== s.devices) this.devices = s.devices
+    if (was?.servers !== s.servers) this.servers = s.servers
     if (was?.pairRequest !== s.pairRequest) this.pairRequest = s.pairRequest
     if (was?.connection !== s.connection) this.connection = s.connection
     if (was?.update !== s.update) this.update = s.update

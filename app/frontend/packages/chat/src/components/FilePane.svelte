@@ -163,10 +163,10 @@
       {/if}
       {#if file?.text}<CopyButton text={file.text} label={t('watch.copy')} />{/if}
       {#if openLabel && !file?.missing}
-        <button class="btn ghost small icon" onclick={() => run(chat.backend.openFile(sessionId, abs(), 0))} disabled={!atServer(chat.backend)} aria-label={openLabel} title={serverTitle(chat.backend, openLabel)}><Icon name="external-link" size={14} /></button>
+        <button class="btn ghost small icon" onclick={() => run(chat.backend.openFile(sessionId, abs(), 0))} disabled={!atServer(chat.backend, sessionId)} aria-label={openLabel} title={serverTitle(chat.backend, openLabel, sessionId)}><Icon name="external-link" size={14} /></button>
       {/if}
       {#if !file?.missing}
-        <button class="btn ghost small icon" onclick={() => run(chat.backend.revealFile(abs()))} disabled={!atServer(chat.backend)} aria-label={t('files.reveal')} title={serverTitle(chat.backend, t('files.reveal'))}><Icon name="folder-search" size={14} /></button>
+        <button class="btn ghost small icon" onclick={() => run(chat.backend.revealFile(abs()))} disabled={!atServer(chat.backend, sessionId)} aria-label={t('files.reveal')} title={serverTitle(chat.backend, t('files.reveal'), sessionId)}><Icon name="folder-search" size={14} /></button>
       {/if}
       <span class="sep" aria-hidden="true"></span>
       <button class="btn ghost small icon" onclick={() => chat.closeFile(sessionId)} aria-label={t('watch.close')} title={t('watch.close')}><Icon name="x" size={14} /></button>

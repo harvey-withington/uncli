@@ -36,7 +36,7 @@
   let { files: raw, sessionId, pageId, question, explanation, move }: Props = $props()
   const chat = useChat()
   // Opening a file or its folder happens on the server's screen.
-  const here = $derived(atServer(chat.backend))
+  const here = $derived(atServer(chat.backend, sessionId))
   const files = $derived(raw ?? [])
   const session = $derived(chat.sessions.find(s => s.id === sessionId))
   const ideLinks = $derived(!!chat.boot?.profiles.find(p => p.id === session?.profileId)?.ideLinks)
@@ -106,11 +106,11 @@
           </button>
         {/if}
         {#if label}
-          <button class="btn ghost small icon" onclick={() => run(chat.backend.openFile(sessionId, f.path, f.line ?? 0))} disabled={!here} aria-label={`${label}: ${name.name}`} title={serverTitle(chat.backend, label)}>
+          <button class="btn ghost small icon" onclick={() => run(chat.backend.openFile(sessionId, f.path, f.line ?? 0))} disabled={!here} aria-label={`${label}: ${name.name}`} title={serverTitle(chat.backend, label, sessionId)}>
             <Icon name="external-link" size={13} />
           </button>
         {/if}
-        <button class="btn ghost small icon" onclick={() => run(chat.backend.revealFile(f.path))} disabled={!here} aria-label={`${t('files.reveal')}: ${name.name}`} title={serverTitle(chat.backend, t('files.reveal'))}>
+        <button class="btn ghost small icon" onclick={() => run(chat.backend.revealFile(f.path))} disabled={!here} aria-label={`${t('files.reveal')}: ${name.name}`} title={serverTitle(chat.backend, t('files.reveal'), sessionId)}>
           <Icon name="folder-search" size={13} />
         </button>
       </span>

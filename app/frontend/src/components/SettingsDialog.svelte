@@ -11,6 +11,7 @@
   import NotifySection from './NotifySection.svelte'
   import ProviderSection from './ProviderSection.svelte'
   import QuickSection from './QuickSection.svelte'
+  import PeersSection from './PeersSection.svelte'
   import RemoteSection from './RemoteSection.svelte'
   import SafeSection from './SafeSection.svelte'
   import StartupSection from './StartupSection.svelte'
@@ -115,6 +116,7 @@
         {#if prefs}<CacheSection {prefs} {savePrefs} />{/if}
       {:else if tab === 'remote'}
         <RemoteSection />
+        <PeersSection />
       {:else if tab === 'containers'}
         <ContainersSection />
       {/if}

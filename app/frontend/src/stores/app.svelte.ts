@@ -59,6 +59,12 @@ export class AppStore extends ChatStore {
   }
 
   get devices() { return this.chat.devices }
+  // The servers this PC is paired with (decision 0031).
+  get servers() { return this.chat.servers }
+  set servers(v) { this.client.patch({ servers: v }) }
+  loadServers() {
+    return this.client.loadServers()
+  }
   set devices(v) { this.client.patch({ devices: v }) }
   get pairRequest() { return this.chat.pairRequest }
   set pairRequest(v) { this.client.patch({ pairRequest: v }) }
@@ -159,8 +165,10 @@ export class AppStore extends ChatStore {
     return this.client.loadContainers()
   }
 
-  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null) {
-    const v = await this.client.createSession(profileId, workdir, model, container, provider, shares)
+  // createSession starts a session on this PC, or on a paired server
+  // through its backend (decision 0031).
+  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null, on: Backend = this.backend) {
+    const v = await this.client.createSession(profileId, workdir, model, container, provider, shares, '', '', on)
     await this.select(v.id)
     return v
   }

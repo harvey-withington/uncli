@@ -1,4 +1,4 @@
-import type { Backend, Handlers } from '@uncli/client'
+import { peerBackend, withServer, type Backend, type Bridge, type Handlers, type PeerState } from '@uncli/client'
 
 // The Wails runtime injects window.go (bound methods) and window.runtime
 // (events, clipboard). We call them directly rather than through generated
@@ -26,8 +26,20 @@ function call<T>(method: string, ...args: unknown[]): Promise<T> {
   return fn(...args) as Promise<T>
 }
 
+// bridge is the bound methods and events, for the paired servers' backends.
+const bridge: Bridge = {
+  call,
+  on: (name, cb) => w().runtime?.EventsOn(name, cb) ?? (() => {}),
+}
+
 export function wailsBackend(): Backend {
-  return {
+  // The paired servers' addresses, for their signed links; kept current by
+  // peer:status.
+  const bases: Record<string, string> = {}
+  const known = (l: PeerState[]) => l.forEach(p => { bases[p.key] = p.url })
+  bridge.on('peer:status', d => known(d as PeerState[]))
+  const peers: Record<string, Backend> = {}
+  const self: Backend = {
     kind: 'wails',
     subscribe(h: Handlers) {
       const rt = w().runtime
@@ -45,6 +57,7 @@ export function wailsBackend(): Backend {
         rt.EventsOn('remote:pair', d => h.pairRequest?.(d as never)),
         rt.EventsOn('remote:devices', d => h.devicesChanged?.(d as never)),
         rt.EventsOn('update:status', d => h.updateStatus?.(d as never)),
+        rt.EventsOn('peer:status', d => h.peersChanged?.(d as never)),
       ]
       return () => offs.forEach(off => off())
     },
@@ -128,6 +141,17 @@ export function wailsBackend(): Backend {
     answerPairing: (id, allow) => call('AnswerPairing', id, allow),
     pairedDevices: () => call('PairedDevices'),
     revokeDevice: id => call('RevokeDevice', id),
+    remoteServers: async () => {
+      const l = await call<PeerState[]>('RemoteServers')
+      known(l)
+      return l
+    },
+    addRemoteServer: (link, name) => call('AddRemoteServer', link, name),
+    cancelAddRemoteServer: () => call('CancelAddRemoteServer'),
+    removeRemoteServer: key => call('RemoveRemoteServer', key),
+    thisPCName: () => call('ThisPCName'),
+    // Links and the clipboard are this PC's, whichever server a session is on.
+    peer: key => (peers[key] ??= withServer({ ...peerBackend(bridge, key, () => bases[key] ?? ''), openURL: self.openURL, copyText: self.copyText }, key)),
     listFolder: p => call('ListFolder', p),
     // Only remote clients send files or open links to them.
     upload: () => Promise.reject(new Error('uploads are for remote clients')),
@@ -189,4 +213,5 @@ export function wailsBackend(): Backend {
       }
     },
   }
+  return self
 }
