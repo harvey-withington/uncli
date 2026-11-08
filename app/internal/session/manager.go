@@ -19,6 +19,7 @@ import (
 
 	"github.com/harvey-withington/uncli/app/internal/artifacts"
 	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/gitinfo"
 	"github.com/harvey-withington/uncli/app/internal/profile"
 	"github.com/harvey-withington/uncli/app/internal/store"
 )
@@ -155,6 +156,7 @@ type Manager struct {
 	models   []core.ModelInfo
 	usage    *core.UsageLimit
 	judge    judging
+	git      *gitinfo.Reader // each session folder's git branch
 
 	cutOff []string // sessions whose turn UNCLI's last stop cut off (cutoff.go)
 
@@ -169,7 +171,7 @@ type Manager struct {
 const modelsSetting = "claude.models"
 
 func NewManager(d Deps) (*Manager, error) {
-	m := &Manager{d: d, sessions: map[string]*Session{}, viewing: map[string]string{}, InterruptGrace: 5 * time.Second,
+	m := &Manager{d: d, sessions: map[string]*Session{}, viewing: map[string]string{}, InterruptGrace: 5 * time.Second, git: gitinfo.NewReader(),
 		judge: judging{inFlight: map[string]bool{}, failed: map[string]bool{}}}
 	if err := m.loadCutOff(); err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package session
 
 import (
 	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/gitinfo"
 	"github.com/harvey-withington/uncli/app/internal/store"
 )
 
@@ -42,6 +43,9 @@ type View struct {
 	MCP []MCPServerView `json:"mcp"`
 	// Queued is a message waiting for the answer to end (queue.go).
 	Queued *QueuedView `json:"queued,omitempty"`
+	// Git is the branch (or detached commit) the session's folder is on,
+	// when the folder is in a git repository.
+	Git *gitinfo.Head `json:"git,omitempty"`
 }
 
 // Sink receives everything the UI needs. Implementations must not call

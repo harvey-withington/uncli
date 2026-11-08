@@ -6,6 +6,7 @@
   import { useShell } from '../lib/shell.svelte'
   import { tintStyle } from '../lib/tint'
   import ActivityBadge from './ActivityBadge.svelte'
+  import GitBranch from './GitBranch.svelte'
   import Icon from './Icon.svelte'
   import McpServers from './McpServers.svelte'
   import ModeSwitch from './ModeSwitch.svelte'
@@ -189,6 +190,7 @@
       {#if chat.headerCompact}
         <!-- Collapsed: the folder follows the title on its line. -->
         <span class="path" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
+        <GitBranch git={session.git} />
         <SharesNote {session} compact />
       {/if}
       <span class="gap"></span>
@@ -227,6 +229,7 @@
     {#if !chat.headerCompact}
       <div class="where">
         <span class="workdir" title={session.workdir}>{profile?.label} · {session.workdir}{place}</span>
+        <GitBranch git={session.git} />
         <SharesNote {session} />
       </div>
     {/if}

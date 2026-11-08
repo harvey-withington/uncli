@@ -618,6 +618,8 @@
   "containers.signOut": "Sign out",
   "newSession.runIn": "Run in",
   "session.inContainer": "in the {label} container",
+  "git.title": "Git branch: {branch}",
+  "git.detached": "detached at {commit}",
   "newSession.thisComputer": "This computer",
   "newSession.containerSignIn": "Sign in for containers in Settings before the first message.",
   "files.changed": "{n} files changed",
