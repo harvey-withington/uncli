@@ -4,6 +4,7 @@
   import { i18n, t } from '@uncli/chat/lib/i18n.svelte'
   import { blank, idFor, profileOf } from '../lib/containers'
   import ContainerEditor from './ContainerEditor.svelte'
+  import ImportFromProject from './ImportFromProject.svelte'
   import Icon from '@uncli/chat/components/Icon.svelte'
   import { useShell } from '@uncli/chat/lib/shell.svelte'
 
@@ -185,9 +186,12 @@
         </li>
       {/if}
     </ul>
-    {#if editing !== 'new'}
-      <button class="btn small new" onclick={() => (editing = 'new')}><Icon name="plus" size={13} />{t('containerEdit.new')}</button>
-    {/if}
+    <div class="add">
+      {#if editing !== 'new'}
+        <button class="btn small" onclick={() => (editing = 'new')}><Icon name="plus" size={13} />{t('containerEdit.new')}</button>
+      {/if}
+      <ImportFromProject />
+    </div>
     <div class="signin">
       {#each providers as p (p.id)}
         <p class="muted">
@@ -255,7 +259,10 @@
     padding: 0;
     border-top: 0;
   }
-  .new {
+  .add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
     margin: calc(-1 * var(--space-2)) 0 var(--space-4);
   }
   .what {

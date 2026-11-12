@@ -7,6 +7,7 @@
   import { cost } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
   import { modelLabel } from '../lib/models'
+  import { walkContext } from '../lib/walkcontext'
   import DeckViewer from './DeckViewer.svelte'
   import ExplainDialog from './ExplainDialog.svelte'
   import Icon from './Icon.svelte'
@@ -19,7 +20,9 @@
   // (DeckViewer). Escape closes it (or first leaves full screen). Explain
   // asks a model to explain them, with the options last used; the arrow
   // beside it opens the options (ExplainDialog) first. The explanation is
-  // kept with the page. An embedding host can leave Explain out.
+  // kept with the page. An embedding host can leave Explain out. New
+  // session starts one in the same place with what the walkthrough knows
+  // (lib/walkcontext.ts), where the app offers it (chat.newSessionFrom).
   interface Props {
     sessionId: string
     pageId: string
@@ -76,6 +79,16 @@
       busy = false
     }
   }
+
+  // A new session from what the walkthrough knows (the explanation, when
+  // there is one), started from the app's new session dialog.
+  function branch() {
+    if (!shown || !chat.newSessionFrom) return
+    const first = question.trim().split('\n')[0]!.slice(0, 80)
+    const context = walkContext(question, shown.deck, current)
+    shown = null
+    chat.newSessionFrom(sessionId, context, first ? t('walk.branchTitle', { title: first }) : '')
+  }
 </script>
 
 {#if recorded.places > 0}
@@ -88,7 +101,8 @@
   <Modal title={t('walk.title')} width={1100} onclose={() => (shown = null)}>
     <DeckViewer deck={shown.deck} codes={shown.codes} title={question.trim().split('\n')[0]!.slice(0, 200) || t('walk.title')}
       summary={count(shown.deck.slides.length, shown.deck.files)} explanation={current} {by}
-      explain={chat.explain ? { busy, run: () => run(loadExplainOptions()), options: () => (choosing = true) } : undefined} />
+      explain={chat.explain ? { busy, run: () => run(loadExplainOptions()), options: () => (choosing = true) } : undefined}
+      branch={chat.newSessionFrom ? branch : undefined} />
   </Modal>
 {/if}
 

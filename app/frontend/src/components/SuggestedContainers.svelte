@@ -10,16 +10,20 @@
   // it), and why one can't be used. One already imported and built is
   // picked for the session when nothing else was. Import and Sync open
   // ImportContainerDialog through onimport, outside the dialog's own body;
-  // a change to refresh reads the suggestions again.
+  // a change to refresh reads the suggestions again. Standalone (Settings →
+  // Containers → Import from a project) lists those already imported too,
+  // and says when the project suggests none.
   interface Props {
     folder: string
-    container: string // the dialog's "Run in"
+    container?: string // the dialog's "Run in"
     refresh: number
+    standalone?: boolean
     onimport: (s: SuggestedContainer, repo: string, name: string) => void
   }
-  let { folder, container = $bindable(), refresh, onimport }: Props = $props()
+  let { folder, container = $bindable(''), refresh, standalone = false, onimport }: Props = $props()
   const app = useApp()
   let found = $state<Suggestions | null>(null)
+  let loaded = $state(false)
   let asked = 0
 
   async function load(dir: string) {
@@ -30,9 +34,11 @@
       found = s
       const built = new Set((app.containers?.containers ?? []).filter(c => c.built).map(c => c.id))
       const mine = s.containers.find(c => c.yours && built.has(c.yours))
-      if (!container && mine?.yours) container = mine.yours
+      if (!standalone && !container && mine?.yours) container = mine.yours
     } catch {
       if (n === asked) found = null // a folder that's gone, say: nothing to suggest
+    } finally {
+      if (n === asked) loaded = true
     }
   }
 
@@ -43,11 +49,15 @@
   })
 
   const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '')
-  const shown = $derived((found?.containers ?? []).filter(c => c.status !== 'imported'))
+  const shown = $derived((found?.containers ?? []).filter(c => standalone || c.status !== 'imported'))
+  const labelOf = (id?: string) => app.containers?.containers.find(c => c.id === id)?.label ?? id ?? ''
 
   const open = (s: SuggestedContainer) => found?.repo && onimport(s, found.repo, found.name ?? '')
 </script>
 
+{#if standalone && loaded && !found?.problem && !shown.length}
+  <p class="line">{t('suggested.none')}</p>
+{/if}
 {#if found?.problem || shown.length}<div class="list">
 {#if found?.problem}
   <p class="line warn"><Icon name="triangle-alert" size={13} />{t(`suggested.problem.${found.problem}`, { detail: found.detail ?? '' })}</p>
@@ -55,11 +65,12 @@
 {#each shown as s (s.profile.id)}
   {@const label = s.profile.label || s.profile.id}
   <p class="line" class:warn={s.status === 'unusable'}>
-    <Icon name={s.status === 'unusable' ? 'triangle-alert' : 'layers'} size={13} />
+    <Icon name={s.status === 'unusable' ? 'triangle-alert' : s.status === 'imported' ? 'check' : 'layers'} size={13} />
     <span class="text">
       {#if s.status === 'new'}{t('suggested.new', { label })}
       {:else if s.status === 'differs' && s.by === 'project'}{t('suggested.changedByProject', { label, day: day(s.changed) })}
       {:else if s.status === 'differs'}{t('suggested.changedByYou', { label })}
+      {:else if s.status === 'imported'}{t('suggested.imported', { yours: labelOf(s.yours) })}
       {:else if s.problem === 'base'}{t('suggested.badBase', { label })}
       {:else}{t('suggested.invalid', { label, detail: s.detail ?? '' })}{/if}
     </span>

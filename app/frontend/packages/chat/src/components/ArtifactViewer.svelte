@@ -7,6 +7,7 @@
   import { t } from '../lib/i18n.svelte'
   import { atServer, serverTitle } from '../lib/remoteonly'
   import { keepScroll } from '../lib/scrollmemory'
+  import { renderMermaid } from '../lib/mermaid'
   import AnswerBlocks from './AnswerBlocks.svelte'
   import CodeBlock from './CodeBlock.svelte'
   import CopyButton from './CopyButton.svelte'
@@ -56,7 +57,9 @@
         if (mine !== seq) return
         data = c.data
         if (k !== 'image') text = decodeText(c.data)
-        if (k === 'mermaid') diagram = await renderMermaid(text, mine)
+        if (k !== 'mermaid') return
+        const svg = await renderMermaid(text)
+        if (mine === seq) diagram = svg
       })
       .catch(err => {
         if (mine === seq) error = String(err)
@@ -65,15 +68,6 @@
         if (mine === seq) loading = false
       })
   })
-
-  // Mermaid is big, so it loads the first time a diagram is shown. Its
-  // strict level escapes labels and turns off clicks and scripts.
-  async function renderMermaid(src: string, mine: number): Promise<string> {
-    const { default: mermaid } = await import('mermaid')
-    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'default' })
-    const { svg } = await mermaid.render(`uncli-mermaid-${mine}`, src)
-    return svg
-  }
 
   async function onDisk(): Promise<string | null> {
     try {
@@ -126,7 +120,7 @@
     {:else if kind === 'mermaid' && diagram}
       <iframe title={name} sandbox="" srcdoc={svgDoc(diagram, '#ffffff')}></iframe>
     {:else if kind === 'markdown'}
-      <div class="doc"><AnswerBlocks markdown={text} /></div>
+      <div class="doc"><AnswerBlocks markdown={text} diagrams /></div>
     {:else if kind === 'image' && data}
       <div class="picture"><img src={`data:${imageType(entry.path)};base64,${data}`} alt={name} /></div>
     {:else if kind === 'text'}

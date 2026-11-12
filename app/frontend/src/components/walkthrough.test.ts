@@ -74,4 +74,32 @@ describe('Walk through the changes', () => {
     expect(JSON.parse(localStorage.getItem('uncli-explain') ?? '{}')).toMatchObject({ context: 'session', detail: 'thorough' })
     expect(await dialog.findByRole('button', { name: 'Explain again' })).toBeInTheDocument()
   })
+
+  it('starts a new session in the same place from what the walkthrough knows', async () => {
+    const backend = mockBackend()
+    const create = vi.spyOn(backend, 'createSession')
+    const send = vi.spyOn(backend, 'send')
+    render(App, { props: { backend } })
+    await fireEvent.click(await screen.findByRole('button', { name: /Fix the flaky parser test/ }))
+    await fireEvent.click(await screen.findByRole('button', { name: 'Walk through' }))
+    const walk = within(await screen.findByRole('dialog', { name: 'Walk through the changes' }))
+    await fireEvent.click(walk.getByRole('button', { name: 'Explain' }))
+    await walk.findByText(/only flushed by the message it belongs to/)
+
+    // The walkthrough gives way to the new session dialog, in the session's folder.
+    await fireEvent.click(walk.getByRole('button', { name: 'New session' }))
+    const dialog = within(await screen.findByRole('dialog', { name: 'New session' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Walk through the changes' })).not.toBeInTheDocument())
+    expect(dialog.getByText(/^From the walkthrough: it starts with what that showed/)).toBeInTheDocument()
+    expect(dialog.getByText('C:\\Users\\you\\code')).toBeInTheDocument()
+
+    await fireEvent.click(dialog.getByRole('button', { name: 'Start session' }))
+    await waitFor(() => expect(send).toHaveBeenCalled())
+    expect(create).toHaveBeenLastCalledWith('code', 'C:\\Users\\you\\code', expect.any(String), '', '', null, expect.objectContaining({ title: 'From: Why does TestMultiTurnPartial fail about one run in five?' }))
+    const [, text] = send.mock.lastCall!
+    expect(text).toContain('> Why does TestMultiTurnPartial fail about one run in five?')
+    expect(text).toContain('internal/adapter/claude/parser.go, lines 145-149 (+5 -2): ')
+    expect(text).toMatch(/only flushed by the message it belongs to/)
+    expect(send.mock.lastCall![0]).not.toBe('s-code')
+  })
 })

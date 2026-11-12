@@ -109,12 +109,17 @@ apply changes.
   and marked added or removed (decisions 0029, 0030); **Explain** has a model
   add a note to each, in a call of its own, with the arrow beside it for its
   options (model, how much of the conversation it sees, how much it says).
+  **New session** there starts one in the same folder and container whose
+  first message is what the walkthrough shows: the request, the
+  explanation and each change.
 - Chat and Co-work sessions keep their **artifacts** (HTML, SVG, Mermaid,
   Markdown, images) version by version. The side panel's Artifacts tab (or
   A) shows them as they were at the page you're on, beside On this page (O).
 - **Watch a file** from the session folder on the side panel's File tab (F):
   a TODO list, a plan or a log, rendered and updated as it changes. Type part
   of a name to find one, latest changed first; star the ones you come back to.
+  Mermaid blocks in a Markdown file (and in a Markdown artifact) are drawn
+  as diagrams, with Code to see their source.
 - A **desktop notification** says when a session you aren't looking at
   finishes or needs approval (Settings → Notifications).
 - **Import** a conversation Claude Code saved (New session → Continue a
@@ -149,7 +154,8 @@ apply changes.
 - **Containers for a team** (decision 0028): a repository suggests
   containers in `.uncli/containers.yaml` (or `.yml`), in the same format
   with `version: 1` at the top and UNCLI's built-in bases. Starting a
-  session in that repository lists them in the new session dialog, and
+  session in that repository lists them in the new session dialog (or
+  pick the project in Settings → Containers → Import from a project…), and
   Import opens the container editor on one, saying whether it reaches
   outside its container (your memories, MCP servers, connectors, secrets
   or folders, and setup steps that send data away or run fetched code). You

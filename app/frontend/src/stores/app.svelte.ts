@@ -3,7 +3,7 @@
 // session; this adds what only the app has: dialogs, search, the sidebar
 // and its pinned pages, Settings, updates, the theme file, and starting on
 // the session open last time.
-import { namesOf, providerOf, type Backend, type CLIStatus, type Notice, type PinnedPage, type SearchHit, type SearchResult, type Share, type Bootstrap } from '@uncli/chat/lib/api'
+import { namesOf, parseRef, providerOf, type Backend, type CLIStatus, type Notice, type PinnedPage, type SearchHit, type SearchResult, type Share, type Bootstrap } from '@uncli/chat/lib/api'
 import { loadSidebarWidth, saveSidebarWidth } from '@uncli/chat/lib/panels'
 import { loadLastSession, saveLastSession } from '@uncli/chat/lib/keep'
 import type { SearchRange } from '@uncli/chat/lib/search'
@@ -15,11 +15,20 @@ import { ChatStore, type ChatStoreOptions } from '@uncli/chat/stores/chat.svelte
 
 export { displayAnswer, type Live } from '@uncli/chat/stores/chat.svelte'
 
+// Where a new session from a walkthrough starts, and what it starts with.
+export interface NewSessionSeed {
+  where: string // LOCAL or a paired server's key
+  container: string // the container it ran in, '' for none
+  prompt: string // its first message (lib/walkcontext.ts)
+  title: string // its name; '' names it by the first message
+}
+
 export class AppStore extends ChatStore {
   newSessionOpen = $state(false)
   newSessionProfile = $state<string | null>(null) // profile the dialog opens on
   newSessionFolder = $state<string | null>(null) // folder it opens with (a dropped folder)
   newSessionSeq = $state(0) // each open is a fresh dialog, even mid fade-out
+  newSessionSeed = $state<NewSessionSeed | null>(null) // a walkthrough's new session: where, and its first message
   settingsOpen = $state(false)
   usageOpen = $state(false) // the usage dashboard
   settingsAt = $state('') // a section to open Settings at ('safe', 'notify'…: #settings-<section>)
@@ -58,6 +67,15 @@ export class AppStore extends ChatStore {
     }
     this.openUsage = () => {
       this.usageOpen = true
+    }
+    // A walkthrough's New session: the dialog opens in the session's place
+    // (its PC, type, folder and container), and Start sends the context.
+    this.newSessionFrom = (id, prompt, title) => {
+      const s = this.sessions.find(x => x.id === id)
+      if (!s) return
+      this.openNewSession(s.profileId, s.workdir || null, {
+        where: parseRef(id).server, container: s.runtime === 'wsl' ? (s.runtimeRef ?? '') : '', prompt, title,
+      })
     }
   }
 
@@ -166,10 +184,12 @@ export class AppStore extends ChatStore {
   }
 
   // openNewSession opens the new-session dialog, on a given profile if one
-  // was picked (the welcome cards), else on the first.
-  openNewSession(profileId: string | null = null, folder: string | null = null) {
+  // was picked (the welcome cards), else on the first; seed starts it from
+  // a walkthrough.
+  openNewSession(profileId: string | null = null, folder: string | null = null, seed: NewSessionSeed | null = null) {
     this.newSessionProfile = profileId
     this.newSessionFolder = folder
+    this.newSessionSeed = seed
     this.newSessionSeq++
     this.newSessionOpen = true
   }
@@ -189,8 +209,8 @@ export class AppStore extends ChatStore {
 
   // createSession starts a session on this PC, or on a paired server
   // through its backend (decision 0031).
-  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null, on: Backend = this.backend) {
-    const v = await this.client.createSession(profileId, workdir, model, container, provider, shares, '', '', on)
+  async createSession(profileId: string, workdir: string, model: string, container = '', provider = '', shares: Share[] | null = null, on: Backend = this.backend, title = '') {
+    const v = await this.client.createSession(profileId, workdir, model, container, provider, shares, '', title, on)
     await this.select(v.id)
     return v
   }

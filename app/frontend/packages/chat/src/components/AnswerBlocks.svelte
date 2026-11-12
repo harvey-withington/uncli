@@ -8,6 +8,7 @@
   import { KIND_ICONS } from '../lib/sections'
   import CodeBlock from './CodeBlock.svelte'
   import CopyButton from './CopyButton.svelte'
+  import MermaidBlock from './MermaidBlock.svelte'
   import Icon from './Icon.svelte'
   import { useShell } from '../lib/shell.svelte'
 
@@ -17,9 +18,10 @@
     markdown: string
     streaming?: boolean
     markers?: Map<number, OutlineEntry> // block index → the outline entry starting there
+    diagrams?: boolean // a document (the file panel, a Markdown artifact): Mermaid blocks are drawn
   }
 
-  let { markdown, streaming = false, markers }: Props = $props()
+  let { markdown, streaming = false, markers, diagrams = false }: Props = $props()
   const chat = useChat()
   const blocks = $derived(toBlocks(markdown))
 
@@ -59,7 +61,11 @@
     {#if b.kind === 'code'}
       <div class="code" data-block={i}>
         {#if m}{@render marker(m)}{/if}
-        <CodeBlock code={b.code ?? ''} lang={b.lang ?? ''} streaming={streaming && i === blocks.length - 1} />
+        {#if diagrams && b.lang?.toLowerCase() === 'mermaid' && b.code?.trim()}
+          <MermaidBlock code={b.code} />
+        {:else}
+          <CodeBlock code={b.code ?? ''} lang={b.lang ?? ''} streaming={streaming && i === blocks.length - 1} />
+        {/if}
       </div>
     {:else}
       <div class="block" data-block={i}>

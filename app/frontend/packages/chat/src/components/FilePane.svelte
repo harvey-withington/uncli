@@ -201,7 +201,7 @@
       <!-- svg gets no scripts at all; html's run inside the frame only. -->
       <iframe class="page" title={parts.name} sandbox={kind === 'svg' ? '' : 'allow-scripts'} srcdoc={pageDoc}></iframe>
     {:else if isMarkdown(current)}
-      <div class="doc"><AnswerBlocks markdown={file.text} /></div>
+      <div class="doc"><AnswerBlocks markdown={file.text} diagrams /></div>
     {:else}
       <div class="doc"><CodeBlock code={file.text} lang={langOf(current)} /></div>
     {/if}

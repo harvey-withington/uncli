@@ -36,6 +36,11 @@
     }
     where = key
   }
+  // A walkthrough's New session opens where its session is, and Start
+  // sends what the walkthrough knows as the first message.
+  const seed = app.newSessionSeed
+  const seedWhere = seed?.where ?? LOCAL
+  if (seedWhere !== LOCAL) choose(seedWhere)
   const profiles = $derived(place.boot?.profiles ?? [])
   // The welcome card clicked, else what was picked last time, else the first.
   const last = $derived(place.boot?.lastNewSession)
@@ -99,8 +104,9 @@
       const was = last?.providers?.[id]
       provider = was && providers.some(p => p.id === was) ? was : (providers[0]?.id ?? '')
       model = modelFor(id, provider)
-      folder = (where === LOCAL && id === firstProfile && dropped) || last?.folders?.[id] || ''
-      const wasIn = last?.containers?.[id] ?? ''
+      const opened = where === seedWhere && id === firstProfile
+      folder = (opened && dropped) || last?.folders?.[id] || ''
+      const wasIn = opened && seed ? seed.container : (last?.containers?.[id] ?? '')
       container = isFirst && built.some(c => c.id === wasIn) ? wasIn : ''
       shares = startingShares(profiles.find(p => p.id === id), last, SHARES)
     })
@@ -152,8 +158,9 @@
     if (!profile || (needsFolder && !folder) || !ready) return
     creating = true
     try {
-      await app.createSession(profile.id, needsFolder ? folder : '', model, container, isFirst ? '' : provider, shareable.length ? shares.filter(s => shareable.includes(s)) : null, place.backend)
+      await app.createSession(profile.id, needsFolder ? folder : '', model, container, isFirst ? '' : provider, shareable.length ? shares.filter(s => shareable.includes(s)) : null, place.backend, seed?.title ?? '')
       app.newSessionOpen = false
+      if (seed?.prompt) await app.send(seed.prompt)
     } catch (e) {
       shell.toast(String(e), 'error')
     } finally {
@@ -165,6 +172,7 @@
 <Modal title={t('newSession.title')} width={560} onclose={() => (app.newSessionOpen = false)}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div {onkeydown}>
+    {#if seed}<p class="hint seed"><Icon name="git-branch-plus" size={13} />{t('newSession.fromWalk')}</p>{/if}
     <WhereField {where} onchoose={choose} error={where === LOCAL ? '' : remote[where]?.error ?? ''} loading={!place.boot} />
     <ProfilePicker {profiles} bind:value={profileId} />
 
@@ -290,6 +298,11 @@
     margin: 0 0 var(--space-4);
     font-size: var(--text-sm);
     color: var(--text-muted);
+  }
+  .hint.seed {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
   .hint.setup {
     display: flex;

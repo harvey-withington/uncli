@@ -4,6 +4,22 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## Unreleased
+
+- **A new session from a walkthrough.** New session in the walkthrough
+  opens the new session dialog on the same folder, container and PC. Start
+  it, and its first message is what the walkthrough shows: the request, the
+  explanation if there is one, and each change with its note. It's a fresh
+  session, not a copy of the conversation.
+- **Mermaid diagrams in Markdown files.** The File tab draws a Markdown
+  file's Mermaid blocks as diagrams, and so does a Markdown artifact. Code
+  under each shows its source; one Mermaid can't read shows its source,
+  with why.
+- **Import a project's container from Settings.** Settings → Containers →
+  Import from a project… asks for the project's folder, then lists the
+  containers its repository suggests, with Import and Sync as in the new
+  session dialog, and those you've already imported.
+
 ## 0.11.0-alpha
 
 A container can keep its own `node_modules`, so Windows and the container

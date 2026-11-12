@@ -106,6 +106,11 @@ export class ChatStore {
   sideTabs = $state.raw<SideTab[]>(BUILTIN_TABS)
   // Explain in a page's walkthrough; an embedding host can leave it out.
   explain = $state(true)
+  // A new session started from a page's walkthrough, in the same place,
+  // with what the walkthrough knows as its first message (lib/walkcontext.ts);
+  // title names it. The app opens its new session dialog; unset, there's no
+  // button.
+  newSessionFrom: ((sessionId: string, context: string, title: string) => void) | undefined = undefined
   sideTabShown: ((sessionId: string, tab: string) => void) | undefined = undefined
 
   reviewsOf(sessionId: string): HostReview[] {

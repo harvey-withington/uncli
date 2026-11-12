@@ -229,6 +229,27 @@ describe('Containers', () => {
     await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'node-dev', local: ['apps/web/node_modules'] })))
   })
 
+  it('imports a container from a project chosen in Settings, as the new session dialog does', async () => {
+    const backend = mockBackend()
+    const imp = vi.spyOn(backend, 'importContainer')
+    render(App, { props: { backend } })
+    const settings = await openSettings('Containers')
+    await fireEvent.click(await settings.findByRole('button', { name: 'Import from a project…' }))
+    const dialog = within(await screen.findByRole('dialog', { name: 'Import a container from a project' }))
+    expect(dialog.getByText('C:\\Users\\you\\projects\\demo')).toBeInTheDocument()
+    expect(await dialog.findByText('This project suggests a container: Team dev')).toBeInTheDocument()
+    expect(dialog.getByText('This project suggests a container: Docs')).toBeInTheDocument()
+
+    await fireEvent.click(dialog.getAllByRole('button', { name: 'Import…' })[1]!)
+    const form = within(await screen.findByRole('dialog', { name: 'Import Docs' }))
+    expect(form.getByText(/It stays inside its container/)).toBeInTheDocument()
+    await fireEvent.click(form.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(imp).toHaveBeenCalledWith(expect.objectContaining({ id: 'docs' }), 'C:\\Users\\you\\projects\\demo', 'docs'))
+    // Back on the project's list, it's imported and up to date.
+    expect(await dialog.findByText('Imported and up to date: Docs')).toBeInTheDocument()
+    expect(dialog.getByText('This project suggests a container: Team dev')).toBeInTheDocument()
+  })
+
   it('without WSL, offers to turn it on', async () => {
     history.replaceState(null, '', '/?containers=nowsl')
     render(App, { props: { backend: mockBackend() } })

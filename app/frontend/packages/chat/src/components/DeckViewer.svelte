@@ -17,7 +17,8 @@
   // above that place's code; Explain (with its options beside it) asks for
   // one, or for another. On a change's slide the file line and the note
   // stay put while the code scrolls on its own, and fold away (on every
-  // slide at once) to give the code the room.
+  // slide at once) to give the code the room. New session (branch) starts
+  // one from what the walkthrough knows.
   interface Props {
     deck: Deck
     codes: string[] // each changed place's code (lib/deckcode.ts)
@@ -26,8 +27,9 @@
     explanation?: PageExplanation | null
     by?: string // who explained it, and what it cost
     explain?: { busy: boolean; run: () => void; options: () => void } // absent: no Explain
+    branch?: () => void // a new session from what's here; absent: no button
   }
-  let { deck, codes, title, summary, explanation, by, explain }: Props = $props()
+  let { deck, codes, title, summary, explanation, by, explain, branch }: Props = $props()
   const notes = $derived(new Map((explanation?.notes ?? []).map(n => [n.place, n.text])))
 
   let box = $state<HTMLElement>()
@@ -118,6 +120,11 @@
     <span class="count" aria-live="polite">{index + 1} / {total}</span>
     <button class="btn ghost small icon" onclick={() => go(index + 1)} disabled={index >= total - 1} aria-label={t('walk.next')} title={t('walk.next')}><Icon name="chevron-right" size={16} /></button>
     <span class="grow"></span>
+    {#if branch}
+      <button class="btn small branch" onclick={branch} disabled={explain?.busy} aria-label={t('walk.branch')} title={t('walk.branchHint')}>
+        <Icon name="git-branch-plus" size={13} /><span class="txt">{t('walk.branch')}</span>
+      </button>
+    {/if}
     {#if explain}
       <span class="split">
         <button class="btn small" onclick={explain.run} disabled={explain.busy}>
@@ -269,7 +276,8 @@
     white-space: nowrap;
   }
   @media (max-width: 600px) {
-    .fs .txt {
+    .fs .txt,
+    .branch .txt {
       display: none; /* the icon alone, its name kept for screen readers */
     }
   }

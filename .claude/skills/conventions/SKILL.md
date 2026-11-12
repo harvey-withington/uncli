@@ -118,10 +118,16 @@ Rules for what UNCLI is, which a change must keep:
   core behind its own server. Don't reintroduce host pairing, CORS or
   session scoping. When a decision quietly supersedes part of the brief,
   say so before building on it.
-- **CLI pins stay put** while they work. Upgrade a pinned CLI before
-  UNCLI leaves alpha, or for a bug a newer version fixes; not just
-  because a newer one exists (recording fixtures and testing costs real
-  usage). Don't propose routine upgrades.
+- **Every release pins each CLI's latest version** (Harvey, 2026-11-12:
+  "so we're always as recent as possible"). Before tagging a release,
+  check the latest release of each pinned CLI (Claude Code, Antigravity,
+  and any plugin that ships a pin); for each that moved, record fixtures
+  for the new version, pass the parser tests and `npm run
+  test:integration`, then bump `PinnedVersion`. A version that breaks
+  something stays unpinned until it's fixed: say so in the release's
+  changelog rather than holding the release. This uses real usage, so say
+  when it runs. Between releases, pins stay put unless a bug needs a newer
+  version.
 
 ## Text meant to be copied
 
