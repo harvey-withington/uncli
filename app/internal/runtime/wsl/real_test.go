@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -117,6 +118,102 @@ func TestRealDistro(t *testing.T) {
 	}
 	if !strings.Contains(result, "TANGERINE") {
 		t.Errorf("result = %q", result)
+	}
+}
+
+// TestLocalPathsInRealDistro mounts a project in an existing distro
+// (UNCLI_WSL_DISTRO) with local paths, and checks that the container's
+// files there and Windows' don't see each other, that taking the project
+// out takes the local paths out first, and that they come back, with what
+// was in them, when the project is mounted again. It uses no CLI.
+func TestLocalPathsInRealDistro(t *testing.T) {
+	name := os.Getenv("UNCLI_WSL_DISTRO")
+	if name == "" {
+		t.Skip("set UNCLI_WSL_DISTRO to an existing distro to try it there")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	r := &Runtime{Distro: name, run: execRunner, Local: func() []string { return []string{"node_modules", "apps/web/node_modules"} }}
+	folder := filepath.Join(t.TempDir(), "release-manager")
+	if err := os.MkdirAll(filepath.Join(folder, "node_modules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(filepath.Join(folder, "node_modules", "esbuild.exe"), []byte("windows\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(folder, "package.json"), []byte("{}\n"), 0o644)
+	point, err := r.Mount(ctx, folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = r.Unmount(context.Background(), point)
+		_, _ = r.run(context.Background(), nil, "--distribution", name, "--user", "root", "--exec", "rm", "-rf", LocalSource(point, ""))
+		r.Close()
+	})
+	sh := func(user, script string) (string, error) {
+		out, err := r.run(ctx, nil, "--distribution", name, "--user", user, "--exec", "sh", "-c", script, "sh", point)
+		return strings.TrimSpace(string(out)), err
+	}
+	install := `echo linux > "$1/node_modules/esbuild" && echo linux > "$1/apps/web/node_modules/esbuild" && ls "$1/node_modules"`
+
+	// The container's user writes into its own copies, and doesn't see
+	// Windows' file; the rest of the project is Windows' as before.
+	out, err := sh(User, install+` && cat "$1/package.json"`)
+	if err != nil || strings.Join(strings.Fields(out), " ") != "esbuild {}" {
+		t.Fatalf("in the container: %q, %v", out, err)
+	}
+	// Windows has its own file and not the container's; the missing path
+	// was made, empty.
+	if b, err := os.ReadFile(filepath.Join(folder, "node_modules", "esbuild.exe")); err != nil || string(b) != "windows\n" {
+		t.Errorf("Windows' file: %q, %v", b, err)
+	}
+	for _, p := range []string{filepath.Join(folder, "node_modules", "esbuild"), filepath.Join(folder, "apps", "web", "node_modules", "esbuild")} {
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("the container's %s reached Windows", p)
+		}
+	}
+	if st, err := os.Stat(filepath.Join(folder, "apps", "web", "node_modules")); err != nil || !st.IsDir() {
+		t.Errorf("apps/web/node_modules wasn't made in the project: %v", err)
+	}
+
+	// The manifest lists them as local, from the distro's own disk.
+	if err := r.WriteManifest(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if out, _ := sh(User, `cat `+ManifestPath); !strings.Contains(out, `"kind": "local"`) || !strings.Contains(out, LocalSource(point, "apps/web/node_modules")) {
+		t.Errorf("manifest: %s", out)
+	}
+
+	// Taking the project out takes the local paths out first: each comes
+	// off cleanly, none lazily left behind.
+	trace, err := exec.Command(Exe, "--distribution", name, "--user", "root", "--exec", "sh", "-xc", unmountScript, "sh", point).CombinedOutput()
+	if err != nil {
+		t.Fatalf("unmount: %v %s", err, trace)
+	}
+	// The traced umount lines, in order, by their target.
+	var order []string
+	for _, l := range strings.Split(strings.ReplaceAll(string(trace), "\r", ""), "\n") {
+		if f := strings.Fields(l); len(f) >= 3 && f[0] == "+" && f[1] == "umount" {
+			order = append(order, strings.TrimPrefix(strings.Join(f[2:], " "), "-l "))
+		}
+	}
+	if !slices.Equal(order, []string{point + "/node_modules", point + "/apps/web/node_modules", point}) && !slices.Equal(order, []string{point + "/apps/web/node_modules", point + "/node_modules", point}) ||
+		strings.Contains(string(trace), "umount -l") {
+		t.Errorf("unmount order %q:\n%s", order, trace)
+	}
+	if out, _ := sh("root", `grep -c " $1" /proc/self/mountinfo || true`); out != "0" {
+		t.Errorf("still mounted: %s", out)
+	}
+	_ = r.Unmount(ctx, point) // forgets them
+
+	// Mounted again, the container's copies are back as they were.
+	if _, err := r.Mount(ctx, folder); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := sh(User, `cat "$1/node_modules/esbuild" "$1/apps/web/node_modules/esbuild"; ls "$1/node_modules"`); err != nil || strings.Join(strings.Fields(out), " ") != "linux linux esbuild" {
+		t.Errorf("after remounting: %q, %v", out, err)
+	}
+	if _, err := os.Stat(filepath.Join(folder, "node_modules", "esbuild")); err == nil {
+		t.Error("the container's file reached Windows after remounting")
 	}
 }
 

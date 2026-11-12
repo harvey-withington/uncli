@@ -69,6 +69,9 @@ type ContainerProfile struct {
 	Secrets string `yaml:"secrets,omitempty" json:"secrets"`
 	// Folders are more Windows folders it mounts (container_folders.go).
 	Folders []ContainerFolder `yaml:"folders,omitempty" json:"folders"`
+	// Local is paths in a session's folder the container keeps on its own
+	// disk, such as node_modules (container_local.go).
+	Local []string `yaml:"local,omitempty" json:"local,omitempty"`
 	// Setup is shell steps run as root after the packages when the
 	// container is built (for what isn't a package: npm i -g, pip install).
 	Setup []string `yaml:"setup,omitempty" json:"setup"`
@@ -144,6 +147,9 @@ func validProfile(p ContainerProfile, bases []Base) error {
 		return fmt.Errorf("container %q: secrets is shared or none, not %q", p.ID, p.Secrets)
 	}
 	if err := validFolders(p.ID, p.Folders); err != nil {
+		return err
+	}
+	if err := validLocal(p.ID, p.Local); err != nil {
 		return err
 	}
 	for _, pkg := range p.Packages {
@@ -496,6 +502,7 @@ func (s *Service) runtimeFor(id, ref string) (core.Runtime, error) {
 		if p.ID == ref {
 			r.Prepare = prepareContainer(func() ContainerProfile { q, _ := s.profile(ref); return q }, filepath.Join(s.Paths.Config, "wsl-data", p.ID), s.containerAccount)
 			r.Briefing = func() string { q, _ := s.profile(ref); return containerBrief(q, r.Mounts()) }
+			r.Local = func() []string { q, _ := s.profile(ref); return localPaths(q.Local) }
 			r.Account = func() bool {
 				q, _ := s.profile(ref)
 				return q.Connectors == ConnectorsShared && s.containerAccount() != ""

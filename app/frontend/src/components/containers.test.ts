@@ -209,6 +209,26 @@ describe('Containers', () => {
     })))
   })
 
+  it('keeps its own copies of paths in the project, and refuses one outside it', async () => {
+    const backend = mockBackend()
+    const save = vi.spyOn(backend, 'saveContainer')
+    render(App, { props: { backend } })
+    const settings = await openSettings('Containers')
+    await fireEvent.click(await settings.findByRole('button', { name: 'Edit Node' }))
+    const form = within(settings.getByRole('form', { name: 'Edit Node' }))
+    expect(form.getByText(/Paths in the project the container keeps its own copy of, e\.g\. node_modules/)).toBeInTheDocument()
+
+    await fireEvent.click(form.getByRole('button', { name: 'Add a path' }))
+    await fireEvent.input(form.getByRole('textbox', { name: 'Own copy 1: path in the project' }), { target: { value: '../node_modules' } })
+    expect(form.getByText(/can't go up out of the project/)).toBeInTheDocument()
+    expect(form.getByRole('button', { name: 'Save' })).toBeDisabled()
+
+    await fireEvent.input(form.getByRole('textbox', { name: 'Own copy 1: path in the project' }), { target: { value: 'apps\\web\\node_modules' } })
+    expect(form.getByText('The container keeps its own apps/web/node_modules; Windows keeps its own too.')).toBeInTheDocument()
+    await fireEvent.click(form.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'node-dev', local: ['apps/web/node_modules'] })))
+  })
+
   it('without WSL, offers to turn it on', async () => {
     history.replaceState(null, '', '/?containers=nowsl')
     render(App, { props: { backend: mockBackend() } })

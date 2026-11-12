@@ -135,7 +135,10 @@ apply changes.
   or `sandboxed`, `mcp` and `connectors: shared` or `none`, `secrets:
   shared` (your `%USERPROFILE%\.secrets` folder, one file per service,
   read-only at `~/.secrets`) and `folders` (more Windows folders at
-  `/home/uncli/<name>`, read-only unless `access: rw`; decision 0017). Each
+  `/home/uncli/<name>`, read-only unless `access: rw`; decision 0017), and
+  `local` (paths in the session's folder, such as `node_modules`, the
+  container keeps its own copy of, which Windows never sees; decision
+  0032). Each
   container lists what's mounted, from where and how, in
   `/etc/uncli/mounts.json` (`$UNCLI_MOUNTS`). Settings →
   Containers edits them (Edit on each, New container, Reset to built-in,

@@ -63,6 +63,10 @@ type Runtime struct {
 	// in the container (mounted by Prepare) instead of the token, which
 	// would take priority over it. Optional.
 	Account func() bool
+	// Local is the paths in a session's folder the container keeps on its
+	// own disk (relative, with forward slashes, already checked), bound over
+	// the folder wherever it's mounted. Optional.
+	Local func() []string
 
 	run runner
 
@@ -211,7 +215,8 @@ func HostPath(host, p string) (string, bool) {
 // HostPath maps a path the CLI reported for a session in host back to it.
 func (r *Runtime) HostPath(host, p string) (string, bool) { return HostPath(host, p) }
 
-// Mount makes a Windows folder visible in the distro and returns where.
+// Mount makes a Windows folder visible in the distro and returns where,
+// with the container's own copies of its local paths over it (Local).
 // Mounts last while the distro runs, so the runtime keeps it running.
 func (r *Runtime) Mount(ctx context.Context, host string) (string, error) {
 	if !filepath.IsAbs(host) {
@@ -221,7 +226,10 @@ func (r *Runtime) Mount(ctx context.Context, host string) (string, error) {
 		return "", fmt.Errorf("the folder %s doesn't exist", host)
 	}
 	point := MountPoint(host)
-	return point, r.MountFolder(ctx, Mount{Name: "project", Source: host, Target: point, Access: ReadWrite, Kind: KindBuiltin})
+	if err := r.MountFolder(ctx, Mount{Name: "project", Source: host, Target: point, Access: ReadWrite, Kind: KindBuiltin}); err != nil {
+		return "", err
+	}
+	return point, r.mountLocal(ctx, point)
 }
 
 // MountAt mounts a Windows folder read-write at a path in the distro, as
@@ -231,9 +239,10 @@ func (r *Runtime) MountAt(ctx context.Context, host, at string) error {
 }
 
 // Unmount unmounts a path in the distro if something is mounted there,
-// with whatever is mounted under it.
+// with whatever is mounted under it (first: a project's local paths go
+// before the project).
 func (r *Runtime) Unmount(ctx context.Context, at string) error {
-	_, err := r.run(ctx, nil, "--distribution", r.Distro, "--user", "root", "--exec", "sh", "-c", `if mountpoint -q "$1"; then umount "$1" 2>/dev/null || umount -l "$1"; fi`, "sh", at)
+	_, err := r.run(ctx, nil, "--distribution", r.Distro, "--user", "root", "--exec", "sh", "-c", unmountScript, "sh", at)
 	if err == nil {
 		r.mu.Lock()
 		r.forget(at)
@@ -337,6 +346,11 @@ func (r *Runtime) Close() {
 		g.wait(time.Until(deadline))
 	}
 	if p != nil {
+		// The local paths go before the projects they're over do, with the
+		// distro.
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		r.unmountLocal(ctx)
+		cancel()
 		_ = p.Kill()
 		if g, ok := p.(*gentle); ok {
 			g.wait(stopGrace + time.Second)

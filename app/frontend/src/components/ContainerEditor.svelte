@@ -6,13 +6,15 @@
   import { useApp } from '../lib/context'
   import { t } from '@uncli/chat/lib/i18n.svelte'
   import ContainerFolders from './ContainerFolders.svelte'
+  import ContainerLocal from './ContainerLocal.svelte'
   import Icon from '@uncli/chat/components/Icon.svelte'
   import { useShell } from '@uncli/chat/lib/shell.svelte'
 
   const shell = useShell()
 
   // Edits one container in the user's containers.yaml (Settings →
-  // Containers): its name, base, packages, setup steps and what it shares.
+  // Containers): its name, base, packages, setup steps, what it shares and
+  // the paths in a project it keeps its own copies of.
   // A new one gets its id from its name. A built-in one saved here is the
   // user's version until Reset; one of the user's own can be deleted, with
   // its container. Importing a project's container (decision 0028) saves
@@ -164,6 +166,9 @@
 
     <span class="label">{t('containerEdit.folders')}</span>
     <ContainerFolders bind:folders={() => draft.folders ?? [], v => (draft.folders = v)} {uid} />
+
+    <span class="label">{t('containerEdit.local')}</span>
+    <ContainerLocal bind:paths={() => draft.local ?? [], v => (draft.local = v)} {uid} />
   </div>
 
   {#if wrong.length && !isNew}<p class="err" role="alert">{wrong.map(k => t(k)).join(' ')}</p>{/if}

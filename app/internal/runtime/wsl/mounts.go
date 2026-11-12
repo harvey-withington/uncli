@@ -9,16 +9,17 @@ import (
 	"strings"
 )
 
-// Mount is a Windows folder UNCLI mounted in the distro. Each one is
+// Mount is a Windows folder UNCLI mounted in the distro, or a folder of
+// the distro's own over part of the project (KindLocal). Each one is
 // recorded, so the manifest (ManifestPath) lists everything a session can
 // see and where it comes from, and a share that's turned off can be taken
 // out again.
 type Mount struct {
-	Name   string `json:"name"`   // what it is: project, skills/<name>, secrets, a custom folder's name
-	Source string `json:"source"` // the Windows folder
+	Name   string `json:"name"`   // what it is: project, skills/<name>, secrets, a custom folder's name, a local path
+	Source string `json:"source"` // the Windows folder; for a local path, the folder on the distro's own disk
 	Target string `json:"target"` // where it is in the distro
 	Access string `json:"access"` // rw or ro
-	Kind   string `json:"kind"`   // builtin, share or custom
+	Kind   string `json:"kind"`   // builtin, share, custom or local
 }
 
 // Mount kinds.
@@ -26,7 +27,13 @@ const (
 	KindBuiltin = "builtin" // UNCLI's own: the session folder, conversations, the account
 	KindShare   = "share"   // one of the user's, given by a share (memories, skills, secrets)
 	KindCustom  = "custom"  // a folder the container profile lists
+	KindLocal   = "local"   // a path in the project the container keeps on its own disk (Runtime.Local)
 )
+
+// LocalRoot is where the distro keeps its own copies of local paths, one
+// folder per project mount (named as under WorkspaceRoot). It's on the
+// distro's disk, so it lasts between sessions and goes with the container.
+const LocalRoot = "/var/lib/uncli/local"
 
 // Access modes.
 const (

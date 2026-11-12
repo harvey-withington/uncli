@@ -106,6 +106,7 @@ func tidyProfile(p ContainerProfile) ContainerProfile {
 		folders = append(folders, f)
 	}
 	p.Folders = folders
+	p.Local = tidyLocal(p.Local)
 	if p.Secrets != SecretsShared {
 		p.Secrets = ""
 	}

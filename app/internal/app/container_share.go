@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
@@ -159,7 +160,8 @@ func foldersFor(p ContainerProfile) (map[string]wsl.Mount, map[string]string) {
 
 // containerBrief is what a session in a container is told about it, so the
 // model knows where to look rather than guessing at paths: what's mounted
-// and from where, and where the secrets are when they're shared.
+// and from where, where the secrets are when they're shared, and which
+// paths in the project are the container's own.
 func containerBrief(p ContainerProfile, mounts []wsl.Mount) string {
 	label := p.Label
 	if label == "" {
@@ -167,11 +169,20 @@ func containerBrief(p ContainerProfile, mounts []wsl.Mount) string {
 	}
 	b := fmt.Sprintf("This session runs in a Linux container (UNCLI's %q) that sees only the folders mounted in it. "+
 		"Each one, the Windows folder it comes from and whether it's read-only is listed in %s ($%s).", label, wsl.ManifestPath, wsl.MountsEnv)
+	var local []string
 	for _, m := range mounts {
 		if m.Name == "secrets" {
 			b += fmt.Sprintf(" The user's secrets are in %s ($%s, read-only), one file per service named for it (such as bitbucket-token). "+
 				"Read a secret from there when a command needs one; never print it, or copy it anywhere else.", m.Target, SecretsEnv)
 		}
+		if m.Kind == wsl.KindLocal && !slices.Contains(local, m.Name) {
+			local = append(local, m.Name)
+		}
+	}
+	if len(local) > 0 {
+		b += fmt.Sprintf(" These paths in the project are the container's own (kind %q in the manifest): %s. "+
+			"What's in them stays in the container and isn't on Windows, and Windows keeps its own copies there, which you can't see; "+
+			"install dependencies in them from the container as usual.", wsl.KindLocal, strings.Join(local, ", "))
 	}
 	return b
 }

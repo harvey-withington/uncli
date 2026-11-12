@@ -1121,6 +1121,9 @@ export interface ContainerProfile {
   connectors?: 'shared' | 'none' | '' // shared: the user's claude.ai connectors, with the full account sign-in
   secrets?: 'shared' | 'none' | '' // shared: %USERPROFILE%\.secrets, read-only at ~/.secrets
   folders?: ContainerFolder[] // more Windows folders it mounts, at /home/uncli/<name>
+  // Paths in a session's folder (node_modules) it keeps on its own disk,
+  // which Windows never sees (decision 0032); they stay inside it.
+  local?: string[]
   from?: ContainerSource // the project container it was imported from (decision 0028); only importing sets it
 }
 

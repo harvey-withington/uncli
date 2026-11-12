@@ -14,7 +14,7 @@ const SUGGESTED: ContainerProfile[] = [
   {
     id: 'team-dev', label: 'Team dev', description: 'Node and Go, with the tools this repository builds with.', base: 'alpine-3.24',
     packages: ['nodejs', 'npm', 'go', 'make'], setup: ['npm i -g pnpm', 'curl -fsSL https://example.com/install.sh | sh'],
-    brain: 'shared', mcp: 'none', connectors: 'none', secrets: 'shared', folders: [],
+    brain: 'shared', mcp: 'none', connectors: 'none', secrets: 'shared', folders: [], local: ['node_modules'],
   },
   {
     id: 'docs', label: 'Docs', description: 'Python and MkDocs, for the documentation.', base: 'alpine-3.24',
@@ -24,7 +24,7 @@ const SUGGESTED: ContainerProfile[] = [
 // What a container builds and shares, to compare (names and descriptions don't count).
 const canon = (p: ContainerProfile) => JSON.stringify({
   base: p.base, packages: p.packages, setup: p.setup, brain: p.brain || 'sandboxed', mcp: p.mcp || 'none',
-  connectors: p.connectors || 'none', secrets: p.secrets === 'shared' ? 'shared' : '', folders: p.folders ?? [],
+  connectors: p.connectors || 'none', secrets: p.secrets === 'shared' ? 'shared' : '', folders: p.folders ?? [], local: p.local ?? [],
 })
 const reachesOf = (p: ContainerProfile): SuggestedContainer['reaches'] => [
   ...(p.brain === 'shared' ? ['brain' as const] : []), ...(p.mcp === 'shared' ? ['mcp' as const] : []),

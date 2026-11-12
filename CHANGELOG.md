@@ -4,6 +4,18 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.11.0-alpha
+
+A container can keep its own `node_modules`, so Windows and the container
+stop breaking each other's installs.
+
+- **A container's own copies.** A container can keep its own copy of paths
+  in the project, such as `node_modules`, on its own disk: Settings →
+  Containers → Edit, under Its own copies, or `local:` in
+  `containers.yaml` and a repository's suggested containers. Windows keeps
+  its own files at the same path and never sees the container's, so an
+  install on one side no longer breaks the other's.
+
 ## 0.10.0-alpha
 
 See another PC's sessions beside your own, and know which branch a

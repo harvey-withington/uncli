@@ -243,7 +243,8 @@ func suggestionSum(p ContainerProfile) string {
 	return hex.EncodeToString(h[:])
 }
 
-// reaches is what of the user's a container shares beyond itself.
+// reaches is what of the user's a container shares beyond itself. Local
+// paths don't count: they keep files in the container, not out of it.
 func reaches(p ContainerProfile) []string {
 	out := []string{}
 	if p.Brain == BrainShared {

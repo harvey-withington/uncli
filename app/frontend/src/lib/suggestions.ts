@@ -21,10 +21,12 @@ export function importStart(s: SuggestedContainer): ContainerProfile {
     connectors: p.connectors || 'none',
     secrets: p.secrets || 'none',
     folders: (p.folders ?? []).map(f => ({ source: f.source, name: f.name, access: f.access === 'rw' ? 'rw' : 'ro' })),
+    local: [...(p.local ?? [])],
   }
 }
 
 // What of the user's a container would share, as it stands in the form.
+// Local paths aren't: they keep files in the container, not out of it.
 export function reachesOf(p: ContainerProfile): Reach[] {
   const out: Reach[] = []
   if (p.brain === 'shared') out.push('brain')

@@ -22,6 +22,8 @@ describe('Suggested containers', () => {
     expect(form.getByText('Your secrets folder, read-only')).toBeInTheDocument()
     expect(form.getByText('A setup step worth a look (marked below)')).toBeInTheDocument()
     expect(form.getByText('It runs code it fetches from elsewhere.')).toBeInTheDocument()
+    // Its own copy of node_modules comes with it, and doesn't reach outside.
+    expect(form.getByRole('textbox', { name: 'Own copy 1: path in the project' })).toHaveValue('node_modules')
 
     // Turned down to what stays inside, the summary says so.
     await fireEvent.click(form.getByRole('checkbox', { name: /Your secrets folder/ }))
@@ -31,7 +33,7 @@ describe('Suggested containers', () => {
     expect(form.queryByText('It runs code it fetches from elsewhere.')).not.toBeInTheDocument()
 
     await fireEvent.click(form.getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(imp).toHaveBeenCalledWith(expect.objectContaining({ id: 'team-dev', secrets: 'none', brain: 'sandboxed', setup: ['npm i -g pnpm'] }), 'C:\\Users\\you\\projects\\demo', 'team-dev'))
+    await waitFor(() => expect(imp).toHaveBeenCalledWith(expect.objectContaining({ id: 'team-dev', secrets: 'none', brain: 'sandboxed', setup: ['npm i -g pnpm'], local: ['node_modules'] }), 'C:\\Users\\you\\projects\\demo', 'team-dev'))
     // Changed on import, it's the user's change: Sync is offered quietly.
     expect(await dialog.findByText("You've changed your Team dev since importing it from this project.")).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: 'Sync…' })).toBeInTheDocument()

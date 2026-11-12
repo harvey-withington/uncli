@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addPackages, blank, folderNameFor, folderProblem, idFor, problems, same, splitPackages, tidy } from './containers'
+import { addPackages, blank, cleanLocal, folderNameFor, folderProblem, idFor, localProblem, localProblems, problems, same, splitPackages, tidy } from './containers'
 
 describe('container editor rules', () => {
   it('makes an id from the name, unlike the others', () => {
@@ -55,5 +55,30 @@ describe('a container’s folders', () => {
     expect(problems({ ...p, folders: [f('C:\\', 'c')] })).toContain('containerEdit.problem.folder')
     expect(problems({ ...p, folders: [f('', '')] })).toEqual([])
     expect(tidy({ ...p, folders: [f(' S:\\A ', ' a '), f('', '')] }).folders).toEqual([f('S:\\A', 'a')])
+  })
+})
+
+describe('a container’s own copies (local paths)', () => {
+  it('takes paths in the project, cleaned, and refuses the rest', () => {
+    expect(localProblem('node_modules')).toBe('')
+    expect(localProblem('apps\\web\\node_modules\\')).toBe('')
+    expect(cleanLocal(' ./apps\\web//node_modules/ ')).toBe('apps/web/node_modules')
+    expect(localProblem('/node_modules')).toBe('containerEdit.localFull')
+    expect(localProblem('C:\\work\\node_modules')).toBe('containerEdit.localFull')
+    expect(localProblem('./')).toBe('containerEdit.localFull')
+    expect(localProblem('../node_modules')).toBe('containerEdit.localUp')
+    expect(localProblem('.git')).toBe('containerEdit.localGit')
+    expect(localProblem('sub/.GIT/hooks')).toBe('containerEdit.localGit')
+    expect(localProblem('a|b')).toBe('containerEdit.localChars')
+    expect(localProblem('cache.')).toBe('containerEdit.localChars')
+  })
+
+  it('marks a path listed twice or inside another, and stops the save', () => {
+    expect(localProblems(['node_modules', './Node_Modules', 'node_modules/.cache', '', 'apps/web/node_modules']))
+      .toEqual(['', 'containerEdit.localTwice', 'containerEdit.localNested', '', ''])
+    const p = { ...blank('dev', 'alpine-3.24'), label: 'Dev' }
+    expect(problems({ ...p, local: ['node_modules', '../x'] })).toEqual(['containerEdit.problem.local'])
+    expect(problems({ ...p, local: ['node_modules', ' '] })).toEqual([])
+    expect(tidy({ ...p, local: [' apps\\web\\node_modules ', '', '../x '] }).local).toEqual(['apps/web/node_modules', '../x'])
   })
 })

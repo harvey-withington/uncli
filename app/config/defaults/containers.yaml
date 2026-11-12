@@ -25,6 +25,14 @@
 #                     (only %USERPROFILE%, %APPDATA% and %LOCALAPPDATA%
 #                     expand; a drive, your profile, system folders and
 #                     folders holding sign-ins are refused)
+#   local:            paths in the session's folder the container keeps its
+#                     own copy of, on its own disk, so its installs and
+#                     Windows' don't overwrite each other, e.g.
+#                       - node_modules
+#                       - apps/web/node_modules
+#                     (relative to the folder; .., .git and a path inside
+#                     another one are refused; decision 0032). Windows keeps
+#                     its own files there and never sees the container's.
 #
 # Every mount is listed in /etc/uncli/mounts.json ($UNCLI_MOUNTS) inside the
 # container, and a missing folder is skipped (Settings says which).
