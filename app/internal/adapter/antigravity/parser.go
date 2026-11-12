@@ -8,7 +8,7 @@ import (
 	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
-// The stream (CLI 1.3.1, testdata/streams/antigravity/1.3.1):
+// The stream (CLI 1.5.6, testdata/streams/antigravity/1.5.6):
 //
 //	{"event":"init","conversation_id":…,"init":{"model":…,"cwd":…,"tools":[…],"permission_mode":…}}
 //	{"event":"step_update","step_update":{"step_index":n,"state":"ACTIVE|DONE|ERROR","step_type":…,…}}
@@ -17,8 +17,9 @@ import (
 // init comes once per process; each turn is a run of step updates and one
 // result. A step is user_input, agent_response (text_delta while ACTIVE,
 // its own usage when DONE), tool (tool_info: name, parameters, output,
-// error), subagent or system_message. The result's usage, duration and
-// turn count are totals for the process.
+// error), subagent (subagent_info, no tool_info, from its first update) or
+// system_message. The result's usage, duration and turn count are totals
+// for the process.
 
 type line struct {
 	Event          string          `json:"event"`
@@ -225,7 +226,10 @@ func (p *parser) result(r *result, raw []byte) []core.Event {
 
 // touched is the file a successful write or edit changed.
 func touched(tool string, params json.RawMessage) (core.FileTouched, bool) {
-	how := map[string]string{"write_to_file": "write", "replace_file_content": "edit", "multi_replace_file_content": "edit", "sed_file": "edit"}[tool]
+	how := map[string]string{
+		"write_to_file": "write", "write_file": "write",
+		"replace_file_content": "edit", "multi_replace_file_content": "edit", "edit_file": "edit", "sed_file": "edit",
+	}[tool]
 	if how == "" {
 		return core.FileTouched{}, false
 	}

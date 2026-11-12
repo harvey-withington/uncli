@@ -4,7 +4,11 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
-## Unreleased
+## 0.12.0-alpha
+
+Carry a walkthrough into a new session, see Mermaid diagrams in your
+Markdown files, import a project's container from Settings, and run on
+newer CLIs.
 
 - **A new session from a walkthrough.** New session in the walkthrough
   opens the new session dialog on the same folder, container and PC. Start
@@ -19,6 +23,11 @@ publishes a version's section as its release notes, so each heading is
   Import from a project… asks for the project's folder, then lists the
   containers its repository suggests, with Import and Sync as in the new
   session dialog, and those you've already imported.
+- **Newer CLIs.** UNCLI now runs Claude Code 2.1.322 (was 2.1.285) and the
+  Antigravity CLI 1.5.6 (was 1.3.1), downloaded and checked as before. With
+  Antigravity 1.5.6, reading and writing files are known for what they are
+  again (the CLI renamed those tools), so a read doesn't ask and a write
+  shows among the changed files.
 
 ## 0.11.0-alpha
 

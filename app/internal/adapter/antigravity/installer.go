@@ -37,8 +37,8 @@ type Build struct {
 var pinned = map[string]map[string]Build{
 	PinnedVersion: {
 		"windows_amd64": {
-			URL:    "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.3.1-4582356770750464/windows-x64/cli_windows_x64.exe",
-			SHA512: "f346d2cd9d68e7e5395cb94ff95e7e8ab2e0c65cf2ad835d0eb671fb41f12f5fc713d7a26ceb4510678eb9baa62c6cd9ab8205211e3661c6cd1e23ca7bc69781",
+			URL:    "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.5.6-6212266538958848/windows-x64/cli_windows_x64.exe",
+			SHA512: "3be98c8635b778a5e884e78059b7976798f0b59c5db3728a7ddbb9251dd70d33487b80ab83b50810db83c3deedc4a9c1e0f905a561503a6c6b3f1ca6cec73102",
 		},
 	},
 }

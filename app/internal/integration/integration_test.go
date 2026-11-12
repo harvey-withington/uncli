@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/harvey-withington/uncli/app/internal/adapter/claude"
 	"github.com/harvey-withington/uncli/app/internal/app"
 	"github.com/harvey-withington/uncli/app/internal/session"
 	"github.com/harvey-withington/uncli/app/internal/store"
@@ -456,7 +457,7 @@ func TestAttachments(t *testing.T) {
 		_ = png.Encode(&b, img)
 		return b.Bytes()
 	}
-	rec, err := os.ReadFile(filepath.Join("..", "..", "testdata", "streams", "claude", "2.1.285", "document-input.in.jsonl"))
+	rec, err := os.ReadFile(filepath.Join("..", "..", "testdata", "streams", "claude", claude.PinnedVersion, "document-input.in.jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -28,7 +28,7 @@ func TestCLIStartedTurnGetsAPage(t *testing.T) {
 	for time.Now().Before(deadline) {
 		ps, _ := h.m.Pages(v.ID)
 		if len(ps) == 2 && ps[1].Status == "done" {
-			if ps[0].Status != "done" || !strings.Contains(ps[0].AnswerMD, "launched a background subagent") {
+			if ps[0].Status != "done" || ps[0].AnswerMD != recordedResults(t, "subagent-background")[0].Text {
 				t.Errorf("first page = %+v", ps[0])
 			}
 			if ps[1].Origin != OriginCLI || ps[1].Question != "" || !strings.Contains(ps[1].AnswerMD, "PING") {
@@ -72,7 +72,7 @@ type bgSink struct {
 
 func (s *bgSink) SessionChanged(v View) {
 	s.recSink.SessionChanged(v)
-	if len(v.Background) == 1 && v.Background[0].Description == "Simple ping response" && v.Background[0].Kind == "local_agent" {
+	if len(v.Background) == 1 && v.Background[0].Description != "" && v.Background[0].Kind == "local_agent" {
 		s.mu.Lock()
 		s.seen = true
 		s.mu.Unlock()

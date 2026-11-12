@@ -11,14 +11,17 @@ import (
 // What the Antigravity CLI's tools do, as provider-neutral actions
 // (core.ToolAction). Argument names are those seen in the recorded hook
 // calls (testdata/streams/antigravity/<version>/*.hook.jsonl); tools not yet
-// seen are read defensively and fall back to "other", which prompts.
+// seen are read defensively and fall back to "other", which prompts. 1.5.6
+// calls read_file and write_file (and has edit_file) where 1.3.1 called
+// view_file and write_to_file, though init still lists the old names; both
+// are known.
 
 var toolKinds = map[string]string{
 	"run_command": core.ActShell,
-	"view_file":   core.ActRead, "command_status": core.ActRead, "read_resource": core.ActRead,
+	"view_file":   core.ActRead, "read_file": core.ActRead, "command_status": core.ActRead, "read_resource": core.ActRead,
 	"list_dir": core.ActSearch, "grep_search": core.ActSearch, "find_by_name": core.ActSearch, "list_resources": core.ActSearch,
-	"write_to_file":        core.ActWrite,
-	"replace_file_content": core.ActEdit, "multi_replace_file_content": core.ActEdit, "sed_file": core.ActEdit, "notebook_edit": core.ActEdit,
+	"write_to_file": core.ActWrite, "write_file": core.ActWrite,
+	"replace_file_content": core.ActEdit, "multi_replace_file_content": core.ActEdit, "edit_file": core.ActEdit, "sed_file": core.ActEdit, "notebook_edit": core.ActEdit,
 	"read_url_content": core.ActWeb, "search_web": core.ActWeb,
 	"call_mcp_tool": core.ActMCP,
 	"ask_question":  core.ActQuestion, "ask_permission": core.ActQuestion, "ask_custom_permission": core.ActQuestion,
@@ -72,7 +75,7 @@ func ActionOf(tool string, args json.RawMessage) core.ToolAction {
 func summary(tool string, args json.RawMessage) string {
 	var in map[string]any
 	_ = json.Unmarshal(args, &in)
-	for _, k := range []string{"toolAction", "toolSummary", "CommandLine", "AbsolutePath", "TargetFile", "Url", "query"} {
+	for _, k := range []string{"toolAction", "toolSummary", "CommandLine", "AbsolutePath", "TargetFile", "Path", "Url", "query"} {
 		if s, ok := in[k].(string); ok && strings.TrimSpace(s) != "" {
 			return firstLine(s)
 		}

@@ -245,7 +245,7 @@ func next(t *testing.T, ch <-chan sseEvent, what string, ok func(sseEvent) bool)
 
 // The fake CLI is the test binary itself, run as Claude Code by the
 // session (UNCLI_CLAUDE_BIN), speaking the stream-json shapes recorded in
-// testdata/streams/claude/2.1.285 (perm-stdio-allow). A message makes it
+// testdata/streams/claude/<pinned> (perm-stdio-allow). A message makes it
 // ask to push; the push waits for UNCLI's answer, then the turn ends.
 func TestMain(m *testing.M) {
 	if os.Getenv("UNCLI_FAKE_CLI") == "1" {

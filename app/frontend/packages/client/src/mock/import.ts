@@ -9,17 +9,17 @@ export function mockTranscripts(now = Date.now()): TranscriptEntry[] {
   return [
     {
       id: 'tr-terminal', workdir: 'C:\\Users\\you\\code\\billing-service', started: now - 3 * HOUR, updated: now - 2 * HOUR,
-      firstQuestion: 'Why do invoices round to the wrong cent when the tax rate has three decimals?', turns: 6, cliVersion: '2.1.285',
+      firstQuestion: 'Why do invoices round to the wrong cent when the tax rate has three decimals?', turns: 6, cliVersion: '2.1.322',
       folderGone: false, fromChat: false, profile: 'code',
     },
     {
       id: 'tr-chat', workdir: 'C:\\Users\\you\\AppData\\Roaming\\uncli\\scratch\\0f3c', started: now - 30 * HOUR, updated: now - 29 * HOUR,
-      firstQuestion: 'Draft a polite note declining the Thursday meeting.', turns: 2, cliVersion: '2.1.285',
+      firstQuestion: 'Draft a polite note declining the Thursday meeting.', turns: 2, cliVersion: '2.1.322',
       folderGone: false, fromChat: true, profile: 'chat',
     },
     {
       id: 'tr-imported', workdir: 'C:\\Users\\you\\code', started: now - 50 * HOUR, updated: now - 48 * HOUR,
-      firstQuestion: 'Why does TestMultiTurnPartial fail about one run in five?', turns: 1, cliVersion: '2.1.285',
+      firstQuestion: 'Why does TestMultiTurnPartial fail about one run in five?', turns: 1, cliVersion: '2.1.322',
       sessionId: 's-code', folderGone: false, fromChat: false, profile: 'code',
     },
     {

@@ -104,7 +104,7 @@ describe('Sidebar', () => {
     expect(within(list).getByText('Fix the flaky parser test')).toBeInTheDocument()
     expect(within(list).getByText('Plan a weekend in Lisbon')).toBeInTheDocument()
     expect(within(list).getByText('Unread')).toBeInTheDocument()
-    expect(screen.getByText('Claude Code 2.1.285')).toBeInTheDocument()
+    expect(screen.getByText('Claude Code 2.1.322')).toBeInTheDocument()
   })
 })
 

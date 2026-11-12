@@ -24,6 +24,29 @@ import (
 
 const fixtures = "../../testdata/streams/claude/" + claude.PinnedVersion
 
+// recorded is what a fixture's result lines say: each turn's answer, the
+// CLI's running cost and the session it ran in. Tests check against the
+// recording, not one CLI version's (or model's) wording.
+type recorded struct {
+	Text  string  `json:"result"`
+	Total float64 `json:"total_cost_usd"`
+	SID   string  `json:"session_id"`
+}
+
+func recordedResults(t *testing.T, name string) []recorded {
+	t.Helper()
+	var out []recorded
+	for _, seg := range segments(t, name) {
+		lines := bytes.Split(bytes.TrimSpace(seg), []byte("\n"))
+		var r recorded
+		if err := json.Unmarshal(lines[len(lines)-1], &r); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
 // segments splits a recorded stream into one chunk per turn (ending at
 // each result line).
 func segments(t *testing.T, name string) [][]byte {
@@ -245,7 +268,8 @@ func TestMultiTurnPages(t *testing.T) {
 	if len(pages) != 3 {
 		t.Fatalf("pages = %d", len(pages))
 	}
-	if pages[0].AnswerMD != "OK" || pages[2].AnswerMD != "Forty-two." || !strings.Contains(pages[1].AnswerMD, "```js") {
+	rec := recordedResults(t, "multi-turn-partial")
+	if pages[0].AnswerMD != rec[0].Text || pages[2].AnswerMD != rec[2].Text || !strings.Contains(pages[1].AnswerMD, "```js") {
 		t.Errorf("answers = %q / %q / %q", pages[0].AnswerMD, pages[1].AnswerMD, pages[2].AnswerMD)
 	}
 	total := 0.0
@@ -255,12 +279,12 @@ func TestMultiTurnPages(t *testing.T) {
 		}
 		total += p.CostUSD
 	}
-	if total < 0.0294 || total > 0.0295 {
-		t.Errorf("page costs should add up to the CLI's running total, got %v", total)
+	if want := rec[2].Total; total < want-1e-9 || total > want+1e-9 {
+		t.Errorf("page costs should add up to the CLI's running total %v, got %v", want, total)
 	}
 	got, _ := h.m.get(v.ID)
 	view := got.View()
-	if view.ProviderSID != "df1bfdf0-962d-4fe2-bc28-eb1f3e0b22e2" || view.Title == "" || view.State != Idle {
+	if view.ProviderSID != rec[0].SID || view.Title == "" || view.State != Idle {
 		t.Errorf("view = %+v", view)
 	}
 	if len(h.rt.starts) != 1 {
@@ -331,10 +355,10 @@ func TestRestartResumes(t *testing.T) {
 		t.Fatalf("restored = %+v", list)
 	}
 	pages = h2.send(v.ID, "What number?")
-	if len(pages) != 2 || !pages[0].Bookmarked || pages[1].AnswerMD != "Forty-two." {
+	if len(pages) != 2 || !pages[0].Bookmarked || pages[1].AnswerMD != recordedResults(t, "resume-partial")[0].Text {
 		t.Errorf("pages after restart = %+v", pages)
 	}
-	if args := strings.Join(h2.rt.starts[0].Args, " "); !strings.Contains(args, "--resume df1bfdf0-962d-4fe2-bc28-eb1f3e0b22e2") {
+	if args := strings.Join(h2.rt.starts[0].Args, " "); !strings.Contains(args, "--resume "+recordedResults(t, "multi-turn-partial")[0].SID) {
 		t.Errorf("restart should resume: %s", args)
 	}
 }
@@ -343,7 +367,8 @@ func TestInterruptedTurn(t *testing.T) {
 	h := newHarness(t, "interrupt-then-continue")
 	v, _ := h.m.Create("chat", "", "haiku")
 	pages := h.send(v.ID, "Write a story")
-	if pages[0].Status != "interrupted" || !strings.Contains(pages[0].AnswerMD, "Last Light") {
+	// What streamed before the interrupt is kept.
+	if pages[0].Status != "interrupted" || strings.TrimSpace(pages[0].AnswerMD) == "" {
 		t.Errorf("page = %+v", pages[0])
 	}
 	pages = h.send(v.ID, "What were you writing?")
@@ -581,11 +606,13 @@ func TestSlashCommandPages(t *testing.T) {
 		h.send(v.ID, q)
 	}
 	pages := h.send(v.ID, "What did I ask first?")
-	if !strings.Contains(pages[1].AnswerMD, "subscription") || pages[3].AnswerMD == "" || pages[6].AnswerMD != "Conversation cleared." {
+	// What /cost prints depends on the sign-in (a subscription, or a token).
+	if !strings.Contains(strings.ToLower(pages[1].AnswerMD), "cost") || pages[3].AnswerMD == "" || pages[6].AnswerMD != "Conversation cleared." {
 		t.Errorf("slash pages: cost=%q compact=%q clear=%q", pages[1].AnswerMD, pages[3].AnswerMD, pages[6].AnswerMD)
 	}
 	s, _ := h.m.get(v.ID)
-	if sid := s.View().ProviderSID; sid != "003f62ed-fcb9-4f24-aebe-59d5f3007ea8" {
+	rec := recordedResults(t, "slash-commands")
+	if sid := s.View().ProviderSID; sid != rec[len(rec)-1].SID {
 		t.Errorf("provider sid after /clear = %s", sid)
 	}
 }

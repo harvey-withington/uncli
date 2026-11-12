@@ -161,7 +161,7 @@ func TestHookAskedOnACard(t *testing.T) {
 	res := h.ask(0, antigravity.EventPreTool, h.calls[1])
 	v := h.until(func(v View) bool { return len(v.Approvals) == 1 }, "no card")
 	a := v.Approvals[0]
-	if a.Tool != "write_to_file" || a.Action.Path != `C:\uncli-spike\colour.txt` || !strings.HasSuffix(a.ToolUseID, ":4") {
+	if a.Tool != "write_file" || a.Action.Path != `C:\uncli-spike\colour.txt` || !strings.HasSuffix(a.ToolUseID, ":4") {
 		t.Errorf("card = %+v", a)
 	}
 	if err := h.m.Answer(h.id, a.RequestID, Allow, ""); err != nil {
@@ -171,14 +171,16 @@ func TestHookAskedOnACard(t *testing.T) {
 	if code != "0" || out != `{"decision":"allow"}` {
 		t.Errorf("hook printed %q, exit %s", out, code)
 	}
-	pages, _ := h.m.Pages(h.id)
-	approved := false
-	for _, it := range pages[0].Trace {
-		approved = approved || it.ID == a.ToolUseID && it.Approved == "you"
+	// The trace catches up with the answer (under load, a moment later).
+	var trace []store.TraceItem
+	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		pages, _ := h.m.Pages(h.id)
+		trace = pages[0].Trace
+		if slices.ContainsFunc(trace, func(it store.TraceItem) bool { return it.ID == a.ToolUseID && it.Approved == "you" }) {
+			return
+		}
 	}
-	if !approved {
-		t.Errorf("trace = %+v", pages[0].Trace)
-	}
+	t.Errorf("trace = %+v", trace)
 }
 
 func TestHookDeniedOnACard(t *testing.T) {

@@ -116,7 +116,7 @@ func TestToolsThroughTheHook(t *testing.T) {
 	for _, s := range started {
 		names = append(names, s.Name)
 	}
-	if strings.Join(names, ",") != "view_file,write_to_file,run_command" || started[2].ID != ToolID(conv, 6) {
+	if strings.Join(names, ",") != "read_file,write_file,run_command" || started[2].ID != ToolID(conv, 6) {
 		t.Fatalf("started = %+v", started)
 	}
 	if started[2].Summary != "Get-Content colour.txt" {
@@ -134,7 +134,7 @@ func TestToolsThroughTheHook(t *testing.T) {
 	// The hook's calls name the same steps, so a card belongs to its tool.
 	calls := readHookCalls(t, "tools-hook-allow")
 	a := &Adapter{}
-	want := map[string]string{"view_file": core.ActRead, "write_to_file": core.ActWrite, "run_command": core.ActShell}
+	want := map[string]string{"read_file": core.ActRead, "write_file": core.ActWrite, "run_command": core.ActShell}
 	for i, raw := range calls {
 		c, err := a.ReadHook(EventPreTool, raw)
 		if err != nil {

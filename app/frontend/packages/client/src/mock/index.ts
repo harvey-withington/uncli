@@ -195,7 +195,7 @@ function mockMCP(): MCPServer[] {
 function session(id: string, profileId: string, title: string, state: ActivityState, extra: Partial<SessionView> = {}): SessionView {
   return {
     id, title, adapter: 'claude', runtime: 'local', profileId, workdir: `C:\\Users\\you\\${profileId}`,
-    providerSid: '', cliVersion: '2.1.285', model: profiles.find(p => p.id === profileId)?.model ?? 'sonnet',
+    providerSid: '', cliVersion: '2.1.322', model: profiles.find(p => p.id === profileId)?.model ?? 'sonnet',
     modifiers: [], sortOrder: 0, archived: false, createdAt: Date.now(), updatedAt: Date.now(),
     state, running: state !== 'idle', busy: false, ...shareFields(profileId, extra), ...extra,
   }
@@ -332,7 +332,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       page('s-cowork', 3, 'Draft a two-line update for the team.', 'We\'re shipping desktop first, keeping pricing flat for a year, and hiring a designer before the beta. Owners are in the planning doc.', { modifiers: ['efficiency'] }),
     ],
   }
-  let cli: CLIStatus = { installed: true, version: '2.1.285', pinned: '2.1.285', custom: false, loggedIn: true, email: 'you@example.com', subscription: 'max', ...opts.cli }
+  let cli: CLIStatus = { installed: true, version: '2.1.322', pinned: '2.1.322', custom: false, loggedIn: true, email: 'you@example.com', subscription: 'max', ...opts.cli }
   // The second provider: ?agy=none (not installed), ?agy=signedout;
   // otherwise installed and signed in.
   const agyMode = new URLSearchParams(location.search).get('agy')
@@ -342,7 +342,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     { value: 'gemini-3.1-pro-high', resolved: 'gemini-3.1-pro-high', displayName: 'Gemini 3.1 Pro (High)', description: '', effortLevels: [] },
   ]
   let agy: CLIStatus = {
-    provider: 'antigravity', installed: agyMode !== 'none', version: '1.3.1', pinned: '1.3.1', custom: false,
+    provider: 'antigravity', installed: agyMode !== 'none', version: '1.5.6', pinned: '1.5.6', custom: false,
     loggedIn: !agyMode, models: agyMode ? undefined : agyModels,
   }
   // ?plugins: a provider plugin (disabled) and a broken one.
@@ -516,7 +516,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     },
     async cancelSignIn() {},
     async setCLIVersion(v) { cli = { ...cli, version: v || cli.pinned }; return cli },
-    async cliChannels() { return { stable: '2.1.285', latest: '2.1.286' } },
+    async cliChannels() { return { stable: '2.1.322', latest: '2.1.323' } },
     async providerStatus(id) { return statusOf(id) },
     async installProvider(id) {
       if (id === 'example-cli') {
@@ -569,7 +569,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
       const p = plugin(id)
       if (p) p.enabled = false
     },
-    async providerChannels(id) { return id === 'antigravity' ? { stable: '1.3.1', latest: '1.3.1' } : this.cliChannels() },
+    async providerChannels(id) { return id === 'antigravity' ? { stable: '1.5.6', latest: '1.5.6' } : this.cliChannels() },
     async pickFolder() { return 'C:\\Users\\you\\projects\\demo' },
     async createSession(profileId, workdir, model, container, provider, shares, opts) {
       const p = profiles.find(x => x.id === profileId)

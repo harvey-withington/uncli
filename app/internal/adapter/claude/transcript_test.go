@@ -18,7 +18,7 @@ func TestListTranscripts(t *testing.T) {
 		t.Fatalf("list = %+v %v", list, err)
 	}
 	i := list[0]
-	if i.ID != fixtureID || i.Workdir != `C:\uncli-spike\w-import` || i.Turns != 4 || i.CLIVersion != "2.1.285" ||
+	if i.ID != fixtureID || i.Workdir != `C:\uncli-spike\w-import` || i.Turns != 4 || i.CLIVersion != PinnedVersion ||
 		!strings.HasPrefix(i.FirstQuestion, "Use the Write tool to create hello.txt") || i.Started == 0 || i.Updated < i.Started {
 		t.Errorf("info = %+v", i)
 	}
@@ -33,7 +33,7 @@ func TestReadTranscript(t *testing.T) {
 		t.Fatalf("turns = %d: %+v", len(tr.Turns), tr.Turns)
 	}
 	first := tr.Turns[0]
-	if !strings.Contains(first.Answer, "DONE") || first.Model != "claude-haiku-4-5-20251001" || first.Usage.OutputTokens == 0 {
+	if !strings.Contains(first.Answer, "DONE") || !strings.HasPrefix(first.Model, "claude-haiku-") || first.Usage.OutputTokens == 0 {
 		t.Errorf("first turn = %+v", first)
 	}
 	if len(first.Tools) != 1 || first.Tools[0].Name != "Write" || !first.Tools[0].Done || !first.Tools[0].OK || first.Tools[0].Summary != "Write hello.txt" {

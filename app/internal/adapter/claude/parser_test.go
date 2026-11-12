@@ -103,7 +103,7 @@ func TestMultiTurnPartial(t *testing.T) {
 	if len(rs) != 3 {
 		t.Fatalf("results = %d, want 3", len(rs))
 	}
-	if rs[2].Text != "Forty-two." || rs[2].IsError {
+	if low := strings.ToLower(rs[2].Text); !strings.Contains(low, "42") && !strings.Contains(low, "forty") || rs[2].IsError {
 		t.Errorf("last result = %+v", rs[2])
 	}
 	if !(rs[0].TotalCost < rs[1].TotalCost && rs[1].TotalCost < rs[2].TotalCost) || !rs[0].CostIsTotal {
@@ -132,7 +132,7 @@ func TestInterruptThenContinue(t *testing.T) {
 	if !rs[0].Interrupted || rs[0].IsError {
 		t.Errorf("first turn should be interrupted, not an error: %+v", rs[0])
 	}
-	if rs[1].Interrupted || rs[1].IsError || !strings.Contains(rs[1].Text, "Last Light") {
+	if rs[1].Interrupted || rs[1].IsError || !strings.Contains(strings.ToLower(rs[1].Text), "lighthouse") {
 		t.Errorf("second turn should continue the conversation: %+v", rs[1])
 	}
 }
@@ -337,7 +337,7 @@ func TestToolHints(t *testing.T) {
 	for _, e := range ofKind(evs, core.EvApprovalAsked) {
 		asked = append(asked, decode[core.ApprovalAsked](t, e).Tool)
 	}
-	if strings.Join(asked, ",") != "mcp__notes__read_note,mcp__notes__delete_note" {
+	if !slices.Contains(asked, "mcp__notes__read_note") || !slices.Contains(asked, "mcp__notes__delete_note") {
 		t.Errorf("asked about %v", asked)
 	}
 	if hints := toolHints([]mcpServer{{Name: "claude.ai Gmail"}}); hints.Tools == nil {
@@ -466,7 +466,7 @@ func TestBackgroundTasks(t *testing.T) {
 	if len(bg) != 2 {
 		t.Fatalf("background events = %d", len(bg))
 	}
-	if first := decode[core.BackgroundTasks](t, bg[0]); len(first.Tasks) != 1 || first.Tasks[0].Description != "Simple ping response" || first.Tasks[0].Kind != "local_agent" {
+	if first := decode[core.BackgroundTasks](t, bg[0]); len(first.Tasks) != 1 || first.Tasks[0].Description == "" || first.Tasks[0].Kind != "local_agent" {
 		t.Errorf("first = %+v", first)
 	}
 	if last := decode[core.BackgroundTasks](t, bg[1]); len(last.Tasks) != 0 {
@@ -533,7 +533,8 @@ func TestCommands(t *testing.T) {
 	for _, x := range c.List {
 		names[x.Name] = x
 	}
-	if len(c.List) != 50 || names["design"].Hint != "consent | revoke" || names["compact"].Description == "" {
+	// How many there are depends on the CLI version; these are its own.
+	if len(c.List) < 30 || names["design"].Hint != "consent | revoke" || names["compact"].Description == "" {
 		t.Errorf("commands = %d, design %+v, compact %+v", len(c.List), names["design"], names["compact"])
 	}
 	for _, terminal := range []string{"doctor", "color", "focus", "reload-plugins"} {

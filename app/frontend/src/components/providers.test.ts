@@ -49,7 +49,7 @@ describe('A second AI provider', () => {
     const settings = within(await screen.findByRole('dialog', { name: 'Settings' }))
     await waitFor(() => expect(settings.getByRole('tab', { name: 'AI Providers' })).toHaveAttribute('aria-selected', 'true'))
     const section = within(settings.getByRole('region', { name: 'Antigravity CLI' }))
-    await fireEvent.click(section.getByRole('button', { name: 'Install Antigravity CLI 1.3.1' }))
+    await fireEvent.click(section.getByRole('button', { name: 'Install Antigravity CLI 1.5.6' }))
     expect(await section.findByText(/Signed in with your Google account/, {}, { timeout: 3000 })).toBeInTheDocument()
   })
 

@@ -37,7 +37,7 @@ func TestManifestChecks(t *testing.T) {
 	cases := map[string]struct{ src, want string }{
 		"checks off without a hook":   {noHook, "launch.approvals switches the CLI's own checks off"},
 		"an http download":            {strings.Replace(src, "url: https://storage", "url: http://storage", 1), "must be https"},
-		"no checksum":                 {strings.Replace(src, "sha512: f346", "sha513: f346", 1), "field sha513 not found"},
+		"no checksum":                 {strings.Replace(src, "        sha512: ", "        sha513: ", 1), "field sha513 not found"},
 		"a file outside its folder":   {strings.Replace(src, `"{state}/config/hooks.json"`, `"{state}/../../evil.json"`, 1), "only files in {state}"},
 		"a tool hook that never runs": {strings.Replace(src, `"{hook:pre-tool}"`, `"echo allow"`, 1), "never run the pre-tool hook"},
 		"a kind UNCLI doesn't have":   {strings.Replace(src, "run_command: shell", "run_command: anything", 1), `"anything" isn't a kind`},

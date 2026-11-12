@@ -146,10 +146,10 @@ func agyPath(t *testing.T, svc *app.Service, config, provider string) {
 
 	// A write waits on a card; allowed, it happens.
 	go func() {
-		_ = svc.Sessions.Send(context.Background(), v.ID, "Use your write_to_file tool to create hello.txt in the current folder containing exactly: hi from agy. Then reply DONE.")
+		_ = svc.Sessions.Send(context.Background(), v.ID, "Use your write_file tool to create hello.txt in the current folder containing exactly: hi from agy. Then reply DONE.")
 	}()
 	card := waitFor(t, svc, v.ID, func(v session.View) bool { return len(v.Approvals) > 0 }, "a card for the write").Approvals[0]
-	if card.Tool != "write_to_file" || !strings.HasSuffix(card.Action.Path, "hello.txt") {
+	if card.Tool != "write_file" || !strings.HasSuffix(card.Action.Path, "hello.txt") {
 		t.Fatalf("card = %+v", card)
 	}
 	if err := svc.Sessions.Answer(v.ID, card.RequestID, session.Allow, ""); err != nil {
@@ -237,7 +237,7 @@ func TestAntigravityHookFailsClosed(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, bin, "--gemini_dir="+state, "--dangerously-skip-permissions", "--model", "gemini-3.8-flash-low",
-				"-p", "Use your write_to_file tool to create made.txt in the current folder containing: x. Then reply DONE.", "--output-format", "json")
+				"-p", "Use your write_file tool to create made.txt in the current folder containing: x. Then reply DONE.", "--output-format", "json")
 			cmd.Dir = work
 			cmd.Env = append(os.Environ(), "AGY_CLI_DISABLE_AUTO_UPDATE=true")
 			out, _ := cmd.CombinedOutput()

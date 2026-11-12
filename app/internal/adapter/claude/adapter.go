@@ -21,7 +21,7 @@ import (
 )
 
 // PinnedVersion is the Claude Code release this build of UNCLI is tested with.
-const PinnedVersion = "2.1.285"
+const PinnedVersion = "2.1.322"
 
 type Adapter struct {
 	installer *Installer

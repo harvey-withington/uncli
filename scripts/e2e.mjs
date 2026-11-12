@@ -51,6 +51,8 @@ function visibleConsoles() {
 }
 
 const APPDIR = path.join(ROOT, 'app')
+// The Claude Code version UNCLI pins, as the adapter says.
+const PINNED = fs.readFileSync(path.join(APPDIR, 'internal', 'adapter', 'claude', 'adapter.go'), 'utf8').match(/PinnedVersion = "([^"]+)"/)[1]
 const EDGE = process.env.EDGE_PATH ?? newestEdge()
 
 // The newest versioned msedge.exe; the top-level one is a launcher.
@@ -169,7 +171,7 @@ let { proc, browser, page } = await launch()
 try {
   await waitText(page, 'Welcome to UNCLI', 30000)
   await shot(page, '01-welcome')
-  ok('app starts signed in with the pinned CLI', (await text(page)).includes('Claude Code 2.1.285'))
+  ok('app starts signed in with the pinned CLI', (await text(page)).includes(`Claude Code ${PINNED}`))
 
   // Chat session through the dialog.
   await clickText(page, 'button', 'New session')
