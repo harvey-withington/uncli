@@ -12,6 +12,9 @@ export interface Place {
   statusOf(provider?: string): CLIStatus | null
   modelsFor(provider?: string): ModelInfo[] | null
   namesFor(adapter?: string): ProviderNames
+  // reloadContainers reads its containers again (after an import or a
+  // build starts); a server's are followed until its builds finish.
+  reloadContainers(): Promise<void>
 }
 
 // thisPC is the app's own machine state.
@@ -24,8 +27,13 @@ export function thisPC(app: AppStore): Place {
     statusOf: p => app.statusOf(p),
     modelsFor: p => app.modelsFor(p),
     namesFor: a => app.namesFor(a),
+    reloadContainers: () => app.loadContainers().then(() => {}),
   }
 }
+
+// How often a server's containers are asked about while one builds: its
+// container changes aren't sent to this PC (only its sessions are).
+const BUILD_POLL_MS = 2000
 
 // ServerPlace is a paired server's, loaded when it's chosen.
 export class ServerPlace implements Place {
@@ -52,6 +60,21 @@ export class ServerPlace implements Place {
       this.error = e instanceof Error ? e.message : String(e)
     }
   }
+
+  async reloadContainers() {
+    if (this.boot?.platform !== 'windows') return
+    this.containers = await this.backend.containers().catch(() => this.containers)
+    // A build there: asked again until it's done (or failed).
+    if (this.containers?.containers.some(c => c.step) && !this.polling) {
+      this.polling = true
+      setTimeout(() => {
+        this.polling = false
+        void this.reloadContainers()
+      }, BUILD_POLL_MS)
+    }
+  }
+
+  private polling = false
 
   statusOf(provider?: string): CLIStatus | null {
     return this.statuses[provider || this.boot?.providers[0]?.id || ''] ?? null

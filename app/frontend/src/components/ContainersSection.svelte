@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ContainerInfo } from '@uncli/chat/lib/api'
+  import type { ContainerInfo, ContainerSource } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
   import { i18n, t } from '@uncli/chat/lib/i18n.svelte'
   import { blank, idFor, profileOf } from '../lib/containers'
@@ -104,6 +104,14 @@
     return t('containers.shares', { what: new Intl.ListFormat(i18n.locale, { type: 'conjunction' }).format(what) })
   }
 
+  // Where an imported container came from, when, and from which paired
+  // device if it wasn't this PC (decisions 0028, 0033).
+  function fromLine(f: ContainerSource): string {
+    const project = f.repo.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? f.repo
+    const day = new Date(f.imported).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    return t(f.device ? 'containers.fromDevice' : 'containers.from', { project, day, device: f.device ?? '' })
+  }
+
   // Wants the user's connectors, but there's no full account sign-in yet:
   // it runs with the models-only token meanwhile.
   const waitsForAccount = (c: ContainerInfo) => c.connectors === 'shared' && !info?.accountSignedIn
@@ -154,6 +162,7 @@
             <span class="name">{c.label}</span>
             <span class="detail" title={c.packages.join(' ')}>{[c.baseLabel, ...c.packages].join(' · ')}</span>
             {#if shares(c)}<span class="shares">{shares(c)}</span>{/if}
+            {#if c.from}<span class="shares">{fromLine(c.from)}</span>{/if}
             {#if c.missing?.length}<span class="missing" role="note"><Icon name="triangle-alert" size={13} />{t('containers.missing', { list: c.missing.join(', ') })}</span>{/if}
             {#if waitsForAccount(c)}<span class="changed">{t('containers.needsAccount')}</span>{/if}
             {#if changed(c)}<span class="changed">{changedLine(c)}</span>{/if}

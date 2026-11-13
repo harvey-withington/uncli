@@ -5,7 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
+
+	"github.com/harvey-withington/uncli/app/internal/notify"
 )
 
 // suggestingRepo makes a repository whose .uncli suggests containers
@@ -56,6 +60,48 @@ func suggested(t *testing.T, svc *Service, folder string) Suggestions {
 		t.Fatal(err)
 	}
 	return s
+}
+
+// notes keeps the notifications a test's service shows.
+type notes struct {
+	notify.None
+	mu    sync.Mutex
+	shown []notify.Note
+}
+
+func (n *notes) Show(x notify.Note) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.shown = append(n.shown, x)
+	return nil
+}
+
+// A paired device's import (decision 0033) is remembered as the device's,
+// and this PC says so; one made here says nothing.
+func TestImportFromADevice(t *testing.T) {
+	svc := editService(t)
+	n := &notes{}
+	svc.notifier = n
+	ctx := context.Background()
+	root := suggestingRepo(t, "containers.yaml", teamDev)
+	p := suggested(t, svc, root).Containers[0].Profile
+	if err := svc.ImportContainerFrom(ctx, p, root, "team-dev", "DEVIANT"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := find(svc.Containers(ctx), "team-dev")
+	if got.From == nil || got.From.Device != "DEVIANT" {
+		t.Fatalf("from = %+v", got.From)
+	}
+	if len(n.shown) != 1 || !strings.Contains(n.shown[0].Body, `DEVIANT imported the container "Team dev"`) {
+		t.Errorf("notes = %+v", n.shown)
+	}
+	// Synced at this PC: no longer the device's, and no note.
+	if err := svc.ImportContainer(ctx, p, root, "team-dev"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := find(svc.Containers(ctx), "team-dev"); got.From.Device != "" || len(n.shown) != 1 {
+		t.Errorf("synced here: from %+v, notes %d", got.From, len(n.shown))
+	}
 }
 
 func TestSuggestedContainers(t *testing.T) {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ContainerBase, ContainerInfo, ContainerProfile, StepRisks } from '@uncli/chat/lib/api'
+  import type { Backend, ContainerBase, ContainerInfo, ContainerProfile, StepRisks } from '@uncli/chat/lib/api'
   import { untrack, type Snippet } from 'svelte'
   import { flaggedIn, whyKey } from '../lib/suggestions'
   import { addPackages, idFor, MAX_STEP, problems, same, tidy, validPackage } from '../lib/containers'
@@ -29,9 +29,14 @@
     onsave?: (p: ContainerProfile) => Promise<void>
     flagged?: StepRisks[]
     top?: Snippet<[ContainerProfile]>
+    // Where it's saved and built: this PC unless given (a paired server's,
+    // importing there; decision 0033), and how its containers are read
+    // again after.
+    backend?: Backend
+    reload?: () => Promise<unknown>
   }
-  let { start, container, bases, taken, onclose, onsave, flagged = [], top }: Props = $props()
   const app = useApp()
+  let { start, container, bases, taken, onclose, onsave, flagged = [], top, backend = app.backend, reload = () => app.loadContainers() }: Props = $props()
   // The editor opens afresh for each container, so what it started from stays put.
   const isNew = untrack(() => !container)
   const importing = untrack(() => !!onsave)
@@ -76,9 +81,9 @@
     saving = true
     try {
       const p = tidy($state.snapshot(draft) as ContainerProfile)
-      await (onsave ?? app.backend.saveContainer)(p)
-      if (build) await app.backend.buildContainer(p.id)
-      await app.loadContainers()
+      await (onsave ?? backend.saveContainer)(p)
+      if (build) await backend.buildContainer(p.id)
+      await reload()
       if (!build) shell.toast(t(container?.built ? 'containerEdit.savedBuilt' : 'containerEdit.saved', { label: draft.label.trim() }))
       else shell.toast(t('containerEdit.building', { label: draft.label.trim() }))
       onclose()

@@ -220,8 +220,10 @@
         <p class="hint">{t('newSession.containerSignIn')}</p>
       {/if}
     {/if}
-    {#if needsFolder && folder && isFirst && app.boot?.platform === 'windows' && here}
-      <SuggestedContainers {folder} bind:container refresh={imported} onimport={(s, repo, name) => (importing = { s, repo, name })} />
+    <!-- A project's containers, on the PC the session starts on: this one or
+         a paired server (decision 0033). Not on the phone: setup stays at a PC. -->
+    {#if needsFolder && folder && isFirst && place.boot?.platform === 'windows' && atServer(app.backend)}
+      <SuggestedContainers {folder} {place} bind:container refresh={imported} onimport={(s, repo, name) => (importing = { s, repo, name })} />
     {/if}
 
     {#if shareable.length}
@@ -256,7 +258,7 @@
   <FolderBrowser backend={place.backend} title={pickTitle} start={folder} onpick={picked} onclose={() => (browsing = false)} />
 {/if}
 {#if importing}
-  <ImportContainerDialog suggestion={importing.s} repo={importing.repo} name={importing.name} onclose={() => { importing = null; imported++ }} />
+  <ImportContainerDialog suggestion={importing.s} repo={importing.repo} name={importing.name} {place} onclose={() => { importing = null; imported++ }} />
 {/if}
 
 <style>

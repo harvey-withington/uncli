@@ -202,6 +202,13 @@ func TestRefusals(t *testing.T) {
 		if err := r.call(nil, "CreateSession", "code", p, "haiku", "", "", []string{}); err == nil || !strings.Contains(err.Error(), "network path") {
 			t.Errorf("CreateSession(%s) = %v", p, err)
 		}
+		// A project's containers are read and imported from this PC's own drives too.
+		if err := r.call(nil, "SuggestedContainers", p); err == nil || !strings.Contains(err.Error(), "network path") {
+			t.Errorf("SuggestedContainers(%s) = %v", p, err)
+		}
+		if err := r.call(nil, "ImportContainer", app.ContainerProfile{ID: "x"}, p, "x"); err == nil || !strings.Contains(err.Error(), "network path") {
+			t.Errorf("ImportContainer(%s) = %v", p, err)
+		}
 	}
 }
 

@@ -112,8 +112,11 @@ Rules for what UNCLI is, which a change must keep:
 - **The phone is for prompting.** Setup and configuration (containers,
   terminals, `.uncli` imports, CLI setup) stay on the desktop: off the
   remote server's allowlist, and shown disabled with `onlyAtServer`
-  remotely. Decide each feature's phone exposure explicitly; raise a
-  possible exception rather than assuming one.
+  remotely. One exception: a project's suggested containers can be
+  imported and built on a paired server from the desktop (decision 0033),
+  so those three methods are on the list, but the phone's screens still
+  don't offer them. Decide each feature's phone exposure explicitly; raise
+  a possible exception rather than assuming one.
 - **Embedding is local** (decision 0027): each host runs its own UNCLI
   core behind its own server. Don't reintroduce host pairing, CORS or
   session scoping. When a decision quietly supersedes part of the brief,

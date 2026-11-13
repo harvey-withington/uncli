@@ -13,15 +13,15 @@ import (
 // widening of what the network can do: check it belongs (decision 0021).
 var pinnedMethods = []string{
 	"AnswerApproval", "AnswerAsk", "Archive", "ArtifactFiles", "ArtifactLink",
-	"Bootstrap", "CLIChannels", "CLIStatus", "CheckForUpdates", "Commands", "Containers",
+	"Bootstrap", "BuildContainer", "CLIChannels", "CLIStatus", "CheckForUpdates", "Commands", "Containers",
 	"CreateSession", "Delete", "DeleteSafeEntry", "Editors", "ExplainCommand", "ExplainPage", "ExplainSize",
-	"Focus", "HasDecisionKey", "ImportTranscript", "InstallUpdate", "Interrupt", "KnownTools",
+	"Focus", "HasDecisionKey", "ImportContainer", "ImportTranscript", "InstallUpdate", "Interrupt", "KnownTools",
 	"ListFolder", "MCPCallback", "MCPCancel", "MCPReconnect", "MCPSignIn",
 	"MCPSignOut", "MCPToggle", "MarkSafe", "MoveSafeEntry", "PageChanges", "Pages", "Pinned",
 	"PreviewClasses", "ProviderChannels", "ProviderStatus", "PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "Queue", "ReadArtifact",
 	"Rename", "Restart", "SafeList", "Search", "Send", "SendQueued", "SendWith", "SessionAllowlist", "SetBookmark",
 	"SetMode", "SetModel", "SetPinned", "SetPushNotifications", "SetResumeCutOff", "SetSafeEntry", "SetSafeLabel",
-	"SetShares", "SetSortOrder", "SetUnattended", "SummarisePage", "Teach", "TestPush",
+	"SetShares", "SetSortOrder", "SetUnattended", "SuggestedContainers", "SummarisePage", "Teach", "TestPush",
 	"ToggleModifier", "Transcripts", "Unqueue", "UpdateStatus", "UploadLink", "Usage", "UsageReport",
 	"WatchFiles", "WatchRead",
 }
@@ -41,9 +41,8 @@ func TestRPCMethods(t *testing.T) {
 		"SetPreferences", "SetDecisionKey", "TestDecisionModel", "TestNotification",
 		"InstallCLI", "InstallProvider", "SetCLIVersion", "SetProviderVersion", "SubmitLoginCode",
 		"SignInTerminal", "CancelDeviceSignIn", "EnablePlugin", "DisablePlugin",
-		"InstallWSL", "StopContainers", "BuildContainer", "SaveContainer", "RemoveContainer",
+		"InstallWSL", "StopContainers", "SaveContainer", "RemoveContainer",
 		"RemoveContainerConfig", "StartContainerSignIn", "SignOutContainers", "Theme",
-		"SuggestedContainers", "ImportContainer",
 		"ArtifactPath", "ClipboardFiles", "DescribePaths", "DescribeAttachments"} {
 		if rpcNames[m] {
 			t.Errorf("%s must not be reachable remotely", m)

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SuggestedContainer, Suggestions } from '@uncli/chat/lib/api'
   import { useApp } from '../lib/context'
+  import { thisPC, type Place } from '../stores/place.svelte'
   import { t } from '@uncli/chat/lib/i18n.svelte'
   import Icon from '@uncli/chat/components/Icon.svelte'
 
@@ -15,13 +16,14 @@
   // and says when the project suggests none.
   interface Props {
     folder: string
+    place?: Place // whose folder it is: this PC's, or a paired server's (decision 0033)
     container?: string // the dialog's "Run in"
     refresh: number
     standalone?: boolean
     onimport: (s: SuggestedContainer, repo: string, name: string) => void
   }
-  let { folder, container = $bindable(''), refresh, standalone = false, onimport }: Props = $props()
   const app = useApp()
+  let { folder, place = thisPC(app), container = $bindable(''), refresh, standalone = false, onimport }: Props = $props()
   let found = $state<Suggestions | null>(null)
   let loaded = $state(false)
   let asked = 0
@@ -29,10 +31,10 @@
   async function load(dir: string) {
     const n = ++asked
     try {
-      const s = await app.backend.suggestedContainers(dir)
+      const s = await place.backend.suggestedContainers(dir)
       if (n !== asked) return
       found = s
-      const built = new Set((app.containers?.containers ?? []).filter(c => c.built).map(c => c.id))
+      const built = new Set((place.containers?.containers ?? []).filter(c => c.built).map(c => c.id))
       const mine = s.containers.find(c => c.yours && built.has(c.yours))
       if (!standalone && !container && mine?.yours) container = mine.yours
     } catch {
@@ -50,7 +52,7 @@
 
   const day = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '')
   const shown = $derived((found?.containers ?? []).filter(c => standalone || c.status !== 'imported'))
-  const labelOf = (id?: string) => app.containers?.containers.find(c => c.id === id)?.label ?? id ?? ''
+  const labelOf = (id?: string) => place.containers?.containers.find(c => c.id === id)?.label ?? id ?? ''
 
   const open = (s: SuggestedContainer) => found?.repo && onimport(s, found.repo, found.name ?? '')
 </script>

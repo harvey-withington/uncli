@@ -4,6 +4,15 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## Unreleased
+
+- **A project's containers on a paired UNCLI.** Starting a session on a
+  paired UNCLI lists the containers that project suggests, as on this PC,
+  and Import… imports (and builds) one there. Settings → Containers →
+  Import from a project… asks which PC first, then browses its folders. The
+  PC it's imported on shows a notification saying which device did it, and
+  its Settings say where each imported container came from.
+
 ## 0.12.0-alpha
 
 Carry a walkthrough into a new session, see Mermaid diagrams in your

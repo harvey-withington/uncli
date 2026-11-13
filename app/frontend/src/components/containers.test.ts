@@ -250,6 +250,39 @@ describe('Containers', () => {
     expect(dialog.getByText('This project suggests a container: Team dev')).toBeInTheDocument()
   })
 
+  it('imports a container from a project on a paired UNCLI, there', async () => {
+    history.replaceState(null, '', '/?peers=on')
+    const backend = mockBackend()
+    const here = vi.spyOn(backend, 'importContainer')
+    const workshop = backend.peer('workshop.tail2ebd58.ts.net:9871')
+    const there = vi.spyOn(workshop, 'importContainer')
+    const listed = vi.spyOn(workshop, 'listFolder')
+    render(App, { props: { backend } })
+    const settings = await openSettings('Containers')
+    await fireEvent.click(await settings.findByRole('button', { name: 'Import from a project…' }))
+    const dialog = within(await screen.findByRole('dialog', { name: 'Import a container from a project' }))
+    expect(dialog.getByText('No project chosen yet')).toBeInTheDocument()
+
+    // Where first; then that PC's folders, browsed.
+    await fireEvent.change(dialog.getByRole('combobox', { name: 'Where' }), { target: { value: 'workshop.tail2ebd58.ts.net:9871' } })
+    await waitFor(() => expect(dialog.getByRole('button', { name: 'Choose…' })).toBeEnabled())
+    await fireEvent.click(dialog.getByRole('button', { name: 'Choose…' }))
+    const browser = within(await screen.findByRole('dialog', { name: 'Choose the project to import a container from' }))
+    for (const name of ['C:\\Users\\you', 'projects', 'demo']) await fireEvent.click(await browser.findByRole('button', { name }))
+    await waitFor(() => expect(browser.getByText('C:\\Users\\you\\projects\\demo')).toBeInTheDocument())
+    await fireEvent.click(browser.getByRole('button', { name: 'Use this folder' }))
+    expect(listed).toHaveBeenCalled()
+
+    // Its suggestions, imported on that PC, not this one.
+    expect(await dialog.findByText('This project suggests a container: Docs')).toBeInTheDocument()
+    await fireEvent.click(dialog.getAllByRole('button', { name: 'Import…' })[1]!)
+    const form = within(await screen.findByRole('dialog', { name: 'Import Docs' }))
+    await fireEvent.click(form.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(there).toHaveBeenCalledWith(expect.objectContaining({ id: 'docs' }), 'C:\\Users\\you\\projects\\demo', 'docs'))
+    expect(here).not.toHaveBeenCalled()
+    expect(await dialog.findByText('Imported and up to date: Docs')).toBeInTheDocument()
+  })
+
   it('without WSL, offers to turn it on', async () => {
     history.replaceState(null, '', '/?containers=nowsl')
     render(App, { props: { backend: mockBackend() } })

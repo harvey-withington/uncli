@@ -1132,6 +1132,7 @@ export interface ContainerSource {
   id: string // the container's id there
   imported: string // when it was last imported or synced (RFC 3339)
   sum: string // fingerprints the suggestion as it was then
+  device?: string // the paired device it was imported or last synced from (decision 0033)
 }
 
 // The containers a session folder's repository suggests in .uncli

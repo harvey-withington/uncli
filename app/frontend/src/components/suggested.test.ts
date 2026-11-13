@@ -38,4 +38,31 @@ describe('Suggested containers', () => {
     expect(await dialog.findByText("You've changed your Team dev since importing it from this project.")).toBeInTheDocument()
     expect(dialog.getByRole('button', { name: 'Sync…' })).toBeInTheDocument()
   })
+
+  it('lists a project’s containers on a paired UNCLI too, imported there', async () => {
+    history.replaceState(null, '', '/?peers=on')
+    try {
+      const backend = mockBackend()
+      const workshop = backend.peer('workshop.tail2ebd58.ts.net:9871')
+      const there = vi.spyOn(workshop, 'importContainer')
+      render(App, { props: { backend } })
+      await fireEvent.click(await screen.findByRole('button', { name: /New session/ }))
+      const dialog = within(await screen.findByRole('dialog', { name: 'New session' }))
+      await fireEvent.change(dialog.getByRole('combobox', { name: 'Where' }), { target: { value: 'workshop.tail2ebd58.ts.net:9871' } })
+      await fireEvent.click(await dialog.findByRole('radio', { name: /^Code/ }))
+      await fireEvent.click(dialog.getByRole('button', { name: 'Choose…' }))
+      const browser = within(await screen.findByRole('dialog', { name: /Choose/ }))
+      for (const name of ['C:\\Users\\you', 'projects', 'demo']) await fireEvent.click(await browser.findByRole('button', { name }))
+      await waitFor(() => expect(browser.getByText('C:\\Users\\you\\projects\\demo')).toBeInTheDocument())
+      await fireEvent.click(browser.getByRole('button', { name: 'Use this folder' }))
+
+      expect(await dialog.findByText('This project suggests a container: Docs')).toBeInTheDocument()
+      await fireEvent.click(dialog.getAllByRole('button', { name: 'Import…' })[1]!)
+      const form = within(await screen.findByRole('dialog', { name: 'Import Docs' }))
+      await fireEvent.click(form.getByRole('button', { name: 'Save' }))
+      await waitFor(() => expect(there).toHaveBeenCalledWith(expect.objectContaining({ id: 'docs' }), 'C:\\Users\\you\\projects\\demo', 'docs'))
+    } finally {
+      history.replaceState(null, '', '/')
+    }
+  })
 })

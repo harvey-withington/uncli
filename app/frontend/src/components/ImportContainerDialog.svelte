@@ -3,6 +3,7 @@
   import { untrack } from 'svelte'
   import { flaggedIn, importStart, reachesOf } from '../lib/suggestions'
   import { useApp } from '../lib/context'
+  import { thisPC, type Place } from '../stores/place.svelte'
   import { t } from '@uncli/chat/lib/i18n.svelte'
   import ContainerEditor from './ContainerEditor.svelte'
   import Icon from '@uncli/chat/components/Icon.svelte'
@@ -17,21 +18,23 @@
     suggestion: SuggestedContainer
     repo: string // the repository's root
     name: string // its folder's name
+    place?: Place // the PC it's imported on: this one, or a paired server (decision 0033)
     onclose: () => void
   }
-  let { suggestion, repo, name, onclose }: Props = $props()
   const app = useApp()
+  let { suggestion, repo, name, place = thisPC(app), onclose }: Props = $props()
   const start = untrack(() => importStart(suggestion))
-  const yours = $derived(suggestion.yours ? app.containers?.containers.find(c => c.id === suggestion.yours) : undefined)
-  const taken = $derived((app.containers?.containers ?? []).map(c => c.id).filter(id => id !== suggestion.yours))
-  const bases = $derived(app.containers?.bases ?? [])
+  const yours = $derived(suggestion.yours ? place.containers?.containers.find(c => c.id === suggestion.yours) : undefined)
+  const taken = $derived((place.containers?.containers ?? []).map(c => c.id).filter(id => id !== suggestion.yours))
+  const bases = $derived(place.containers?.bases ?? [])
   const syncing = untrack(() => !!suggestion.yours)
 
-  const save = (p: ContainerProfile) => app.backend.importContainer(p, repo, suggestion.profile.id)
+  const save = (p: ContainerProfile) => place.backend.importContainer(p, repo, suggestion.profile.id)
 </script>
 
 <Modal title={t(syncing ? 'suggested.syncTitle' : 'suggested.importTitle', { label: suggestion.profile.label })} width={640} {onclose}>
-  <ContainerEditor {start} container={yours} {bases} {taken} {onclose} onsave={save} flagged={suggestion.steps}>
+  <ContainerEditor {start} container={yours} {bases} {taken} {onclose} onsave={save} flagged={suggestion.steps}
+    backend={place.backend} reload={() => place.reloadContainers()}>
     {#snippet top(draft: ContainerProfile)}
       {@const reaches = reachesOf(draft)}
       {@const steps = flaggedIn(draft.setup, suggestion.steps)}

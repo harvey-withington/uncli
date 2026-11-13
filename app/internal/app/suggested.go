@@ -18,6 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/harvey-withington/uncli/app/internal/core"
+	"github.com/harvey-withington/uncli/app/internal/notify"
 	"github.com/harvey-withington/uncli/app/internal/runtime/local"
 	"github.com/harvey-withington/uncli/app/internal/session"
 )
@@ -37,6 +38,9 @@ type ContainerSource struct {
 	// project's changes from the user's (a commit's date can be older than
 	// the import it's pulled after).
 	Sum string `yaml:"sum" json:"sum"`
+	// Device is the paired device it was imported (or last synced) from;
+	// empty at this PC (decision 0033).
+	Device string `yaml:"device,omitempty" json:"device,omitempty"`
 }
 
 // Suggestions are the containers a session's folder's repository suggests.
@@ -316,6 +320,13 @@ func lastChanged(ctx context.Context, root, path string) time.Time {
 // repository's suggestion: p as they left it in the editor, which
 // remembers the repository and the suggestion's id, imported now.
 func (s *Service) ImportContainer(ctx context.Context, p ContainerProfile, repo, suggestion string) error {
+	return s.ImportContainerFrom(ctx, p, repo, suggestion, "")
+}
+
+// ImportContainerFrom is ImportContainer from a paired device (decision
+// 0033): the container remembers the device, and this PC shows a
+// notification, so a container can't change here unseen.
+func (s *Service) ImportContainerFrom(ctx context.Context, p ContainerProfile, repo, suggestion, device string) error {
 	if s.embedded {
 		return errEmbedded
 	}
@@ -330,6 +341,33 @@ func (s *Service) ImportContainer(ctx context.Context, p ContainerProfile, repo,
 	if sug.Containers[i].Status == "unusable" {
 		return errors.New("UNCLI can't build that container")
 	}
-	p.From = &ContainerSource{Repo: sug.Repo, ID: suggestion, Imported: time.Now(), Sum: suggestionSum(sug.Containers[i].Profile)}
-	return s.saveContainer(p)
+	syncing := sug.Containers[i].Yours != ""
+	p.From = &ContainerSource{Repo: sug.Repo, ID: suggestion, Imported: time.Now(), Sum: suggestionSum(sug.Containers[i].Profile), Device: device}
+	if err := s.saveContainer(p); err != nil {
+		return err
+	}
+	if device != "" {
+		what := "imported"
+		if syncing {
+			what = "synced"
+		}
+		s.showNote(notify.Note{Key: "container-" + p.ID, Title: "Container " + what,
+			Body: fmt.Sprintf("%s %s the container %q from %s. See Settings → Containers.", device, what, p.Label, sug.Name)})
+	}
+	return nil
+}
+
+// BuildContainerFrom is BuildContainer from a paired device (decision
+// 0033), with a notification here, as for an import.
+func (s *Service) BuildContainerFrom(id, device string) error {
+	if err := s.BuildContainer(id); err != nil {
+		return err
+	}
+	label := id
+	if p, ok := s.profile(id); ok && p.Label != "" {
+		label = p.Label
+	}
+	s.showNote(notify.Note{Key: "container-" + id, Title: "Building a container",
+		Body: fmt.Sprintf("%s started building the container %q here.", device, label)})
+	return nil
 }

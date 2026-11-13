@@ -24,17 +24,23 @@ type client struct {
 }
 
 // rpcMethods is everything a paired device may call. It covers what the
-// window does with sessions (decision 0021). Left out, and shown disabled
-// on remote clients with the reason: opening things on the server's screen
+// window does with sessions (decision 0021), and importing and building
+// the containers a project on the server suggests (decision 0033; the
+// phone's screens don't offer it). Left out, and shown disabled on remote
+// clients with the reason: opening things on the server's screen
 // (folders, files, editors, links, the clipboard, dropped paths), CLI
-// installs, versions and sign-in, plugins, container management, the
-// theme file, the decision model's key and test, desktop notification
-// tests and the desktop's own preferences. Remote access itself (devices,
-// pairing, turning it off) is only changed at the server.
+// installs, versions and sign-in, plugins, editing and removing
+// containers and WSL itself, the theme file, the decision model's key and
+// test, desktop notification tests and the desktop's own preferences.
+// Remote access itself (devices, pairing, turning it off) is only changed
+// at the server.
 var rpcMethods = []string{
 	// Start-up and status.
 	"Bootstrap", "CLIStatus", "ProviderStatus", "CLIChannels", "ProviderChannels",
 	"Containers", "Editors", "HasDecisionKey", "Usage", "UsageReport",
+	// The containers a project suggests: imported and built here, said so
+	// on this PC (decision 0033).
+	"SuggestedContainers", "ImportContainer", "BuildContainer",
 	// Sessions.
 	"CreateSession", "Pages", "Send", "SendWith", "Queue", "Unqueue", "SendQueued", "Interrupt", "Restart", "Focus", "Rename", "Delete",
 	"Archive", "SetSortOrder", "SetModel", "ToggleModifier", "SetShares",
@@ -59,13 +65,15 @@ var rpcMethods = []string{
 
 // EmbeddedMethods is what a host's own UNCLI offers its page (decision
 // 0027): a paired device's methods, less push notifications (the host
-// notifies its users itself) and UNCLI's updates (the host ships its
-// UNCLI with its own releases), plus setting up the CLIs: the host's page
-// is its users' only way to install and sign in to them.
+// notifies its users itself), UNCLI's updates (the host ships its UNCLI
+// with its own releases) and containers (they belong to the whole Windows
+// user, not one host), plus setting up the CLIs: the host's page is its
+// users' only way to install and sign in to them.
 func EmbeddedMethods() []string {
 	m := slices.DeleteFunc(slices.Clone(rpcMethods), func(m string) bool {
 		return strings.HasPrefix(m, "Push") || m == "SetPushNotifications" || m == "TestPush" ||
-			m == "UpdateStatus" || m == "CheckForUpdates" || m == "InstallUpdate" || m == "SetResumeCutOff"
+			m == "UpdateStatus" || m == "CheckForUpdates" || m == "InstallUpdate" || m == "SetResumeCutOff" ||
+			m == "SuggestedContainers" || m == "ImportContainer" || m == "BuildContainer"
 	})
 	return append(append(m, setupMethods...), hostMethods...)
 }
@@ -168,6 +176,26 @@ func (c *client) CreateSession(profileID, workdir, model, container, provider st
 	}
 	return c.API.CreateSession(profileID, workdir, model, container, provider, shares)
 }
+
+// SuggestedContainers reads a project's suggestions in a folder on the
+// server's own drives, as ListFolder browses them.
+func (c *client) SuggestedContainers(folder string) (app.Suggestions, error) {
+	if networkPath(folder) {
+		return app.Suggestions{}, errNetworkPath
+	}
+	return c.API.SuggestedContainers(folder)
+}
+
+// ImportContainer and BuildContainer record the device, and the server
+// says so (decision 0033).
+func (c *client) ImportContainer(ctx context.Context, p app.ContainerProfile, repo, suggestion string) error {
+	if networkPath(repo) {
+		return errNetworkPath
+	}
+	return c.svc.ImportContainerFrom(ctx, p, repo, suggestion, c.device.Name)
+}
+
+func (c *client) BuildContainer(id string) error { return c.svc.BuildContainerFrom(id, c.device.Name) }
 
 // CreateSessionWith is CreateSession with a host's meta (embedded only).
 func (c *client) CreateSessionWith(profileID, workdir, model, container, provider string, shares []string, opts app.CreateOptions) (app.CreatedSession, error) {

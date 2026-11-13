@@ -155,7 +155,9 @@ apply changes.
   containers in `.uncli/containers.yaml` (or `.yml`), in the same format
   with `version: 1` at the top and UNCLI's built-in bases. Starting a
   session in that repository lists them in the new session dialog (or
-  pick the project in Settings → Containers → Import from a project…), and
+  pick the project in Settings → Containers → Import from a project…),
+  on this PC or a paired one (decision 0033, which then says who imported
+  it), and
   Import opens the container editor on one, saying whether it reaches
   outside its container (your memories, MCP servers, connectors, secrets
   or folders, and setup steps that send data away or run fetched code). You

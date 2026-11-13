@@ -5,8 +5,9 @@ import type { AttachmentKind, FolderListing, NotifySetting, PushState, PushSubsc
 
 const TREE: Record<string, string[]> = {
   '': ['C:\\Users\\you', 'C:\\', 'D:\\'],
-  'C:\\Users\\you': ['code', 'Documents', 'Downloads'],
+  'C:\\Users\\you': ['code', 'Documents', 'Downloads', 'projects'],
   'C:\\Users\\you\\code': ['uncli', 'website', 'notes'],
+  'C:\\Users\\you\\projects': ['demo'], // its .uncli suggests containers (mock/containers.ts)
   'C:\\': ['Users', 'Projects'],
   'D:\\': ['Backups'],
 }
