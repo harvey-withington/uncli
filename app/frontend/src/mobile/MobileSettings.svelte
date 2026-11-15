@@ -1,6 +1,7 @@
 <script lang="ts">
   import AppearanceSection from '../components/AppearanceSection.svelte'
   import Modal from '@uncli/chat/components/Modal.svelte'
+  import SignInSection from '../components/SignInSection.svelte'
   import UpdateSection from '../components/UpdateSection.svelte'
   import { t } from '@uncli/chat/lib/i18n.svelte'
   import type { Snippet } from 'svelte'
@@ -10,7 +11,8 @@
 
   // The phone's Settings: this device and the server it's paired with,
   // its look, what it's told about (notifications, from the slot), the
-  // PC's updates (Check now, Update now: decision 0025), and
+  // PC's CLI sign-in (Sign in again: decision 0034), the PC's updates
+  // (Check now, Update now: decision 0025), and
   // Forget this device, which drops its token here (the server keeps it
   // listed until it's revoked there). The server's nickname, if any, is
   // shown instead of its address everywhere but here.
@@ -47,6 +49,7 @@
     </dl>
   </section>
   {@render notifications?.()}
+  <SignInSection />
   <UpdateSection />
   <AppearanceSection />
   <section>

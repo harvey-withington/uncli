@@ -3,6 +3,7 @@
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
   import { attentionCount } from '../lib/attention'
+  import { signInFailed } from '../lib/signin'
   import { useShell } from '../lib/shell.svelte'
   import { tintStyle } from '../lib/tint'
   import ActivityBadge from './ActivityBadge.svelte'
@@ -39,7 +40,10 @@
   const profile = $derived(chat.boot?.profiles.find(p => p.id === session.profileId))
   // A session in a container says which (decision 0011).
   const place = $derived(session.runtimeRef ? ` · ${t('session.inContainer', { label: chat.containers?.containers.find(c => c.id === session.runtimeRef)?.label ?? session.runtimeRef })}` : '')
-  const failed = $derived(!!session.error && session.state === 'error')
+  // The session's error, unless its last page says it already: a failed
+  // sign-in shows there with Sign in again, so it isn't said twice.
+  const last = $derived(chat.pages[session.id]?.at(-1))
+  const failed = $derived(!!session.error && session.state === 'error' && !(last && signInFailed(last)))
   // The status line goes when the header (desktop) or the question
   // (compact) is collapsed; an error still shows.
   const quiet = $derived(compact ? chat.questionCompact : chat.headerCompact)

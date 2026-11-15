@@ -12,6 +12,17 @@ publishes a version's section as its release notes, so each heading is
   Import from a project… asks which PC first, then browses its folders. The
   PC it's imported on shows a notification saying which device did it, and
   its Settings say where each imported container came from.
+- **Sign in again away from the PC.** When Claude Code's sign-in expires,
+  Sign in again on the failed turn now works from the phone and from
+  another PC, signing in the PC the session runs on: open the sign-in page,
+  sign in, paste the code. The phone's Settings shows the PC's account,
+  with Sign in again. The PC shows a notification saying which device
+  signed it in, and as which account.
+- A failed sign-in is said once, in the turn's card, not also in the
+  session's header.
+- Subscription usage names the weekly window with extra usage ("This week
+  (with extra usage)"), and gives any window it doesn't know yet a readable
+  name instead of showing its key.
 
 ## 0.12.0-alpha
 

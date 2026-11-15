@@ -104,6 +104,18 @@ func TestImportFromADevice(t *testing.T) {
 	}
 }
 
+// A paired device signing the CLI in again is said on this PC, with the
+// account it's signed in as (decision 0034).
+func TestSignedInFromADevice(t *testing.T) {
+	svc := editService(t)
+	n := &notes{}
+	svc.notifier = n
+	svc.SignedInFrom("TROPIX", CLIStatus{Provider: "claude", LoggedIn: true, Email: "you@example.com"})
+	if len(n.shown) != 1 || n.shown[0].Body != "TROPIX signed Claude Code in again on this PC, as you@example.com." {
+		t.Errorf("notes = %+v", n.shown)
+	}
+}
+
 func TestSuggestedContainers(t *testing.T) {
 	svc := editService(t)
 	ctx := context.Background()

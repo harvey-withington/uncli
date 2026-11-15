@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { describe, expect, it, vi } from 'vitest'
 import App from '../App.svelte'
+import { combinedBackend } from '@uncli/client'
 import { mockBackend } from '@uncli/client/mock'
 
 describe('A turn whose sign-in failed', () => {
@@ -15,6 +16,8 @@ describe('A turn whose sign-in failed', () => {
     await fireEvent.keyDown(window, { key: 'End' })
     const box = (await screen.findByText(/Claude couldn't use your Claude sign-in/)).closest('.signin-failed') as HTMLElement
     expect(within(box).getByText(/401 OAuth token has expired/)).toBeInTheDocument()
+    // Said once, in the card with what to do; not again in the header.
+    expect(screen.getAllByText(/401 OAuth token has expired/)).toHaveLength(1)
 
     await fireEvent.click(within(box).getByRole('button', { name: 'Sign in again' }))
     const code = await within(box).findByRole('textbox', { name: 'Code from the sign-in page' })
@@ -42,6 +45,31 @@ describe('A turn whose sign-in failed', () => {
     await fireEvent.click(section.getByRole('button', { name: 'Sign in again' }))
     expect(await section.findByRole('textbox', { name: 'Code from the sign-in page' })).toBeInTheDocument()
   })
+})
+
+describe('A turn whose sign-in failed on a paired UNCLI', () => {
+  it('signs that PC’s CLI in again, not this one’s (decision 0034)', async () => {
+    history.replaceState(null, '', '/?peers=on&signin=peer')
+    try {
+      // The window as the app runs it: this PC's backend, with its paired servers'.
+      const base = mockBackend()
+      const here = vi.spyOn(base, 'signIn')
+      const workshop = base.peer('workshop.tail2ebd58.ts.net:9871')
+      const there = vi.spyOn(workshop, 'signIn')
+      render(App, { props: { backend: combinedBackend(base) } })
+      await fireEvent.click(await screen.findByText('Draft the 0.4 release notes', {}, { timeout: 6000 }))
+      await screen.findByRole('heading', { name: 'Draft the 0.4 release notes' })
+      await fireEvent.keyDown(window, { key: 'End' })
+      const box = (await screen.findByText(/Claude couldn't use your Claude sign-in/)).closest('.signin-failed') as HTMLElement
+      await fireEvent.click(within(box).getByRole('button', { name: 'Sign in again' }))
+      await waitFor(() => expect(there).toHaveBeenCalled())
+      expect(here).not.toHaveBeenCalled()
+      // That PC's link isn't opened here by itself: it's offered.
+      expect(await within(box).findByRole('button', { name: 'Open the sign-in page' })).toBeInTheDocument()
+    } finally {
+      history.replaceState(null, '', '/')
+    }
+  }, 15000)
 })
 
 describe('A turn whose sign-in failed in a container', () => {

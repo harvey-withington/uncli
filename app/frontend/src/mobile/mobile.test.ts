@@ -220,6 +220,29 @@ describe('the phone app', () => {
     expect(await screen.findByRole('heading', { name: late.title })).toBeInTheDocument()
   })
 
+  it('signs the PC\u2019s CLI in again from Settings, with the link to open here (decision 0034)', async () => {
+    const backend = phoneBackend()
+    const signIn = vi.spyOn(backend, 'signIn')
+    const finish = vi.spyOn(backend, 'submitLoginCode')
+    const open = vi.spyOn(backend, 'openURL')
+    render(MobileApp, { props: { backend } })
+    await screen.findByRole('list', { name: 'Sessions' })
+    await fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+    const section = within(document.getElementById('settings-signin') as HTMLElement)
+    expect(section.getByRole('heading', { name: 'Claude Code on the PC' })).toBeInTheDocument()
+    expect(section.getByText(/Signed in as you@example\.com/)).toBeInTheDocument()
+
+    await fireEvent.click(section.getByRole('button', { name: 'Sign in again' }))
+    expect(signIn).toHaveBeenCalled()
+    // Nothing was opened for the phone: it offers the page, then takes the code.
+    expect(section.queryByText('Sign-in opened in your browser.')).toBeNull()
+    await fireEvent.click(await section.findByRole('button', { name: 'Open the sign-in page' }))
+    expect(open).toHaveBeenCalled()
+    await fireEvent.input(section.getByRole('textbox', { name: 'Code from the sign-in page' }), { target: { value: 'good-code' } })
+    await fireEvent.click(section.getByRole('button', { name: 'Finish sign-in' }))
+    await waitFor(() => expect(finish).toHaveBeenCalledWith('good-code'))
+  })
+
   it('shows the PC\u2019s nickname instead of its address once one is set', async () => {
     render(MobileApp, { props: { backend: phoneBackend() } })
     await screen.findByRole('list', { name: 'Sessions' })

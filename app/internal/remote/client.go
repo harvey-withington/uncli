@@ -41,6 +41,9 @@ var rpcMethods = []string{
 	// The containers a project suggests: imported and built here, said so
 	// on this PC (decision 0033).
 	"SuggestedContainers", "ImportContainer", "BuildContainer",
+	// Signing the first provider's CLI in again, by link and code, when its
+	// sign-in expires away from the PC; said so on this PC (decision 0034).
+	"SignIn", "SubmitLoginCode", "CancelSignIn",
 	// Sessions.
 	"CreateSession", "Pages", "Send", "SendWith", "Queue", "Unqueue", "SendQueued", "Interrupt", "Restart", "Focus", "Rename", "Delete",
 	"Archive", "SetSortOrder", "SetModel", "ToggleModifier", "SetShares",
@@ -75,7 +78,12 @@ func EmbeddedMethods() []string {
 			m == "UpdateStatus" || m == "CheckForUpdates" || m == "InstallUpdate" || m == "SetResumeCutOff" ||
 			m == "SuggestedContainers" || m == "ImportContainer" || m == "BuildContainer"
 	})
-	return append(append(m, setupMethods...), hostMethods...)
+	for _, s := range setupMethods {
+		if !slices.Contains(m, s) { // signing in is a device's too
+			m = append(m, s)
+		}
+	}
+	return append(m, hostMethods...)
 }
 
 // hostMethods are calls only a host's page makes: a new session with the
@@ -90,6 +98,18 @@ var setupMethods = []string{"InstallCLI", "InstallProvider", "SignIn", "SubmitLo
 // SignIn starts the first provider's sign-in. The page opens the link in
 // its user's browser; the CLI waits for the code past this request.
 func (c *client) SignIn() (app.SignInStart, error) { return c.svc.SignIn(context.Background()) }
+
+// SubmitLoginCode finishes the sign-in with the code the page showed. From
+// a paired device, this PC says who signed its CLI in, and as which
+// account (decision 0034): a sign-in to another account would send the
+// sessions there.
+func (c *client) SubmitLoginCode(code string) (app.CLIStatus, error) {
+	st, err := c.svc.SubmitLoginCode(context.Background(), code)
+	if err == nil && st.LoggedIn && c.device.Name != "" {
+		c.svc.SignedInFrom(c.device.Name, st)
+	}
+	return st, err
+}
 
 // StartDeviceSignIn starts a provider's device sign-in, as SignIn does.
 func (c *client) StartDeviceSignIn(id string) (app.DeviceSignIn, error) {

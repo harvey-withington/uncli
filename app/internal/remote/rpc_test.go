@@ -13,7 +13,7 @@ import (
 // widening of what the network can do: check it belongs (decision 0021).
 var pinnedMethods = []string{
 	"AnswerApproval", "AnswerAsk", "Archive", "ArtifactFiles", "ArtifactLink",
-	"Bootstrap", "BuildContainer", "CLIChannels", "CLIStatus", "CheckForUpdates", "Commands", "Containers",
+	"Bootstrap", "BuildContainer", "CLIChannels", "CLIStatus", "CancelSignIn", "CheckForUpdates", "Commands", "Containers",
 	"CreateSession", "Delete", "DeleteSafeEntry", "Editors", "ExplainCommand", "ExplainPage", "ExplainSize",
 	"Focus", "HasDecisionKey", "ImportContainer", "ImportTranscript", "InstallUpdate", "Interrupt", "KnownTools",
 	"ListFolder", "MCPCallback", "MCPCancel", "MCPReconnect", "MCPSignIn",
@@ -21,7 +21,7 @@ var pinnedMethods = []string{
 	"PreviewClasses", "ProviderChannels", "ProviderStatus", "PushKey", "PushState", "PushSubscribe", "PushUnsubscribe", "Queue", "ReadArtifact",
 	"Rename", "Restart", "SafeList", "Search", "Send", "SendQueued", "SendWith", "SessionAllowlist", "SetBookmark",
 	"SetMode", "SetModel", "SetPinned", "SetPushNotifications", "SetResumeCutOff", "SetSafeEntry", "SetSafeLabel",
-	"SetShares", "SetSortOrder", "SetUnattended", "SuggestedContainers", "SummarisePage", "Teach", "TestPush",
+	"SetShares", "SetSortOrder", "SetUnattended", "SignIn", "SubmitLoginCode", "SuggestedContainers", "SummarisePage", "Teach", "TestPush",
 	"ToggleModifier", "Transcripts", "Unqueue", "UpdateStatus", "UploadLink", "Usage", "UsageReport",
 	"WatchFiles", "WatchRead",
 }
@@ -39,7 +39,7 @@ func TestRPCMethods(t *testing.T) {
 	// What stays at the server's own screen.
 	for _, m := range []string{"OpenFolder", "OpenFile", "OpenPath", "RevealFile", "RevealCLI",
 		"SetPreferences", "SetDecisionKey", "TestDecisionModel", "TestNotification",
-		"InstallCLI", "InstallProvider", "SetCLIVersion", "SetProviderVersion", "SubmitLoginCode",
+		"InstallCLI", "InstallProvider", "SetCLIVersion", "SetProviderVersion",
 		"SignInTerminal", "CancelDeviceSignIn", "EnablePlugin", "DisablePlugin",
 		"InstallWSL", "StopContainers", "SaveContainer", "RemoveContainer",
 		"RemoveContainerConfig", "StartContainerSignIn", "SignOutContainers", "Theme",
@@ -70,11 +70,16 @@ func TestEmbeddedMethods(t *testing.T) {
 			t.Errorf("%s must not be offered to a host's page", m)
 		}
 	}
-	// Devices still can't set up the CLIs.
+	// Devices still can't install the CLIs or sign in the others; they can
+	// sign the first in again by link and code (decision 0034).
 	for _, m := range setupMethods {
-		if rpcNames[m] {
-			t.Errorf("%s must not be reachable from a device", m)
+		again := m == "SignIn" || m == "SubmitLoginCode" || m == "CancelSignIn"
+		if rpcNames[m] != again {
+			t.Errorf("%s reachable from a device: %v, want %v", m, rpcNames[m], again)
 		}
+	}
+	if n := len(got); n != len(slices.Compact(slices.Sorted(slices.Values(got)))) {
+		t.Errorf("a host's page is offered a method twice: %q", got)
 	}
 }
 

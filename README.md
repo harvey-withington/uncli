@@ -46,8 +46,12 @@ them to remove everything.
 
 ### What goes over the network
 
-UNCLI has no account, telemetry or update check of its own. It connects to:
+UNCLI has no account or telemetry. It connects to:
 
+- GitHub, to check UNCLI's releases for a newer one (30 seconds after it
+  starts, then every 6 hours, unless Settings → Updates turns that off),
+  and to download it when you choose Update now. The request names only
+  UNCLI, nothing about you or this PC, and no other server is asked;
 - each provider's download host, to install the pinned CLI you chose;
 - the Alpine Linux mirror, when you build a container;
 - a decision model's endpoint, only if you set one up in Settings;

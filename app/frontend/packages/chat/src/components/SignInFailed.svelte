@@ -2,7 +2,7 @@
   import type { Page } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
-  import { providerOf } from '../lib/api'
+  import { LOCAL, parseRef, providerOf } from '../lib/api'
   import { errorDetail, resend } from '../lib/signin'
   import CodeSignIn from './CodeSignIn.svelte'
   import Icon from './Icon.svelte'
@@ -28,9 +28,12 @@
   const provider = $derived(providerOf(chat.boot, session?.adapter))
   // The container the session runs in, by its name; '' on this machine.
   const container = $derived(session?.runtimeRef ? chat.containers?.containers.find(c => c.id === session.runtimeRef)?.label ?? session.runtimeRef : '')
-  // Only the first provider signs in by link and code from here (Service.SignIn),
-  // and only for a session on this machine.
+  // Only the first provider signs in by link and code from here
+  // (Service.SignIn): on the PC the session runs on, which may be a paired
+  // server's, or the phone's PC (decision 0034).
   const here = $derived(!container && provider?.signIn === 'link' && provider.id === chat.boot?.providers[0]?.id)
+  const server = $derived(parseRef(page.sessionId).server)
+  const itsPC = $derived(server === LOCAL ? chat.backend : chat.backend.peer(server))
   const latest = $derived(chat.pages[page.sessionId]?.at(-1)?.id === page.id)
   let signedIn = $state(false)
   let signingIn = $state(false) // the code is being asked for: Send again waits
@@ -64,7 +67,7 @@
     {:else if container}
       <!-- At the PC only (the phone sets nothing up): the line above says where. -->
     {:else if here}
-      <CodeSignIn label={t('signinFailed.signIn')} primary onsignedin={() => { signedIn = true; signingIn = false }} bind:active={signingIn} />
+      <CodeSignIn label={t('signinFailed.signIn')} primary backend={itsPC} onsignedin={() => { signedIn = true; signingIn = false }} bind:active={signingIn} />
     {:else if provider && chat.openSettings}
       {@const open = chat.openSettings}
       <button class="btn small primary" onclick={() => open(`provider-${provider.id}`)}>

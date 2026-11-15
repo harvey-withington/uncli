@@ -1,22 +1,34 @@
 <script lang="ts">
+  import type { Backend } from '../lib/api'
   import { useChat } from '../lib/chatcontext'
   import { t } from '../lib/i18n.svelte'
+  import { atServer } from '../lib/remoteonly'
   import Icon from './Icon.svelte'
 
   // Signing the first provider's CLI in again, by link and code, where it's
-  // needed: a turn its sign-in failed, or Settings. The CLI opens the link
-  // in the browser; the page there shows a code to paste back. Signed in,
-  // the backend restarts the provider's idle sessions at their next message
-  // (Manager.Reconnect), so they use the new sign-in.
+  // needed: a turn its sign-in failed, or Settings. The page at the link
+  // shows a code to paste back. Signed in, the backend restarts the
+  // provider's idle sessions at their next message (Manager.Reconnect), so
+  // they use the new sign-in. Away from the PC (the phone, or a paired
+  // server's CLI from the desktop; decision 0034) it signs in that PC's CLI,
+  // and offers the link to open here rather than saying it was opened.
   interface Props {
     label: string
     primary?: boolean
     onsignedin?: () => void
     active?: boolean // bindable: a code is being asked for
+    backend?: Backend // the CLI's PC: the window's by default, a paired server's for its sessions
   }
 
-  let { label, primary = false, onsignedin, active = $bindable(false) }: Props = $props()
   const chat = useChat()
+  let { label, primary = false, onsignedin, active = $bindable(false), backend = chat.backend }: Props = $props()
+  // Another PC's CLI: its status isn't the one this window shows.
+  const elsewhere = $derived(backend !== chat.backend)
+  // The window opens the link itself; anywhere else, it's offered to open.
+  const opened = $derived(atServer(chat.backend) && !elsewhere)
+  function openPage() {
+    if (!chat.openLink?.(url)) void chat.backend.openURL(url)
+  }
   let step = $state<'idle' | 'starting' | 'code' | 'verifying'>('idle')
   $effect(() => {
     active = step === 'code' || step === 'verifying'
@@ -30,9 +42,9 @@
     step = 'starting'
     error = ''
     try {
-      const s = await chat.backend.signIn()
+      const s = await backend.signIn()
       if (s.signedIn) {
-        chat.cli = s.status
+        if (!elsewhere) chat.cli = s.status
         step = 'idle'
         onsignedin?.()
         return
@@ -49,7 +61,8 @@
     step = 'verifying'
     error = ''
     try {
-      chat.cli = await chat.backend.submitLoginCode(code)
+      const st = await backend.submitLoginCode(code)
+      if (!elsewhere) chat.cli = st
       step = 'idle'
       code = ''
       onsignedin?.()
@@ -61,20 +74,29 @@
   }
 
   async function cancel() {
-    await chat.backend.cancelSignIn().catch(() => {})
+    await backend.cancelSignIn().catch(() => {})
     step = 'idle'
     code = ''
   }
 </script>
 
-<div class="code-signin">
+<!-- Asking for the code, it takes the row, so the code fits. -->
+<div class="code-signin" class:wide={step === 'code' || step === 'verifying'}>
   {#if step === 'code' || step === 'verifying'}
-    <p class="opened">
-      {t('setup.signin.opened')}
-      <button class="link" onclick={() => chat.backend.openURL(url)}>{t('setup.signin.openAgain')}</button>
-      ·
-      <button class="link" onclick={() => chat.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
-    </p>
+    {#if opened}
+      <p class="opened">
+        {t('setup.signin.opened')}
+        <button class="link" onclick={openPage}>{t('setup.signin.openAgain')}</button>
+        ·
+        <button class="link" onclick={() => chat.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
+      </p>
+    {:else}
+      <p class="opened">
+        <button class="btn small" onclick={openPage}><Icon name="external-link" size={13} />{t('setup.signin.openPage')}</button>
+        <button class="link" onclick={() => chat.backend.copyText(url)}>{t('setup.signin.copyLink')}</button>
+      </p>
+      <p class="hint">{t('setup.signin.pasteHint')}</p>
+    {/if}
     <form class="row" onsubmit={e => { e.preventDefault(); void finish() }}>
       <!-- svelte-ignore a11y_autofocus -->
       <input
@@ -107,9 +129,22 @@
     align-items: flex-start;
     gap: var(--space-2);
   }
+  .code-signin.wide {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
   .opened {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
     margin: 0;
     font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+  .hint {
+    margin: 0;
+    font-size: var(--text-xs);
     color: var(--text-muted);
   }
   .row {

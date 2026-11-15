@@ -1,0 +1,15 @@
+# A dummy container this repository suggests, for testing the import flow
+# (decision 0028): New session in this repo, or Settings → Containers →
+# Import from a project….
+version: 1
+
+containers:
+  - id: uncli-dev
+    label: UNCLI dev
+    description: A test container for this repository, with Node and Go.
+    base: alpine-3.24
+    packages: [coreutils, findutils, grep, git, make, nodejs, npm, go]
+    setup:
+      - npm i -g pnpm
+    local:
+      - app/frontend/node_modules

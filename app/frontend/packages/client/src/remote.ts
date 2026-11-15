@@ -69,11 +69,6 @@ export function remoteBackend(tr: Transport): Backend {
   const setup = tr.canSetUp
     ? {
         installCLI: () => call<CLIStatus>('InstallCLI'),
-        // The links aren't opened here: after an await, a browser takes that
-        // for a popup. The setup screen offers them to click.
-        signIn: () => call<SignInStart>('SignIn'),
-        submitLoginCode: (code: string) => call<CLIStatus>('SubmitLoginCode', code),
-        cancelSignIn: () => call<void>('CancelSignIn'),
         installProvider: (pid: string) => call<CLIStatus>('InstallProvider', pid),
         startDeviceSignIn: (pid: string) => call<DeviceSignIn>('StartDeviceSignIn', pid),
         cancelDeviceSignIn: (pid: string) => call<void>('CancelDeviceSignIn', pid),
@@ -90,9 +85,12 @@ export function remoteBackend(tr: Transport): Backend {
     cliChannels: () => call('CLIChannels'),
     providerChannels: pid => call('ProviderChannels', pid),
     installCLI: only('installCLI'),
-    signIn: only('signIn'),
-    submitLoginCode: only('submitLoginCode'),
-    cancelSignIn: async () => {},
+    // Signing the first provider's CLI in again, on the server (decision
+    // 0034). Its link isn't opened here: after an await, a browser takes
+    // that for a popup, so the sign-in offers it to click.
+    signIn: () => call<SignInStart>('SignIn'),
+    submitLoginCode: (code: string) => call<CLIStatus>('SubmitLoginCode', code),
+    cancelSignIn: () => call<void>('CancelSignIn'),
     setCLIVersion: only('setCLIVersion'),
     installProvider: only('installProvider'),
     setProviderVersion: only('setProviderVersion'),

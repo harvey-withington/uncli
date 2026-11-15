@@ -5,6 +5,7 @@
   import { resetsIn } from '../lib/format'
   import { t } from '../lib/i18n.svelte'
   import { useChat } from '../lib/chatcontext'
+  import { windowLabel } from '../lib/usagewindows'
   import Icon from './Icon.svelte'
 
   interface Props {
@@ -27,10 +28,10 @@
       {@const pct = Math.round(w.utilization * 100)}
       <div class="win">
         <div class="row">
-          <span>{t(`usage.window.${name}`)}</span>
+          <span class="name">{windowLabel(name)}</span>
           <span class="pct">{t('usage.used', { pct })}</span>
         </div>
-        <div class="bar" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={t(`usage.window.${name}`)}>
+        <div class="bar" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={windowLabel(name)}>
           <span style:width="{Math.min(100, pct)}%" class:high={pct >= 80}></span>
         </div>
         <span class="reset">{t('usage.resets', { when: resetsIn(w.resetsAt) })}</span>
@@ -86,9 +87,14 @@
   .row {
     display: flex;
     justify-content: space-between;
+    gap: var(--space-3);
     font-size: var(--text-sm);
   }
+  .name {
+    min-width: 0; /* a long name wraps, beside its percentage */
+  }
   .pct {
+    flex: none;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
   }

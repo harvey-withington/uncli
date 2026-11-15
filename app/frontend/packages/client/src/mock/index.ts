@@ -280,7 +280,15 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
   ]
   const pages: Record<string, Page[]> = opts.server ? {
     'r-build': [page('r-build', 1, 'Why does the nightly build time out on this machine?', 'The **WSL import** step waits on a lock left by the previous run. Clearing it at the start of the job fixes it.')],
-    'r-notes': [page('r-notes', 1, 'Draft the 0.4 release notes from the merged changes.', '**UNCLI 0.4**\n\n- Remote servers: see a home server’s sessions beside your own.\n- Phone notifications.')],
+    'r-notes': [
+      page('r-notes', 1, 'Draft the 0.4 release notes from the merged changes.', '**UNCLI 0.4**\n\n- Remote servers: see a home server’s sessions beside your own.\n- Phone notifications.'),
+      // ?signin=peer: the server's CLI sign-in expired (decision 0034).
+      ...(new URLSearchParams(location.search).get('signin') === 'peer'
+        ? [page('r-notes', 2, 'Add the container import to the notes.', '', {
+          status: 'error', error: 'authentication_failed: Failed to authenticate. API Error: 401 OAuth token has expired.', outputTokens: 0, costUsd: 0,
+        })]
+        : []),
+    ],
   } : opts.empty ? {} : {
     's-code': [
       page('s-code', 1, 'Why does TestMultiTurnPartial fail about one run in five?', PARSER, {
@@ -1071,7 +1079,7 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
     },
     async usage() {
       const now = Math.floor(Date.now() / 1000)
-      return { status: 'allowed', windows: { five_hour: { utilization: 0.18, resetsAt: now + 7200 }, seven_day: { utilization: 0.31, resetsAt: now + 260000 } } }
+      return { status: 'allowed', windows: { five_hour: { utilization: 0.18, resetsAt: now + 7200 }, seven_day: { utilization: 0.31, resetsAt: now + 260000 }, seven_day_overage_included: { utilization: 0.67, resetsAt: now + 260000 } } }
     },
     async openFolder() {},
     async openFile() {},

@@ -184,9 +184,14 @@ describe('httpBackend', () => {
     // Opened after an await, a browser would block it as a popup.
     expect(opened).not.toHaveBeenCalled()
     opened.mockRestore()
+    // A phone can't install a CLI, but can sign the PC's in again (decision 0034).
     const phone = httpBackend({ base: '', token: () => 'tok', fetch: fetch as never })
     await expect(phone.installCLI()).rejects.toBeInstanceOf(RemoteOnlyError)
-    await expect(phone.signIn()).rejects.toBeInstanceOf(RemoteOnlyError)
+    methods.length = 0
+    await phone.signIn()
+    await phone.submitLoginCode('abc')
+    await phone.cancelSignIn()
+    expect(methods).toEqual(['SignIn', 'SubmitLoginCode', 'CancelSignIn'])
   })
 
   it('refuses what only works at the server', async () => {

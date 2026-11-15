@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -285,6 +286,23 @@ func (s *Service) notifyClicked(sessionID string) {
 		s.ShowWindow()
 	}
 	s.emit.Emit(EvtNotifyOpen, sessionID)
+}
+
+// SignedInFrom says, on this PC, that a paired device signed a provider's
+// CLI in, and as which account (decision 0034).
+func (s *Service) SignedInFrom(device string, st CLIStatus) {
+	name := st.Provider
+	for _, p := range s.Providers() {
+		if p.ID == st.Provider {
+			name = p.Name
+		}
+	}
+	as := ""
+	if st.Email != "" {
+		as = ", as " + st.Email
+	}
+	s.showNote(notify.Note{Key: "signin-" + st.Provider, Title: name + " signed in",
+		Body: fmt.Sprintf("%s signed %s in again on this PC%s.", device, name, as)})
 }
 
 func (s *Service) showNote(n notify.Note) {
