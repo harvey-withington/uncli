@@ -167,7 +167,7 @@ func runAntigravity(from, version string, only []string) error {
 			env[agyHookLogEnv] = hookLog
 			env[agyHookDenyEnv] = strings.Join(agyDenies[name], ",")
 		}
-		out, stderr, err := agyRecord(ctx, cli, agyArgs(f.args, state, convs), env, work, f)
+		out, stderr, err := agyRecord(ctx, cli, agyArgs(f, state, convs), env, work, f)
 		if err != nil {
 			fmt.Println("FAILED:", err)
 			failed = append(failed, fmt.Sprintf("%s: %v", name, err))
@@ -206,16 +206,17 @@ func agyTemp(prefix string) (string, error) {
 }
 
 // agyArgs are the recorded arguments with the state folder this run's and
-// a resumed conversation the one recorded now.
-func agyArgs(recorded []string, state string, convs map[string]string) []string {
-	args := slices.Clone(recorded)
+// a resumed conversation the one recorded now (see resume).
+func agyArgs(f *fixture, state string, convs map[string]string) []string {
+	args := slices.Clone(f.args)
 	for i, a := range args {
 		if strings.HasPrefix(a, "--gemini_dir=") {
 			args[i] = "--gemini_dir=" + state
 		}
 		if i > 0 && args[i-1] == "--conversation" {
-			if nid, ok := convs[a]; ok {
+			if nid, ok := resume(a, agyConversation(f.old), convs); ok {
 				args[i] = nid
+				f.resumedFrom, f.resumedTo = a, nid
 			}
 		}
 	}
@@ -510,12 +511,8 @@ func agySave(f *fixture, dst string, out, calls []string, stderr, work, state st
 	} else if err := os.Remove(filepath.Join(dst, f.name+".hook.jsonl")); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	for _, ext := range []string{".args.txt", ".in.jsonl"} {
-		if raw, err := os.ReadFile(filepath.Join(f.dir, f.name+ext)); err == nil {
-			if err := os.WriteFile(filepath.Join(dst, f.name+ext), raw, 0o644); err != nil {
-				return err
-			}
-		}
+	if err := f.copyInputs(dst); err != nil {
+		return err
 	}
 	if f.stderr {
 		return os.WriteFile(filepath.Join(dst, f.name+".stderr.txt"), []byte(scrub(stderr)), 0o644)

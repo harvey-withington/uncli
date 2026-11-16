@@ -8,7 +8,7 @@ import (
 	"github.com/harvey-withington/uncli/app/internal/core"
 )
 
-// The stream (CLI 1.5.6, testdata/streams/antigravity/1.5.6):
+// The stream (CLI 1.5.9, testdata/streams/antigravity/1.5.9):
 //
 //	{"event":"init","conversation_id":…,"init":{"model":…,"cwd":…,"tools":[…],"permission_mode":…}}
 //	{"event":"step_update","step_update":{"step_index":n,"state":"ACTIVE|DONE|ERROR","step_type":…,…}}

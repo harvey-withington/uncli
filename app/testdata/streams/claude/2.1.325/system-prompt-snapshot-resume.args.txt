@@ -1,0 +1,1 @@
+-p --input-format stream-json --output-format stream-json --verbose --model haiku --resume 969e4fad-c947-4328-bdde-e0625ef35a9d --append-system-prompt Always end your reply with the word MANGO. --disallowedTools Bash --permission-prompts none

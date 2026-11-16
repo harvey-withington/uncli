@@ -284,6 +284,44 @@ type fixture struct {
 	stderr bool   // the old one kept its stderr
 	config string // the CLAUDE_CONFIG_DIR it records in: the run's, or its own (ownConfig)
 	token  string // the models-only token it signs in with
+	// The session it resumes, as its args.txt names it and as this run
+	// resumed it: the saved args.txt names the new one, so the next
+	// recording finds it.
+	resumedFrom, resumedTo string
+}
+
+// resume is the session this run recorded in place of id, the one a
+// fixture's args resume. An args.txt saved before the recorder rewrote it
+// still names the session from two recordings back, so failing that, it's
+// the one the old recording actually resumed (oldResumed, from its stream).
+// Neither known (a session that's meant to be lost): ok is false.
+func resume(id, oldResumed string, recorded map[string]string) (string, bool) {
+	if nid, ok := recorded[id]; ok {
+		return nid, true
+	}
+	if oldResumed == "" {
+		return "", false
+	}
+	nid, ok := recorded[oldResumed]
+	return nid, ok
+}
+
+// copyInputs saves a fixture's args.txt and in.jsonl with its recording,
+// the args naming the session this run resumed.
+func (f *fixture) copyInputs(dst string) error {
+	for _, ext := range []string{".args.txt", ".in.jsonl"} {
+		raw, err := os.ReadFile(filepath.Join(f.dir, f.name+ext))
+		if err != nil {
+			continue
+		}
+		if ext == ".args.txt" && f.resumedFrom != "" {
+			raw = []byte(strings.ReplaceAll(string(raw), f.resumedFrom, f.resumedTo))
+		}
+		if err := os.WriteFile(filepath.Join(dst, f.name+ext), raw, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func load(dir, name string) (*fixture, error) {
@@ -453,8 +491,9 @@ func (f *fixture) record(ctx context.Context, cli, work string, sessions map[str
 			args[i] = p
 		}
 		if i > 0 && args[i-1] == "--resume" {
-			if nid, ok := sessions[a]; ok {
+			if nid, ok := resume(a, sessionOf(f.old), sessions); ok {
 				args[i] = nid
+				f.resumedFrom, f.resumedTo = a, nid
 			}
 		}
 	}
@@ -820,12 +859,8 @@ func (f *fixture) save(dst string, out []string, stderr, work string) error {
 	if err := os.WriteFile(filepath.Join(dst, f.name+".jsonl"), []byte(b.String()), 0o644); err != nil {
 		return err
 	}
-	for _, ext := range []string{".args.txt", ".in.jsonl"} {
-		if raw, err := os.ReadFile(filepath.Join(f.dir, f.name+ext)); err == nil {
-			if err := os.WriteFile(filepath.Join(dst, f.name+ext), raw, 0o644); err != nil {
-				return err
-			}
-		}
+	if err := f.copyInputs(dst); err != nil {
+		return err
 	}
 	if f.stderr {
 		return os.WriteFile(filepath.Join(dst, f.name+".stderr.txt"), []byte(scrub(stderr)), 0o644)

@@ -4,7 +4,11 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
-## Unreleased
+## 0.13.0-alpha
+
+Import a project's containers on a paired UNCLI, sign Claude Code in again
+from your phone, update on work PCs that block scheduled tasks, and run on
+newer CLIs.
 
 - **A project's containers on a paired UNCLI.** Starting a session on a
   paired UNCLI lists the containers that project suggests, as on this PC,
@@ -30,6 +34,8 @@ publishes a version's section as its release notes, so each heading is
   position and category lines left out (they're kept in `update.log`), and
   its notice above the sidebar's footer wraps a long error inside the box,
   scrolling past about ten lines, instead of running out of it.
+- **Newer CLIs.** UNCLI now runs Claude Code 2.1.325 (was 2.1.322) and the
+  Antigravity CLI 1.5.9 (was 1.5.6), downloaded and checked as before.
 
 ## 0.12.0-alpha
 

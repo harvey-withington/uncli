@@ -18,7 +18,7 @@ import (
 )
 
 // PinnedVersion is the Antigravity CLI release this build of UNCLI is tested with.
-const PinnedVersion = "1.5.6"
+const PinnedVersion = "1.5.9"
 
 type Adapter struct {
 	installer *Installer

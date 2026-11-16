@@ -28,15 +28,19 @@ a config folder of their own, and the import transcript under
 containers (sign in for containers first) and Antigravity's own sign-in. Then
 pass the tests, bump `PinnedVersion` and update the sections below. Tests
 check what a recording says (its answers, costs and session ids), not one
-version's wording.
+version's wording. A resume's `.args.txt` is saved naming the session it
+resumed in the new recording, so the next one finds it; check that each
+resume fixture still remembers (a stale id starts a new conversation in
+Antigravity, and fails at once in Claude Code).
 
-## claude/2.1.322
+## claude/2.1.325
 
-Recorded with Claude Code 2.1.322 (`latest` on 2026-11-12) by
+Recorded with Claude Code 2.1.325 (`latest` on 2026-11-16) by
 `uncli-record`, on Haiku 5.5 (`--model haiku`). The work folder was a git
 repository holding `notes.txt` (the lines one to ten). `single-turn` was
 given an input of its own (the 2.1.285 recording had none). The fixtures
-below show the same as they did for 2.1.285, except where it says.
+below show the same as they did for 2.1.285 and 2.1.322, except where it
+says.
 
 | Fixture | What it shows |
 | --- | --- |
@@ -73,11 +77,11 @@ below show the same as they did for 2.1.285, except where it says.
 | `exit-plan-mode` | `--permission-mode plan`: the plan presented with `ExitPlanMode` over stdio |
 | `mcp-auth-local`, `mcp-auth-callback`, `mcp-auth-custom`, `mcp-auth-clear` | The MCP sign-in control requests against `claude/mcp-oauth-server.mjs` (`claude/mcp-oauth.json`), with no model turn, in a config folder of their own: through the CLI's own listener, by passing the redirect with `mcp_oauth_callback_url`, with a custom redirect, and clearing a sign-in |
 
-The import transcript (`../transcripts/claude/2.1.322`) is a conversation as the CLI saved it: a write, a question, `/compact`, one more turn.
+The import transcript (`../transcripts/claude/2.1.325`) is a conversation as the CLI saved it: a write, a question, `/compact`, one more turn.
 
-## antigravity/1.5.6
+## antigravity/1.5.9
 
-Recorded with the Antigravity CLI (`agy`) 1.5.6 on Windows on 2026-11-12, on Gemini 3.8 Flash (Low), with `--gemini_dir=C:\uncli-agy` (decision 0012), by `go run ./cmd/uncli-record -cli antigravity`, which replays each fixture's `.args.txt` and `.in.jsonl` and answers the hook as UNCLI does. Turns are `{"event":"user","message":{"content":"…"}}` lines; each is sent after the previous turn's `result`. `<name>.hook.jsonl` holds what the `PreToolUse` hook was sent for each tool call, one JSON object a line. The work folder held a `note.txt` saying "The colour is teal."
+Recorded with the Antigravity CLI (`agy`) 1.5.9 on Windows on 2026-11-16, on Gemini 3.8 Flash (Low), with `--gemini_dir=C:\uncli-agy` (decision 0012), by `go run ./cmd/uncli-record -cli antigravity`, which replays each fixture's `.args.txt` and `.in.jsonl` and answers the hook as UNCLI does. Turns are `{"event":"user","message":{"content":"…"}}` lines; each is sent after the previous turn's `result`. `<name>.hook.jsonl` holds what the `PreToolUse` hook was sent for each tool call, one JSON object a line. The work folder held a `note.txt` saying "The colour is teal."
 
 | Fixture | What it shows |
 | --- | --- |
