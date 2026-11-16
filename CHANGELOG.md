@@ -23,6 +23,13 @@ publishes a version's section as its release notes, so each heading is
 - Subscription usage names the weekly window with extra usage ("This week
   (with extra usage)"), and gives any window it doesn't know yet a readable
   name instead of showing its key.
+- Update now works on PCs that don't let a user create a scheduled task (a
+  work PC's policy, say), where it failed with "Register-ScheduledTask :
+  Access is denied": the update then starts without the task.
+- A failed update says what went wrong in a line, with PowerShell's
+  position and category lines left out (they're kept in `update.log`), and
+  its notice above the sidebar's footer wraps a long error inside the box,
+  scrolling past about ten lines, instead of running out of it.
 
 ## 0.12.0-alpha
 

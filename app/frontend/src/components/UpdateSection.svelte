@@ -76,7 +76,7 @@
   {/if}
   {#if line}
     <p class="line" class:err={u?.state === 'error'} role="status">
-      {#if busy}<Icon name="loader" spin size={13} />{/if}{line}
+      {#if busy}<Icon name="loader" spin size={13} />{/if}<span>{line}</span>
     </p>
   {/if}
   <div class="acts">
@@ -123,6 +123,10 @@
     gap: var(--space-2);
     margin: var(--space-3) 0 0;
     font-size: var(--text-sm);
+  }
+  .line span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .line.err {
     color: var(--danger);

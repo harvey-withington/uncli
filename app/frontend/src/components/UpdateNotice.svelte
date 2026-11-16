@@ -21,7 +21,7 @@
     {:else if u.state === 'installing'}
       <p><Icon name="loader" spin size={14} />{t('update.installing', { version })}</p>
     {:else}
-      <p><Icon name={u.state === 'error' ? 'triangle-alert' : 'circle-arrow-up'} size={14} />{u.state === 'error' ? t('update.failed', { error: u.error ?? '' }) : t('update.available', { version })}</p>
+      <p><Icon name={u.state === 'error' ? 'triangle-alert' : 'circle-arrow-up'} size={14} /><span>{u.state === 'error' ? t('update.failed', { error: u.error ?? '' }) : t('update.available', { version })}</span></p>
       <div class="acts">
         <button class="btn primary small" onclick={() => app.installUpdate()}>{t(u.state === 'error' ? 'update.retry' : 'update.now')}</button>
         {#if u.latest?.url}
@@ -53,6 +53,15 @@
     align-items: flex-start;
     gap: var(--space-2);
     margin: 0;
+  }
+  /* An error can carry a path or a long unbroken run: it wraps inside the
+     notice rather than overflowing it, and a long one scrolls rather than
+     taking over the sidebar. */
+  p span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    max-height: 10lh;
+    overflow-y: auto;
   }
   p :global(svg) {
     flex: none;

@@ -9,7 +9,9 @@ UNCLI before replacing it, so nothing started from a session survives the
 install. This script copies the installer and itself to
 %LOCALAPPDATA%\UNCLI\update and hands over to a Windows scheduled task
 ("UNCLI update", the user's own, no administrator), which runs outside
-UNCLI:
+UNCLI. Where Windows won't let the user register a task (a work PC's
+policy, say), it starts the same copy through WMI instead, which is
+outside UNCLI too. Either way, that copy:
 
   1. installs silently (per-user, so no UAC prompt);
   2. waits for every running UNCLI to exit;
@@ -161,13 +163,31 @@ $hash = (Get-FileHash -Path $Installer -Algorithm SHA256).Hash.ToLower()
 $taskArgs = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StagedScript`" -Run"
 $taskArgs += " -Delay $Delay"
 if ($DryRun) { $taskArgs += ' -DryRun' }
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $taskArgs -WorkingDirectory $UpdateDir
-$principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
-Register-ScheduledTask -TaskName $TaskName -Action $action -Principal $principal -Settings $settings -Description 'Installs a UNCLI build and starts UNCLI again (install-build.ps1).' -Force | Out-Null
-Start-ScheduledTask -TaskName $TaskName
+$how = $null
+try {
+  $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $taskArgs -WorkingDirectory $UpdateDir
+  $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
+  Register-ScheduledTask -TaskName $TaskName -Action $action -Principal $principal -Settings $settings -Description 'Installs a UNCLI build and starts UNCLI again (install-build.ps1).' -Force -ErrorAction Stop | Out-Null
+  Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+  $how = "the '$TaskName' task"
+} catch {
+  # Some PCs (work ones, mostly) don't let a user register a task: policy, or
+  # a task of that name left by an administrator. WMI starts the same copy
+  # instead; its process is created by the WMI service, not by UNCLI, so it's
+  # outside UNCLI's job too and outlives UNCLI quitting.
+  $taskError = $_.Exception.Message
+  $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]0 }
+  $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+    CommandLine = "powershell.exe $taskArgs"
+    CurrentDirectory = $UpdateDir
+    ProcessStartupInformation = $startup
+  }
+  if ($r.ReturnValue -ne 0) { throw "Couldn't start the update: Windows refused the '$TaskName' task ($taskError), and starting it directly failed too (Win32_Process.Create returned $($r.ReturnValue))." }
+  $how = "the update (pid $($r.ProcessId); the '$TaskName' task was refused: $taskError)"
+}
 
 $mode = if ($DryRun) { 'dry run' } else { 'install' }
-Write-Host "Started the '$TaskName' task ($mode) for $Installer"
+Write-Host "Started $how ($mode) for $Installer"
 Write-Host "sha256 $hash"
 Write-Host "UNCLI quits in about $Delay seconds and comes back about half a minute after that. Log: $LogFile"

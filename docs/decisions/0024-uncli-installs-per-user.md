@@ -44,7 +44,10 @@ prompt, which quietly gets around UAC.
 - **Installing from a session.** `app/internal/update/install-build.ps1` copies an
   installer and itself to `%LocalAppData%\UNCLI\update` and starts a
   scheduled task of the user's own ("UNCLI update", no administrator). The
-  task runs outside UNCLI's job. It installs silently, waits for every
+  task runs outside UNCLI's job. Where Windows refuses the user a task (a
+  work PC's policy, say: "Access is denied"), the script starts the same
+  copy through WMI (`Win32_Process.Create`), whose process the WMI service
+  creates, so it's outside UNCLI's job too. It installs silently, waits for every
   UNCLI to exit, starts the new one, and checks it stays up. If it doesn't,
   or the install failed, it starts whichever UNCLI is installed, so a PC
   reached from a phone is never left without UNCLI. It logs each step to
