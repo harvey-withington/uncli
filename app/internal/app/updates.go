@@ -53,6 +53,10 @@ type UpdateStatus struct {
 	Percent   int             `json:"percent,omitempty"`
 	Error     string          `json:"error,omitempty"`
 	CheckedAt int64           `json:"checkedAt,omitempty"` // ms
+	// Blocked is why Update now can't work on this PC (running as
+	// administrator, a PowerShell policy; README, "Updates"), found when a
+	// check finds a newer release: the UI offers the release page instead.
+	Blocked string `json:"blocked,omitempty"`
 }
 
 type updates struct {
@@ -64,12 +68,19 @@ type updates struct {
 	url     string
 	client  *http.Client
 	install func(installer string) error
+	blocked func(ctx context.Context) string // why Update now can't work here, or ""
 }
 
 func (s *Service) initUpdates() {
 	s.updates.url = update.ReleasesURL
 	s.updates.client = &http.Client{Timeout: 5 * time.Minute}
 	s.updates.install = update.Install
+	s.updates.blocked = func(ctx context.Context) string {
+		if elevated() {
+			return "UNCLI is running as administrator, so the update would be set up as the administrator. Start UNCLI normally, without Run as administrator"
+		}
+		return update.Blocked(ctx)
+	}
 	s.updates.status = UpdateStatus{Current: buildinfo.Version, Dev: buildinfo.Dev(), State: UpdateIdle}
 }
 
@@ -115,12 +126,25 @@ func (s *Service) CheckForUpdates(ctx context.Context) (UpdateStatus, error) {
 	s.updates.mu.Lock()
 	s.updates.release = rel
 	s.updates.mu.Unlock()
+	available := update.Compare(rel.Version, cur.Current) > 0
+	blocked := ""
+	if available {
+		blocked = s.updateBlocked(ctx)
+	}
 	st := s.setUpdate(func(u *UpdateStatus) {
 		u.State, u.CheckedAt = UpdateIdle, time.Now().UnixMilli()
 		u.Latest = &rel
-		u.Available = update.Compare(rel.Version, u.Current) > 0
+		u.Available, u.Blocked = available, blocked
 	})
 	return st, nil
+}
+
+// updateBlocked is why Update now can't work on this PC, or "".
+func (s *Service) updateBlocked(ctx context.Context) string {
+	if s.updates.blocked == nil {
+		return ""
+	}
+	return s.updates.blocked(ctx)
 }
 
 // InstallUpdate downloads the newer release, checks it, and hands it to the
@@ -137,6 +161,11 @@ func (s *Service) InstallUpdate(ctx context.Context) (UpdateStatus, error) {
 		return cur, nil
 	case !cur.Available:
 		return cur, errors.New("there's no newer release to install")
+	}
+	// Checked again: what was fine at the last check may not be now.
+	if why := s.updateBlocked(ctx); why != "" {
+		st := s.setUpdate(func(u *UpdateStatus) { u.Blocked = why })
+		return st, errors.New("updating from UNCLI doesn't work on this PC: " + why)
 	}
 	s.updates.mu.Lock()
 	rel := s.updates.release

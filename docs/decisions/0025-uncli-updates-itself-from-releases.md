@@ -48,6 +48,16 @@ than the last release, not older.
   back in well under a minute. The phone retries every few seconds for the
   first half minute after a drop, and asks for the update status again when
   it reconnects, so it shows the new version as soon as the PC is back.
+- **Where it can't work.** Update now needs what the README lists under
+  Install. What can be checked without side effects is checked when a
+  newer release is found, and again by Update now before it downloads:
+  UNCLI not running as administrator, and Windows PowerShell running a
+  script in full language mode with no Group Policy execution policy
+  stricter than RemoteSigned (a policy overrides the script's
+  `-ExecutionPolicy Bypass`). If one fails, the status says why
+  (`UpdateStatus.blocked`), and the notice and Settings offer the release
+  page (Download) instead of Update now. A scheduled task or WMI, and the
+  installer being allowed to run, only show by trying.
 - **From the phone too.** A paired device sees the same status and can
   start the update (three RPC methods). Updating isn't setting up, and the
   PC is often reached only from the phone. When the phone reconnects to a

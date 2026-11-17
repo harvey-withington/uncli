@@ -3,6 +3,7 @@
   import { dragSort } from '@uncli/chat/lib/actions'
   import SessionItem from '@uncli/chat/components/SessionItem.svelte'
   import UpdateNotice from '../components/UpdateNotice.svelte'
+  import AdminNotice from '../components/AdminNotice.svelte'
   import { useApp } from '../lib/context'
   import { t } from '@uncli/chat/lib/i18n.svelte'
 
@@ -35,6 +36,7 @@
   {#if !app.cliReady}
     <p class="note" role="status"><Icon name="triangle-alert" size={15} />{t('mobile.cliNotReady')}</p>
   {/if}
+  <AdminNotice remote />
   <UpdateNotice />
   <button class="btn primary new" onclick={() => app.openNewSession()} disabled={!app.cliReady}>
     <Icon name="plus" size={16} />{t('session.new')}

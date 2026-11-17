@@ -518,6 +518,9 @@ type Bootstrap struct {
 	Preferences  Preferences           `json:"preferences"`
 	Providers    []Provider            `json:"providers"`
 	Editors      []ide.Editor          `json:"editors"`
+	// Elevated: UNCLI runs with administrator rights, which it never needs
+	// (the UI says so, and how to start it normally).
+	Elevated bool `json:"elevated,omitempty"`
 }
 
 // NewSessionChoices is what the user picked last time in the new-session
@@ -618,6 +621,7 @@ func (s *Service) Bootstrap() Bootstrap {
 		Sessions: s.Sessions.List(), Models: s.Sessions.Models(), Capabilities: s.Adapter.Capabilities(),
 		Platform: runtime.GOOS, LastNew: s.lastNewSession(),
 		Preferences: s.Preferences(), Providers: s.Providers(), Editors: s.Editors(),
+		Elevated: elevated(),
 	}
 }
 

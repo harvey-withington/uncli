@@ -580,6 +580,7 @@ export interface UpdateStatus {
   percent?: number // while downloading
   error?: string
   checkedAt?: number // ms
+  blocked?: string // why Update now can't work on this PC: the release page is offered instead
 }
 
 // How long a session's conversation stays cached after its last message:
@@ -680,6 +681,7 @@ export interface Bootstrap {
   preferences: Preferences
   providers: Provider[]
   editors?: Editor[]
+  elevated?: boolean // UNCLI runs with administrator rights, which it never needs
 }
 
 export interface CLIStatus {

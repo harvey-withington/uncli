@@ -31,7 +31,11 @@ prompt, which quietly gets around UAC.
   `%LocalAppData%\Programs\UNCLI`, the way VS Code's user installer and
   Chrome do. It asks for no administrator (`asInvoker`). Its uninstall
   entry, Start menu and desktop shortcuts are the user's own (`HKCU`, the
-  user's folders).
+  user's folders). Run as administrator anyway, it asks before going on
+  (No is the default): that way it can install for another account (the
+  one whose password was typed at the prompt) and starts UNCLI with
+  administrator rights, which everything UNCLI starts gets too. UNCLI says
+  so as well when it runs as administrator (`AdminNotice`).
 - **Quitting the running copy.** The installer asks any running UNCLI to
   quit (`--quit`), wherever it's installed, not only one in its own folder,
   so the first per-user install also quits one in Program Files.

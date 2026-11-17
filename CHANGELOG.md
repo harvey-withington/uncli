@@ -4,6 +4,13 @@ What changed in each release of UNCLI, newest first. The release workflow
 publishes a version's section as its release notes, so each heading is
 `## <version>` exactly as tagged, without the v.
 
+## 0.14.0-alpha
+
+Updating and installing on locked-down work PCs: UNCLI says when updating from it can't work and why, and warns when it or its installer runs as administrator.
+
+- The installer asks before going on when it's run as administrator, which UNCLI doesn't need: run that way, it can install UNCLI for another account (the administrator's) and starts UNCLI with administrator rights. UNCLI says so too when it's running as administrator, with how to start it normally.
+- Where Update now can't work on a PC (UNCLI running as administrator, or a policy that stops PowerShell running UNCLI's install script), UNCLI says why when it finds a newer release and offers its release page to download the installer instead. The README lists what Update now needs.
+
 ## 0.13.0-alpha
 
 Import a project's containers on a paired UNCLI, sign Claude Code in again

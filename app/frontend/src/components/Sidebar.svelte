@@ -9,6 +9,7 @@
   import ServerGroup from './ServerGroup.svelte'
   import SessionGroup from './SessionGroup.svelte'
   import UpdateNotice from './UpdateNotice.svelte'
+  import AdminNotice from './AdminNotice.svelte'
   import { SIDEBAR_MAX, SIDEBAR_MIN } from '@uncli/chat/lib/panels'
   import { groupSessions } from '@uncli/chat/lib/servers'
   import { LOCAL } from '@uncli/chat/lib/api'
@@ -63,6 +64,7 @@
     {/if}
   </nav>
 
+  <AdminNotice />
   <UpdateNotice />
   <footer>
     <button class="btn ghost small settings" onclick={() => app.openSettings(attentionAt)} title={attentionTitle}>

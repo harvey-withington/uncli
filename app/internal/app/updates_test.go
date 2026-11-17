@@ -48,7 +48,7 @@ func TestUpdatesFindAndInstallANewerRelease(t *testing.T) {
 	asRelease(t, "0.3.0-alpha")
 	t.Setenv("LOCALAPPDATA", t.TempDir()) // where the download goes
 	s := newTestService(t)
-	s.initUpdates()
+	initTestUpdates(s, "")
 	srv := releaseServer(t, []byte("installer bytes"))
 	s.updates.url, s.updates.client = srv.URL+"/releases", srv.Client()
 	var handed string
@@ -70,7 +70,7 @@ func TestUpdatesFindAndInstallANewerRelease(t *testing.T) {
 func TestUpdatesSayWhenUpToDate(t *testing.T) {
 	asRelease(t, "0.4.0-alpha")
 	s := newTestService(t)
-	s.initUpdates()
+	initTestUpdates(s, "")
 	srv := releaseServer(t, []byte("x"))
 	s.updates.url, s.updates.client = srv.URL+"/releases", srv.Client()
 	st, err := s.CheckForUpdates(context.Background())
@@ -87,7 +87,7 @@ func TestUpdatesSayWhenUpToDate(t *testing.T) {
 func TestUpdatesOfferTheNextReleaseToATestBuild(t *testing.T) {
 	asRelease(t, "0.3.0-alpha+dev.66")
 	s := newTestService(t)
-	s.initUpdates()
+	initTestUpdates(s, "")
 	srv := releaseServer(t, []byte("x"))
 	s.updates.url, s.updates.client = srv.URL+"/releases", srv.Client()
 	st, err := s.CheckForUpdates(context.Background())
@@ -99,7 +99,7 @@ func TestUpdatesOfferTheNextReleaseToATestBuild(t *testing.T) {
 func TestUpdatesNeverCheckInADevelopmentBuild(t *testing.T) {
 	asRelease(t, "dev")
 	s := newTestService(t)
-	s.initUpdates()
+	initTestUpdates(s, "")
 	s.updates.url = "http://127.0.0.1:1/never"
 	if st, err := s.CheckForUpdates(context.Background()); err == nil || !st.Dev || !strings.Contains(err.Error(), "npm run install-build") {
 		t.Errorf("check = %+v, %v", st, err)
@@ -119,5 +119,33 @@ func TestUpdateCheckPreference(t *testing.T) {
 	p.UpdateCheck = "sometimes"
 	if _, err := s.SetPreferences(p); err == nil {
 		t.Error("accepted an unknown setting")
+	}
+}
+
+// initTestUpdates sets updates up with what would block Update now here
+// replaced (a CI runner runs as administrator): blocked, or "" for nothing.
+func initTestUpdates(s *Service, blocked string) {
+	s.initUpdates()
+	s.updates.blocked = func(context.Context) string { return blocked }
+}
+
+// Where Update now can't work (README, "Updates"), a check says why with the
+// newer release, and Update now refuses before downloading anything.
+func TestUpdatesSayWhyUpdateNowCantWorkHere(t *testing.T) {
+	asRelease(t, "0.3.0-alpha")
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	s := newTestService(t)
+	initTestUpdates(s, "UNCLI is running as administrator")
+	srv := releaseServer(t, []byte("installer bytes"))
+	s.updates.url, s.updates.client = srv.URL+"/releases", srv.Client()
+	s.updates.install = func(string) error { t.Error("handed an installer over"); return nil }
+
+	st, err := s.CheckForUpdates(context.Background())
+	if err != nil || !st.Available || st.Blocked != "UNCLI is running as administrator" {
+		t.Fatalf("check = %+v, %v", st, err)
+	}
+	st, err = s.InstallUpdate(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "doesn't work on this PC") || st.State == UpdateDownloading || st.State == UpdateInstalling {
+		t.Fatalf("install = %+v, %v", st, err)
 	}
 }

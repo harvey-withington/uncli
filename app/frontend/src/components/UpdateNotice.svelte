@@ -6,8 +6,10 @@
   // A newer UNCLI release (decision 0025), above the sidebar's footer on
   // the PC and atop the session list on the phone: Update now, and what's
   // new on its release page. Then how far it's got: downloading, handed to
-  // the installer (UNCLI restarts in a moment), or why it failed. Nothing
-  // while there's no newer release.
+  // the installer (UNCLI restarts in a moment), or why it failed. Where
+  // Update now can't work on this PC (blocked: README, "Updates"), why, with
+  // Download (the release page) instead. Nothing while there's no newer
+  // release.
   const app = useApp()
   const u = $derived(app.update)
   const version = $derived(u?.latest?.version ?? '')
@@ -15,11 +17,18 @@
 </script>
 
 {#if u && shown}
-  <div class="update" class:failed={u.state === 'error'} role="status">
+  <div class="update" class:failed={u.state === 'error' || !!u.blocked} role="status">
     {#if u.state === 'downloading'}
       <p><Icon name="loader" spin size={14} />{t('update.downloading', { version, percent: u.percent ?? 0 })}</p>
     {:else if u.state === 'installing'}
       <p><Icon name="loader" spin size={14} />{t('update.installing', { version })}</p>
+    {:else if u.blocked}
+      <p><Icon name="triangle-alert" size={14} /><span>{t('update.blocked', { version, why: u.blocked })}</span></p>
+      {#if u.latest?.url}
+        <div class="acts">
+          <button class="btn primary small" onclick={() => app.backend.openURL(u.latest?.url ?? '')}>{t('update.download')}</button>
+        </div>
+      {/if}
     {:else}
       <p><Icon name={u.state === 'error' ? 'triangle-alert' : 'circle-arrow-up'} size={14} /><span>{u.state === 'error' ? t('update.failed', { error: u.error ?? '' }) : t('update.available', { version })}</span></p>
       <div class="acts">

@@ -40,8 +40,9 @@
       case 'checking': return t('update.checking')
       case 'downloading': return t('update.downloading', { version: u.latest?.version ?? '', percent: u.percent ?? 0 })
       case 'installing': return t('update.installing', { version: u.latest?.version ?? '' })
-      case 'error': return t('update.failed', { error: u.error ?? '' })
+      case 'error': if (!u.blocked) return t('update.failed', { error: u.error ?? '' })
     }
+    if (u.available && u.blocked) return t('update.blocked', { version: u.latest?.version ?? '', why: u.blocked })
     if (u.available) return t('update.available', { version: u.latest?.version ?? '' })
     if (u.checkedAt) return t('update.upToDate', { when: relativeTime(u.checkedAt) })
     return t('update.notChecked')
@@ -75,13 +76,17 @@
     <p class="muted hint" id="phone-resume-hint">{t('settings.resumeCutOffHint')}</p>
   {/if}
   {#if line}
-    <p class="line" class:err={u?.state === 'error'} role="status">
+    <p class="line" class:err={u?.state === 'error' || (u?.available && !!u.blocked)} role="status">
       {#if busy}<Icon name="loader" spin size={13} />{/if}<span>{line}</span>
     </p>
   {/if}
   <div class="acts">
     <button class="btn small" onclick={() => app.checkForUpdates()} disabled={!u || u.dev || busy}>{t('update.checkNow')}</button>
-    {#if u?.available && !busy}
+    {#if u?.available && !busy && u.blocked}
+      {#if u.latest?.url}
+        <button class="btn primary small" onclick={() => app.backend.openURL(u.latest?.url ?? '')}>{t('update.download')}</button>
+      {/if}
+    {:else if u?.available && !busy}
       <button class="btn primary small" onclick={() => app.installUpdate()}>{t('update.now')}</button>
       {#if u.latest?.url}
         <button class="btn ghost small" onclick={() => app.backend.openURL(u.latest?.url ?? '')}>{t('update.whatsNew')}</button>

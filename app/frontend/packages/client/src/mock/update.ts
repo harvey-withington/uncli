@@ -1,7 +1,8 @@
 // UNCLI's own updates for the browser mock (decision 0025): a release build
 // that's up to date. ?update=available has 0.4.0-alpha out; ?update=failed
 // has it out and a long install error, unbroken runs and all (one seen on a
-// work PC); ?update=dev is a development build. Installing runs through
+// work PC); ?update=blocked has it out where Update now can't work (a
+// PowerShell policy); ?update=dev is a development build. Installing runs through
 // downloading and installing, then stays there, as UNCLI would quit.
 import type { UpdateStatus } from '../types'
 
@@ -17,7 +18,9 @@ export function mockUpdate(emit: (s: UpdateStatus) => void) {
       ? { ...newer }
       : scenario === 'failed'
         ? { ...newer, state: 'error', error: longError }
-        : { current: '0.3.0-alpha', dev: false, state: 'idle', available: false }
+        : scenario === 'blocked'
+          ? { ...newer, blocked: "Group Policy sets Windows PowerShell's execution policy to AllSigned on this PC, so UNCLI's install script can't run" }
+          : { current: '0.3.0-alpha', dev: false, state: 'idle', available: false }
   const set = (next: Partial<UpdateStatus>) => {
     status = { ...status, ...next }
     emit(structuredClone(status))
@@ -31,6 +34,7 @@ export function mockUpdate(emit: (s: UpdateStatus) => void) {
     },
     async installUpdate() {
       if (!status.available) throw new Error("there's no newer release to install")
+      if (status.blocked) throw new Error(`updating from UNCLI doesn't work on this PC: ${status.blocked}`)
       set({ state: 'downloading', percent: 0 })
       for (const p of [35, 70, 100]) {
         await new Promise(r => setTimeout(r, 120))

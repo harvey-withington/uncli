@@ -50,6 +50,23 @@ describe('updates', () => {
     expect(await within(section).findByText(/UNCLI is up to date \(checked/)).toBeInTheDocument()
   })
 
+  it('offer the release page instead of Update now where updating from UNCLI can’t work, saying why', async () => {
+    scenario('blocked')
+    const backend = mockBackend()
+    const install = vi.spyOn(backend, 'installUpdate')
+    const open = vi.spyOn(backend, 'openURL').mockResolvedValue(undefined)
+    render(App, { props: { backend } })
+    expect(await screen.findByText(/UNCLI 0.4.0-alpha is available, but it can't be installed from UNCLI on this PC: Group Policy sets Windows PowerShell's execution policy to AllSigned/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Update now' })).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: 'Download' }))
+    expect(open).toHaveBeenCalledWith('https://github.com/harvey-withington/uncli/releases/tag/v0.4.0-alpha')
+    const section = await openUpdates()
+    expect(within(section).getByText(/can't be installed from UNCLI on this PC/)).toBeInTheDocument()
+    expect(within(section).queryByRole('button', { name: 'Update now' })).toBeNull()
+    expect(within(section).getByRole('button', { name: 'Download' })).toBeInTheDocument()
+    expect(install).not.toHaveBeenCalled()
+  })
+
   it('say a development build is updated another way', async () => {
     scenario('dev')
     render(App, { props: { backend: mockBackend() } })

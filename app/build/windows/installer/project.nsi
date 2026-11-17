@@ -83,6 +83,17 @@ ShowInstDetails show # This will always show the installation details.
 
 Function .onInit
    !insertmacro wails.checkArchitecture
+   # UNCLI installs for the account that runs the installer and never needs
+   # an administrator. Run as administrator, it can install for another
+   # account (the one whose password was typed), and Start UNCLI at the end
+   # starts it with administrator rights, which everything it starts gets
+   # too, and an update's task is then set up as the administrator. So it
+   # asks first; a silent install (an update) goes on.
+   System::Call 'shell32::IsUserAnAdmin() i .r0'
+   ${If} $0 <> 0
+      MessageBox MB_YESNO|MB_ICONEXCLAMATION|MB_DEFBUTTON2 "This installer is running as administrator, which UNCLI doesn't need: it installs just for the account that runs it.$\r$\n$\r$\nRun as administrator, it can install UNCLI for another account (the administrator's), and it starts UNCLI with administrator rights.$\r$\n$\r$\nClose this and double-click the installer instead, without Run as administrator. Install anyway?" /SD IDYES IDYES +2
+      Abort
+   ${EndIf}
 FunctionEnd
 
 # UNCLI keeps running in the tray when its window closes, so a running copy

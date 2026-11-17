@@ -21,9 +21,11 @@ Requires Windows 10 or 11 (x64). Download the installer from
 WebView2 runtime if Windows doesn't have it yet.
 
 UNCLI installs for you alone, in `%LocalAppData%\Programs\UNCLI`, so
-installing and updating never ask for an administrator (decision 0024). If
-an older version is installed for everyone in Program Files, the installer
-offers to remove it, and Windows asks for permission once.
+installing and updating never ask for an administrator (decision 0024).
+Double-click the installer rather than using Run as administrator: that way
+it can install for the administrator's account instead of yours, so it asks
+first. If an older version is installed for everyone in Program Files, the
+installer offers to remove it, and Windows asks for permission once.
 
 UNCLI looks for a newer release by itself and offers to install it: Update
 now downloads it, checks its checksum, then quits, installs and starts UNCLI
@@ -31,6 +33,25 @@ again (decision 0025). Settings → Updates checks on demand, or turns the
 automatic checks off. Builds you make yourself (`npm run build`) don't
 check; test builds from `npm run publish-build` carry the last release's
 version plus `+dev.<build>`, so they're offered the next release.
+
+Update now needs, on this PC:
+
+- UNCLI running as you, not as administrator.
+- Windows PowerShell able to run UNCLI's install script: in full language
+  mode (not Constrained Language, which AppLocker or WDAC can set), with no
+  Group Policy execution policy stricter than RemoteSigned.
+- Windows letting you start a program that outlives UNCLI: a scheduled task
+  of your own, or failing that, a process started through WMI.
+- Windows letting the installer run. It isn't code-signed yet, so Smart App
+  Control, an AppLocker or WDAC policy, or Defender's rule against new
+  programs can block it.
+- GitHub reachable, to check for and download the release.
+
+UNCLI checks the first two when it finds a newer release. If one fails, it
+says why and offers the release page to download the installer instead of
+Update now. The others only show by trying: Update now then says what went
+wrong, and `%LocalAppData%\UNCLI\update\update.log` has each step. Wherever
+Update now doesn't work, installing the new release by hand does the same.
 
 On first run UNCLI downloads its own copy of Claude Code (the version this
 release is tested with, about 240 MB, checked against Anthropic's published

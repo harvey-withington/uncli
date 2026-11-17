@@ -495,6 +495,8 @@ export function mockBackend(opts: { cli?: Partial<CLIStatus>; signInFailed?: boo
         profiles, modifiers, toolbar, models, platform: 'windows', lastNewSession: structuredClone(lastNew),
         preferences: structuredClone(prefs), providers: structuredClone(providers), editors: structuredClone(MOCK_EDITORS),
         sessions: sessions.map(wire),
+        // ?admin: UNCLI running as administrator (AdminNotice).
+        elevated: new URLSearchParams(globalThis.location?.search ?? '').has('admin'),
         capabilities: {
           partialStreaming: true, resume: true, liveModelSwitch: true, interrupt: true, approvals: true,
           images: true, usageReporting: true, thinkingEvents: true, slashPassthrough: true, import: true, sharedTools: true, sharedSkills: true, mcpSignIn: true,
